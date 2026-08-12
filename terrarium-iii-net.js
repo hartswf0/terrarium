@@ -51,16 +51,29 @@
   }
   function cleanRoom(value) { return String(value || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64); }
   function config() {
+    const builtInUrl = document.querySelector('meta[name="terrarium-supabase-url"]')?.content || '';
+    const builtInKey = document.querySelector('meta[name="terrarium-supabase-key"]')?.content || '';
     return {
-      url: (localStorage.getItem(STORE_URL) || '').trim().replace(/\/+$/, ''),
-      key: (localStorage.getItem(STORE_KEY) || '').trim()
+      url: (localStorage.getItem(STORE_URL) || builtInUrl).trim().replace(/\/+$/, ''),
+      key: (localStorage.getItem(STORE_KEY) || builtInKey).trim()
     };
+  }
+  function keyIsSecret(key) {
+    if (/^sb_secret_/i.test(key)) return true;
+    try {
+      const part = String(key).split('.')[1];
+      if (!part) return false;
+      const padded = part.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - part.length % 4) % 4);
+      const payload = JSON.parse(atob(padded));
+      return payload?.role === 'service_role';
+    } catch (_) { return false; }
   }
   function configure(url, key, persist = true) {
     url = String(url || '').trim().replace(/\/+$/, '');
     key = String(key || '').trim();
     if (!/^https?:\/\//i.test(url)) throw new Error('SUPABASE PROJECT URL REQUIRED');
     if (key.length < 20) throw new Error('SUPABASE ANON / PUBLISHABLE KEY REQUIRED');
+    if (keyIsSecret(key)) throw new Error('SECRET / SERVICE-ROLE KEY BLOCKED — COPY THE PUBLISHABLE KEY');
     if (persist) {
       localStorage.setItem(STORE_URL, url);
       localStorage.setItem(STORE_KEY, key);

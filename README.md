@@ -33,11 +33,13 @@ All three are browser-native. `TERRARIUM.html` is the living-ground build. `unse
 
 ## III multiplayer
 
-III removes the Durable Object room relay. Create a Supabase project, copy its Project URL and **publishable** (`sb_publishable_…`) or legacy anon key from the Connect dialog, and save both once under **Signal Desk Setup**. Public Realtime channels must be allowed in the project's Realtime settings.
+III removes the Durable Object room relay. Create a Supabase project, open its **Connect** dialog, copy the browser `.env` block, and paste it once under **One-time host setup**. III extracts the Project URL and **publishable** (`sb_publishable_…`) or legacy anon key and rejects secret/service-role keys. Public Realtime channels must be allowed in the project's Realtime settings.
 
 Hosting then makes a complete scan-and-join link. The URL and public key travel in its fragment so guests need no setup; never use a secret or service-role key. Supabase carries only temporary presence and WebRTC introductions. Motion uses a fast unordered peer channel; land, worlds, builds, chat, and journals use a reliable ordered peer channel. TURN credentials come from the existing stateless credential endpoint when direct traversal needs help.
 
 The trade is visible rather than hidden: III has no always-on server copy, no seamless host migration, and no room after the host leaves. Save or export anything that must outlive the live vessel.
+
+For a zero-step public deployment, the same two browser-public values can be placed in the `terrarium-supabase-url` and `terrarium-supabase-key` meta tags in `unset-04-hartsoe-iii.html`. Do not put a secret or service-role key there.
 
 ## The model: weather, trace, deed
 

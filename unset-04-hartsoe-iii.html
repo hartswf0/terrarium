@@ -8,6 +8,9 @@
 <meta name="theme-color" content="#000000">
 <meta name="thunder-worker-url" content="https://thunder-rigs-relay.hartswf0.workers.dev">
 <meta name="thunder-ai-url" content="">
+<!-- Optional zero-setup deployment defaults. Only browser-public Supabase values belong here. -->
+<meta name="terrarium-supabase-url" content="">
+<meta name="terrarium-supabase-key" content="">
 <meta name="thunder-tier" content="iii">
 <meta name="thunder-public-url" content="https://hartswf0.github.io/terrarium/unset-04-hartsoe-iii.html">
 <title>TERRARIUM III · a live vessel between browsers</title>
@@ -1516,15 +1519,24 @@ body.watcher-role #crosshair{display:none!important}
 
     <button class="mini-btn" id="btn-mp-garage" style="border-color:#a855f7; color:#a855f7; height:30px; margin-bottom:0;">GARAGE / EDIT MY RIG</button>
     <details id="iii-signal-setup" style="border:1px solid #333;background:#080808;padding:8px;text-align:left;">
-        <summary style="cursor:pointer;color:#aaa;font-size:9px;letter-spacing:.14em;">SIGNAL DESK SETUP</summary>
+        <summary id="iii-signal-summary" style="cursor:pointer;color:#aaa;font-size:9px;letter-spacing:.14em;">ONE-TIME HOST SETUP</summary>
         <form id="iii-signal-form" onsubmit="return false" style="display:grid;gap:7px;margin-top:9px;">
-            <input id="iii-supabase-url" type="url" autocomplete="url" spellcheck="false" placeholder="SUPABASE PROJECT URL" style="width:100%;background:#111;color:#fff;border:1px solid #444;padding:9px;font:10px inherit;user-select:text;">
-            <input id="iii-supabase-key" type="password" autocomplete="off" spellcheck="false" placeholder="ANON / PUBLISHABLE KEY" style="width:100%;background:#111;color:#fff;border:1px solid #444;padding:9px;font:10px inherit;user-select:text;">
-            <div style="display:flex;gap:7px;">
-                <button class="mini-btn" id="btn-iii-signal-save" type="button" style="flex:1;border-color:#19e6c8;color:#19e6c8;height:28px;">SAVE SIGNAL</button>
-                <button class="mini-btn" id="btn-iii-signal-clear" type="button" style="border-color:#666;color:#aaa;height:28px;">CLEAR</button>
-            </div>
-            <div style="font-size:8px;color:#777;line-height:1.45;">Use only a public anon/publishable key—never a secret/service key. It rides inside the invite fragment so guests need no setup. Realtime introduces browsers only; the host holds the live vessel.</div>
+            <a href="https://supabase.com/dashboard/new" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;height:34px;border:1px solid #19e6c8;color:#19e6c8;text-decoration:none;font-size:9px;font-weight:700;letter-spacing:.1em;">1 · CREATE FREE SIGNAL DESK ↗</a>
+            <div style="font-size:8px;color:#aaa;line-height:1.45;">2 · In the project, open <b style="color:#fff">CONNECT</b> and copy the browser <b style="color:#fff">.env</b> block.</div>
+            <textarea id="iii-signal-paste" autocomplete="off" spellcheck="false" placeholder="3 · PASTE THE .ENV BLOCK HERE" style="width:100%;height:58px;resize:none;background:#111;color:#fff;border:1px solid #444;padding:9px;font:9px/1.45 inherit;user-select:text;"></textarea>
+            <button class="mini-btn" id="btn-iii-paste-save" type="button" style="border-color:#19e6c8;background:#19e6c8;color:#000;height:34px;">USE THIS SETUP</button>
+            <details style="border-top:1px solid #222;padding-top:6px;">
+                <summary style="cursor:pointer;color:#666;font-size:8px;letter-spacing:.1em;">ENTER TWO VALUES MANUALLY</summary>
+                <div style="display:grid;gap:7px;margin-top:7px;">
+                    <input id="iii-supabase-url" type="url" autocomplete="url" spellcheck="false" placeholder="PROJECT URL" style="width:100%;background:#111;color:#fff;border:1px solid #444;padding:9px;font:10px inherit;user-select:text;">
+                    <input id="iii-supabase-key" type="password" autocomplete="off" spellcheck="false" placeholder="PUBLISHABLE KEY" style="width:100%;background:#111;color:#fff;border:1px solid #444;padding:9px;font:10px inherit;user-select:text;">
+                    <div style="display:flex;gap:7px;">
+                        <button class="mini-btn" id="btn-iii-signal-save" type="button" style="flex:1;border-color:#19e6c8;color:#19e6c8;height:28px;">SAVE</button>
+                        <button class="mini-btn" id="btn-iii-signal-clear" type="button" style="border-color:#666;color:#aaa;height:28px;">CLEAR</button>
+                    </div>
+                </div>
+            </details>
+            <div style="font-size:8px;color:#777;line-height:1.45;">Publishable keys are browser-public. III blocks secret/service-role keys. Guests joining your QR need no setup.</div>
         </form>
     </details>
     <input type="text" id="mp-room-input" placeholder="ROOM CODE OR INVITE LINK" maxlength="256">
@@ -7880,6 +7892,21 @@ function iiiSignalValues() {
         key: (document.getElementById('iii-supabase-key')?.value || saved.key || '').trim()
     };
 }
+function iiiParseSignalPaste(raw) {
+    const text = String(raw || '').trim();
+    if (!text) throw new Error('PASTE THE CONNECT .ENV BLOCK');
+    if (/\bsb_secret_[A-Za-z0-9_-]+/i.test(text)
+        || /(?:SERVICE_ROLE|SECRET_KEY)[A-Z0-9_]*\s*=\s*["']?\S{20,}/i.test(text)) {
+        throw new Error('SECRET KEY FOUND — DELETE IT AND COPY ONLY THE PUBLISHABLE BLOCK');
+    }
+    const url = text.match(/https:\/\/[A-Za-z0-9-]+\.supabase\.co\b/i)?.[0]
+        || text.match(/(?:SUPABASE_URL|PROJECT_URL)[A-Z0-9_]*\s*=\s*["']?(https?:\/\/[^\s"']+)/i)?.[1];
+    const key = text.match(/\bsb_publishable_[A-Za-z0-9_-]+\b/i)?.[0]
+        || text.match(/(?:ANON|PUBLISHABLE)[A-Z0-9_]*\s*=\s*["']?([^\s"']{20,})/i)?.[1];
+    if (!url) throw new Error('PROJECT URL NOT FOUND IN THAT PASTE');
+    if (!key) throw new Error('PUBLISHABLE KEY NOT FOUND IN THAT PASTE');
+    return { url, key };
+}
 function iiiPaintRoster(peers) {
     const oldIds = new Set(Object.keys(remotePeers));
     remotePeers = {};
@@ -7932,7 +7959,10 @@ async function joinRoomIII(host, rid) {
     const cfg = iiiSignalValues();
     if (!cfg.url || !cfg.key) {
         document.getElementById('iii-signal-setup')?.setAttribute('open', '');
-        throw new Error('OPEN SIGNAL DESK SETUP FIRST');
+        setRoomStatus('ONE-TIME HOST SETUP · PASTE THE CONNECT BLOCK', '#ffd23f');
+        notify('PASTE SUPABASE CONNECT BLOCK ONCE');
+        setTimeout(() => document.getElementById('iii-signal-paste')?.focus(), 50);
+        return false;
     }
     setRoomStatus('OPENING SIGNAL DESK…', '#ffd23f');
     const join = await window.III_NET.join({
@@ -12157,26 +12187,45 @@ document.getElementById('btn-mp-close').addEventListener('click', () => { docume
 
 // III keeps one small, reusable introduction credential in this browser. It is
 // the public Supabase anon/publishable key, never a service-role key.
+function iiiShowSignalReady(ready) {
+    const summary = document.getElementById('iii-signal-summary');
+    if (!summary) return;
+    summary.textContent = ready ? 'SIGNAL READY ✓' : 'ONE-TIME HOST SETUP';
+    summary.style.color = ready ? '#00ff88' : '#aaa';
+}
+function iiiSaveSignalConfig(cfg) {
+    window.III_NET.configure(cfg.url, cfg.key, true);
+    document.getElementById('iii-supabase-url').value = cfg.url;
+    document.getElementById('iii-supabase-key').value = cfg.key;
+    document.getElementById('iii-signal-paste').value = '';
+    document.getElementById('iii-signal-setup')?.removeAttribute('open');
+    iiiShowSignalReady(true);
+    setRoomStatus('SIGNAL READY · HOST WHEN YOU ARE', '#00ff88');
+    notify('ONE-TIME SETUP SAVED');
+}
 window.addEventListener('DOMContentLoaded', () => {
     const cfg = window.III_NET?.config?.() || {};
     const url = document.getElementById('iii-supabase-url');
     const key = document.getElementById('iii-supabase-key');
     if (url) url.value = cfg.url || '';
     if (key) key.value = cfg.key || '';
+    iiiShowSignalReady(!!(cfg.url && cfg.key));
+});
+document.getElementById('btn-iii-paste-save')?.addEventListener('click', () => {
+    try { iiiSaveSignalConfig(iiiParseSignalPaste(document.getElementById('iii-signal-paste').value)); }
+    catch (err) { setRoomStatus(err.message || String(err), '#ff2e2e'); notify('CHECK THE PASTED CONNECT BLOCK'); }
 });
 document.getElementById('btn-iii-signal-save')?.addEventListener('click', () => {
     try {
-        const cfg = iiiSignalValues();
-        window.III_NET.configure(cfg.url, cfg.key, true);
-        document.getElementById('iii-signal-setup')?.removeAttribute('open');
-        setRoomStatus('SIGNAL DESK READY · WORLD TRAFFIC STAYS P2P', '#00ff88');
-        notify('SIGNAL DESK SAVED');
+        iiiSaveSignalConfig(iiiSignalValues());
     } catch (err) { setRoomStatus(err.message || String(err), '#ff2e2e'); }
 });
 document.getElementById('btn-iii-signal-clear')?.addEventListener('click', () => {
     window.III_NET?.clearConfig?.();
     document.getElementById('iii-supabase-url').value = '';
     document.getElementById('iii-supabase-key').value = '';
+    document.getElementById('iii-signal-paste').value = '';
+    iiiShowSignalReady(false);
     setRoomStatus('SIGNAL DESK CLEARED', '#aaa');
 });
 
