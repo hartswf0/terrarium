@@ -7761,14 +7761,62 @@ function pushFortsToNewPeers() {
     if (currentRole !== 'host' || !currentRoom || !currentPeerId) return;
     Object.keys(knownForts).forEach(id => { const f = knownForts[id]; if (f && f.code) roomSend({ type: 'fort', id, code: f.code, anchor: f.anchor, t: Date.now() }); });
 }
-// ── SHARED CITY — the real map travels as its COORDINATES ────────────────────
+// ── SHARED LAND — the terrain travels as a reproducible address ───────────────
+// A TERRA tile is far too large for the room relay (heightfield + 1024px image),
+// but it is deterministic from {lat, lon, halfM}. Share that small recipe and
+// let every peer fetch, cache and mount the same land in its own browser.
+let applyingRemoteLand = false, lastLandKey = '', lastLandSpec = null;
+function landSyncSpec(lat, lon, halfM, name, withCity) {
+    lat = +lat; lon = +lon; halfM = Math.max(20, Math.min(20000, +(halfM || 147)));
+    if (!isFinite(lat) || !isFinite(lon) || !isFinite(halfM)) return null;
+    return { lat, lon, halfM, withCity: withCity === undefined ? halfM === 147 : !!withCity,
+        name: String(name || 'TERRA').slice(0, 60) };
+}
+function broadcastLand(lat, lon, halfM, name, withCity) {
+    if (applyingRemoteLand) return;
+    const spec = landSyncSpec(lat, lon, halfM, name, withCity); if (!spec) return;
+    lastLandSpec = spec;
+    lastLandKey = spec.lat.toFixed(5) + ',' + spec.lon.toFixed(5) + '@' + Math.round(spec.halfM) + (spec.withCity ? ':city' : ':bare');
+    // The host owns the room's ground. A guest can inspect another tile locally,
+    // but its startup/default land must never replace everybody else's world.
+    if (currentRoom && currentRole !== 'host') return;
+    if (!currentRoom || !currentPeerId) return;
+    roomSend({ type: 'land', ...spec, t: Date.now() });
+    if (window.__SYNC_TRACE) __syncLog('⇄ LAND SENT → ' + currentRoom + ' (' + lastLandKey + ')', '#19e6c8');
+}
+window.__broadcastLand = broadcastLand;
+function applyRemoteLand(msg) {
+    const spec = landSyncSpec(msg && msg.lat, msg && msg.lon, msg && msg.halfM, msg && msg.name, msg && msg.withCity);
+    if (!spec) return;
+    const key = spec.lat.toFixed(5) + ',' + spec.lon.toFixed(5) + '@' + Math.round(spec.halfM) + (spec.withCity ? ':city' : ':bare');
+    if (key === lastLandKey && window.HARTSOE_GROUND && window.HARTSOE_GROUND.on) return;
+    if (typeof window.__applySharedLand !== 'function') {
+        window.__pendingSharedLand = msg;
+        return;
+    }
+    lastLandKey = key; lastLandSpec = spec;
+    applyingRemoteLand = true;
+    notify('A PEER SHARED LAND — ' + spec.name.toUpperCase().slice(0, 28));
+    Promise.resolve(window.__applySharedLand(spec.lat, spec.lon, spec.withCity ? 0 : spec.halfM))
+        .then(() => { if (window.__SYNC_TRACE) __syncLog('✓ LAND MOUNTED (' + key + ')', '#00ff88'); })
+        .catch((e) => __syncLog('✗ LAND FAILED: ' + String(e && e.message || e), '#ff4444'))
+        .finally(() => { applyingRemoteLand = false; });
+}
+function pushLandToNewPeers() {
+    if (currentRole !== 'host' || !currentRoom || !currentPeerId || applyingRemoteLand || !lastLandSpec) return false;
+    roomSend({ type: 'land', ...lastLandSpec, t: Date.now() });
+    if (window.__SYNC_TRACE) __syncLog('↻ land re-sent to new peer', '#888');
+    return true;
+}
+// ── SHARED CITY — the real map travels as its COORDINATES ───────────────────
 // OSM data is deterministic per lat/lon, so the city syncs like a world: send
 // {lat, lon, name}, every peer fetches and builds the identical district. The
 // invite QR carries the same pair (#geo=lat,lon), so scanning the code lands a
 // player in the same real place even before the room relay says a word.
 let applyingRemoteGeo = false, lastGeoKey = '';
 function broadcastGeo(lat, lon, name) {
-    if (applyingRemoteGeo) return;                       // echo guard
+    // LAND already carries this coordinate when GEO is the tile's overlay.
+    if (applyingRemoteGeo || applyingRemoteLand || window.__terraSyncLoadingGeo) return;
     lastGeoKey = (+lat).toFixed(4) + ',' + (+lon).toFixed(4);
     if (!currentRoom || !currentPeerId) return;
     roomSend({ type: 'geo', lat: +lat, lon: +lon, name: String(name || '').slice(0, 60), t: Date.now() });
@@ -7895,7 +7943,12 @@ function pollRoom() {
                 const prev = window.__prevPeerIds || new Set();
                 let fresh = false; nowIds.forEach(id => { if (id !== currentPeerId && !prev.has(id)) fresh = true; });
                 window.__prevPeerIds = nowIds;
-                if (fresh) { if (typeof pushWorldToNewPeers === 'function') pushWorldToNewPeers(); if (typeof pushFortsToNewPeers === 'function') pushFortsToNewPeers(); if (typeof pushGeoToNewPeers === 'function') pushGeoToNewPeers(); }
+                if (fresh) {
+                    if (typeof pushWorldToNewPeers === 'function') pushWorldToNewPeers();
+                    if (typeof pushFortsToNewPeers === 'function') pushFortsToNewPeers();
+                    const sentLand = typeof pushLandToNewPeers === 'function' && pushLandToNewPeers();
+                    if (!sentLand && typeof pushGeoToNewPeers === 'function') pushGeoToNewPeers();
+                }
             } catch(_){}
             const selfPeer = (data.peers || []).find(p => p.id === currentPeerId);
             if (selfPeer?.role && selfPeer.role !== currentRole) { currentRole = selfPeer.role; renderBotList(true); }
@@ -7939,6 +7992,7 @@ function handleRoomMessage(entry) {
     if (msg.type === 'snapshot') return fetchRoomSnapshot(msg.version);
     if (msg.type === 'world') return applyRemoteWorld(msg);   // shared world, regenerated from its code
     if (msg.type === 'fort') return applyRemoteFort(msg);     // shared fort (accumulates), regenerated from its code
+    if (msg.type === 'land') return applyRemoteLand(msg);     // shared TERRA tile, refetched from its address
     if (msg.type === 'geo') return applyRemoteGeo(msg);       // shared real city, refetched from its coordinates
     if (msg.type === 'edit') return applyArenaOps(entry.from, msg);
     if (msg.type === 'arena-req') { if (currentRole === 'host' && entry.from !== currentPeerId) sendArenaFull(); return; }
@@ -20948,6 +21002,7 @@ resetDrive(); requestAnimationFrame(frame);
   const LAND_FMT = 'unsettled.landpack/v1';
   const LAND_CACHE_KEY = 'atlas.landcache.v1';
   let curLand = null;               // whatever is mounted, as a serializable pack
+  let landLoadVersion = 0;          // latest request wins when tile fetches overlap
   function packHeights(H, relief) {
     let bin = '';
     for (let i = 0; i < H.length; i += 2) {
@@ -21163,6 +21218,7 @@ resetDrive(); requestAnimationFrame(frame);
     // city, so the car is a car and a street is a street. Bigger windows are a
     // deliberate choice ("@620") and read as terrain, not as a drivable town.
     halfM = halfM || 147;
+    const loadVersion = ++landLoadVersion;
     try {
       // a land you have stood on is a land you own: mount the cached pack, no network
       const cached = landCacheGet(landKey(lat, lon, halfM));
@@ -21212,6 +21268,7 @@ resetDrive(); requestAnimationFrame(frame);
           .then(((ii, jj) => (im) => cq.drawImage(im, (ii - ix0) * 256, (jj - iy0) * 256))(i, j)).catch(() => {}));
       }
       await Promise.all(ijobs);
+      if (loadVersion !== landLoadVersion) return 'ground superseded';
       const px0 = (t2.x(lon - halfM / mLon, iz) - ix0) * 256, px1 = (t2.x(lon + halfM / mLon, iz) - ix0) * 256;
       const py0 = (t2.y(lat + halfM / mLat, iz) - iy0) * 256, py1 = (t2.y(lat - halfM / mLat, iz) - iy0) * 256;
       const oc = document.createElement('canvas'); oc.width = 1024; oc.height = 1024;
@@ -21227,6 +21284,7 @@ resetDrive(); requestAnimationFrame(frame);
         relief = Math.max(relief, 0.001);
         curLand = { format: LAND_FMT, name: 'TERRA ' + lat.toFixed(4) + ',' + lon.toFixed(4),
           lat: +lat.toFixed(5), lon: +lon.toFixed(5), scale: +S.toFixed(3),
+          halfM: +halfM,
           w: WU, h: WU, nx: N, nz: N, relief: +relief.toFixed(3),
           zminM: Math.round(zmin * S), reliefM: +(relief * S).toFixed(1),
           hf: packHeights(H, relief), tex: oc.toDataURL('image/jpeg', 0.82),
@@ -21239,6 +21297,7 @@ resetDrive(); requestAnimationFrame(frame);
       // They collide, they laser, and they ride the pack for offline remounts.
       try {
         const blds = await fetchStructures(lat, lon, halfM, S);
+        if (loadVersion !== landLoadVersion) return 'ground superseded';
         const nB = raiseStructures(blds);
         if (curLand) { curLand.bld = blds; landCachePut(landKey(lat, lon, halfM), curLand); }
         if (nB) { try { notify('TERRA — ' + nB + ' STRUCTURES RAISED ON THE LAND'); } catch (_) {} }
@@ -21273,10 +21332,20 @@ resetDrive(); requestAnimationFrame(frame);
     let res;
     try { res = await loadTerraAt(lat, lon, hm || undefined); }
     catch (e) { suppressBld = false; throw e; }
-    if (!hm && window.GEO && window.GEO.load && window.HARTSOE_GROUND && window.HARTSOE_GROUND.on) {
+    if (/superseded/.test(String(res))) { suppressBld = false; return res; }
+    const landReady = !!(window.HARTSOE_GROUND && window.HARTSOE_GROUND.on && curLand
+      && Math.abs((+curLand.lat) - lat) < 0.0001 && Math.abs((+curLand.lon) - lon) < 0.0001);
+    // Share the recipe, not the heightfield/image payload. This also registers
+    // solo land so the host can replay it when someone joins later.
+    try { if (landReady && window.__broadcastLand) window.__broadcastLand(lat, lon, hm || 147, curLand.name, !hm); } catch (_) {}
+    if (!hm && landReady && window.GEO && window.GEO.load) {
       try {
         try { notify('RAISING THE STANDARD CITY ON THE REAL GROUND…'); } catch (_) {}
-        await Promise.resolve(window.GEO.load(lat.toFixed(5) + ',' + lon.toFixed(5)));
+        // GEO is part of this LAND build; do not announce a second flat-city
+        // event while peers are fetching and mounting the terrain.
+        window.__terraSyncLoadingGeo = true;
+        try { await Promise.resolve(window.GEO.load(lat.toFixed(5) + ',' + lon.toFixed(5))); }
+        finally { window.__terraSyncLoadingGeo = false; }
       } catch (_) {}
     }
     suppressBld = false;
@@ -21286,6 +21355,11 @@ resetDrive(); requestAnimationFrame(frame);
     }
     try { if (henryCovered()) raiseHenrySite(); } catch (_) {}   // standing on the deed's land → the site appears
     return res;
+  }
+  window.__applySharedLand = terraCombine;
+  if (window.__pendingSharedLand) {
+    const pendingLand = window.__pendingSharedLand; window.__pendingSharedLand = null;
+    setTimeout(() => { try { applyRemoteLand(pendingLand); } catch (_) {} }, 0);
   }
   async function terraGo(q) {
     q = String(q == null ? '' : q).trim();
@@ -21711,6 +21785,7 @@ resetDrive(); requestAnimationFrame(frame);
   // (cached after the first visit — instant, offline). The green deed cartridge
   // stays one tap away in the ⛰ menu; it is the fallback if the sky is closed.
   setTimeout(() => {
+    if (currentRoom && currentRole !== 'host') return;   // the host will replay its authoritative tile
     Promise.resolve(terraGo(HENRY.view.lat + ', ' + HENRY.view.lon + ' @' + HENRY.view.halfM))
       .then((r) => { if (!/loaded/.test(String(r))) loadHartsoe(); })
       .catch(() => { try { loadHartsoe(); } catch (_) {} });
