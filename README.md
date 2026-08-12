@@ -15,17 +15,29 @@ TERRARIUM is the project that emerges where those systems meet.
 
 ## Enter
 
-The [project landing page](https://hartswf0.github.io/terrarium/) presents two complementary builds:
+The [project landing page](https://hartswf0.github.io/terrarium/) opens onto three complementary builds:
 
 ### [Terrarium](https://hartswf0.github.io/terrarium/TERRARIUM.html)
 
 The living-ground build. Import a real place; read its terrain, buildings, parcels, and water; talk to what is there; make accountable changes; and keep alternative futures as branches.
 
-### [Unsettled Atlas × Thunder Rigs — Unset 04](https://hartswf0.github.io/terrarium/unset-04-hartsoe-jr.html)
+### [TERRARIUM III — Live Vessel](https://hartswf0.github.io/terrarium/unset-04-hartsoe-iii.html)
+
+The browser-to-browser build. Supabase Realtime introduces players, then leaves the world alone: bodies, land, builds, chat, journals, and games move directly between browsers over WebRTC. The host holds the live world and replays its terrain and field to each new arrival. When the host leaves, the vessel closes.
+
+### [Unsettled Atlas × Thunder Rigs — JR](https://hartswf0.github.io/terrarium/unset-04-hartsoe-jr.html)
 
 The inhabited-world build. Make a rig, enter a synthetic world, drive, build, play, leave sediment, raise normalization pressure, and unsettle what began as given.
 
-Both are browser-native. `TERRARIUM.html` is a self-contained build; `unset-04-hartsoe-jr.html` is a self-contained playable world.
+All three are browser-native. `TERRARIUM.html` is the living-ground build. `unset-04-hartsoe-iii.html` is the direct, host-held multiplayer world. `unset-04-hartsoe-jr.html` preserves the relay-era playable world.
+
+## III multiplayer
+
+III removes the Durable Object room relay. Create a Supabase project, copy its Project URL and **publishable** (`sb_publishable_…`) or legacy anon key from the Connect dialog, and save both once under **Signal Desk Setup**. Public Realtime channels must be allowed in the project's Realtime settings.
+
+Hosting then makes a complete scan-and-join link. The URL and public key travel in its fragment so guests need no setup; never use a secret or service-role key. Supabase carries only temporary presence and WebRTC introductions. Motion uses a fast unordered peer channel; land, worlds, builds, chat, and journals use a reliable ordered peer channel. TURN credentials come from the existing stateless credential endpoint when direct traversal needs help.
+
+The trade is visible rather than hidden: III has no always-on server copy, no seamless host migration, and no room after the host leaves. Save or export anything that must outlive the live vessel.
 
 ## The model: weather, trace, deed
 
@@ -57,9 +69,10 @@ An API key is optional. The deterministic world, tools, simulation, driving, bra
 python3 serve.py
 ```
 
-Open <http://localhost:8000> for the landing page. The two builds are available at:
+Open <http://localhost:8000> for the landing page. The three builds are available at:
 
 - <http://localhost:8000/TERRARIUM.html>
+- <http://localhost:8000/unset-04-hartsoe-iii.html>
 - <http://localhost:8000/unset-04-hartsoe-jr.html>
 
 ## Test
@@ -73,7 +86,9 @@ node tests/audit-geometry.mjs
 
 - `index.html` — sendable project landing page
 - `TERRARIUM.html` — self-contained Terrarium build
-- `unset-04-hartsoe-jr.html` — self-contained Unsettled Atlas × Thunder Rigs build
+- `unset-04-hartsoe-iii.html` — host-authoritative WebRTC build; Supabase Realtime is signaling only
+- `terrarium-iii-net.js` — III peer topology, signaling, reliable world stream, and fast motion stream
+- `unset-04-hartsoe-jr.html` — preserved Durable Object relay build
 - `src/` — modular Terrarium source
 - `places/` — included place records
 - `tests/` — geometry, world, persistence, and professional-use tests
