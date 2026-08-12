@@ -2,175 +2,316 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<meta name="description" content="Terrarium combines Unsettled Atlas with MOTOR: accountable ground, drivable bodies, and traces that can unsettle the standing world.">
-<title>TERRARIUM — Unsettled Atlas × MOTOR</title>
-<link rel="stylesheet" href="app.css">
+<meta name="theme-color" content="#08110f">
+<meta name="description" content="Terrarium is a small world held close enough to watch itself become alive: accountable ground, drivable bodies, and histories that remain open to change.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="TERRARIUM">
+<meta property="og:description" content="A small world held close enough to watch itself become alive.">
+<meta property="og:url" content="https://hartswf0.github.io/terrarium/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="TERRARIUM">
+<meta name="twitter:description" content="A small world held close enough to watch itself become alive.">
+<link rel="canonical" href="https://hartswf0.github.io/terrarium/">
+<title>TERRARIUM — a small world held close</title>
+<style>
+:root {
+  --night: #08110f;
+  --deep: #0c1714;
+  --moss: #14251f;
+  --glass: rgba(19, 38, 32, .72);
+  --line: rgba(195, 232, 208, .19);
+  --ink: #edf4ef;
+  --soft: #afc2b6;
+  --dim: #788d81;
+  --mint: #71e3b2;
+  --sun: #e5c675;
+  --ember: #ef7967;
+  --radius: 22px;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; background: var(--night); }
+body {
+  margin: 0;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background:
+    radial-gradient(circle at 80% 8%, rgba(68, 135, 100, .17), transparent 30rem),
+    radial-gradient(circle at 4% 38%, rgba(229, 198, 117, .07), transparent 28rem),
+    linear-gradient(180deg, #07100e 0%, #0b1713 48%, #07100e 100%);
+  color: var(--ink);
+  font: 16px/1.65 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: .28;
+  background-image: radial-gradient(rgba(215, 239, 221, .35) .6px, transparent .7px);
+  background-size: 17px 17px;
+  mask-image: linear-gradient(to bottom, black, transparent 70%);
+}
+
+a { color: inherit; }
+a:focus-visible { outline: 2px solid var(--mint); outline-offset: 5px; }
+.skip { position: fixed; left: 16px; top: -60px; z-index: 30; padding: 10px 14px; background: var(--ink); color: var(--night); }
+.skip:focus { top: 16px; }
+.wrap { width: min(1160px, calc(100% - 40px)); margin: 0 auto; }
+
+nav {
+  min-height: 78px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+}
+.wordmark { font: 800 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .28em; text-decoration: none; }
+.navlinks { display: flex; align-items: center; gap: 22px; }
+.navlinks a { color: var(--soft); font-size: 12px; letter-spacing: .06em; text-decoration: none; }
+.navlinks a:hover { color: var(--mint); }
+
+.hero {
+  min-height: 670px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(300px, .75fr);
+  align-items: center;
+  gap: clamp(40px, 7vw, 100px);
+  padding: 86px 0 92px;
+}
+.eyebrow { margin: 0 0 24px; color: var(--mint); font: 700 11px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .22em; text-transform: uppercase; }
+h1 { max-width: 850px; margin: 0; font: 400 clamp(52px, 8.4vw, 112px)/.91 Georgia, "Times New Roman", serif; letter-spacing: -.055em; }
+.dek { max-width: 690px; margin: 32px 0 0; color: var(--soft); font-size: clamp(17px, 2vw, 21px); line-height: 1.55; }
+.dek strong { color: var(--ink); font-weight: 650; }
+
+.world-mark { position: relative; aspect-ratio: 1; width: min(370px, 100%); margin: auto; display: grid; place-items: center; }
+.world-mark::before, .world-mark::after { content: ""; position: absolute; border: 1px solid rgba(113, 227, 178, .2); border-radius: 50%; }
+.world-mark::before { inset: 3%; animation: turn 24s linear infinite; border-left-color: var(--mint); }
+.world-mark::after { inset: 17%; animation: turn 16s linear infinite reverse; border-top-color: var(--sun); }
+.world {
+  position: relative;
+  width: 56%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid rgba(215, 248, 226, .24);
+  background:
+    radial-gradient(circle at 38% 31%, rgba(231, 245, 213, .82) 0 1%, transparent 2%),
+    radial-gradient(circle at 53% 46%, #467f60 0 5%, transparent 6%),
+    radial-gradient(circle at 48% 40%, #274b3b 0 17%, transparent 18%),
+    radial-gradient(circle at 59% 57%, #1b352c 0 29%, #10231d 58%, #08110f 79%);
+  box-shadow: 0 0 70px rgba(96, 205, 153, .16), inset -30px -34px 45px rgba(0, 0, 0, .6);
+}
+.world::after { content: ""; position: absolute; inset: 0; background: repeating-radial-gradient(ellipse at 46% 42%, transparent 0 9px, rgba(157, 219, 181, .08) 10px 11px); transform: rotate(-24deg) scale(1.3); }
+.specimen { position: absolute; padding: 7px 10px; border: 1px solid var(--line); background: rgba(8, 17, 15, .8); color: var(--dim); font: 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .14em; text-transform: uppercase; }
+.specimen.one { left: 0; top: 25%; }
+.specimen.two { right: 0; bottom: 22%; }
+
+.section { padding: 95px 0; border-top: 1px solid var(--line); }
+.section-head { display: grid; grid-template-columns: minmax(0, .72fr) minmax(300px, 1.28fr); gap: 50px; margin-bottom: 50px; }
+.kicker { margin: 5px 0 0; color: var(--mint); font: 700 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .2em; text-transform: uppercase; }
+h2 { margin: 0; font: 400 clamp(35px, 5vw, 62px)/1 Georgia, "Times New Roman", serif; letter-spacing: -.035em; }
+.section-copy { margin: 4px 0 0; color: var(--soft); font-size: 18px; }
+
+.doors { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.door {
+  min-height: 500px;
+  display: flex;
+  flex-direction: column;
+  padding: clamp(26px, 4vw, 42px);
+  overflow: hidden;
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: linear-gradient(150deg, rgba(32, 62, 50, .74), rgba(8, 17, 15, .9));
+  text-decoration: none;
+  transition: transform .25s ease, border-color .25s ease, background .25s ease;
+}
+.door:nth-child(2) { background: linear-gradient(150deg, rgba(52, 40, 32, .62), rgba(8, 17, 15, .92)); }
+.door:hover { transform: translateY(-6px); border-color: rgba(113, 227, 178, .62); }
+.door::after { content: "↗"; position: absolute; right: 28px; top: 25px; color: var(--mint); font-size: 22px; }
+.door:nth-child(2)::after { color: var(--sun); }
+.door-no { color: var(--dim); font: 700 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .18em; }
+.door h3 { max-width: 420px; margin: auto 0 18px; font: 400 clamp(36px, 5vw, 60px)/.98 Georgia, "Times New Roman", serif; letter-spacing: -.04em; }
+.door p { max-width: 480px; margin: 0; color: var(--soft); }
+.door-tags { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 28px; }
+.door-tags span { padding: 6px 9px; border: 1px solid var(--line); border-radius: 999px; color: var(--dim); font: 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; text-transform: uppercase; }
+.door-cta { margin-top: 28px; color: var(--mint); font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .12em; text-transform: uppercase; }
+.door:nth-child(2) .door-cta { color: var(--sun); }
+
+.principle { max-width: 900px; margin: 0 auto; text-align: center; }
+.principle blockquote { margin: 0; font: 400 clamp(32px, 5.2vw, 65px)/1.12 Georgia, "Times New Roman", serif; letter-spacing: -.04em; }
+.principle p { max-width: 680px; margin: 30px auto 0; color: var(--soft); font-size: 18px; }
+
+.lineage { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+.ancestor { min-height: 245px; padding: 32px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-decoration: none; }
+.ancestor:hover { background: rgba(113, 227, 178, .045); }
+.ancestor small { color: var(--dim); font: 700 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .17em; text-transform: uppercase; }
+.ancestor h3 { margin: 44px 0 12px; font: 400 30px/1.05 Georgia, "Times New Roman", serif; }
+.ancestor p { max-width: 480px; margin: 0; color: var(--soft); font-size: 14px; }
+.ancestor .out { display: inline-block; margin-top: 20px; color: var(--mint); font: 700 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .12em; text-transform: uppercase; }
+
+.states { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.state { padding: 30px; border-top: 1px solid var(--line); }
+.state b { color: var(--mint); font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .17em; text-transform: uppercase; }
+.state h3 { margin: 22px 0 10px; font: 400 27px/1.1 Georgia, "Times New Roman", serif; }
+.state p { margin: 0; color: var(--soft); font-size: 14px; }
+
+footer { padding: 42px 0 70px; border-top: 1px solid var(--line); }
+.footer-grid { display: flex; justify-content: space-between; gap: 30px; align-items: flex-end; }
+.footer-mark { font: 400 28px/1 Georgia, "Times New Roman", serif; }
+.footer-copy { margin-top: 10px; color: var(--dim); font-size: 12px; }
+.footer-links { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 18px; }
+.footer-links a { color: var(--soft); font-size: 12px; text-decoration: none; }
+.footer-links a:hover { color: var(--mint); }
+
+@keyframes turn { to { transform: rotate(360deg); } }
+@media (max-width: 780px) {
+  .wrap { width: min(100% - 28px, 1160px); }
+  .navlinks a:not(:last-child) { display: none; }
+  .hero { min-height: auto; grid-template-columns: 1fr; padding: 72px 0; }
+  .world-mark { width: min(310px, 84vw); }
+  .section { padding: 72px 0; }
+  .section-head { grid-template-columns: 1fr; gap: 22px; }
+  .doors, .lineage, .states { grid-template-columns: 1fr; }
+  .door { min-height: 430px; }
+  .footer-grid { align-items: flex-start; flex-direction: column; }
+  .footer-links { justify-content: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .world-mark::before, .world-mark::after { animation: none; }
+  .door { transition: none; }
+}
+</style>
 </head>
 <body>
-<canvas id="world" aria-label="The place. Drag to look around, tap to select."></canvas>
+<a class="skip" href="#main">Skip to the project</a>
 
-<!-- Everything below is chrome. It appears only when it has something to say. -->
-<header id="top">
-  <button id="placeChip" class="chip" aria-haspopup="listbox">
-    <span id="placeName">Baba Dogo</span><span class="caret">▾</span>
-  </button>
-  <button id="whereAmI" class="chip where" title="Tap to copy this position">
-    <svg id="compassRose" viewBox="-12 -12 24 24" width="15" height="15" aria-hidden="true">
-      <polygon points="0,-9 -2.4,-2 2.4,-2" fill="#e86a4e"/>
-      <polygon points="0,9 -2.4,2 2.4,2" fill="currentColor" opacity=".45"/>
-    </svg>
-    <span id="whereLatLon">—</span>
-    <span id="whereGround" class="sub"></span>
-  </button>
-  <button id="themeChip" class="chip icon" title="Daylight or night (T)" aria-label="Daylight or night">◐</button>
-  <button id="findChip" class="chip" aria-label="Go to something in this place" title="Go to something here (G)">⌕</button>
-  <div id="branchChip" class="chip branch" hidden>
-    <span id="branchName">As it is</span><span class="caret">▾</span>
+<nav class="wrap" aria-label="Primary navigation">
+  <a class="wordmark" href="#top">TERRARIUM</a>
+  <div class="navlinks">
+    <a href="#enter">Enter</a>
+    <a href="#lineage">Lineage</a>
+    <a href="https://github.com/hartswf0/terrarium">Source ↗</a>
   </div>
-  <div class="spacer"></div>
-  <button id="authorChip" class="chip unset" aria-label="Who you are">
-    <span id="authorName">add your name</span>
-  </button>
-  <button id="undoBtn" class="icon" title="Undo" aria-label="Undo" disabled>↶</button>
-  <button id="redoBtn" class="icon" title="Redo" aria-label="Redo" disabled>↷</button>
-</header>
+</nav>
 
-<!-- Aiming point for anyone working without a pointing device. -->
-<div id="crosshair" hidden aria-hidden="true"></div>
+<main id="main">
+  <header class="hero wrap" id="top">
+    <div>
+      <p class="eyebrow">A living spatial instrument</p>
+      <h1>A small world held close enough to watch itself become alive.</h1>
+      <p class="dek"><strong>Terrarium</strong> is accountable, conversational ground inhabited by a drivable body. Movement leaves traces. Language becomes world-action. The standing arrangement can be unsettled without erasing its history.</p>
+    </div>
+    <div class="world-mark" aria-hidden="true">
+      <div class="world"></div>
+      <span class="specimen one">weather → trace</span>
+      <span class="specimen two">trace → deed</span>
+    </div>
+  </header>
 
-<!-- Where you are, in a place you can see all of. Tap it to go. -->
-<div id="plan" hidden>
-  <canvas id="planCanvas" aria-label="Plan of the whole place. Tap to move there."></canvas>
-  <button id="planOut" title="See more ground (−)" aria-label="Pull the plan out">−</button>
-  <button id="planIn" title="See less ground (+)" aria-label="Bring the plan in">+</button>
-  <button id="dropBtn" title="Take a building in hand, then tap the ground (B)" aria-label="Put a building here">⌂</button>
-  <button id="exploreBtn" title="Drag the window to ground you have not loaded (X)" aria-label="Explore beyond this ground">⊕</button>
-</div>
+  <section class="section" id="enter">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="kicker">Two ways in</p>
+        <div>
+          <h2>Enter the ground. Then give it a body.</h2>
+          <p class="section-copy">The two builds expose different scales of the same project: one begins with place, the other with inhabitation and play.</p>
+        </div>
+      </div>
+      <div class="doors">
+        <a class="door" href="TERRARIUM.html">
+          <span class="door-no">01 · The living ground</span>
+          <h3>Terrarium</h3>
+          <p>Import a real place, read its terrain and buildings, talk to what is there, test rain, make accountable changes, and keep alternative futures as branches.</p>
+          <div class="door-tags"><span>real terrain</span><span>conversation</span><span>flood</span><span>branches</span></div>
+          <span class="door-cta">Enter Terrarium</span>
+        </a>
+        <a class="door" href="unset-04-hartsoe-jr.html">
+          <span class="door-no">02 · The inhabited world</span>
+          <h3>Unsettled Atlas × Thunder Rigs</h3>
+          <p>Make a rig, enter a synthetic world, drive, build, play, leave sediment, raise normalization pressure, and unsettle what began as given.</p>
+          <div class="door-tags"><span>drive</span><span>forge</span><span>play</span><span>trace</span></div>
+          <span class="door-cta">Enter Unset 04</span>
+        </a>
+      </div>
+    </div>
+  </section>
 
-<!-- Explore controls sit OUTSIDE the plan: inside it they were clipped by its
-     own overflow, and a control you cannot see is a control you do not have. -->
-<!-- Detail follows the view: shown when you have gone somewhere with nothing
-     recorded on it, and never fetching without being asked. -->
-<div id="frameOffer" hidden>
-  <span id="frameWhere"></span>
-  <div class="frameRow">
-    <button id="frameGo" class="btn primary">Read what is built here</button>
-    <button id="frameDismiss" class="tool">Not now</button>
+  <section class="section">
+    <div class="wrap principle">
+      <p class="kicker">The proposition</p>
+      <blockquote>“The world is not a backdrop. It is the record of what happens inside it.”</blockquote>
+      <p>Terrarium keeps motion, accumulation, and accountable change distinct. That lets a world move freely without confusing every passing event with history—and lets repetition become history when it begins to alter the ground.</p>
+    </div>
+  </section>
+
+  <section class="section" id="lineage">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="kicker">One project, four inheritances</p>
+        <div>
+          <h2>Terrarium grows where these systems meet.</h2>
+          <p class="section-copy">It is not a collage of demos. Each parent contributes a necessary organ: ground, address, body, and the power to question what has become normal.</p>
+        </div>
+      </div>
+      <div class="lineage">
+        <a class="ancestor" href="https://github.com/hartswf0/unsettled-atlas">
+          <small>Doctrine · repository</small>
+          <h3>Unsettled Atlas</h3>
+          <p>Synthetic places for testing how space becomes normal—and for keeping those conditions visible, contestable, and available for reconstruction.</p>
+          <span class="out">Visit the atlas ↗</span>
+        </a>
+        <a class="ancestor" href="https://hartswf0.github.io/motor/">
+          <small>Ground · live project</small>
+          <h3>MOTOR</h3>
+          <p>Two engines built on one conviction: the substrate is not the picture. CREO makes place operable; WORLDTEXT makes a written world addressable.</p>
+          <span class="out">Open MOTOR ↗</span>
+        </a>
+        <a class="ancestor" href="https://hartswf0.github.io/hello-world-text/">
+          <small>Address · live project</small>
+          <h3>HELLO WORLD TEXT</h3>
+          <p>The smallest piece of language that proves a world can be addressed, rendered, and entered—the threshold between a description and a place.</p>
+          <span class="out">Open the project ↗</span>
+        </a>
+        <a class="ancestor" href="https://hartswf0.github.io/hello-world-text/unset-03.html">
+          <small>Body · playable ancestor</small>
+          <h3>Thunder Rigs</h3>
+          <p>The inhabitant, forge, commons, theatre, arena, and room: a world made social and playable by the bodies moving through it.</p>
+          <span class="out">Play Unset 03 ↗</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="kicker">How time enters the world</p>
+        <div><h2>Weather. Trace. Deed.</h2></div>
+      </div>
+      <div class="states">
+        <article class="state"><b>01 · Weather</b><h3>Motion without a ledger</h3><p>Driving, looking, passing bodies, rain in flight: live events that matter now without rebuilding the world sixty times a second.</p></article>
+        <article class="state"><b>02 · Trace</b><h3>Repetition becomes ground</h3><p>Ruts, habits, pressure, and thresholds. What happens often enough begins to sediment into a condition the world can show.</p></article>
+        <article class="state"><b>03 · Deed</b><h3>Change with an author</h3><p>Buildings, testimony, branches, and commitments enter the journal with provenance, consequences, and a path back.</p></article>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap footer-grid">
+    <div><div class="footer-mark">TERRARIUM</div><div class="footer-copy">A small world held close enough to watch itself become alive.</div></div>
+    <div class="footer-links">
+      <a href="https://github.com/hartswf0/terrarium">Source</a>
+      <a href="https://github.com/hartswf0/hello-world-text">HELLO WORLD TEXT source</a>
+      <a href="TERRARIUM.md">Theory</a>
+    </div>
   </div>
-</div>
-
-<div id="exploreHint" hidden>
-    <span id="exploreWhere"></span>
-    <button id="exploreGo" class="btn primary" hidden></button>
-  </div>
-
-<div id="viewTools">
-  <button id="fitBtn" class="icon small" title="Show the whole place (F)" aria-label="Show the whole place">⤢</button>
-  <button id="planBtn" class="icon small" title="Plan (M)" aria-label="Toggle the plan">▣</button>
-  <button id="layersBtn" class="icon small" title="What to show" aria-label="Layers">◈</button>
-  <button id="rainBtn" class="icon small" title="Simulate heavy rain (R) — rivers and ponds are always shown" aria-label="Simulate rain">☂</button>
-  <button id="exportBtn" class="icon small" title="Take it away — export" aria-label="Export">↧</button>
-  <button id="helpBtn" class="icon small" title="Help (?)" aria-label="Help">?</button>
-</div>
-
-<div id="waterLegend" hidden>
-  <div class="legendTitle">Flood simulation — an hour of heavy rain</div>
-  <div class="legendScale"><i style="background:#6bb8eb"></i><i style="background:#4c9ad9"></i><i style="background:#2f7bc4"></i><i style="background:#1f5ca8"></i></div>
-  <div class="legendEnds"><span>5&nbsp;cm</span><span id="legendMax">45&nbsp;cm</span></div>
-  <div class="legendNote" id="legendNote"></div>
-  <div class="legendNote">This is temporary water on top of the world. Rivers, ponds and the sea are permanent and always drawn.</div>
-</div>
-
-<div id="youAreHere" class="pill ghosted" hidden>you are here</div>
-<!-- Real places carry their licence where a person can see it, not in a file. -->
-<button id="attribution" hidden title="Where this place came from"></button>
-
-<!-- Circle or tap something and it becomes the subject: everything you say
-     after that is about it, and it can answer for itself. -->
-<div id="tools" hidden role="region" aria-label="About what you chose">
-  <div class="subjectHead">
-    <div id="toolTitle" class="toolTitle"></div>
-    <button id="subjectClose" class="icon small" aria-label="Let it go">✕</button>
-  </div>
-  <div id="subjectFacts" class="subjectFacts"></div>
-  <div class="row" id="toolRow"></div>
-  <div id="subjectThread" class="thread" hidden></div>
-  <div class="subjectAsk">
-    <input id="subjectInput" type="text" autocomplete="off" enterkeyhint="send"
-           placeholder="Ask about this" aria-label="Ask about what you chose">
-    <button id="subjectSend" class="icon small" aria-label="Ask">↑</button>
-  </div>
-</div>
-
-<!-- Shown once, on the main page, when nothing can think yet. -->
-<div id="setup" hidden>
-  <div class="setupHead">Let CREO think<button id="setupClose" class="icon small" aria-label="Not now">✕</button></div>
-  <p>CREO already answers from the world without one. A key adds open-ended
-     questions and lets it work the interface for you. It stays in this browser.</p>
-  <input id="setupKey" type="password" placeholder="sk-…" aria-label="API key">
-  <div class="setupRow">
-    <select id="setupModel" aria-label="Model"><option>— add a key, then choose —</option></select>
-    <button id="setupRefresh" class="tool">Refresh</button>
-  </div>
-  <div id="setupStatus"></div>
-  <button id="setupDone" class="btn primary">Done</button>
-</div>
-
-<!-- The proposal: shown before anything becomes real. -->
-<section id="proposal" hidden aria-live="polite">
-  <div class="head">
-    <h2 id="propTitle"></h2>
-    <button id="propClose" class="icon" aria-label="Discard">✕</button>
-  </div>
-  <p id="propSummary"></p>
-  <div id="propCert" class="cert"></div>
-  <div id="propImpact" class="impact"></div>
-  <div id="propAlts" class="alts"></div>
-  <div class="actions">
-    <button id="propDiscard" class="btn ghost">Discard</button>
-    <button id="propCommit" class="btn primary">Put it in the world</button>
-  </div>
-</section>
-
-<!-- The answer panel for questions asked of the place. -->
-<section id="answer" hidden aria-live="polite">
-  <div class="head">
-    <h2 id="ansTitle">The place says</h2>
-    <button id="ansClose" class="icon" aria-label="Close">✕</button>
-  </div>
-  <div id="ansBody"></div>
-</section>
-
-<!-- Branches: futures that coexist. -->
-<section id="branches" hidden>
-  <div class="head"><h2>Futures</h2><button id="brClose" class="icon" aria-label="Close">✕</button></div>
-  <div id="branchList"></div>
-  <div class="actions"><button id="compareBtn" class="btn ghost">Compare all</button></div>
-</section>
-
-<!-- The one invitation. -->
-<footer id="say">
-  <button id="modeDraw" class="icon mode" title="Draw an area or a line" aria-label="Draw">◌</button>
-  <div id="sayWrap">
-    <button id="modeChip" aria-haspopup="menu" title="How hard to think — hold for the machinery">✦ Auto</button>
-    <input id="sayInput" type="text" autocomplete="off" enterkeyhint="go"
-           placeholder="Say something about this place" aria-label="Say something about this place">
-  </div>
-  <button id="micBtn" class="icon mic" title="Speak" aria-label="Speak">◉</button>
 </footer>
-
-<!-- What it is doing, in the world's own terms. Not a spinner. -->
-<div id="working" hidden>
-  <span id="workingMode"></span>
-  <span id="workingStep"></span>
-  <button id="workingStop" aria-label="Stop">■</button>
-</div>
-
-<div id="toast" class="toast" hidden role="status"></div>
-<div id="labels" aria-hidden="false"></div>
-
-<script type="module" src="src/ui/app.js"></script>
 </body>
 </html>
