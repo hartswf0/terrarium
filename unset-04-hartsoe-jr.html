@@ -552,10 +552,10 @@ body.in-ritual #post-tilt-top, body.in-ritual #post-tilt-bot{ display:none; }   
     </div>
     <div id="film-composer">
         <button id="film-ai-status" type="button"></button>
-        <div id="film-ai-setup" class="hidden">
-            <input id="film-ai-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-… paste your OpenAI key">
+        <form id="film-ai-setup" class="hidden" onsubmit="return false;">
+            <input id="film-ai-key" name="openai-key" type="password" autocomplete="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" placeholder="sk-… paste your OpenAI key">
             <button id="film-ai-save" type="button">USE THIS KEY ▸</button>
-        </div>
+        </form>
         <div class="fc-cue">Describe a film — a place, a memory, a character:</div>
         <input id="film-seed-input" type="text" autocomplete="off" spellcheck="false" placeholder="a keeper of the storm gate">
         <button id="film-compose-btn" type="button">COMPOSE FILM ▸</button>
@@ -7304,16 +7304,15 @@ function aiWorkerUrl(cfg){
         A.log('Serve it:  python3 -m http.server 8000  → open http://localhost:8000/' + (location.pathname.split('/').pop() || ''), 'wrn');
     }
 })();
-// PATCH 3: slower send/poll cadence (fewer worker round-trips) paired with lower lerp
-// constants so sparser packets blend more smoothly instead of snapping.
-// TIER-AWARE state cadence. The free (KV) relay allows ~1000 writes/day; at
-// 10 sends/sec that's gone in ~100s. Reading <meta name="thunder-tier" content="free">
-// widens the interval so a few friends fit the free budget (cars step ~1/sec
-// instead of gliding). Paid (Durable Object) relay streams smoothly at 100ms.
+// TIER-AWARE room cadence. A free Durable Object allows 100k requests/day;
+// every poll AND every state send counts. The old 150ms poll alone generated
+// 576k requests/day per open tab and repeatedly shut the whole relay down.
+// Free rooms therefore use a bounded field-test cadence; paid rooms retain the
+// smooth 100/150ms path. A failed free relay backs off instead of request-storming.
 const THUNDER_TIER = (document.querySelector('meta[name="thunder-tier"]')?.content || 'paid').toLowerCase();
-const ROOM_STATE_MS = THUNDER_TIER === 'free' ? 1200 : 100;
-const ROOM_POLL_MS = 150;
-const ROOM_RETRY_MS = 700;
+const ROOM_STATE_MS = THUNDER_TIER === 'free' ? 4000 : 100;
+const ROOM_POLL_MS = THUNDER_TIER === 'free' ? 4000 : 150;
+const ROOM_RETRY_MS = THUNDER_TIER === 'free' ? 30000 : 700;
 const ROOM_SNAPSHOT_MS = 3500;
 const REMOTE_CAR_LERP = 10;
 const REMOTE_BALL_LERP = 8;
@@ -7901,8 +7900,9 @@ async function joinRoomUIHandler(host) {
         renderBotList(true); notify(host ? "ROOM READY — SCAN QR" : "JOINED ROOM");
     } catch (err) {
         console.error(err);
-        setRoomStatus('ROOM FAILED: ' + err.message, '#ff2e2e');
-        notify("ROOM FAILED");
+        const relayDown = err && (err.name === 'TypeError' || /failed to fetch|network/i.test(String(err.message)));
+        setRoomStatus(relayDown ? 'ROOM RELAY LIMIT REACHED — RETRY AFTER 00:00 UTC' : ('ROOM FAILED: ' + err.message), '#ff2e2e');
+        notify(relayDown ? 'ROOM RELAY IS RESETTING — THE WORLD IS SAFE' : 'ROOM FAILED');
     }
 }
 async function leaveRoom() {
