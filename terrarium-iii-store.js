@@ -1,16 +1,14 @@
 /* TERRARIUM III durable artifact sidecar
  *
  * PROVISIONAL. This module is intentionally outside the live networking path.
- * A build/world operation is successful before persistence is attempted.
- * Database/auth/storage failure may queue or drop a durable copy, but must never
- * stop WebRTC, movement, building, chat, or the host-held live vessel.
+ * A world/build operation succeeds before persistence is attempted.
+ * Persistence failure may queue a durable copy, but must never stop the vessel.
  */
 (function terrariumIIIStore(global) {
   'use strict';
 
   const TABLE = 'iii_artifacts';
-  const CLIENT_VERSION = 'iii-store-0.2-provisional';
-  const AUTH_STORAGE_KEY = 'terrarium-iii-auth';
+  const CLIENT_VERSION = 'iii-store-0.3-provisional';
   const IDB_NAME = 'terrarium-iii-store';
   const IDB_STORE = 'queue';
   const IDB_VERSION = 1;
@@ -20,18 +18,20 @@
   const FLUSH_BATCH = 20;
   const RETRY_STEPS = [1500, 5000, 15000, 30000, 60000];
   const ALLOWED_TYPES = new Set(['prompt', 'geometry', 'build', 'world_snapshot']);
-  const SESSION_ID = crypto.randomUUID ? crypto.randomUUID() : ('s-' + Date.now().toString(36) + Math.random().toString(36).slice(2));
+  const SESSION_ID = crypto.randomUUID
+    ? crypto.randomUUID()
+    : ('s-' + Date.now().toString(36) + Math.random().toString(36).slice(2));
 
   let client = null;
   let clientKey = '';
-  let readyPromise = null;
   let userId = '';
+  let authState = 'idle';
+  let readyPromise = null;
   let flushPromise = null;
   let retryTimer = null;
   let retryStep = 0;
   let idbPromise = null;
   let persistenceAvailable = false;
-  let authState = 'idle';
   let lastError = '';
   let lastWriteAt = 0;
   let lastFlushAt = 0;
@@ -55,6 +55,24 @@
     try { global.dispatchEvent(new CustomEvent(name, { detail })); } catch (_) {}
   }
 
+  function stats() {
+    return {
+      version: CLIENT_VERSION,
+      table: TABLE,
+      sessionId: SESSION_ID,
+      auth: authState,
+      userId: userId || null,
+      queueMemory: memoryQueue.size,
+      queuePersistence: persistenceAvailable ? 'indexeddb' : 'memory',
+      written,
+      failed,
+      autoCaptured,
+      lastWriteAt: lastWriteAt || null,
+      lastFlushAt: lastFlushAt || null,
+      lastError: lastError || null
+    };
+  }
+
   function logError(where, err) {
     lastError = String(err?.message || err || where);
     console.warn('[III STORE] ' + where, err);
@@ -65,46 +83,6 @@
     try { return global[name] || null; } catch (_) { return null; }
   }
 
-  // Supabase Auth normally persists to localStorage. TERRARIUM can fill that
-  // origin with world caches, so auth gets a storage adapter that degrades:
-  // localStorage -> sessionStorage -> memory, without ever throwing outward.
-  const failSoftAuthStorage = {
-    getItem(key) {
-      const local = storage('localStorage');
-      const session = storage('sessionStorage');
-      try {
-        const value = local?.getItem(key);
-        if (value != null) return value;
-      } catch (_) {}
-      try {
-        const value = session?.getItem(key);
-        if (value != null) return value;
-      } catch (_) {}
-      return authMemory.get(key) || null;
-    },
-    setItem(key, value) {
-      const text = String(value);
-      const local = storage('localStorage');
-      const session = storage('sessionStorage');
-      try {
-        local?.setItem(key, text);
-        authMemory.set(key, text);
-        return;
-      } catch (_) {}
-      try {
-        session?.setItem(key, text);
-        authMemory.set(key, text);
-        return;
-      } catch (_) {}
-      authMemory.set(key, text);
-    },
-    removeItem(key) {
-      try { storage('localStorage')?.removeItem(key); } catch (_) {}
-      try { storage('sessionStorage')?.removeItem(key); } catch (_) {}
-      authMemory.delete(key);
-    }
-  };
-
   function currentConfig() {
     const cfg = global.III_NET?.config?.() || {};
     return {
@@ -113,26 +91,78 @@
     };
   }
 
+  function projectRef(url) {
+    try {
+      return new URL(url).hostname.split('.')[0].replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80) || 'default';
+    } catch (_) {
+      return 'default';
+    }
+  }
+
+  function authStorageFor(ref) {
+    const prefix = 'terrarium-iii-auth:' + ref + ':';
+    return {
+      getItem(key) {
+        const namespaced = prefix + key;
+        try {
+          const value = storage('localStorage')?.getItem(namespaced);
+          if (value != null) return value;
+        } catch (_) {}
+        try {
+          const value = storage('sessionStorage')?.getItem(namespaced);
+          if (value != null) return value;
+        } catch (_) {}
+        return authMemory.get(namespaced) || null;
+      },
+      setItem(key, value) {
+        const namespaced = prefix + key;
+        const text = String(value);
+        try {
+          storage('localStorage')?.setItem(namespaced, text);
+          authMemory.set(namespaced, text);
+          return;
+        } catch (_) {}
+        try {
+          storage('sessionStorage')?.setItem(namespaced, text);
+          authMemory.set(namespaced, text);
+          return;
+        } catch (_) {}
+        authMemory.set(namespaced, text);
+      },
+      removeItem(key) {
+        const namespaced = prefix + key;
+        try { storage('localStorage')?.removeItem(namespaced); } catch (_) {}
+        try { storage('sessionStorage')?.removeItem(namespaced); } catch (_) {}
+        authMemory.delete(namespaced);
+      }
+    };
+  }
+
   function makeClient() {
     const factory = global.supabase?.createClient;
     if (typeof factory !== 'function') throw new Error('SUPABASE CLIENT NOT AVAILABLE');
+
     const cfg = currentConfig();
     if (!/^https?:\/\//i.test(cfg.url) || cfg.key.length < 20) {
       throw new Error('SUPABASE CONFIG NOT READY');
     }
+
     const identity = cfg.url + '|' + cfg.key;
     if (client && clientKey === identity) return client;
 
     clientKey = identity;
+    client = null;
     userId = '';
-    authState = 'opening';
+    authState = 'idle';
+    const ref = projectRef(cfg.url);
+
     client = factory(cfg.url, cfg.key, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: false,
-        storage: failSoftAuthStorage,
-        storageKey: AUTH_STORAGE_KEY
+        storage: authStorageFor(ref),
+        storageKey: 'session'
       },
       realtime: { params: { eventsPerSecond: 2 } }
     });
@@ -141,6 +171,8 @@
 
   async function ensureAnonymousUser() {
     const sb = makeClient();
+    authState = 'opening';
+
     const sessionResult = await sb.auth.getSession();
     if (sessionResult.error) throw sessionResult.error;
     let session = sessionResult.data?.session || null;
@@ -217,8 +249,7 @@
       const out = [];
       try {
         const tx = db.transaction(IDB_STORE, 'readonly');
-        const store = tx.objectStore(IDB_STORE);
-        const index = store.index('created_at');
+        const index = tx.objectStore(IDB_STORE).index('created_at');
         const request = index.openCursor();
         request.onerror = () => resolve(out);
         request.onsuccess = () => {
@@ -244,32 +275,28 @@
     });
   }
 
-  function safeJSON(value, maxChars, field) {
+  function safeJSON(value, maxChars) {
     if (value == null) return { value: null, chars: 0, omitted: false };
     let parsed = value;
     if (typeof value === 'string') {
       try { parsed = JSON.parse(value); }
       catch (_) { parsed = { raw: value }; }
     }
-    let text;
-    try { text = JSON.stringify(parsed); }
-    catch (_) { text = ''; }
+    let text = '';
+    try { text = JSON.stringify(parsed); } catch (_) {}
     if (!text) return { value: null, chars: 0, omitted: false };
-    if (text.length > maxChars) {
-      return { value: null, chars: text.length, omitted: true, field };
-    }
+    if (text.length > maxChars) return { value: null, chars: text.length, omitted: true };
     try { return { value: JSON.parse(text), chars: text.length, omitted: false }; }
     catch (_) { return { value: null, chars: 0, omitted: false }; }
   }
 
   function normalizeArtifact(input = {}) {
-    const id = String(input.id || randomId());
     const type = ALLOWED_TYPES.has(input.artifact_type)
       ? input.artifact_type
       : (ALLOWED_TYPES.has(input.type) ? input.type : 'build');
     const prompt = input.prompt == null ? null : String(input.prompt).slice(0, MAX_PROMPT_CHARS);
-    const geometry = safeJSON(input.geometry_json ?? input.geometry ?? null, MAX_GEOMETRY_CHARS, 'geometry');
-    const metaBase = safeJSON(input.metadata_json ?? input.metadata ?? {}, MAX_METADATA_CHARS, 'metadata');
+    const geometry = safeJSON(input.geometry_json ?? input.geometry ?? null, MAX_GEOMETRY_CHARS);
+    const metaBase = safeJSON(input.metadata_json ?? input.metadata ?? {}, MAX_METADATA_CHARS);
     const metadata = metaBase.value && typeof metaBase.value === 'object' ? metaBase.value : {};
 
     if (geometry.omitted) {
@@ -278,7 +305,7 @@
         geometry_omitted: true,
         geometry_chars: geometry.chars,
         inline_limit_chars: MAX_GEOMETRY_CHARS,
-        reason: 'geometry exceeds provisional inline Postgres limit; Storage handoff not implemented yet'
+        reason: 'geometry exceeds provisional inline limit; object Storage handoff is not implemented yet'
       };
     }
     if (metaBase.omitted) {
@@ -291,7 +318,7 @@
     }
 
     return {
-      id,
+      id: String(input.id || randomId()),
       created_at: input.created_at || new Date().toISOString(),
       artifact_type: type,
       room_code: String(input.room_code ?? input.roomCode ?? global.III_NET?.room ?? '').slice(0, 64) || null,
@@ -340,9 +367,15 @@
   async function flush() {
     if (flushPromise) return flushPromise;
     flushPromise = (async () => {
-      if (!navigator.onLine) {
-        scheduleRetry();
-        return { ok: false, offline: true };
+      if (!navigator.onLine) return { ok: false, offline: true };
+
+      // Critical: do not create an anonymous Auth user for a spectator who has
+      // never authored anything. Identity is created only if something is queued.
+      const batch = await queuedBatch();
+      if (!batch.length) {
+        retryStep = 0;
+        lastFlushAt = Date.now();
+        return { ok: true, flushed: 0, remaining: 0 };
       }
 
       let identity;
@@ -353,14 +386,7 @@
         failed++;
         logError('anonymous auth unavailable; artifacts remain queued', err);
         scheduleRetry();
-        return { ok: false, auth: false };
-      }
-
-      const batch = await queuedBatch();
-      if (!batch.length) {
-        retryStep = 0;
-        lastFlushAt = Date.now();
-        return { ok: true, flushed: 0 };
+        return { ok: false, auth: false, remaining: batch.length };
       }
 
       let flushed = 0;
@@ -368,7 +394,12 @@
         const row = { ...queued, user_id: identity.userId };
         try {
           const result = await identity.client.from(TABLE).insert(row);
-          if (result.error) throw result.error;
+          if (result.error) {
+            // If the network lost the successful response, retrying the same
+            // client UUID can produce a primary-key collision. Treat that as
+            // already durable instead of retrying forever.
+            if (String(result.error.code || '') !== '23505') throw result.error;
+          }
           await removeQueued(queued.id);
           written++;
           flushed++;
@@ -392,11 +423,9 @@
   }
 
   async function recordArtifact(input) {
-    let record;
     try {
-      record = normalizeArtifact(input);
+      const record = normalizeArtifact(input);
       await enqueue(record);
-      // Deliberately detached from the caller's build operation.
       queueMicrotask(() => flush().catch(() => {}));
       return { ok: true, queued: true, id: record.id };
     } catch (err) {
@@ -409,15 +438,12 @@
   function recordBuild(input = {}) {
     return recordArtifact({ ...input, artifact_type: 'build' });
   }
-
   function recordPrompt(input = {}) {
     return recordArtifact({ ...input, artifact_type: 'prompt' });
   }
-
   function recordGeometry(input = {}) {
     return recordArtifact({ ...input, artifact_type: 'geometry' });
   }
-
   function recordWorldSnapshot(input = {}) {
     return recordArtifact({ ...input, artifact_type: 'world_snapshot' });
   }
@@ -426,39 +452,22 @@
     if (readyPromise) return readyPromise;
     readyPromise = (async () => {
       await openQueueDB();
-      const identity = await ensureAnonymousUser();
-      flush().catch(() => {});
-      return { ok: true, userId: identity.userId, persistence: persistenceAvailable ? 'indexeddb' : 'memory' };
+      const pending = await idbCount().catch(() => memoryQueue.size);
+      if (pending > 0) queueMicrotask(() => flush().catch(() => {}));
+      return {
+        ok: true,
+        userId: userId || null,
+        pending,
+        persistence: persistenceAvailable ? 'indexeddb' : 'memory'
+      };
     })().catch(err => {
       readyPromise = null;
-      authState = 'fault';
-      logError('store not ready', err);
+      logError('store queue not ready', err);
       return { ok: false, error: String(err?.message || err) };
     });
     return readyPromise;
   }
 
-  function stats() {
-    return {
-      version: CLIENT_VERSION,
-      table: TABLE,
-      sessionId: SESSION_ID,
-      auth: authState,
-      userId: userId || null,
-      queueMemory: memoryQueue.size,
-      queuePersistence: persistenceAvailable ? 'indexeddb' : 'memory',
-      written,
-      failed,
-      autoCaptured,
-      lastWriteAt: lastWriteAt || null,
-      lastFlushAt: lastFlushAt || null,
-      lastError: lastError || null
-    };
-  }
-
-  // Snapshot the build BEFORE the page's commit handler clears its draft state,
-  // then persist only AFTER the proposal UI confirms that the commit completed.
-  // This avoids storing discarded blueprints and avoids modifying the 1.7 MB page.
   function captureDraftBeforeCommit() {
     const proposal = document.getElementById('proposal-ui');
     if (!proposal || proposal.classList.contains('gone')) return null;
@@ -510,10 +519,10 @@
       const button = document.getElementById('btn-draft-commit');
       if (!button || button.__iiiStoreCaptureInstalled) return !!button;
       button.__iiiStoreCaptureInstalled = true;
+
       button.addEventListener('click', () => {
         const candidate = captureDraftBeforeCommit();
         if (!candidate) return;
-        // Main-page commit listeners now run. A successful commit hides proposal-ui.
         setTimeout(() => {
           const proposal = document.getElementById('proposal-ui');
           if (!proposal || !proposal.classList.contains('gone')) return;
@@ -545,20 +554,14 @@
     get sessionId() { return SESSION_ID; }
   };
 
-  // Generic integration seam. Any future builder can persist an artifact without
-  // taking a dependency on this module.
   global.addEventListener('terrarium:artifact', event => {
     recordArtifact(event?.detail || {}).catch(() => {});
   });
-
   global.addEventListener('online', () => flush().catch(() => {}));
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) flush().catch(() => {});
   });
 
   installCommitCapture();
-
-  // Initialization is opportunistic. Anonymous Auth may not be enabled or the
-  // SQL migration may not yet exist; either case leaves III_STORE non-fatal.
   setTimeout(() => ready().catch(() => {}), 0);
 })(window);
