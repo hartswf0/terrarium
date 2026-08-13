@@ -180,7 +180,7 @@ main { position: fixed; inset: 0; z-index: 2; pointer-events: none; }
    now sit ABOVE the say bar as real targets: readable, bordered, thumb-sized,
    with the engine itself taking the lead. */
 .doors { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 0 0 10px; }
-.doors .door {
+.door {
   display: inline-flex; align-items: center; gap: 7px;
   min-height: 40px; padding: 0 16px;
   border: 1px solid rgba(24, 33, 39, .28);
@@ -190,16 +190,16 @@ main { position: fixed; inset: 0; z-index: 2; pointer-events: none; }
   text-decoration: none; text-transform: uppercase; white-space: nowrap;
   transition: background .16s, color .16s, border-color .16s, transform .16s;
 }
-.doors .door b { font-weight: 700; opacity: .5; }
-.doors .door:hover { background: var(--panel); color: var(--glass); border-color: var(--panel); transform: translateY(-1px); }
-.doors .door:hover b { opacity: 1; }
-.doors .door.primary {
+.door b { font-weight: 700; opacity: .5; }
+.door:hover { background: var(--panel); color: var(--glass); border-color: var(--panel); transform: translateY(-1px); }
+.door:hover b { opacity: 1; }
+.door.primary {
   background: var(--cyan); border-color: var(--cyan); color: var(--panel);
   box-shadow: 0 8px 22px rgba(24, 33, 39, .22);
 }
-.doors .door.primary:hover { background: var(--panel); color: var(--cyan); border-color: var(--panel); }
-.doors .door.quiet { background: transparent; color: rgba(24, 33, 39, .66); }
-.doors .door.quiet:hover { background: rgba(24, 33, 39, .08); color: var(--panel); }
+.door.primary:hover { background: var(--panel); color: var(--cyan); border-color: var(--panel); }
+.door.quiet { background: transparent; color: rgba(24, 33, 39, .66); }
+.door.quiet:hover { background: rgba(24, 33, 39, .08); color: var(--panel); }
 
 @media (max-width: 700px) {
   .wash { background: linear-gradient(180deg, rgba(191, 223, 242, .72) 0, rgba(191, 223, 242, .32) 34%, transparent 55%); }
@@ -221,7 +221,7 @@ main { position: fixed; inset: 0; z-index: 2; pointer-events: none; }
     -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent);
   }
   .doors::-webkit-scrollbar { display: none; }
-  .doors .door { min-height: 38px; padding: 0 13px; font-size: 9px; flex: 0 0 auto; }
+  .door { min-height: 38px; padding: 0 13px; font-size: 9px; flex: 0 0 auto; }
 }
 
 @media (max-width: 350px) {
@@ -232,6 +232,110 @@ main { position: fixed; inset: 0; z-index: 2; pointer-events: none; }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+/* ══ SCROLLYTELLING ═════════════════════════════════════════════════════════
+   The world is a fixed backdrop; the page is a column of chapters that scroll
+   over it. The old page was one locked viewport whose only call to action was
+   a text field — which asked a stranger to compose a sentence before they had
+   seen anything. Now the first thing on screen is a door, and the reading
+   carries you to the rest of them. */
+html { scroll-behavior: smooth; overflow-y: auto; }
+/* the old page was one locked viewport, so the body was overflow:hidden — with
+   that left in place the BODY becomes the scroller and window-level scroll
+   listeners never hear a thing, which is exactly how the chapters ended up
+   frozen on the first one. The document scrolls. */
+body { overflow: visible !important; height: auto; }
+#world { position: fixed; inset: 0; z-index: 0; }
+.wash, .grain { position: fixed; }
+main { position: relative; z-index: 20; }
+.chapter {
+  position: relative; min-height: 100vh; display: flex; flex-direction: column;
+  justify-content: center; padding: 96px max(24px, 5vw) 120px;
+  opacity: .35; transform: translateY(14px);
+  transition: opacity .5s ease, transform .5s ease;
+}
+.chapter.on { opacity: 1; transform: none; }
+.chapter.hero { justify-content: flex-end; padding-bottom: 132px; }
+.chapter.hero h1 {
+  margin: 0 0 18px; max-width: 13ch; color: var(--panel);
+  font: 400 clamp(58px, 7.7vw, 112px)/.85 var(--serif);
+  letter-spacing: -.047em; text-shadow: 0 1px 0 rgba(255,255,255,.22);
+}
+.chapter.hero h1 span { display: block; }
+.lede {
+  max-width: 54ch; margin: 0 0 26px; color: var(--panel);
+  font-size: clamp(13px, 1.5vw, 16px); line-height: 1.65;
+  background: rgba(237, 244, 242, .62); backdrop-filter: blur(3px);
+  padding: 12px 14px; border-left: 2px solid var(--cyan);
+}
+.cta { display: flex; flex-wrap: wrap; gap: 10px; }
+.scrollcue {
+  margin-top: 30px; display: flex; align-items: center; gap: 9px;
+  color: rgba(24,33,39,.6); font-size: 8px; font-weight: 700; letter-spacing: .3em;
+}
+.scrollcue i {
+  width: 1px; height: 26px; background: rgba(24,33,39,.4);
+  animation: cue 1.9s ease-in-out infinite;
+}
+@keyframes cue { 0%,100% { transform: scaleY(.35); opacity: .4 } 50% { transform: scaleY(1); opacity: 1 } }
+
+.card {
+  max-width: 58ch; padding: 26px 28px;
+  background: rgba(237, 244, 242, .9); backdrop-filter: blur(6px);
+  border: 1px solid rgba(24, 33, 39, .16);
+  box-shadow: 0 18px 50px rgba(24, 33, 39, .16);
+}
+.card h2, .worksHead h2 {
+  margin: 10px 0 12px; color: var(--panel);
+  font: 400 clamp(30px, 3.9vw, 46px)/.94 var(--serif); letter-spacing: -.03em;
+}
+.card p { margin: 0; color: rgba(24,33,39,.86); font-size: 14px; line-height: 1.7; }
+.card code {
+  background: var(--panel); color: var(--cyan); padding: 1px 7px;
+  font-size: 12px; letter-spacing: .04em;
+}
+.tag { color: var(--panel); font-size: 8px; font-weight: 700; letter-spacing: .3em; }
+
+/* ══ THE INDEX ══ the part that grows as works come online ══ */
+.works { justify-content: center; }
+.worksHead { margin-bottom: 22px; }
+.grid {
+  list-style: none; margin: 0; padding: 0; display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+  max-width: 1080px;
+}
+.work a {
+  display: flex; flex-direction: column; gap: 6px; height: 100%;
+  padding: 18px 20px; text-decoration: none;
+  background: rgba(237, 244, 242, .92); border: 1px solid rgba(24, 33, 39, .18);
+  transition: transform .16s, box-shadow .16s, background .16s, border-color .16s;
+}
+.work a:hover { transform: translateY(-2px); box-shadow: 0 16px 38px rgba(24,33,39,.2); border-color: var(--panel); }
+.work .kind { color: rgba(24,33,39,.55); font-size: 8px; font-weight: 700; letter-spacing: .26em; text-transform: uppercase; }
+.work .name { color: var(--panel); font: 400 21px/1.1 var(--serif); letter-spacing: -.01em; }
+.work .name b { opacity: .45; font-weight: 700; }
+.work .note { color: rgba(24,33,39,.74); font-size: 12px; line-height: 1.6; }
+.work.lead a { background: var(--panel); border-color: var(--panel); }
+.work.lead .kind { color: var(--cyan); }
+.work.lead .name { color: var(--glass); }
+.work.lead .note { color: rgba(237,244,242,.76); }
+.work.lead a:hover { background: #0f171c; }
+.work.quiet a { background: rgba(237,244,242,.55); }
+.foot { margin: 26px 0 0; color: rgba(24,33,39,.6); font-size: 10px; letter-spacing: .1em; }
+.foot a { color: var(--panel); }
+
+/* the line is demoted: a narrow bar, not the page's reason for being */
+.dock { width: min(430px, calc(100% - 28px)); }
+.say { min-height: 52px; grid-template-columns: 1fr 46px 46px; }
+
+@media (max-width: 700px) {
+  .chapter { padding: 82px 18px 104px; min-height: 96vh; }
+  .chapter.hero { padding-bottom: 152px; }
+  .lede { font-size: 13px; }
+  .grid { grid-template-columns: 1fr; }
+  .dock { width: calc(100% - 20px); }
+}
+
 </style>
 </head>
 <body>
@@ -248,23 +352,71 @@ main { position: fixed; inset: 0; z-index: 2; pointer-events: none; }
 </header>
 
 <main>
-  <section class="question" id="question">
+  <!-- CHAPTER 0 · the hero. One question, one door. -->
+  <section class="chapter hero" id="ch-hero" data-yaw="0" data-pitch=".62" data-night="0">
     <h1><span>What happens when</span><span>words have somewhere to live?</span></h1>
+    <p class="lede">TERRARIUM is a world you drive, build in, and argue with — real
+      ground from OpenStreetMap, a record that remembers who changed what, and an
+      atlas that notices when a place stops being questioned.</p>
+    <div class="cta">
+      <a class="door primary" href="TERRARIUM.html">Drive the ground <b>↗</b></a>
+      <a class="door" href="#works">See the works <b>↓</b></a>
+    </div>
+    <div class="scrollcue" aria-hidden="true"><i></i>SCROLL</div>
+  </section>
+
+  <!-- CHAPTERS 1–3 · what it is, told against the world behind them -->
+  <section class="chapter" id="ch-ground" data-yaw="1.05" data-pitch=".46" data-night="0">
+    <div class="card">
+      <span class="tag">THE GROUND</span>
+      <h2>Real places, at their real size.</h2>
+      <p>Say <code>land piedmont park</code> and the elevation, the streets and the
+        buildings arrive as one window you can drive across. Ask for more than a
+        neighbourhood and it lands a pack of adjacent windows instead — you cross
+        between them at the seams, and your deeds travel with you.</p>
+    </div>
+  </section>
+
+  <section class="chapter" id="ch-gate" data-yaw="2.2" data-pitch=".8" data-night="0">
+    <div class="card">
+      <span class="tag">THE GATE</span>
+      <h2>The world interrogates the act.</h2>
+      <p>Nothing lands because you asked. A part put down inside a standing building
+        is refused by name; one that blocks a right of way is refused for blocking it;
+        anything else steps clear and says how far it moved. Every commitment carries
+        its cause, and undo means it.</p>
+    </div>
+  </section>
+
+  <section class="chapter" id="ch-atlas" data-yaw="3.4" data-pitch=".52" data-night="1">
+    <div class="card">
+      <span class="tag">THE ATLAS · UNSETTLED 05</span>
+      <h2>A place can stop being questioned.</h2>
+      <p>Wheels leave ruts. Driving your own ruts raises the normalization pressure;
+        breaking ground, building, testifying and unsettling lower it. <b>Unsettle</b>
+        swaps the standing arrangement for its alternative and keeps the given one on
+        a branch — remembered, not inevitable.</p>
+    </div>
+  </section>
+
+  <!-- CHAPTER 4 · THE INDEX. This is the part that grows. -->
+  <section class="chapter works" id="works" data-yaw="4.5" data-pitch=".7" data-night="0">
+    <div class="worksHead">
+      <span class="tag">THE WORKS</span>
+      <h2>Ways in.</h2>
+    </div>
+    <ul class="grid" id="worksGrid"><!-- built from WORKS below --></ul>
+    <p class="foot">Hablando me creo · <a href="https://github.com/hartswf0/terrarium">source on GitHub ↗</a></p>
   </section>
 </main>
 
 <div class="world-word" id="worldWord" role="status" aria-live="polite"></div>
 
+<!-- The line stays, demoted to what it is: a way to talk to the demo world
+     behind the page, not the reason you came. -->
 <div class="dock">
-  <div class="dock-meta"><b>Hablando me creo.</b><span>Drag to inspect</span></div>
-  <nav class="doors" aria-label="Enter TERRARIUM">
-    <a class="door primary" href="TERRARIUM.html">Drive the ground <b>↗</b></a>
-    <a class="door" href="unset-04-hartsoe-iii.html">Live vessel <b>↗</b></a>
-    <a class="door" href="unset-04-hartsoe-jr.html">JR <b>↗</b></a>
-    <a class="door quiet" href="https://github.com/hartswf0/terrarium">Source <b>↗</b></a>
-  </nav>
   <form class="say" id="say">
-    <input id="sayInput" name="say" type="text" maxlength="120" autocomplete="off" enterkeyhint="send" placeholder="Say something to the world…" aria-label="Say something to the world">
+    <input id="sayInput" name="say" type="text" maxlength="120" autocomplete="off" enterkeyhint="send" placeholder="Talk to the world behind this page — “night”, “a house here”…" aria-label="Talk to the world behind this page">
     <button class="mic" id="mic" type="button" aria-label="Speak to the world">●</button>
     <button class="send" type="submit" aria-label="Send words into the world">↑</button>
   </form>
@@ -272,6 +424,34 @@ main { position: fixed; inset: 0; z-index: 2; pointer-events: none; }
 
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
+
+// ── THE WORKS ────────────────────────────────────────────────────────────────
+// One list. To publish something new, add a line here — the page builds the
+// card, and the index grows without anyone redesigning the landing.
+const WORKS = [
+  { href: 'TERRARIUM.html', name: 'TERRARIUM', kind: 'the engine', lead: true,
+    note: 'Drive real ground. Build against a gate that answers. One file, four worlds aboard, and anywhere on Earth by name.' },
+  { href: 'unset-04-hartsoe-iii.html', name: 'VESSEL III', kind: 'live · multiplayer',
+    note: 'The peer-to-peer vessel — a shared world with other people in it.' },
+  { href: 'unset-04-hartsoe-jr.html', name: 'VESSEL JR', kind: 'live',
+    note: 'The smaller vessel: the same rig, a lighter room.' },
+  { href: 'engine.html', name: 'ENGINE (dev)', kind: 'source build',
+    note: 'The same cockpit served from src/ — for reading the parts while they run.' },
+  { href: 'https://github.com/hartswf0/terrarium', name: 'SOURCE', kind: 'github', quiet: true,
+    note: 'The theory documents, the tests, and every organ named in them.' },
+];
+
+const grid = document.querySelector('#worksGrid');
+if (grid) {
+  grid.innerHTML = WORKS.map((w) => `
+    <li class="work${w.lead ? ' lead' : ''}${w.quiet ? ' quiet' : ''}">
+      <a href="${w.href}"${/^https?:/.test(w.href) ? ' rel="noopener"' : ''}>
+        <span class="kind">${w.kind}</span>
+        <span class="name">${w.name} <b>↗</b></span>
+        <span class="note">${w.note}</span>
+      </a>
+    </li>`).join('');
+}
 
 const canvas = document.querySelector('#world');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -574,10 +754,62 @@ function resize() {
 addEventListener('resize', resize);
 resize();
 
+// ── SCROLLYTELLING ──────────────────────────────────────────────────────────
+// The world is the backdrop and the page is the story told over it: each
+// chapter names the camera it wants (data-yaw / data-pitch / data-night) and
+// the scene EASES between them as you scroll. Nothing jumps, nothing is a
+// slideshow, and the reader is never asked to click to keep reading.
+const chapters = [...document.querySelectorAll('.chapter')];
+let wantYaw = 0, wantPitch = .62, wantNight = 0, current = null;
+
+
+function enter(c) {
+  if (!c || c === current) return;
+  current = c;
+  chapters.forEach((x) => x.classList.toggle('on', x === c));
+  wantYaw = parseFloat(c.dataset.yaw || 0);
+  wantPitch = parseFloat(c.dataset.pitch || .62);
+  wantNight = parseFloat(c.dataset.night || 0);
+}
+// THE STORY IS READ FROM THE RENDER LOOP, not from a scroll event and not
+// from an observer. Either can be silenced — a scroll listener hears nothing
+// when the BODY is the scrolling box, and an IntersectionObserver needs frames
+// the page may not be producing. The loop is already running; five rectangles
+// per tick is nothing, and it is true no matter what moves.
+function syncChapter() {
+  const mid = innerHeight * .45;
+  let best = chapters[0], bestD = Infinity;
+  for (const c of chapters) {
+    const r = c.getBoundingClientRect();
+    const d = Math.abs(r.top + r.height / 2 - mid);
+    if (d < bestD) { bestD = d; best = c; }
+  }
+  enter(best);
+  const r = best.getBoundingClientRect();
+  const t = Math.max(-1, Math.min(1, (mid - (r.top + r.height / 2)) / innerHeight));
+  wantYaw = parseFloat(best.dataset.yaw || 0) + t * .35;
+}
+window.syncChapter = syncChapter;
+
+// the nudge inside a chapter listens EVERYWHERE, since either the document or
+// the body may be the thing that moves
+enter(chapters[0]);
+syncChapter();
+
 const clock = new THREE.Clock();
+let frameCount = 0;
 function frame() {
   const time = clock.getElapsedTime();
+  if ((frameCount = (frameCount + 1) % 5) === 0) syncChapter();
   if (playing) orbitYaw -= .0007;
+  // the story steers, unless a hand is on the world
+  if (!pointerDown) {
+    orbitYaw += (wantYaw - orbitYaw) * .045;
+    orbitPitch += (wantPitch - orbitPitch) * .045;
+  }
+  const nightMix = wantNight;
+  scene.background.lerpColors(dayColor, nightColor, nightMix * .82);
+  scene.fog.color.copy(scene.background);
   camera.position.set(Math.sin(orbitYaw) * orbitRadius, Math.sin(orbitPitch) * orbitRadius * .72 + 3, Math.cos(orbitYaw) * orbitRadius);
   cameraTarget.y = innerWidth < 700 ? 1.5 : 1;
   camera.lookAt(cameraTarget);
