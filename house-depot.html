@@ -1,0 +1,1367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HOUSE DEPOT · Henry Kit Roster</title>
+<style>
+  :root{ --ink:#0c0e12; --line:#2a2f38; --chalk:#f3f4f6; --dim:#8b93a1; --amber:#e6b84d; }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;background:var(--ink);overflow:hidden;
+    font-family:"DIN Alternate","Bahnschrift","Arial Narrow",system-ui,sans-serif;
+    color:var(--chalk);-webkit-font-smoothing:antialiased}
+  #app{position:fixed;inset:0}
+  canvas{display:block}
+  .hud{position:fixed;left:0;right:0;top:0;padding:18px 22px;display:flex;align-items:baseline;gap:14px;
+    pointer-events:none;background:linear-gradient(180deg,rgba(10,11,15,.82),rgba(10,11,15,0));z-index:5}
+  .hud h1{font-size:clamp(15px,2vw,22px);letter-spacing:.42em;font-weight:700;text-transform:uppercase}
+  .hud .sub{font-size:11px;letter-spacing:.34em;color:var(--dim);text-transform:uppercase}
+  .legend{position:fixed;right:18px;bottom:18px;z-index:5;border:1px solid var(--line);
+    background:rgba(16,18,24,.82);backdrop-filter:blur(4px);padding:12px 14px;max-width:290px}
+  .legend .lab{font-size:10px;letter-spacing:.3em;color:var(--dim);text-transform:uppercase;margin-bottom:8px}
+  .legend ol{list-style:none;font-size:11.5px;line-height:1.9;letter-spacing:.04em;columns:2;column-gap:16px}
+  .legend ol li{white-space:nowrap;cursor:pointer;transition:color .15s}
+  .legend ol li:hover{color:#fff}
+  .legend ol li b{display:inline-block;width:14px;color:var(--dim)}
+  .kit{position:fixed;left:18px;top:74px;z-index:5;border:1px solid var(--line);
+    background:rgba(16,18,24,.72);padding:10px 12px;max-width:196px}
+  .kit .lab{font-size:9.5px;letter-spacing:.28em;color:var(--dim);text-transform:uppercase;margin-bottom:7px}
+  .kit .sw{display:flex;align-items:center;gap:7px;font-size:10px;letter-spacing:.14em;
+    text-transform:uppercase;color:#c3cad4;margin:4px 0}
+  .kit .sw i{width:12px;height:12px;border:1px solid rgba(255,255,255,.18);flex:0 0 auto}
+  .spec{position:fixed;left:18px;bottom:66px;z-index:5;border-left:2px solid var(--amber);
+    padding:6px 0 6px 10px;max-width:290px;font-size:11px;line-height:1.65;color:#c3cad4;
+    letter-spacing:.04em;opacity:0;transition:opacity .2s}
+  .spec b{display:block;font-size:10px;letter-spacing:.28em;text-transform:uppercase;color:var(--amber);margin-bottom:3px}
+  .hint{position:fixed;left:18px;bottom:18px;z-index:5;font-size:10px;letter-spacing:.26em;
+    color:var(--dim);text-transform:uppercase;line-height:1.8}
+  .hint kbd{border:1px solid var(--line);padding:1px 5px;border-radius:2px;color:#cfd5df;font-family:inherit}
+  .tag{position:fixed;z-index:4;pointer-events:none;transform:translate(-50%,-100%);
+    font-size:10px;letter-spacing:.22em;text-transform:uppercase;white-space:nowrap;
+    padding:3px 7px;border:1px solid var(--line);background:rgba(12,14,18,.92);opacity:0;transition:opacity .15s}
+  .tag .n{color:var(--dim);margin-right:6px}
+  .tag .f{color:var(--amber);margin-left:6px;letter-spacing:.12em}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="hud">
+  <h1>House Depot</h1>
+  <span class="sub">Henry Kit · 09 Species</span>
+</div>
+<div class="kit">
+  <div class="lab">One kit of parts</div>
+  <div class="sw"><i style="background:#3c4740"></i>siding</div>
+  <div class="sw"><i style="background:#646e78"></i>standing seam</div>
+  <div class="sw"><i style="background:#8a8378"></i>masonry</div>
+  <div class="sw"><i style="background:#5d5952"></i>concrete</div>
+  <div class="sw"><i style="background:#9c8767"></i>timber</div>
+  <div class="sw"><i style="background:#22303a"></i>glass</div>
+  <div class="sw"><i style="background:#14171a"></i>steel</div>
+</div>
+<div class="spec" id="spec"><b></b><span></span></div>
+<div class="legend">
+  <div class="lab">Roster</div>
+  <ol id="grid"></ol>
+</div>
+<div class="hint">drag orbit · wheel zoom · click to focus · <kbd>esc</kbd> back<br><kbd id="roofbtn" style="cursor:pointer;pointer-events:auto">R</kbd> roofs off ·
+ <kbd id="wallbtn" style="cursor:pointer;pointer-events:auto">W</kbd> walls off ·
+ <kbd id="auditbtn" style="cursor:pointer;pointer-events:auto">B</kbd> buildability check</div>
+<div class="tag" id="tag"><span class="n"></span><span class="t"></span><span class="f"></span></div>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js" }}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* ============================================================
+   HOUSE DEPOT — nine houses, one kit of parts.
+
+   These are built the way the HENRY HOUSE is built, not merely in its
+   colours. The first pass of this file was massing — boxes with glass
+   decals stuck on the outside — and it read as toys, because the things
+   that make a building believable were missing:
+
+     · OPENINGS ARE HOLES. A wall is assembled as piers between windows
+       plus the strip below the sill and the strip above the head. Glass
+       sits INSIDE the wall thickness, in a reveal, with a frame. Nothing
+       is coplanar with anything, which is also why nothing flickers.
+     · THE EAVE IS THE BUILDING. Their source says so outright. Every
+       roof here carries a fascia, a gutter, a soffit and downspouts that
+       reach the ground.
+     · DECKS ARE BOARDS. Framing, then individual boards, then a cable
+       guard on steel posts that stand on footings.
+     · EVERYTHING LANDS. No floating porch posts, no hovering cisterns.
+       If it is in the air, something carries it.
+     · SURFACES HAVE GRAIN. Board siding, standing-seam ribs and board-
+       formed concrete are drawn into textures and tiled at a fixed size
+       in FEET, so a 40 ft wall has forty feet of boards on it.
+
+   Units are FEET, and the house frame is the Henry frame: x along the
+   bar, y across (north), z up — mbox maps that to three.js as (x, z, −y)
+   so a part could be lifted between this file and the real model.
+   ============================================================ */
+
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.42;
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x2b333d);
+scene.fog = new THREE.Fog(0x2b333d, 60, 150);
+const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 300);
+
+function buildEnvMap() {
+  const es = new THREE.Scene();
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(50, 24, 12), new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    uniforms: { top: { value: new THREE.Color(0x4a5a76) }, bot: { value: new THREE.Color(0x0a0c10) } },
+    vertexShader: 'varying vec3 vP; void main(){vP=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+    fragmentShader: 'varying vec3 vP; uniform vec3 top; uniform vec3 bot; void main(){float h=clamp(normalize(vP).y*0.5+0.5,0.,1.); gl_FragColor=vec4(mix(bot,top,h),1.);}'
+  }));
+  es.add(sky);
+  const lm = new THREE.MeshBasicMaterial({ color: 0xfff4e0 });
+  for (let i = -2; i <= 2; i++) { const s = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.4, 30), lm); s.position.set(i * 8, 22, 0); es.add(s); }
+  const pm = new THREE.PMREMGenerator(renderer); const rt = pm.fromScene(es, 0.04); pm.dispose();
+  return rt.texture;
+}
+const envMap = buildEnvMap(); scene.environment = envMap;
+
+scene.add(new THREE.HemisphereLight(0xa8bcd6, 0x272d36, 0.95));
+scene.add(new THREE.AmbientLight(0xffffff, 0.46));
+const key = new THREE.DirectionalLight(0xfff2dd, 2.1);
+key.position.set(13, 23, 15); key.castShadow = true; key.shadow.mapSize.set(2048, 2048);
+{ const d = 26, c = key.shadow.camera; c.left = -d; c.right = d; c.top = d; c.bottom = -d; c.near = 1; c.far = 76;
+  key.shadow.bias = -0.0004; key.shadow.normalBias = 0.02; }
+scene.add(key);
+const rim = new THREE.DirectionalLight(0x6f8bd0, 0.5);
+rim.position.set(-12, 9, -10); rim.intensity = 0.75; scene.add(rim);   // .position is read-only; set through it, never over it
+
+/* ═══ KIT START ═══ everything between these markers is self-contained
+   (given THREE + an optional envMap) and is what other pages import. */
+/* ============================================================
+   GRAIN — textures drawn once, tiled in feet
+   ============================================================ */
+function tex(draw, px) {
+  const c = document.createElement('canvas'); c.width = c.height = px || 256;
+  draw(c.getContext('2d'), c.width);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+/* horizontal board siding — a shadow line every board */
+const TX_SIDING = tex((x, N) => {
+  x.fillStyle = '#59665e'; x.fillRect(0, 0, N, N);
+  for (let i = 0; i < 8; i++) {
+    const y = i * N / 8;
+    x.fillStyle = 'rgba(255,255,255,0.05)'; x.fillRect(0, y + 1, N, N / 8 - 3);
+    x.fillStyle = 'rgba(0,0,0,0.55)'; x.fillRect(0, y + N / 8 - 2, N, 2);
+  }
+  for (let i = 0; i < 240; i++) {   // grain
+    x.fillStyle = 'rgba(0,0,0,' + (0.03 + Math.random() * 0.05) + ')';
+    x.fillRect(Math.random() * N, Math.random() * N, 18 + Math.random() * 40, 1);
+  }
+});
+/* standing seam — a raised rib every panel */
+const TX_SEAM = tex((x, N) => {
+  x.fillStyle = '#8b949c'; x.fillRect(0, 0, N, N);
+  for (let i = 0; i < 6; i++) {
+    const u = i * N / 6;
+    x.fillStyle = 'rgba(255,255,255,0.16)'; x.fillRect(u + 2, 0, 3, N);
+    x.fillStyle = 'rgba(0,0,0,0.42)'; x.fillRect(u, 0, 2, N);
+  }
+});
+/* board-formed concrete */
+const TX_CONC = tex((x, N) => {
+  x.fillStyle = '#8d887f'; x.fillRect(0, 0, N, N);
+  for (let i = 0; i < 10; i++) {
+    x.fillStyle = 'rgba(0,0,0,0.16)'; x.fillRect(0, i * N / 10, N, 1.5);
+  }
+  for (let i = 0; i < 700; i++) {
+    x.fillStyle = 'rgba(0,0,0,' + (Math.random() * 0.09) + ')';
+    x.fillRect(Math.random() * N, Math.random() * N, 2, 2);
+  }
+});
+/* coursed stone */
+const TX_STONE = tex((x, N) => {
+  x.fillStyle = '#9a9186'; x.fillRect(0, 0, N, N);
+  const rows = 7;
+  for (let r = 0; r < rows; r++) {
+    const h = N / rows, off = (r % 2) * 0.5;
+    for (let c = 0; c < 4; c++) {
+      const w = N / 4;
+      x.fillStyle = 'rgba(0,0,0,' + (0.06 + Math.random() * 0.16) + ')';
+      x.fillRect((c + off) * w + 1, r * h + 1, w - 2, h - 2);
+    }
+    x.fillStyle = 'rgba(0,0,0,0.4)'; x.fillRect(0, r * h, N, 1.5);
+  }
+});
+/* deck boards */
+const TX_DECK = tex((x, N) => {
+  x.fillStyle = '#a58f6d'; x.fillRect(0, 0, N, N);
+  for (let i = 0; i < 10; i++) {
+    x.fillStyle = 'rgba(0,0,0,0.42)'; x.fillRect(i * N / 10, 0, 2, N);
+    x.fillStyle = 'rgba(255,255,255,0.05)'; x.fillRect(i * N / 10 + 3, 0, N / 10 - 6, N);
+  }
+});
+
+const std = (c, r, m, map) => new THREE.MeshStandardMaterial({
+  color: c, roughness: r, metalness: m || 0, map: map || null, envMap, envMapIntensity: 0.5 });
+const M = {
+  siding:   std(0x69766c, 0.84, 0, TX_SIDING),
+  roof:     std(0x6d757c, 0.62, 0.18, TX_SEAM),   // painted seam, not chrome
+  masonry:  std(0x9a9186, 0.92, 0, TX_STONE),
+  concrete: std(0x8d887f, 0.93, 0, TX_CONC),
+  timber:   std(0xa58f6d, 0.86, 0, TX_DECK),
+  steel:    std(0x1b1f24, 0.55, 0.45),
+  fascia:   std(0x222a2c, 0.72),
+  gutter:   std(0x1b2225, 0.6, 0.2),
+  frame:    std(0x1a1f24, 0.45, 0.28),
+  water:    new THREE.MeshPhysicalMaterial({ color: 0x2b4b52, roughness: 0.06, metalness: 0, envMap, envMapIntensity: 1.3 }),
+  gravel:   std(0x2a2f36, 0.96),
+};
+M.white  = std(0xd8d4ca, 0.55);
+M.linen  = std(0xb9b2a2, 0.9);
+// vertex-built slabs/prisms wind both ways; double-side the structural mats
+[M.siding, M.roof, M.timber, M.steel, M.fascia, M.concrete, M.masonry].forEach((m) => { m.side = THREE.DoubleSide; });
+M.glass = (() => {
+  const m = new THREE.MeshPhysicalMaterial({ color: 0x1d2a34, metalness: 0, roughness: 0.05,
+    transparent: true, opacity: 0.46, envMap, envMapIntensity: 1.5, clearcoat: 1, clearcoatRoughness: 0.06,
+    side: THREE.DoubleSide, depthWrite: false });
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uRim = { value: new THREE.Color(0xbfd2e8) };
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 uRim;')
+      .replace('#include <opaque_fragment>',
+        'float fres=pow(1.0-clamp(dot(normalize(vViewPosition),normal),0.0,1.0),3.0);\n' +
+        'outgoingLight+=uRim*fres*0.9; diffuseColor.a=clamp(diffuseColor.a+fres*0.5,0.0,0.95);\n' +
+        '#include <opaque_fragment>');
+  };
+  return m;
+})();
+
+/* ============================================================
+   PARTS — all in FEET.  x = along the bar · y = across · z = up
+   ============================================================ */
+/* tile a texture at a fixed size in feet no matter how big the box is */
+function boxUV(geo, w, h, d, tile) {
+  const uv = geo.attributes.uv;
+  const S = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
+  for (let f = 0; f < 6; f++) {
+    const su = S[f][0] / tile, sv = S[f][1] / tile;
+    for (let i = 0; i < 4; i++) {
+      const k = f * 4 + i;
+      uv.setXY(k, uv.getX(k) * su, uv.getY(k) * sv);
+    }
+  }
+  uv.needsUpdate = true;
+}
+function mbox(x0, x1, y0, y1, z0, z1, mat, tile) {
+  const w = Math.abs(x1 - x0), h = Math.abs(z1 - z0), d = Math.abs(y1 - y0);
+  const g = new THREE.BoxGeometry(w, h, d);
+  if (tile) boxUV(g, w, h, d, tile);
+  const m = new THREE.Mesh(g, mat);
+  m.position.set((x0 + x1) / 2, (z0 + z1) / 2, -(y0 + y1) / 2);
+  m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+const SID = 3, CON = 5, STO = 4, DEK = 3.5, SEA = 3;   // texture tile sizes, feet
+
+/* A WALL WITH HOLES IN IT.
+   run = along x (dir 'x') or along y (dir 'y'); `band` is the wall's two
+   faces in the other horizontal axis. Openings are cut properly: pier,
+   under-sill, over-head. Glass is set INSIDE the band with a frame, so
+   no two surfaces ever share a plane. */
+function wall(g, dir, a0, a1, b0, b1, z0, z1, ops, mat) {
+  mat = mat || M.siding;
+  const put = (s, e, zz0, zz1, mm, tl) => {
+    if (e - s < 0.05 || zz1 - zz0 < 0.05) return;
+    g.add(dir === 'x' ? mbox(s, e, b0, b1, zz0, zz1, mm, tl) : mbox(b0, b1, s, e, zz0, zz1, mm, tl));
+  };
+  const hits = (ops || []).slice().sort((p, q) => p[0] - q[0]);
+  let cur = a0;
+  for (const o of hits) {
+    const s = Math.max(a0, o[0]), e = Math.min(a1, o[1]), sill = o[2], head = o[3];
+    put(cur, s, z0, z1, mat, SID);                      // pier between openings
+    put(s, e, z0, Math.max(z0, sill), mat, SID);        // under the sill
+    put(s, e, Math.min(z1, head), z1, mat, SID);        // over the head
+    cur = e;
+  }
+  put(cur, a1, z0, z1, mat, SID);
+  const t = b1 - b0;
+  for (const o of hits) {
+    const s = Math.max(a0, o[0]), e = Math.min(a1, o[1]), sill = o[2], head = o[3];
+    if (head - sill < 0.4 || e - s < 0.4) continue;
+    const gi0 = b0 + t * 0.34, gi1 = b1 - t * 0.34;     // glass, deep in the reveal
+    if (o[4] === 'd') {
+      // A DOOR YOU COULD WALK THROUGH: leaf hung in the reveal, a lit glazed
+      // slot at head height, a stone threshold that oversails the wall, a
+      // lever at 3 ft, and a step down to grade so the entry MEETS the ground.
+      const leaf = dir === 'x' ? mbox(s + 0.3, e - 0.3, gi0, gi1, sill + 0.15, head - 0.2, M.timber, 2.2)
+                               : mbox(gi0, gi1, s + 0.3, e - 0.3, sill + 0.15, head - 0.2, M.timber, 2.2);
+      g.add(leaf);
+      const lz0 = head - 2.6, lz1 = head - 0.9;
+      g.add(dir === 'x' ? mbox(s + 0.85, e - 0.85, gi0 - 0.06, gi1 + 0.06, lz0, lz1, M.glass)
+                        : mbox(gi0 - 0.06, gi1 + 0.06, s + 0.85, e - 0.85, lz0, lz1, M.glass));
+      const hx = dir === 'x' ? [e - 1.15, e - 0.85] : null;
+      if (dir === 'x') g.add(mbox(hx[0], hx[1], b0 - 0.18, b0 + 0.06, sill + 3.0, sill + 3.35, M.steel));
+      else g.add(mbox(b0 - 0.18, b0 + 0.06, e - 1.15, e - 0.85, sill + 3.0, sill + 3.35, M.steel));
+      // a FLUSH threshold. The old masonry sill + concrete grade-step assumed
+      // the door met dirt — on a deck the blocks punched up through the boards.
+      // Whatever the door lands on (deck, porch, slab, stair pad) is the step.
+      if (dir === 'x') g.add(mbox(s - 0.25, e + 0.25, b0 - 0.35, b1 - t * 0.2, sill - 0.12, sill + 0.04, M.masonry, STO));
+      else g.add(mbox(b0 - 0.35, b1 - t * 0.2, s - 0.25, e + 0.25, sill - 0.12, sill + 0.04, M.masonry, STO));
+    } else {
+      const gl = dir === 'x' ? mbox(s + 0.25, e - 0.25, gi0, gi1, sill + 0.25, head - 0.25, M.glass)
+                             : mbox(gi0, gi1, s + 0.25, e - 0.25, sill + 0.25, head - 0.25, M.glass);
+      gl.castShadow = false; g.add(gl);
+      const sl = dir === 'x' ? mbox(s - 0.2, e + 0.2, b0 - 0.35, b1 - t * 0.2, sill - 0.22, sill + 0.06, M.fascia)
+                             : mbox(b0 - 0.35, b1 - t * 0.2, s - 0.2, e + 0.2, sill - 0.22, sill + 0.06, M.fascia);
+      g.add(sl);                                          // a sill that sheds water
+      const hd = dir === 'x' ? mbox(s - 0.3, e + 0.3, b0 - 0.45, b1 - t * 0.2, head, head + 0.3, M.fascia)
+                             : mbox(b0 - 0.45, b1 - t * 0.2, s - 0.3, e + 0.3, head, head + 0.3, M.fascia);
+      g.add(hd);                                          // and a head flashing over it
+    }
+    const f = 0.25, fo0 = b0 + t * 0.14, fo1 = b1 - t * 0.14;   // frame, proud of the glass
+    if (dir === 'x') {
+      g.add(mbox(s, e, fo0, fo1, sill, sill + f, M.frame));
+      g.add(mbox(s, e, fo0, fo1, head - f, head, M.frame));
+      g.add(mbox(s, s + f, fo0, fo1, sill, head, M.frame));
+      g.add(mbox(e - f, e, fo0, fo1, sill, head, M.frame));
+      if (e - s > 7) g.add(mbox((s + e) / 2 - 0.12, (s + e) / 2 + 0.12, fo0, fo1, sill, head, M.frame));
+    } else {
+      g.add(mbox(fo0, fo1, s, e, sill, sill + f, M.frame));
+      g.add(mbox(fo0, fo1, s, e, head - f, head, M.frame));
+      g.add(mbox(fo0, fo1, s, s + f, sill, head, M.frame));
+      g.add(mbox(fo0, fo1, e - f, e, sill, head, M.frame));
+      if (e - s > 7) g.add(mbox(fo0, fo1, (s + e) / 2 - 0.12, (s + e) / 2 + 0.12, sill, head, M.frame));
+    }
+  }
+}
+/* the four walls of a box volume, openings keyed by face */
+function room(g, x0, x1, y0, y1, z0, z1, ops) {
+  const t = 0.7;
+  ops = ops || {};
+  const mark = g.children.length;   // everything added below is ENVELOPE, liftable
+  wall(g, 'x', x0, x1, y0, y0 + t, z0, z1, ops.s, M.siding);
+  wall(g, 'x', x0, x1, y1 - t, y1, z0, z1, ops.n, M.siding);
+  wall(g, 'y', y0 + t, y1 - t, x0, x0 + t, z0, z1, ops.w, M.siding);
+  wall(g, 'y', y0 + t, y1 - t, x1 - t, x1, z0, z1, ops.e, M.siding);
+  for (const cx of [x0, x1 - 0.5]) for (const cy of [y0, y1 - 0.5]) {   // corner boards
+    g.add(mbox(cx, cx + 0.5, cy, cy + 0.5, z0, z1, M.fascia));
+  }
+  for (let i = mark; i < g.children.length; i++) g.children[i].userData.wallPart = true;
+}
+/* ── VERTEX-BUILT ROOFS ────────────────────────────────────────────────────
+   Every earlier roof was a rotated box, and across four rounds a sign kept
+   flipping somewhere between the rotation, the wedge and the eave hardware.
+   So roofs are no longer rotated into place at all: the four corners of each
+   plane are COMPUTED, in feet, from the roof equation z(u), and the fascia,
+   gutter, downspouts and wedge are computed from the SAME equation. A plane
+   can no longer disagree with its own eave.
+
+   THE CRITIC rides along: every roof and stair registers rule checks
+   (fall exists, gutter on the low edge, wall head meets the roof, riser in
+   the code range) into CRITIC, and the B audit reports them with the
+   connectivity check. */
+const CRITIC = [];
+let CUR = '';
+function crit(name, pass, detail) { CRITIC.push({ name: CUR + ' · ' + name, pass: !!pass, detail: String(detail) }); }
+function W(x, y, z) { return new THREE.Vector3(x, z, -y); }   // house feet -> world
+function slab(g, A, B, C, D, th, mat, tile) {
+  const P = [A, B, C, D].map((q) => W(q[0], q[1], q[2]));
+  let n = new THREE.Vector3().subVectors(P[1], P[0]).cross(new THREE.Vector3().subVectors(P[3], P[0])).normalize();
+  if (n.y < 0) n.negate();
+  const Q = P.map((q) => q.clone().addScaledVector(n, -th));
+  const v = [];
+  const quad = (a, b, c, d) => { v.push(a, b, c, a, c, d); };
+  quad(P[0], P[1], P[2], P[3]); quad(Q[3], Q[2], Q[1], Q[0]);
+  quad(Q[0], Q[1], P[1], P[0]); quad(Q[1], Q[2], P[2], P[1]);
+  quad(Q[2], Q[3], P[3], P[2]); quad(Q[3], Q[0], P[0], P[3]);
+  const geo = new THREE.BufferGeometry().setFromPoints(v);
+  geo.computeVertexNormals();
+  const t2 = tile || 3, eU = new THREE.Vector3().subVectors(P[1], P[0]).normalize(),
+        eV = new THREE.Vector3().subVectors(P[3], P[0]).normalize(), uv = [];
+  for (const q of v) { const d = new THREE.Vector3().subVectors(q, P[0]); uv.push(d.dot(eU) / t2, d.dot(eV) / t2); }
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  const m = new THREE.Mesh(geo, mat);
+  m.castShadow = true; m.receiveShadow = true; g.add(m);
+  return m;
+}
+function prism(g, exAxis, a0, a1, pts, mat) {
+  // solid prism: cross-section pts [[v,z]…] extruded a0..a1 along exAxis
+  const pt = (a, q) => exAxis === 'x' ? W(a, q[0], q[1]) : W(q[0], a, q[1]);
+  const A = pts.map((q) => pt(a0, q)), B = pts.map((q) => pt(a1, q));
+  const v = [];
+  for (let i = 1; i + 1 < pts.length; i++) { v.push(A[0], A[i], A[i + 1]); v.push(B[0], B[i + 1], B[i]); }
+  for (let i = 0; i < pts.length; i++) {
+    const j = (i + 1) % pts.length;
+    v.push(A[i], B[i], B[j], A[i], B[j], A[j]);
+  }
+  const geo = new THREE.BufferGeometry().setFromPoints(v);
+  geo.computeVertexNormals();
+  const uv = []; for (const q of v) uv.push(q.x / SID, q.y / SID);
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  const m = new THREE.Mesh(geo, mat);
+  m.castShadow = true; m.receiveShadow = true; g.add(m);
+  return m;
+}
+function shed(g, x0, x1, y0, y1, zLo, zHi, oh, grade, opts) {
+  opts = opts || {};
+  const ax = opts.axis || 'y';                       // the axis the slope runs along
+  const u0 = ax === 'y' ? y0 : x0, u1 = ax === 'y' ? y1 : x1;
+  const v0 = ax === 'y' ? x0 : y0, v1 = ax === 'y' ? x1 : y1;
+  const pitch = (zHi - zLo) / (u1 - u0);
+  const zAt = (u) => zLo + pitch * (u - u0);
+  const ohLo = opts.ohLo != null ? opts.ohLo : oh, ohHi = opts.ohHi != null ? opts.ohHi : oh;
+  const uA = u0 - ohLo, uB = u1 + ohHi, vA = v0 - oh, vB = v1 + oh;
+  const P = (u, v) => ax === 'y' ? [v, u, zAt(u)] : [u, v, zAt(u)];
+  slab(g, P(uA, vA), P(uA, vB), P(uB, vB), P(uB, vA), 0.5, M.roof, SEA).userData.roofPart = true;
+  // the raking band between the flat wall head and the roof line
+  const wallU = opts.wall ? opts.wall[0] : u0, wallZ = opts.wall ? opts.wall[1] : zLo;
+  // the wedge's sloped face sits 0.15 BELOW the roof plane — sharing the exact
+  // plane with the slab's top face was the shimmering "double material".
+  // Seam ends (oh = 0) inset 2 hundredths so two abutting wedges never share a face.
+  const e0 = wallU + (ohLo === 0 ? 0.02 : 0), e1 = u1 - (ohHi === 0 ? 0.02 : 0);
+  // THE WEDGE TOP RUNS PARALLEL TO THE ROOF, a slab-thickness below it.
+  // Clamping just its low corner tilted the top SHALLOWER than the roof, and
+  // it surfaced through the slab mid-span — the dark patch on the heart roof.
+  // Where the roof line comes down to the wall head, the wedge simply ENDS.
+  // (Ends also inset 0.06 so they never share the walls' outer planes.)
+  {
+    const tuck = 0.56;                               // >= the slab's vertical thickness
+    const zt = (u) => zAt(u) - tuck;
+    let w0 = e0, w1 = e1;
+    if (pitch > 0 && zt(w0) < wallZ) w0 = u0 + (wallZ + tuck - zLo) / pitch;   // rises: start where it clears
+    if (pitch < 0 && zt(w1) < wallZ) w1 = u0 + (wallZ + tuck - zLo) / pitch;   // falls: end where it clears
+    if (w1 - w0 > 0.1) {
+      const wedge = prism(g, ax === 'y' ? 'x' : 'y', v0 + 0.06, v1 - 0.06,
+        [[w0, wallZ], [w1, wallZ], [w1, Math.max(wallZ, zt(w1))], [w0, Math.max(wallZ, zt(w0))]], M.siding);
+      wedge.userData.roofPart = true;
+    }
+  }
+  // eave hardware, from the SAME equation — explicit low/high, no sign algebra
+  const mb = (a0v, a1v, b0v, b1v, zz0, zz1, m2, tl) => g.add(ax === 'y'
+    ? mbox(b0v, b1v, a0v, a1v, zz0, zz1, m2, tl) : mbox(a0v, a1v, b0v, b1v, zz0, zz1, m2, tl));
+  const GR = 0.38;
+  const lowAtA = pitch >= 0;
+  const uLow = lowAtA ? uA : uB, uHigh = lowAtA ? uB : uA;
+  const zL = zAt(uLow), zH = zAt(uHigh);
+  if (lowAtA) mb(uA - 0.55, uA, vA, vB, zL - 1.05, zL + 0.1, M.fascia);
+  else mb(uB, uB + 0.55, vA, vB, zL - 1.05, zL + 0.1, M.fascia);
+  const highOh = lowAtA ? ohHi : ohLo;
+  if (highOh > 0.01) {
+    if (lowAtA) mb(uB, uB + 0.55, vA, vB, zH - 1.05, zH + 0.1, M.fascia);
+    else mb(uA - 0.55, uA, vA, vB, zH - 1.05, zH + 0.1, M.fascia);
+  }
+  const gU = lowAtA ? uA - 0.55 - GR : uB + 0.55 + GR;
+  const gt = new THREE.Mesh(new THREE.CylinderGeometry(GR, GR, vB - vA, 12), M.gutter);
+  if (ax === 'y') { gt.rotation.z = Math.PI / 2; gt.position.set((vA + vB) / 2, zL - 0.42 - GR, -gU); }
+  else { gt.rotation.x = Math.PI / 2; gt.position.set(gU, zL - 0.42 - GR, -(vA + vB) / 2); }
+  gt.castShadow = true; g.add(gt);
+  if (grade != null) for (const dv of [vA + 1.5, vB - 1.5]) {
+    if (lowAtA) mb(uA - 0.55 - GR * 2, uA - 0.55, dv - 0.28, dv + 0.28, grade, zL - 0.42 - GR, M.gutter);
+    else mb(uB + 0.55, uB + 0.55 + GR * 2, dv - 0.28, dv + 0.28, grade, zL - 0.42 - GR, M.gutter);
+  }
+  for (let v = vA + 1.5; v < vB; v += 4) {                        // rafter tails, 18in past the fascia
+    if (lowAtA) mb(uA + 0.15, uA + 1.65, v - 0.25, v + 0.25, zL - 0.43, zL + 0.02, M.timber);
+    else mb(uB - 1.65, uB - 0.15, v - 0.25, v + 0.25, zL - 0.43, zL + 0.02, M.timber);
+  }
+  // the RAKES: the sloped edges get a board, computed from the same zAt —
+  // a bare slab edge is what read as "the eave is on the wrong side"
+  for (const vE of [vA, vB]) {
+    const sgn = vE === vA ? -1 : 1;
+    const q0 = P(uA, vE), q1 = P(uB, vE);
+    const rb = slab(g, [q0[0], q0[1], q0[2] + 0.08], [q1[0], q1[1], q1[2] + 0.08],
+      [q1[0], q1[1], q1[2] - 1.0], [q0[0], q0[1], q0[2] - 1.0], 0.16, M.fascia, 3);
+    rb.userData.roofPart = true;
+    rb.position.add(ax === 'y' ? new THREE.Vector3(sgn * 0.08, 0, 0) : new THREE.Vector3(0, 0, -sgn * 0.08));
+  }
+  crit('shed has fall', Math.abs(pitch) > 0.01, 'pitch ' + pitch.toFixed(3));
+  crit('gutter on the LOW edge', zAt(gU > (u0 + u1) / 2 ? uB : uA) <= zAt(gU > (u0 + u1) / 2 ? uA : uB), 'gutter u=' + gU.toFixed(1));
+  crit('wall head meets roof', zAt(wallU) >= wallZ - 0.06 && zAt(wallU) - wallZ < 6, 'roof ' + zAt(wallU).toFixed(2) + ' vs wall ' + wallZ);
+}
+function gable(g, x0, x1, y0, y1, zE, zR, oh, grade) {
+  oh = oh == null ? 2.5 : oh;
+  const yc = (y0 + y1) / 2, half = (y1 - y0) / 2, rise = zR - zE;
+  const zEa = zE - (rise / half) * oh;                            // eave height past the wall
+  const X0 = x0 - oh, X1 = x1 + oh, GR = 0.36;
+  slab(g, [X0, y0 - oh, zEa], [X1, y0 - oh, zEa], [X1, yc, zR + 0.02], [X0, yc, zR + 0.02], 0.5, M.roof, SEA).userData.roofPart = true;
+  slab(g, [X0, yc, zR + 0.02], [X1, yc, zR + 0.02], [X1, y1 + oh, zEa], [X0, y1 + oh, zEa], 0.5, M.roof, SEA).userData.roofPart = true;
+  g.add(mbox(X0, X1, yc - 0.4, yc + 0.4, zR - 0.1, zR + 0.42, M.roof, SEA));   // ridge cap
+  const wedge = prism(g, 'x', x0 + 0.06, x1 - 0.06, [[y0, zE], [y1, zE], [yc, zR - 0.18]], M.siding);   // apex tucked; ends inset off the wall planes
+  wedge.userData.roofPart = true;
+  [-1, 1].forEach((sg) => {
+    const yE = yc + sg * (half + oh);
+    g.add(mbox(X0, X1, yE, yE + sg * 0.55, zEa - 1.0, zEa + 0.1, M.fascia));
+    const gt = new THREE.Mesh(new THREE.CylinderGeometry(GR, GR, X1 - X0, 12), M.gutter);
+    gt.rotation.z = Math.PI / 2;
+    gt.position.set((X0 + X1) / 2, zEa - 0.4 - GR, -(yE + sg * (0.55 + GR)));
+    gt.castShadow = true; g.add(gt);
+    if (grade != null) g.add(mbox(X0 + 1, X0 + 1.55, yE + sg * 0.55, yE + sg * (0.55 + GR * 2),
+      grade, zEa - 0.4 - GR, M.gutter));
+  });
+  crit('gable ridge above eaves', zR > zEa, 'ridge ' + zR + ' eave ' + zEa.toFixed(2));
+  crit('gable eaves level', true, 'both at ' + zEa.toFixed(2));
+}
+/* a deck that is FRAMED and BOARDED, on posts that reach the ground */
+function deck(g, x0, x1, y0, y1, z, grade, rail) {
+  g.add(mbox(x0, x1, y0, y1, z - 1.05, z - 0.35, M.timber, DEK));         // framing
+  for (let y = y0 + 0.1; y < y1 - 0.2; y += 0.62) {                       // individual boards
+    g.add(mbox(x0, x1, y, y + 0.5, z - 0.35, z, M.timber, DEK));
+  }
+  for (let x = x0 + 1.2; x <= x1 - 1; x += 8) for (const y of [y0 + 0.8, y1 - 0.8]) {
+    g.add(mbox(x - 0.3, x + 0.3, y - 0.3, y + 0.3, grade, z - 1.05, M.steel));   // posts, to grade
+    g.add(mbox(x - 0.7, x + 0.7, y - 0.7, y + 0.7, grade, grade + 0.5, M.concrete, CON));  // footing
+  }
+  if (rail !== false) {
+    // guard the OUTER edge and the two ENDS. The house edge stays open —
+    // a rail along it was standing in front of every deck door.
+    const gap = rail && rail.gap;
+    const spans = gap ? [[x0, gap[0]], [gap[1], x1]] : [[x0, x1]];
+    for (const [a, b2] of spans) {
+      if (b2 - a < 0.3) continue;
+      g.add(mbox(a, b2, y0 - 0.12, y0 + 0.12, z + 3.35, z + 3.6, M.steel));
+      for (let cz = 0.6; cz < 3.3; cz += 0.55) {
+        g.add(mbox(a, b2, y0 - 0.05, y0 + 0.05, z + cz, z + cz + 0.08, M.steel));
+      }
+      g.add(mbox(a - 0.02, a + 0.3, y0 - 0.16, y0 + 0.16, z, z + 3.6, M.steel));
+      g.add(mbox(b2 - 0.3, b2 + 0.02, y0 - 0.16, y0 + 0.16, z, z + 3.6, M.steel));
+      for (let x = a + 5.5; x < b2 - 0.5; x += 5.5) {
+        g.add(mbox(x - 0.16, x + 0.16, y0 - 0.16, y0 + 0.16, z, z + 3.6, M.steel));
+      }
+    }
+    for (const ax2 of [x0, x1]) {                          // the ends
+      g.add(mbox(ax2 - 0.12, ax2 + 0.12, y0, y1, z + 3.35, z + 3.6, M.steel));
+      for (let cz = 0.6; cz < 3.3; cz += 0.55) {
+        g.add(mbox(ax2 - 0.05, ax2 + 0.05, y0, y1, z + cz, z + cz + 0.08, M.steel));
+      }
+      for (let y = y0 + 0.16; y < y1; y += 5.5) {
+        g.add(mbox(ax2 - 0.16, ax2 + 0.16, y - 0.16, y + 0.16, z, z + 3.6, M.steel));
+      }
+    }
+  }
+}
+/* masonry mass with a corbelled cap — every species keeps its fire somewhere */
+function flue(g, x, y, zBase, zTop, w) {
+  FIREPITS.push({ h: CUR, x, y });
+  w = w || 4.7;
+  g.add(mbox(x - w / 2, x + w / 2, y - w / 2, y + w / 2, zBase, zTop - 1.1, M.masonry, STO));
+  g.add(mbox(x - w / 2 - 0.4, x + w / 2 + 0.4, y - w / 2 - 0.4, y + w / 2 + 0.4, zTop - 1.1, zTop - 0.5, M.masonry, STO));
+  g.add(mbox(x - w / 2 - 0.2, x + w / 2 + 0.2, y - w / 2 - 0.2, y + w / 2 + 0.2, zTop - 0.5, zTop - 0.25, M.steel));
+  g.add(mbox(x - 0.7, x + 0.7, y - 0.7, y + 0.7, zTop - 0.25, zTop, M.steel));   // the pot
+}
+function door(g, x0, x1, y, z0, z1, w) {
+  w = w || 0.35;
+  g.add(mbox(x0, x1, y - w, y + w, z0, z1, M.frame));
+  g.add(mbox(x0 + 0.3, x1 - 0.3, y - w - 0.06, y - w + 0.02, z0 + 0.3, z1 - 0.3, M.timber, 2));
+}
+function pier(g, x, y, z0, z1, s) {
+  s = s || 1.1;
+  g.add(mbox(x - s / 2, x + s / 2, y - s / 2, y + s / 2, z0, z1, M.concrete, CON));
+}
+/* ── PROCEDURAL STAIRS ─────────────────────────────────────────────────────
+   Why stairs kept failing: they were authored as world-space geometry, with
+   a sign convention per feature. This builder is TIERED so those mistakes
+   have nowhere to live:
+
+   T1 · THE COUNT   riser count and height are DERIVED from total rise and
+                    the code ceiling (7¾in). Never authored, never wrong.
+   T2 · THE WALK    a stair is a walkline in plan: flights and landings that
+                    consume distance along a HEADING VECTOR; a turn rotates
+                    the vector. There is no left/right/up/down bookkeeping —
+                    only a point p and a direction d.
+   T3 · THE PARTS   every tread, riser, stringer, rail and post is placed in
+                    the segment's LOCAL frame (u along the walk, w across it)
+                    and mapped by one rule: P = p + u·d + w·n. The stringer
+                    and rail are bands on the flight's own nosing line.
+
+   The critic rides along: derived riser in range, and the walk must arrive
+   at exactly the target height with exactly the derived count. */
+const HEAD = { N: [0, 1], S: [0, -1], E: [1, 0], W: [-1, 0] };
+const turnL = (d) => [-d[1], d[0]], turnR = (d) => [d[1], -d[0]];
+function stairs(g, o) {
+  const RIS_MAX = 7.75 / 12, TRD = 11 / 12, SW = o.width || 3.6;
+  const total = o.zTop - o.zBot;
+  const n = Math.max(1, Math.ceil(total / RIS_MAX));
+  const rise = total / n;
+  const grade = o.grade != null ? o.grade : o.zBot;
+  let plan = o.plan;
+  if (!plan) {
+    if (n <= 10) plan = [{ f: n }];
+    else { const n1 = Math.ceil(n / 2);
+      plan = [{ f: n1 }, { landing: SW + 0.4, turn: o.turn || 'R' }, { f: n - n1 }]; }
+  }
+  let p = [o.x, o.y];                       // top nosing, on the walkline centre
+  let d = HEAD[o.heading || 'S'];
+  let z = o.zTop, steps = 0;
+  const put = (uc, wc, uL, wL, z0, z1, mat, tile) => {
+    const nv = turnL(d);
+    const cx = p[0] + d[0] * uc + nv[0] * wc, cy = p[1] + d[1] * uc + nv[1] * wc;
+    const hx = Math.abs(d[0]) * uL / 2 + Math.abs(nv[0]) * wL / 2;
+    const hy = Math.abs(d[1]) * uL / 2 + Math.abs(nv[1]) * wL / 2;
+    g.add(mbox(cx - hx, cx + hx, cy - hy, cy + hy, z0, z1, mat, tile));
+  };
+  for (const seg of plan) {
+    if (seg.landing) {
+      const L = seg.landing, nv = turnL(d);
+      put(L / 2, 0, L, SW, z - 0.35, z, M.timber, DEK);
+      for (const wS of [-1, 1]) {                            // posts to grade, on footings
+        const cx = p[0] + d[0] * (L - 0.6) + nv[0] * wS * (SW / 2 - 0.4);
+        const cy = p[1] + d[1] * (L - 0.6) + nv[1] * wS * (SW / 2 - 0.4);
+        g.add(mbox(cx - 0.25, cx + 0.25, cy - 0.25, cy + 0.25, grade, z - 0.35, M.steel));
+        g.add(mbox(cx - 0.55, cx + 0.55, cy - 0.55, cy + 0.55, grade - 0.5, grade + 0.1, M.concrete, CON));
+      }
+      // guards on the closed edges: the far edge, and the side you do NOT exit
+      const exitSide = (seg.turn === 'L') ? 1 : -1;          // +w is left of travel
+      put(L - 0.15, 0, 0.24, SW, z + 3.35, z + 3.6, M.steel);
+      for (let cz = 0.6; cz < 3.3; cz += 0.55) put(L - 0.15, 0, 0.1, SW, z + cz, z + cz + 0.08, M.steel);
+      put(L / 2, -exitSide * (SW / 2 - 0.08), L, 0.16, z + 3.35, z + 3.6, M.steel);
+      for (let cz = 0.6; cz < 3.3; cz += 0.55) put(L / 2, -exitSide * (SW / 2 - 0.08), L, 0.07, z + cz, z + cz + 0.08, M.steel);
+      if (seg.turn) {
+        // TURN AT THE CENTRE. Advancing the full pad and then turning started
+        // the next flight ON the pad — the bottom step sat on the landing.
+        // You walk to the middle, pivot, and step off the pad's edge.
+        p = [p[0] + d[0] * (L / 2), p[1] + d[1] * (L / 2)];
+        d = seg.turn === 'L' ? turnL(d) : turnR(d);
+        p = [p[0] + d[0] * (SW / 2 + 0.05), p[1] + d[1] * (SW / 2 + 0.05)];
+      } else p = [p[0] + d[0] * L, p[1] + d[1] * L];
+      continue;
+    }
+    const f = seg.f, run = f * TRD, nv = turnL(d);
+    for (let i = 0; i < f; i++) {                            // treads + riser boards
+      const zi = z - (i + 1) * rise;
+      put(i * TRD + TRD / 2, 0, TRD + 0.06, SW, zi - 0.22, zi, M.timber, DEK);
+      put(i * TRD + 0.07, 0, 0.14, SW, zi, zi + rise - 0.22, M.fascia);
+    }
+    for (const wS of [-1, 1]) {                              // stringers + rails ON the nosing line
+      const off = wS * (SW / 2 + 0.09);
+      const A = [p[0] + nv[0] * off, p[1] + nv[1] * off];
+      const B = [A[0] + d[0] * run, A[1] + d[1] * run];
+      slab(g, [A[0], A[1], z - 0.2], [B[0], B[1], z - f * rise - 0.2],
+              [B[0], B[1], z - f * rise - 1.15], [A[0], A[1], z - 1.15], 0.18, M.timber, 2);
+      slab(g, [A[0], A[1], z + 2.85], [B[0], B[1], z - f * rise + 2.85],
+              [B[0], B[1], z - f * rise + 3.02], [A[0], A[1], z + 3.02], 0.17, M.steel, 2);
+      for (let i = 0; i <= f; i += 3) {                      // rail posts on nosings
+        put(i * TRD, wS * (SW / 2 + 0.09), 0.17, 0.17, z - i * rise, z - i * rise + 2.85, M.steel);
+      }
+    }
+    p = [p[0] + d[0] * run, p[1] + d[1] * run];
+    z -= f * rise; steps += f;
+  }
+  put(0.9, 0, 1.9, SW + 0.7, grade - 0.5, grade + 0.06, M.concrete, CON);   // the foot, ON grade
+  crit('stair riser derived in range', rise <= RIS_MAX + 1e-9 && rise * 12 >= 5.8, (rise * 12).toFixed(2) + 'in × ' + n);
+  crit('stair arrives exactly', Math.abs(z - o.zBot) < 1e-6 && steps === n, steps + ' steps end at z=' + z.toFixed(3) + ' (target ' + o.zBot + ')');
+}
+/* ── THE PLAN ──────────────────────────────────────────────────────────────
+   A house you cannot imagine living in is a shed. Each species gets its
+   floor and its partitions, and every partition is broken by a cased door
+   opening, so the rooms connect the way rooms do. Hit R (or the button) to
+   lift the roofs off and read the plan from above. */
+function floorSlab(g, x0, x1, y0, y1, z) {
+  g.add(mbox(x0, x1, y0, y1, z - 0.35, z, M.timber, 4.5));
+}
+function part(g, dir, a0, a1, b, z0, z1, gaps) {
+  const t = 0.42, b0 = b - t / 2, b1 = b + t / 2;
+  const put = (p, q) => {
+    if (q - p < 0.05) return;
+    g.add(dir === 'x' ? mbox(p, q, b0, b1, z0, z1, M.siding, SID) : mbox(b0, b1, p, q, z0, z1, M.siding, SID));
+  };
+  const hs = (gaps || []).slice().sort((u, v) => u[0] - v[0]);
+  let cur = a0;
+  for (const gp of hs) {
+    put(cur, gp[0]);
+    const head = z0 + (gp[2] || 6.9);
+    if (head < z1) g.add(dir === 'x' ? mbox(gp[0], gp[1], b0, b1, head, z1, M.siding, SID)
+                                     : mbox(b0, b1, gp[0], gp[1], head, z1, M.siding, SID));
+    const c = 0.28;                                        // the casing
+    if (dir === 'x') {
+      g.add(mbox(gp[0] - c, gp[0], b0 - 0.08, b1 + 0.08, z0, head + c, M.fascia));
+      g.add(mbox(gp[1], gp[1] + c, b0 - 0.08, b1 + 0.08, z0, head + c, M.fascia));
+      g.add(mbox(gp[0] - c, gp[1] + c, b0 - 0.08, b1 + 0.08, head, head + c, M.fascia));
+    } else {
+      g.add(mbox(b0 - 0.08, b1 + 0.08, gp[0] - c, gp[0], z0, head + c, M.fascia));
+      g.add(mbox(b0 - 0.08, b1 + 0.08, gp[1], gp[1] + c, z0, head + c, M.fascia));
+      g.add(mbox(b0 - 0.08, b1 + 0.08, gp[0] - c, gp[1] + c, head, head + c, M.fascia));
+    }
+    cur = gp[1];
+  }
+  put(cur, a1);
+}
+
+
+/* ── ROOMS YOU CAN READ ───────────────────────────────────────────────────
+   A plan is scannable when the rooms say what they are and hold what they
+   hold. Labels are sprites (they face you, they never block the plan) and
+   the fixtures are the honest minimum: a kitchen run with sink and range,
+   a bath with shower, wc and basin, a bed that proves the room takes one. */
+const ROOMTAGS = [], FIREPITS = [];
+function roomLabel(g, text, x, y, z) {
+  ROOMTAGS.push({ h: CUR, t: text, x, y });
+  const c = document.createElement('canvas'); c.width = 256; c.height = 64;
+  const cx = c.getContext('2d');
+  cx.fillStyle = 'rgba(12,14,18,0.78)'; cx.fillRect(0, 0, 256, 64);
+  cx.strokeStyle = '#e6b84d'; cx.lineWidth = 3; cx.strokeRect(2, 2, 252, 60);
+  cx.fillStyle = '#f3f4f6'; cx.font = '700 26px system-ui'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  cx.fillText(text, 128, 34);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true, opacity: 0.85 }));
+  sp.scale.set(5, 1.25, 1);
+  sp.position.copy(W(x, y, z + 1.5));
+  sp.userData.audit = false;
+  g.add(sp);
+}
+function kitchen(g, x0, x1, yB, z0) {
+  g.add(mbox(x0, x1, yB - 2.1, yB, z0, z0 + 3, M.timber, 2));                      // base cabinets
+  g.add(mbox(x0 - 0.05, x1 + 0.05, yB - 2.2, yB, z0 + 3, z0 + 3.2, M.concrete, CON)); // counter
+  g.add(mbox(x0, x1, yB - 1.1, yB, z0 + 4.6, z0 + 7.2, M.siding, SID));            // uppers
+  g.add(mbox(x0 + 1, x0 + 3.4, yB - 2.0, yB - 0.2, z0 + 3.2, z0 + 3.32, M.steel)); // the sink
+  g.add(mbox(x1 - 4, x1 - 1.6, yB - 2.0, yB - 0.2, z0 + 3.2, z0 + 3.4, M.steel));  // the range
+}
+function bathset(g, x, y, z0, opts) {
+  opts = opts || {};
+  if (opts.shower !== false) {
+    g.add(mbox(x, x + 3, y, y + 3, z0, z0 + 0.35, M.concrete, CON));               // shower tray
+    g.add(mbox(x + 2.9, x + 3.02, y, y + 3, z0 + 0.35, z0 + 6.4, M.glass));        // its screen
+  }
+  g.add(mbox(x + 3.6, x + 5, y + 0.2, y + 2.3, z0, z0 + 1.4, M.white));            // wc
+  g.add(mbox(x + 5.4, x + 7.3, y, y + 1.8, z0 + 2.6, z0 + 2.95, M.white));         // basin counter
+  g.add(mbox(x + 5.4, x + 7.3, y, y + 0.4, z0, z0 + 2.6, M.timber, 2));            // its cabinet
+}
+function bed(g, x, y, z0, w, l) {
+  w = w || 5.4; l = l || 7;
+  g.add(mbox(x, x + w, y, y + l, z0, z0 + 1.1, M.timber, 2));
+  g.add(mbox(x + 0.15, x + w - 0.15, y + 0.15, y + l - 0.15, z0 + 1.1, z0 + 1.85, M.white));
+  g.add(mbox(x + 0.5, x + w - 0.5, y + l - 1.6, y + l - 0.4, z0 + 1.85, z0 + 2.2, M.linen));
+}
+function sofa(g, x, y, z0, len) {
+  len = len || 7;
+  g.add(mbox(x, x + len, y, y + 2.8, z0, z0 + 1.35, M.linen));
+  g.add(mbox(x, x + len, y + 2.2, y + 2.8, z0 + 1.35, z0 + 2.6, M.linen));
+}
+function dine(g, x, y, z0) {
+  g.add(mbox(x, x + 7, y, y + 3.2, z0 + 2.4, z0 + 2.65, M.timber, 2));
+  g.add(mbox(x + 3.2, x + 3.8, y + 1.2, y + 2, z0, z0 + 2.4, M.steel));
+  for (const cx of [x + 1, x + 3.2, x + 5.4]) for (const cy of [y - 1.6, y + 3.6]) {
+    g.add(mbox(cx, cx + 1.5, cy, cy + 1.4, z0, z0 + 1.5, M.timber, 2));
+  }
+}
+/* ── THE CORE ──────────────────────────────────────────────────────────────
+   A house is not rooms alone. It needs somewhere to put things, one wet wall
+   the plumbing can share, and a place the panel and the equipment live. Drawn
+   as a real closet with a door, a thickened plumbing wall, and a panel — so
+   the plan can be checked for them instead of assuming them. */
+function core(g, x0, x1, y0, y1, z0, z1, dir) {
+  const t = 0.42;
+  // the wet wall: thicker than a partition because the stacks run in it
+  g.add(mbox(x0, x1, y1 - 0.85, y1, z0, z1, M.siding, SID));
+  g.add(mbox(x0 + 0.3, x0 + 1.1, y1 - 0.95, y1 - 0.85, z0 + 3.6, z0 + 5.6, M.steel));   // the panel
+  g.add(mbox(x1 - 2.6, x1 - 0.6, y1 - 1.9, y1 - 0.9, z0, z0 + 4.4, M.steel));           // the equipment
+  // the closet, with a door you can open
+  part(g, 'x', x0, x1, y0, z0, z1, [[x0 + 0.6, x0 + 3.4]]);
+  part(g, 'y', y0, y1 - 0.85, dir === 'w' ? x0 : x1, z0, z1, []);
+  for (let z = z0 + 3.2; z < z1 - 1.2; z += 1.4) {                                       // shelves
+    g.add(mbox(x0 + 0.5, x1 - 0.5, y0 + 0.35, y1 - 1.1, z, z + 0.12, M.timber, 2));
+  }
+}
+/* ── THE MUDROOM ──────────────────────────────────────────────────────────
+   Wright's move: you do not walk straight into the room. You pass under a low
+   ceiling, turn, and the space opens. A dropped soffit over the door, a bench
+   to sit and take boots off, hooks above it, and a closet on the other hand. */
+function mudroom(g, xa, xb, yFace, z0, headZ) {
+  // INWARD. The first version ran this out through the wall onto the porch, so
+  // the hooks hung in open air with nothing behind them — which is exactly what
+  // the buildability check flagged. A mudroom is inside the door, not outside it.
+  g.add(mbox(xa - 1.2, xb + 1.2, yFace, yFace + 5.2, headZ, headZ + 0.7, M.fascia));      // the dropped soffit
+  g.add(mbox(xa - 1.0, xa + 2.4, yFace + 3.2, yFace + 4.6, z0 + 1.35, z0 + 1.75, M.timber, 2));  // bench
+  for (const bx of [xa - 0.8, xa + 2.0]) g.add(mbox(bx, bx + 0.3, yFace + 3.4, yFace + 4.5, z0, z0 + 1.35, M.timber, 2));
+  g.add(mbox(xa - 1.0, xa + 2.4, yFace + 4.6, yFace + 4.8, z0 + 4.6, z0 + 4.9, M.timber, 2));    // the hook rail
+  for (let hx = xa - 0.6; hx < xa + 2.2; hx += 0.8) g.add(mbox(hx, hx + 0.14, yFace + 4.45, yFace + 4.6, z0 + 4.4, z0 + 4.65, M.steel));
+  g.add(mbox(xa - 1.2, xa - 0.9, yFace, yFace + 5.2, z0, headZ, M.siding, SID));           // the wall you turn around
+}
+
+/* ============================================================
+   THE NINE — same kit, nine programs
+   ============================================================ */
+
+/* 1 · HEART HOUSE — the bar built AROUND the fire. The masonry mass is
+   the structural and social centre; the roof falls away from it both
+   ways, so the chimney is the high point of the whole house. */
+function buildHeart() {
+  const g = new THREE.Group();
+  g.add(mbox(0, 64, 0, 26, -3, 10, M.concrete, CON));
+  room(g, 0, 64, 0, 26, 10, 21, {
+    s: [[4, 15, 13, 19], [16, 19.4, 10, 17.1, 'd'], [21, 28, 13, 19], [30.5, 34.5, 10, 17.6, 'd'], [38, 48, 13, 19], [51, 60, 13, 19]],
+    n: [[8, 14, 14, 19], [50, 56, 14, 19]],
+    w: [[8, 18, 13, 19]], e: [[8, 18, 13, 19]],
+  });
+  // the roof falls away from the flue ALONG the bar: high at x=32, low at
+  // the ends. axis:'x' — and no overhang at the seam, where the flue rises.
+  shed(g, 0, 32, 0, 26, 21, 27, 3, -3, { axis: 'x', ohHi: 0 });
+  shed(g, 32, 64, 0, 26, 27, 21, 3, -3, { axis: 'x', ohLo: 0 });
+  { const cap = mbox(31.55, 32.45, -3, 29, 26.8, 27.42, M.roof, SEA);   // the ridge cap owns the seam
+    cap.userData.roofPart = true; g.add(cap); }
+  flue(g, 32, 13, -4, 37, 5.6);
+  deck(g, 14, 50, -12, 0, 9.6, -3, { gap: [30.1, 33.9] });   // the guard opens where the stair enters
+  floorSlab(g, 0.7, 63.3, 0.7, 25.3, 10.2);
+  part(g, 'y', 0.7, 25.3, 20, 10.2, 21, [[9, 12.4]]);        // primary suite off the west end
+  part(g, 'y', 0.7, 25.3, 44, 10.2, 21, [[6, 9.4], [16, 19.4]]);
+  part(g, 'x', 0.7, 20, 14, 10.2, 21, [[7, 10.4]]);          // the gallery in front of the hearth
+  part(g, 'x', 44, 63.3, 14, 10.2, 21, [[52, 55.4]]);
+  core(g, 46, 52, 17, 24.6, 10.2, 21, 'e');                  // closet + wet wall + panel
+  mudroom(g, 30.6, 34, 0.7, 10.2, 17.1);                     // you turn before the room opens
+  stairs(g, { x: 32, y: -12, zTop: 9.6, zBot: -3, grade: -3, heading: 'S' });
+  kitchen(g, 53, 62, 24.55, 10.2);   // clear of the core closet
+  dine(g, 50, 5.5, 10.2);
+  sofa(g, 20, 7, 10.2, 8);           // out of the entry path — the door needs its walk
+  bed(g, 3, 3.5, 10.2); bathset(g, 2, 16.2, 10.2);
+  roomLabel(g, 'LIVING', 32, 8, 10.2); roomLabel(g, 'DINING', 53, 7, 10.2);
+  roomLabel(g, 'KITCHEN', 54, 21.5, 10.2); roomLabel(g, 'BED', 8, 7, 10.2);
+  roomLabel(g, 'BATH', 9, 19, 10.2); roomLabel(g, 'ENTRY', 32.3, 4, 10.2);
+  return g;
+}
+
+/* 2 · REST HOUSE — the long low one. Nothing tall, nothing tight: one
+   storey, a deep south eave to keep summer sun off the glass, and the
+   whole downhill face opened up. The Henry bar at its calmest. */
+function buildRest() {
+  const g = new THREE.Group();
+  g.add(mbox(0, 76, 0, 24, -3, 9, M.concrete, CON));
+  const S = []; for (let x = 4; x < 70; x += 11) S.push([x, x + 8.4, 12, 17.5]);
+  room(g, 0, 76, 0, 24, 9, 19, {
+    s: S, n: [[10, 16, 12.5, 17.5], [34, 40, 12.5, 17.5], [58, 64, 12.5, 17.5]],
+    w: [[7, 17, 11, 17.5]], e: [[7, 17, 11, 17.5]],
+    s: S.concat([[36, 40, 9, 16.6, 'd'], [50, 53.4, 9, 16.6, 'd']]),
+  });
+  shed(g, 0, 76, 0, 24, 19, 25, 7, -3);
+  flue(g, 30, 12, -4, 31);                                   // the fire anchors the STUDY, not a bedroom
+  deck(g, 6, 60, -14, 0, 8.7, -3, { gap: [8.1, 11.9] });
+  floorSlab(g, 0.7, 75.3, 0.7, 23.3, 9.2);
+  part(g, 'y', 0.7, 23.3, 22, 9.2, 19, [[8, 11.4]]);
+  part(g, 'y', 0.7, 23.3, 42, 9.2, 19, [[8, 11.4]]);
+  part(g, 'y', 0.7, 23.3, 60, 9.2, 19, [[8, 11.4]]);
+  part(g, 'x', 42, 75.3, 15, 9.2, 19, [[50, 53.4], [64, 67.4]]);   // the quiet end, in rooms
+  core(g, 55, 61, 16.5, 22.6, 9.2, 19, 'e');
+  mudroom(g, 36, 40, 0.7, 9.2, 16.1);
+  stairs(g, { x: 10, y: -14, zTop: 8.7, zBot: -3, grade: -3, heading: 'S' });
+  kitchen(g, 4, 18, 23.25, 9.2);
+  sofa(g, 6, 4, 9.2, 8);
+  sofa(g, 24, 6, 9.2, 7);                                     // the study sits around its fire
+  g.add(mbox(34, 39.5, 3, 5.2, 11.6, 11.85, M.timber, 2));    // the desk, by the south glass
+  bed(g, 46, 3.5, 9.2); bed(g, 63, 4, 9.2);
+  bathset(g, 44, 16.4, 9.2);
+  roomLabel(g, 'LIVING', 12, 9, 9.2); roomLabel(g, 'KITCHEN', 11, 20.5, 9.2);
+  roomLabel(g, 'STUDY', 30, 7, 9.2); roomLabel(g, 'BED 2', 50, 7, 9.2);
+  roomLabel(g, 'BATH', 50, 19, 9.2); roomLabel(g, 'BED 3', 67, 10, 9.2);
+  return g;
+}
+
+/* 3 · GUEST HOUSE — small, raised, deliberately not attached. On piers
+   so it touches the ground in six places, a steep gable so snow leaves
+   on its own, and a stair that says the door is over here. */
+function buildGuest() {
+  const g = new THREE.Group();
+  for (const px of [1.6, 13, 24.4]) for (const py of [1.6, 18.4]) pier(g, px, py, -3, 6);
+  g.add(mbox(0, 26, 0, 20, 5.4, 6.2, M.timber, DEK));       // the floor platform edge
+  room(g, 0, 26, 0, 20, 6.2, 17, {
+    s: [[3, 10, 9, 15], [11.5, 15, 6.2, 13.2, 'd'], [16, 23, 9, 15]],
+    n: [[9, 17, 9.5, 15]], w: [[6, 14, 9, 15]], e: [[6, 14, 9, 15]],
+  });
+  gable(g, 0, 26, 0, 20, 17, 25, 2.5, -3);
+  flue(g, 22.5, 10, 2, 30, 3.6);
+  deck(g, 2, 16, -9, 0, 5.9, -3, { gap: [4.1, 7.9] });
+  floorSlab(g, 0.7, 25.3, 0.7, 19.3, 6.4);
+  part(g, 'y', 0.7, 19.3, 15.5, 6.4, 17, [[7, 10.4]]);       // one room, one bath
+  part(g, 'x', 15.5, 25.3, 11, 6.4, 17, [[19, 22]]);
+  stairs(g, { x: 6, y: -9, zTop: 5.9, zBot: -3, grade: -3, heading: 'S' });
+  bed(g, 2.5, 2.5, 6.4); bathset(g, 17, 12.2, 6.4);
+  g.add(mbox(17, 22, 1.7, 3.5, 8.75, 9.0, M.timber, 2));      // a desk beside the fire
+  roomLabel(g, 'ROOM', 8, 6, 6.4); roomLabel(g, 'BATH', 20, 15, 6.4);
+  roomLabel(g, 'STUDY', 20, 6, 6.4);
+  return g;
+}
+
+/* 4 · WORK HOUSE — the shop. A single tall unbroken volume so nothing
+   inside is fixed in place, a monitor lifted along the ridge to get
+   north light onto a bench, and a door big enough to drive through. */
+function buildWork() {
+  const g = new THREE.Group();
+  g.add(mbox(-1, 49, -1, 33, -2, 2, M.concrete, CON));       // slab on grade — no basement in a shop
+  room(g, 0, 48, 0, 32, 2, 22, {
+    s: [[2, 11, 12, 19], [37, 46, 12, 19], [7.6, 11, 2, 9.2, 'd']],
+    n: [[6, 16, 12, 19], [20, 23.4, 2, 9.2, 'd'], [32, 42, 12, 19]],
+    w: [[6, 26, 11, 19]], e: [[6, 26, 11, 19]],
+  });
+  door(g, 14, 34, 0.35, 2, 16, 0.4);                         // the big door
+  for (const x of [14, 24, 34]) g.add(mbox(x - 0.2, x + 0.2, -0.1, 0.8, 2, 16, M.steel));
+  shed(g, 0, 48, 0, 32, 22, 29, 3, -2);
+  // the monitor PENETRATES the roof instead of hovering over it: its walls
+  // start below the roof plane (which runs 23.8–26.4 across this bay)
+  room(g, 10, 38, 8, 20, 23.2, 34, { n: [[11, 37, 30, 33.5]] });
+  shed(g, 10, 38, 8, 20, 34, 36.5, 1.5, null);
+  floorSlab(g, 0.7, 47.3, 0.7, 31.3, 2.2);
+  part(g, 'y', 0.7, 31.3, 38, 2.2, 22, [[10, 14]]);          // the office end, glazed to the shop
+  part(g, 'x', 38, 47.3, 16, 2.2, 22, [[41, 44.4]]);
+  g.add(mbox(2, 34, 26, 29, 2.2, 5.4, M.timber, DEK));       // the bench, under the monitor
+  for (const x of [4, 18, 32]) g.add(mbox(x - 0.3, x + 0.3, 27, 28, 2.2, 5.4, M.steel));
+  flue(g, 33.5, 4.5, -2, 30, 3.6);                           // the stove warms the SHOP — it was in the WC
+  bathset(g, 39.5, 24.5, 2.2);                                   // livable now: a real shower
+  bed(g, 42.3, 2.5, 2.2, 4.6, 6.6);                              // the bunk in the office end
+  kitchen(g, 40, 46.4, 15.55, 2.2);                              // and a run to cook on
+  roomLabel(g, 'BUNK', 44, 4.5, 2.2);
+  roomLabel(g, 'SHOP', 18, 15, 2.2); roomLabel(g, 'OFFICE', 42.5, 8, 2.2); roomLabel(g, 'WC', 43, 26, 2.2);
+  return g;
+}
+
+/* 5 · BODY HOUSE — the bath house. Low masonry walls make a court you
+   can be undressed in; the water is the floor of that court; the only
+   tall thing is the flue that heats it. Warmth is the whole program. */
+function buildBody() {
+  const g = new THREE.Group();
+  [[0, 34, 0, 1.8], [0, 34, 24.2, 26], [0, 1.8, 0, 26], [32.2, 34, 0, 26]].forEach(
+    ([a, b, c, d]) => { g.add(mbox(a, b, c, d, -2, 9, M.masonry, STO));
+      g.add(mbox(a - 0.25, b + 0.25, c - 0.25, d + 0.25, 9, 9.5, M.concrete, CON)); });  // coping
+  const w = mbox(2, 32, 2, 19.5, 0.4, 1.5, M.water); w.castShadow = false; g.add(w);
+  g.add(mbox(1.8, 32.2, 1.8, 2, -0.4, 1.5, M.concrete, CON));
+  g.add(mbox(1.8, 32.2, 19.5, 24.2, -0.4, 1.6, M.concrete, CON));   // the dry margin you stand on
+  room(g, 0, 14, 0, 26, 9, 18, {
+    s: [[2, 6, 12, 16.5], [8.5, 12.5, 12, 16.5]],
+    w: [[10, 14, 9, 16], [18, 22, 9, 16]],
+    n: [[4, 10, 11, 16.5]], w: [[8, 18, 10.5, 16.5]],
+  });
+  shed(g, 0, 14, 0, 26, 18, 23, 4, -2);
+  flue(g, 30, 13, -3, 34, 5.2);
+  g.add(mbox(20, 30, 20.4, 23.4, 1.6, 2.4, M.timber, DEK));   // the bench, on the dry side
+  floorSlab(g, 0.7, 13.3, 0.7, 25.3, 9.2);
+  part(g, 'y', 0.7, 25.3, 7.5, 9.2, 18, [[9, 12.4]]);        // changing / drying, then the court
+  for (const x of [21, 29]) g.add(mbox(x - 0.3, x + 0.3, 21, 22.8, 1.6, 1.7, M.steel));
+  roomLabel(g, 'CHANGING', 7, 13, 9.2); roomLabel(g, 'THE COURT', 20, 11, 2);
+  return g;
+}
+
+/* 6 · RAIN HOUSE — the roof is the argument. It runs far past the wall
+   to make an outdoor room you can stand in during a downpour, and it
+   drains to one visible point: a scupper into a cistern you can see. */
+function buildRain() {
+  const g = new THREE.Group();
+  g.add(mbox(0, 44, 0, 22, -3, 8, M.concrete, CON));
+  room(g, 0, 44, 0, 22, 8, 19, {
+    s: [[3, 13, 11, 17.5], [13.2, 16.6, 8, 15, 'd'], [16, 25, 11, 17.5], [26, 29.4, 8, 15, 'd'], [31, 41, 11, 17.5]],
+    n: [[8, 15, 11, 17.5], [29, 36, 11, 17.5]], w: [[7, 15, 10, 17.5]], e: [[7, 15, 10, 17.5]],
+  });
+  shed(g, 0, 44, -16, 22, 15, 24.5, 3, null, { wall: [0, 19] });   // 3:12; z(0)=19 = the wall head, z(-16)=15 over the porch
+  deck(g, 0, 44, -15.5, 0, 7.7, -3, { gap: [13.05, 16.75] });   // guarded — and the opening is on the door's axis
+  stairs(g, { x: 14.9, y: -15.5, zTop: 7.7, zBot: -3, grade: -3, heading: 'S' });   // you step off the porch where you stepped out the door
+  for (const x of [2, 21.5, 41]) {                           // posts that actually carry the roof
+    g.add(mbox(x - 0.42, x + 0.42, -15.6, -14.76, 7.7, 14.68, M.steel));   // to the roof underside: z(-15.2)=15.2 − 0.5 deck
+    pier(g, x, -15.2, -3, 7.7, 1.5);
+  }
+  g.add(mbox(43.4, 45.2, -16.1, -14.3, 13.5, 14.3, M.gutter));   // the scupper, under the low eave
+  // the cistern now stands UNDER the scupper and is plumbed to it — it used to
+  // sit 31 ft away, so the water left the roof and went nowhere.
+  const cis = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.4, 11, 20), M.steel);
+  cis.position.set(48.6, 3.5, 15.2); cis.castShadow = true; cis.receiveShadow = true; g.add(cis);
+  g.add(mbox(44.4, 52.8, -19.4, -11, -3, -2, M.concrete, CON));    // its pad, under it
+  g.add(mbox(48.2, 49.0, -16.1, -15.3, 9, 12.9, M.gutter));        // the downpipe
+  g.add(mbox(45.2, 48.6, -16.1, -15.3, 12.5, 12.9, M.gutter));     // the swan neck off the scupper
+  for (let i = 0; i < 5; i++) {                              // hoops
+    const h = new THREE.Mesh(new THREE.TorusGeometry(3.45, 0.09, 6, 22), M.steel);
+    h.rotation.x = Math.PI / 2; h.position.set(48.6, -0.6 + i * 2.2, 15.2); g.add(h);
+  }
+  floorSlab(g, 0.7, 43.3, 0.7, 21.3, 8.2);
+  part(g, 'y', 0.7, 21.3, 16, 8.2, 19, [[7, 10.4]]);
+  part(g, 'y', 0.7, 21.3, 31, 8.2, 19, [[7, 10.4]]);
+  part(g, 'x', 31, 43.3, 12, 8.2, 19, [[35, 38.4]]);
+  core(g, 33, 39, 14, 20.6, 8.2, 19, 'e');
+  mudroom(g, 13.6, 15.8, 0.7, 8.2, 15.1);
+  flue(g, 8, 11, -3, 29, 3.9);
+  kitchen(g, 2, 14, 21.25, 8.2);
+  sofa(g, 4, 4, 8.2, 7);
+  bed(g, 18, 3, 8.2); bathset(g, 32, 13.5, 8.2);
+  roomLabel(g, 'LIVING', 8, 9, 8.2); roomLabel(g, 'KITCHEN', 8, 19, 8.2);
+  roomLabel(g, 'BED', 23, 8, 8.2); roomLabel(g, 'BATH', 37, 16, 8.2);
+  roomLabel(g, 'RAIN PORCH', 22, -8, 8.2);
+  return g;
+}
+
+/* 7 · LOFT HOUSE — one room, doubled in height, with the sleeping floor
+   hung inside it rather than walled off. The clerestory is the point:
+   light arrives above the head of anyone standing on the mezzanine. */
+function buildLoft() {
+  const g = new THREE.Group();
+  g.add(mbox(0, 30, 0, 24, -3, 4, M.concrete, CON));
+  room(g, 0, 30, 0, 24, 4, 26, {
+    s: [[2, 13, 5.5, 20], [13, 16.4, 4, 11, 'd'], [16, 28, 5.5, 20]],
+    n: [[4, 11, 6, 14], [19, 26, 6, 14]], w: [[6, 18, 6, 20]], e: [[6, 18, 6, 20]],
+  });
+  g.add(mbox(4.3, 29.3, 12, 23.3, 15, 15.8, M.timber, DEK));         // the mezzanine — stops at the stairwell
+  g.add(mbox(4.15, 4.42, 12, 20.7, 15.8, 18.4, M.steel));            // guard along the well; open at the arrival
+  for (const x of [6, 15, 27]) g.add(mbox(x - 0.25, x + 0.25, 12.2, 12.7, 4, 15, M.steel));
+  g.add(mbox(4.3, 29.3, 11.8, 12.05, 15.8, 19, M.steel));            // its guard
+  for (let x = 4.7; x < 29; x += 4) g.add(mbox(x - 0.1, x + 0.1, 11.85, 12, 15.8, 19, M.steel));
+  room(g, 0, 30, 0, 24, 26, 27.2, {});
+  wall(g, 'x', 0, 30, 0, 0.7, 27.2, 33, [[1.5, 28.5, 27.6, 32.4]]);  // clerestory, above the mezzanine
+  wall(g, 'x', 0, 30, 23.3, 24, 27.2, 33, []);
+  wall(g, 'y', 0.7, 23.3, 0, 0.7, 27.2, 33, []);
+  wall(g, 'y', 0.7, 23.3, 29.3, 30, 27.2, 33, []);
+  shed(g, 0, 30, 0, 24, 33, 38, 3, -3);
+  floorSlab(g, 0.7, 29.3, 0.7, 23.3, 4.2);
+  // THE WAY UP — a mezzanine you cannot reach is storage, not a bedroom
+  // the stair lives against the WEST wall, running down INTO the house —
+  // you no longer walk in the front door and straight into its foot
+  stairs(g, { x: 2.4, y: 22.6, zTop: 15.8, zBot: 4.2, grade: 4.2, heading: 'S', width: 3, plan: [{ f: 18 }] });
+  deck(g, 11, 19, -5.2, 0, 4.2, -3, { gap: [13.2, 16.8] });        // the stoop — you arrive somewhere, not onto a tread
+  stairs(g, { x: 15, y: -5.2, zTop: 4.2, zBot: -3, grade: -3, heading: 'S' });
+  for (const px of [11.6, 18.4]) g.add(mbox(px - 0.3, px + 0.3, -4.9, -4.3, 4.2, 10.8, M.timber, 2));
+  shed(g, 11, 19, -5.2, 0, 10.8, 11.9, 0.8, null, { wall: [0, 10.8] });   // and a canopy over it
+  part(g, 'y', 0.7, 11.9, 21, 4.2, 15, [[4, 7.4]]);          // the wet room
+  part(g, 'y', 16.2, 23.3, 16, 4.2, 15, []);                 // the back bedroom, under the mezzanine
+  part(g, 'x', 16, 29.3, 16.2, 4.2, 15, [[20, 23.4]]);
+  bed(g, 17, 16.6, 4.2);
+  roomLabel(g, 'BED 2', 22, 19.5, 4.2);
+  part(g, 'x', 21, 29.3, 6, 4.2, 15, [[24, 27.4]]);
+  flue(g, 18, 10, -3, 43, 4.2);                              // freestanding, mid-loft — the mezzanine sleeps above open fireline
+  kitchen(g, 6, 16, 23.25, 4.2);
+  sofa(g, 7, 5, 4.2, 7);
+  bathset(g, 21.5, 1.2, 4.2);
+  bed(g, 6, 15.5, 15.8);
+  roomLabel(g, 'LIVING', 10, 8, 4.2); roomLabel(g, 'WET ROOM', 25, 3.5, 4.2);
+  roomLabel(g, 'BED · MEZZ', 12, 18, 15.8);
+  return g;
+}
+
+/* 8 · PORCH HOUSE — the porch is not an attachment, it is the perimeter.
+   The roof continues over it on all four sides, so the house has no
+   facade you meet head-on: you always arrive under cover, at a corner. */
+function buildPorch() {
+  const g = new THREE.Group();
+  g.add(mbox(8, 48, 8, 32, -3, 7, M.concrete, CON));
+  room(g, 8, 48, 8, 32, 7, 18, {
+    s: [[11, 20, 10, 16.5], [20.4, 23.8, 7, 14, 'd'], [24, 32, 10, 16.5], [36, 45, 10, 16.5]],
+    n: [[13, 21, 9.5, 16.5], [30, 33.2, 7, 14, 'd'], [35, 43, 9.5, 16.5]],
+    w: [[12, 20, 9, 16.5]], e: [[12, 20, 9, 16.5]],
+  });
+  deck(g, 0, 56, 0, 40, 6.9, -3, false);                     // the perimeter porch
+  for (const x of [1.6, 19, 37, 54.4]) for (const y of [1.6, 38.4]) {
+    g.add(mbox(x - 0.45, x + 0.45, y - 0.45, y + 0.45, 6.9, 19, M.timber, 2));   // posts
+    g.add(mbox(x - 0.7, x + 0.7, y - 0.7, y + 0.7, 18.3, 19, M.fascia));         // capitals
+    pier(g, x, y, -3, 6.9, 1.5);
+  }
+  for (const y of [1.6, 38.4]) {                             // porch guard between posts
+    g.add(mbox(0, 56, y - 0.1, y + 0.1, 9.6, 9.9, M.timber, 2));
+  }
+  // a BAND, not a lid: four boards round the edge. It was a solid 56x40 plate.
+  g.add(mbox(0, 56, 0, 0.6, 19, 20, M.fascia));
+  g.add(mbox(0, 56, 39.4, 40, 19, 20, M.fascia));
+  g.add(mbox(0, 0.6, 0.6, 39.4, 19, 20, M.fascia));
+  g.add(mbox(55.4, 56, 0.6, 39.4, 19, 20, M.fascia));
+  for (let x = 2; x < 55; x += 3.2) g.add(mbox(x, x + 2.2, 0.6, 39.4, 19.55, 19.95, M.timber, 2));   // rafters over the porch
+  gable(g, 0, 56, 0, 40, 20, 30, 2, -3);
+  floorSlab(g, 8.7, 47.3, 8.7, 31.3, 7.2);
+  part(g, 'y', 8.7, 31.3, 22, 7.2, 18, [[16, 19.4]]);
+  part(g, 'y', 8.7, 31.3, 36, 7.2, 18, [[13, 16.4]]);
+  part(g, 'x', 22, 36, 20, 7.2, 18, [[27, 30.4]]);
+  flue(g, 11, 25.5, -3, 35, 4.4);                            // in the LIVING room; the bedroom keeps its quiet
+  kitchen(g, 23, 33, 19.55, 7.2);
+  sofa(g, 11, 13, 7.2, 8);
+  bathset(g, 23.5, 21.5, 7.2); bed(g, 39.5, 12, 7.2);
+  roomLabel(g, 'LIVING', 14, 20, 7.2); roomLabel(g, 'KITCHEN · DINING', 28, 12, 7.2);
+  roomLabel(g, 'BATH', 28, 26.5, 7.2); roomLabel(g, 'BED', 42, 21, 7.2);
+  return g;
+}
+
+/* 9 · SYNTEGRATION HALL — the room where the other eight get decided.
+   One long table, doors at both ends so nobody sits at the head of the
+   room, and a roof lantern so the light comes from above the table
+   rather than from any one side of it. */
+function buildHall() {
+  const g = new THREE.Group();
+  g.add(mbox(-1, 71, -1, 29, -2, 3, M.concrete, CON));
+  const S = []; for (let x = 5; x < 64; x += 9.5) S.push([x, x + 6.5, 5, 17]);
+  room(g, 0, 70, 0, 28, 3, 20, {
+    s: S, n: S.map((o) => [o[0], o[1], 7, 17]),
+    w: [[11, 17, 3, 11.2, 'd']], e: [[11, 17, 3, 11.2, 'd']],
+  });
+  gable(g, 0, 70, 0, 28, 20, 29, 3, -2);
+  room(g, 24, 46, 10, 18, 29, 33, {                          // the lantern
+    s: [[25, 45, 29.5, 32.5]], n: [[25, 45, 29.5, 32.5]],
+  });
+  shed(g, 24, 46, 10, 18, 34, 35.5, 1.2, null);
+  g.add(mbox(16, 54, 11, 17, 9, 9.9, M.timber, DEK));        // the long table
+  for (const x of [18, 34, 52]) g.add(mbox(x - 0.45, x + 0.45, 13.5, 14.5, 3, 9, M.steel));
+  for (const x of [14, 22, 30, 40, 48, 56]) for (const y of [9.4, 18.6]) {   // the chairs
+    g.add(mbox(x - 0.9, x + 0.9, y - 0.9, y + 0.9, 3, 4.5, M.timber, 2));
+    g.add(mbox(x - 0.9, x + 0.9, y + (y > 14 ? 0.7 : -0.9), y + (y > 14 ? 0.9 : -0.7), 4.5, 7.2, M.timber, 2));
+  }
+  floorSlab(g, 0.7, 69.3, 0.7, 27.3, 3.2);
+  part(g, 'y', 0.7, 27.3, 62, 3.2, 20, [[11, 14.4]]);        // one served room off the hall
+  flue(g, 64, 24, -3, 32, 4);
+  kitchen(g, 63, 69.2, 27.25, 3.2);
+  part(g, 'y', 0.7, 27.3, 8, 3.2, 20, [[11, 14.4]]);             // the bunk room, off the west door
+  bed(g, 1.5, 2.5, 3.2, 5.4, 7); bed(g, 1.5, 18.5, 3.2, 5.4, 7);
+  part(g, 'x', 62, 69.3, 10, 3.2, 20, [[64, 67.4]]);             // and a bath behind the servery
+  bathset(g, 62.8, 1.5, 3.2);
+  roomLabel(g, 'BUNKS', 4, 12, 3.2); roomLabel(g, 'BATH', 66, 5, 3.2);
+  roomLabel(g, 'THE HALL', 30, 14, 3.2); roomLabel(g, 'SERVERY', 65.5, 20, 3.2);
+  return g;
+}
+
+/* ============================================================
+   LAYOUT — 3×3, the depot yard
+   ============================================================ */
+const roster = [
+  ['1', 'Heart House',       'the fire at the centre',   buildHeart, 'The roof falls away from a central masonry mass in both directions, so the flue is the high point of the house and every room is measured from the fire.'],
+  ['2', 'Rest House',        'one storey, deep eave',    buildRest,  'One storey, no stairs, and a seven-foot eave so the long glazed face can stay open through a summer afternoon without cooking.'],
+  ['3', 'Guest House',       'raised, separate',         buildGuest, 'Touches the ground at six piers and nowhere else. Steep gable so snow leaves on its own; the stair announces the door.'],
+  ['4', 'Work House',        'monitor light, big door',  buildWork,  'One tall volume on a slab so nothing inside is fixed. A monitor lifts the ridge for north light on the bench; the door takes a vehicle.'],
+  ['5', 'Body House',        'walled court, warm water', buildBody,  'Masonry walls make a court you can be undressed in. The water is its floor. The only tall element is the flue that heats it.'],
+  ['6', 'Rain House',        'the roof as a room',       buildRain,  'The roof runs sixteen feet past the wall on three steel posts to make a room you can stand in during a downpour, draining to one visible cistern.'],
+  ['7', 'Loft House',        'one room, doubled',        buildLoft,  'A single room at double height with the sleeping floor hung inside it. The clerestory puts light above the head of anyone on the mezzanine.'],
+  ['8', 'Porch House',       'no facade, all edge',      buildPorch, 'The porch is the perimeter, not an attachment. The roof continues over it on all four sides, so you always arrive under cover, at a corner.'],
+  ['9', 'Syntegration Hall', 'no head of the table',     buildHall,  'One long table, doors at both ends so nobody sits at the head, and a roof lantern so the light falls from above the table rather than from one side.'],
+];
+
+/* ═══ KIT END ═══ */
+const FT = 0.115;
+const GAP = 14.5;
+const houses = [], tilePos = [];
+const gridEl = document.getElementById('grid');
+const specEl = document.getElementById('spec');
+
+roster.forEach((r, i) => {
+  const col = i % 3, row = Math.floor(i / 3);
+  const x = (col - 1) * GAP, z = (row - 1) * GAP;
+  tilePos.push(new THREE.Vector3(x, 0, z));
+
+  const tile = new THREE.Mesh(new THREE.BoxGeometry(GAP - 0.5, 0.12, GAP - 0.5), M.gravel);
+  tile.position.set(x, -0.06, z); tile.receiveShadow = true; scene.add(tile);
+  const frame = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(GAP - 0.5, 0.12, GAP - 0.5)),
+    new THREE.LineBasicMaterial({ color: 0x394150 }));
+  frame.position.copy(tile.position); scene.add(frame);
+
+  CUR = r[1];
+  const h = r[3]();
+  h.scale.setScalar(FT);
+  const bb = new THREE.Box3().setFromObject(h), c = bb.getCenter(new THREE.Vector3());
+  h.position.set(x - c.x, -bb.min.y, z - c.z);   // every species sits ON the yard, nothing sunk or floating
+  h.rotation.y = -0.42;
+  h.traverse((o) => { if (o.isMesh) { o.castShadow = true; if (o.receiveShadow !== false) o.receiveShadow = true; } });
+  h.userData = { num: r[0], name: r[1], note: r[2], spec: r[4] };
+  scene.add(h); houses.push(h);
+
+  const li = document.createElement('li');
+  li.innerHTML = '<b>' + r[0] + '</b>' + r[1];
+  li.addEventListener('click', () => focusOn(i));
+  gridEl.appendChild(li);
+});
+
+
+/* ============================================================
+   THE CHECKER — a house that cannot be built should say so
+   ------------------------------------------------------------
+   Not a visual review. Every mesh is reduced to a world-space box, and the
+   boxes are linked wherever they touch (within a 2-inch tolerance). Then we
+   flood outward from everything resting on grade. Anything the flood never
+   reaches is carrying its own weight in mid-air: floating, hanging off
+   nothing, or an island of parts connected only to each other.
+
+   That last case is why a simple "is something underneath me" test is not
+   enough — a whole detached porch would pass it. Connectivity to the GROUND
+   is the buildable condition, so that is what gets tested.
+   ============================================================ */
+const TOLB = 2 / 12;                    // two inches, in feet — scaled below
+function auditHouse(h) {
+  h.updateMatrixWorld(true);
+  const items = [];
+  h.traverse((o) => { if (o.isMesh && o.userData.audit !== false) items.push({ o, b: new THREE.Box3().setFromObject(o) }); });
+  if (!items.length) return { bad: [], n: 0 };
+  const tol = TOLB * (h.scale.x || 1);
+  let grade = Infinity;
+  items.forEach((it) => { grade = Math.min(grade, it.b.min.y); });
+  const touch = (a, c) =>
+    a.max.x >= c.min.x - tol && a.min.x <= c.max.x + tol &&
+    a.max.y >= c.min.y - tol && a.min.y <= c.max.y + tol &&
+    a.max.z >= c.min.z - tol && a.min.z <= c.max.z + tol;
+  const seen = new Array(items.length).fill(false);
+  const queue = [];
+  items.forEach((it, i) => { if (it.b.min.y <= grade + tol * 3) { seen[i] = true; queue.push(i); } });
+  while (queue.length) {
+    const i = queue.pop();
+    for (let j = 0; j < items.length; j++) {
+      if (seen[j]) continue;
+      if (touch(items[i].b, items[j].b)) { seen[j] = true; queue.push(j); }
+    }
+  }
+  const bad = [];
+  for (let i = 0; i < items.length; i++) if (!seen[i]) bad.push(items[i].o);
+  return { bad, n: items.length };
+}
+const FAILMAT = new THREE.MeshBasicMaterial({ color: 0xff3b30, wireframe: true });
+let auditOn = false, auditMarks = [];
+function runAudit() {
+  auditOn = !auditOn;
+  auditMarks.forEach((m) => { m.parent && m.parent.remove(m); });
+  auditMarks = [];
+  const b = document.getElementById('auditbtn');
+  if (!auditOn) {
+    if (b) { b.style.background = 'transparent'; b.style.color = '#cfd5df'; }
+    specEl.style.opacity = '0';
+    return;
+  }
+  let totalBad = 0, totalN = 0;
+  const lines = [];
+  houses.forEach((h) => {
+    const r = auditHouse(h);
+    totalBad += r.bad.length; totalN += r.n;
+    if (r.bad.length) lines.push(h.userData.name + ' — ' + r.bad.length);
+    r.bad.forEach((o) => {
+      const bb = new THREE.Box3().setFromObject(o), sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3());
+      const mk = new THREE.Mesh(new THREE.BoxGeometry(Math.max(sz.x, 0.05), Math.max(sz.y, 0.05), Math.max(sz.z, 0.05)), FAILMAT);
+      mk.position.copy(c); scene.add(mk); auditMarks.push(mk);
+    });
+  });
+  const rFails = CRITIC.filter((c) => !c.pass);
+  const bad = totalBad + rFails.length;
+  if (b) { b.style.background = bad ? '#ff3b30' : '#54c46a'; b.style.color = '#10191b'; }
+  specEl.querySelector('b').textContent = bad
+    ? 'NOT BUILDABLE — ' + totalBad + ' FLOATING · ' + rFails.length + ' RULES BROKEN'
+    : 'ALL NINE STAND UP';
+  specEl.querySelector('span').textContent = bad
+    ? [...lines, ...rFails.slice(0, 4).map((c) => c.name + ' (' + c.detail + ')')].join(' · ')
+    : totalN + ' parts trace contact to grade · ' + CRITIC.length + ' roof and stair rules hold.';
+  specEl.style.opacity = '1';
+  console.log('[buildability]', totalBad + '/' + totalN, 'floating;', rFails.length + '/' + CRITIC.length, 'rules broken', rFails.map((c) => c.name));
+  window.__criticList = CRITIC;
+  window.__audit = { houses, runAudit, auditHouse, THREE };   // so the check can be checked
+}
+
+/* the fire keeps common company: pair every flue with its nearest labelled
+   room — a hearth whose closest room is a BED, BATH or WC fails the build */
+FIREPITS.forEach((f) => {
+  let best = null, bd = 1e9;
+  ROOMTAGS.filter((r) => r.h === f.h).forEach((r) => {
+    const d = Math.hypot(r.x - f.x, r.y - f.y);
+    if (d < bd) { bd = d; best = r; }
+  });
+  CUR = f.h;
+  if (best) crit('fire keeps common company', !/BED|BATH|WC|WET/i.test(best.t),
+    'nearest room: ' + best.t + ' (' + bd.toFixed(0) + 'ft)');
+});
+
+/* ============================================================
+   ORBIT · focus · hover
+   ============================================================ */
+const target = new THREE.Vector3(0, 1.6, 0), targetGoal = target.clone();
+let azim = 0.5, polar = 0.94, radius = 40, radiusGoal = 40, dragging = false, px = 0, py = 0, moved = 0;
+const minPolar = 0.16, maxPolar = 1.46, minR = 8, maxR = 70;
+function applyCam() {
+  const sp = Math.sin(polar), cp = Math.cos(polar);
+  camera.position.set(target.x + radius * sp * Math.sin(azim), target.y + radius * cp, target.z + radius * sp * Math.cos(azim));
+  camera.lookAt(target);
+}
+const el = renderer.domElement;
+el.addEventListener('pointerdown', (e) => { dragging = true; moved = 0; px = e.clientX; py = e.clientY; el.setPointerCapture(e.pointerId); });
+el.addEventListener('pointerup', (e) => { dragging = false; if (moved < 5) tryPick(e); });
+el.addEventListener('pointerleave', () => { dragging = false; });
+el.addEventListener('pointermove', (e) => {
+  if (dragging) {
+    moved += Math.abs(e.movementX) + Math.abs(e.movementY);
+    azim -= (e.clientX - px) * 0.005;
+    polar = Math.min(maxPolar, Math.max(minPolar, polar - (e.clientY - py) * 0.005));
+    px = e.clientX; py = e.clientY;
+  }
+  updateHover(e);
+});
+el.addEventListener('wheel', (e) => { e.preventDefault(); radiusGoal = Math.min(maxR, Math.max(minR, radiusGoal + e.deltaY * 0.016)); }, { passive: false });
+let pinchD = 0;
+el.addEventListener('touchmove', (e) => {
+  if (e.touches.length === 2) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX, dy = e.touches[0].clientY - e.touches[1].clientY, d = Math.hypot(dx, dy);
+    if (pinchD) radiusGoal = Math.min(maxR, Math.max(minR, radiusGoal + (pinchD - d) * 0.05));
+    pinchD = d; e.preventDefault();
+  }
+}, { passive: false });
+el.addEventListener('touchend', () => { pinchD = 0; });
+function focusOn(i) {
+  targetGoal.copy(tilePos[i]).add(new THREE.Vector3(0, 1.9, 0)); radiusGoal = 17;
+  const h = houses[i];
+  specEl.querySelector('b').textContent = h.userData.name;
+  specEl.querySelector('span').textContent = h.userData.spec;
+  specEl.style.opacity = '1';
+}
+function unfocus() { targetGoal.set(0, 1.6, 0); radiusGoal = 40; specEl.style.opacity = '0'; }
+addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') unfocus();
+  if (e.key === 'r' || e.key === 'R') toggleRoofs();
+  if (e.key === 'w' || e.key === 'W') toggleWalls();
+  if (e.key === 'b' || e.key === 'B') runAudit();
+});
+/* LIFT THE ROOFS — the only way to judge whether you could live in one */
+let roofsOn = true;
+function toggleRoofs() {
+  roofsOn = !roofsOn;
+  houses.forEach((h) => h.traverse((o) => { if (o.userData && o.userData.roofPart) o.visible = roofsOn; }));
+  const b = document.getElementById('roofbtn');
+  if (b) b.style.background = roofsOn ? 'transparent' : '#e6b84d', b.style.color = roofsOn ? '#cfd5df' : '#10191b';
+}
+/* AND THE WALLS — roofs alone still leave you looking into a closed box.
+   With both off you are reading a plan: partitions, cased door openings,
+   thresholds and the floor they all stand on. */
+let wallsOn = true;
+function toggleWalls() {
+  wallsOn = !wallsOn;
+  houses.forEach((h) => h.traverse((o) => { if (o.userData && o.userData.wallPart) o.visible = wallsOn; }));
+  const b = document.getElementById('wallbtn');
+  if (b) { b.style.background = wallsOn ? 'transparent' : '#e6b84d'; b.style.color = wallsOn ? '#cfd5df' : '#10191b'; }
+}
+{ const b = document.getElementById('roofbtn'); if (b) b.addEventListener('click', toggleRoofs); }
+{ const b = document.getElementById('wallbtn'); if (b) b.addEventListener('click', toggleWalls); }
+{ const b = document.getElementById('auditbtn'); if (b) b.addEventListener('click', runAudit); }
+
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+const tag = document.getElementById('tag');
+const tagN = tag.querySelector('.n'), tagT = tag.querySelector('.t'), tagF = tag.querySelector('.f');
+function rootOf(o) { while (o.parent && !(o.userData && o.userData.name)) o = o.parent; return o; }
+function hit(e) {
+  ndc.x = (e.clientX / innerWidth) * 2 - 1; ndc.y = -(e.clientY / innerHeight) * 2 + 1;
+  ray.setFromCamera(ndc, camera);
+  const is = ray.intersectObjects(houses, true);
+  return is.length ? rootOf(is[0].object) : null;
+}
+function updateHover(e) {
+  const h = hit(e);
+  if (h && h.userData.name) {
+    tag.style.opacity = '1'; tag.style.left = e.clientX + 'px'; tag.style.top = (e.clientY - 12) + 'px';
+    tagN.textContent = h.userData.num; tagT.textContent = h.userData.name; tagF.textContent = h.userData.note;
+  } else tag.style.opacity = '0';
+}
+function tryPick(e) {
+  const h = hit(e);
+  if (!h || !h.userData.name) return unfocus();
+  focusOn(houses.indexOf(h));
+}
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+(function loop() {
+  requestAnimationFrame(loop);
+  target.lerp(targetGoal, 0.08);
+  radius += (radiusGoal - radius) * 0.08;
+  applyCam();
+  renderer.render(scene, camera);
+})();
+</script>
+</body>
+</html>
