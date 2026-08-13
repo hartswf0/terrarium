@@ -2729,6 +2729,17 @@ function mountConsole(S3) {
   if (nameEl && typeof MutationObserver === "function") {
     new MutationObserver(paintPlace).observe(nameEl, { childList: true, characterData: true, subtree: true });
   }
+  const keyBtn = document.createElement("button");
+  keyBtn.textContent = "\u2726";
+  const paintKey = () => {
+    const on = hasKey();
+    keyBtn.title = on ? "the AI key \u2014 change or remove it" : "ADD AN API KEY to switch on the thinking";
+    keyBtn.style.background = on ? "rgba(255,255,255,.05)" : "rgba(159,122,234,.24)";
+    keyBtn.style.borderColor = on ? "rgba(151,187,213,.28)" : "rgba(159,122,234,.7)";
+    keyBtn.style.color = on ? "#8d9aa5" : "#d8c9ff";
+  };
+  keyBtn.style.cssText = "flex:0 0 auto;width:30px;height:30px;border-radius:8px;cursor:pointer;border:1px solid rgba(159,122,234,.7);background:rgba(159,122,234,.24);color:#d8c9ff;font:700 13px/1 ui-monospace,monospace;";
+  keyBtn.addEventListener("click", () => openKeyPanel());
   const chip = document.createElement("button");
   chip.style.cssText = "flex:0 0 auto;border-radius:8px;font:800 9px/1 ui-monospace,monospace;letter-spacing:.1em;padding:7px 9px;cursor:pointer;";
   const inp = document.createElement("input");
@@ -2780,6 +2791,11 @@ function mountConsole(S3) {
         return;
       }
     }
+    if ((mode === "AGENT" || mode === "BUILD") && !hasKey()) {
+      flash("no key yet \u2014 the \u2726 on this line switches the thinking on");
+      openKeyPanel();
+      return;
+    }
     say(mode === "BUILD" ? text.replace(/^(build|make|put)\s+/i, "") : text);
   };
   send.addEventListener("click", go);
@@ -2796,7 +2812,8 @@ function mountConsole(S3) {
   const burger = document.createElement("button");
   burger.textContent = "\u2261";
   burger.style.cssText = "flex:0 0 auto;width:32px;height:32px;border-radius:9px;cursor:pointer;border:1px solid rgba(151,187,213,.3);background:rgba(255,255,255,.05);color:#cfe8dd;font-size:15px;";
-  bar.append(placeBtn, chip, inp, send, burger);
+  paintKey();
+  bar.append(placeBtn, chip, inp, keyBtn, send, burger);
   document.body.appendChild(bar);
   const menu = document.createElement("div");
   menu.style.cssText = "position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:63;display:none;flex-direction:column;gap:5px;width:min(760px,98vw);padding:0 2px;pointer-events:none;";
@@ -2850,6 +2867,10 @@ function mountConsole(S3) {
     const hide2 = () => {
       el.classList.remove("show");
       el.hidden = true;
+      try {
+        paintKey();
+      } catch (_) {
+      }
     };
     if (done) done.onclick = hide2;
     if (close) close.onclick = hide2;

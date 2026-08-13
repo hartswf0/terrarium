@@ -308,6 +308,25 @@ export function mountConsole(S) {
     new MutationObserver(paintPlace).observe(nameEl, { childList: true, characterData: true, subtree: true });
   }
 
+  // THE AI DOOR BELONGS ON THE LINE. The key panel existed, but it sat three
+  // taps deep — menu, then the ASK subject (which you may have to scroll the
+  // arc to reach), then the item. AGENT mode is RIGHT HERE on the bar and does
+  // nothing without a key, so the door is here too: one chip, lit when there
+  // is no key, quiet once there is.
+  const keyBtn = document.createElement('button');
+  keyBtn.textContent = '✦';
+  const paintKey = () => {
+    const on = hasKey();
+    keyBtn.title = on ? 'the AI key — change or remove it' : 'ADD AN API KEY to switch on the thinking';
+    keyBtn.style.background = on ? 'rgba(255,255,255,.05)' : 'rgba(159,122,234,.24)';
+    keyBtn.style.borderColor = on ? 'rgba(151,187,213,.28)' : 'rgba(159,122,234,.7)';
+    keyBtn.style.color = on ? '#8d9aa5' : '#d8c9ff';
+  };
+  keyBtn.style.cssText = 'flex:0 0 auto;width:30px;height:30px;border-radius:8px;cursor:pointer;'
+    + 'border:1px solid rgba(159,122,234,.7);background:rgba(159,122,234,.24);color:#d8c9ff;'
+    + 'font:700 13px/1 ui-monospace,monospace;';
+  keyBtn.addEventListener('click', () => openKeyPanel());
+
   const chip = document.createElement('button');
   chip.style.cssText = 'flex:0 0 auto;border-radius:8px;font:800 9px/1 ui-monospace,monospace;'
     + 'letter-spacing:.1em;padding:7px 9px;cursor:pointer;';
@@ -354,6 +373,12 @@ export function mountConsole(S) {
       if (r !== null) { flash(r); return; }
       if (mode === 'GAME') { flash('the commons knows no such verb — try help'); return; }
     }
+    // AGENT with no key is a question into a void — say so, and open the door
+    if ((mode === 'AGENT' || mode === 'BUILD') && !hasKey()) {
+      flash('no key yet — the ✦ on this line switches the thinking on');
+      openKeyPanel();
+      return;
+    }
     // every other mode ends in CREO's own operator — one mind, many mouths
     say(mode === 'BUILD' ? text.replace(/^(build|make|put)\s+/i, '') : text);
   };
@@ -367,7 +392,8 @@ export function mountConsole(S) {
   burger.style.cssText = 'flex:0 0 auto;width:32px;height:32px;border-radius:9px;cursor:pointer;'
     + 'border:1px solid rgba(151,187,213,.3);background:rgba(255,255,255,.05);color:#cfe8dd;font-size:15px;';
 
-  bar.append(placeBtn, chip, inp, send, burger);
+  paintKey();
+  bar.append(placeBtn, chip, inp, keyBtn, send, burger);
   document.body.appendChild(bar);
 
   // ── the one menu: the same speech, with buttons ──────────────────────────
@@ -451,7 +477,7 @@ export function mountConsole(S) {
     el.classList.add('show');
     const done = document.getElementById('setupDone');
     const close = document.getElementById('setupClose');
-    const hide = () => { el.classList.remove('show'); el.hidden = true; };
+    const hide = () => { el.classList.remove('show'); el.hidden = true; try { paintKey(); } catch (_) {} };
     if (done) done.onclick = hide;
     if (close) close.onclick = hide;
     setTimeout(() => { const k = document.getElementById('setupKey'); if (k) k.focus(); }, 60);
