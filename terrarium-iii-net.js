@@ -1,27 +1,36 @@
 /* TERRARIUM III multiplayer
  *
- * Supabase Realtime is used only as an introduction desk. Once introduced,
- * every world message moves browser-to-browser over WebRTC. The host is the
- * live authority and the room intentionally ends when the host leaves.
+ * PROVISIONAL NETWORK BUILD.
+ * Supabase Realtime is only the introduction desk. Once introduced, world
+ * traffic moves browser-to-browser over WebRTC. The host remains the live
+ * authority and the room intentionally ends when the host truly leaves.
  */
 (function terrariumIIINetwork(global) {
   'use strict';
 
   const STORE_URL = 'terrarium.iii.supabase.url';
   const STORE_KEY = 'terrarium.iii.supabase.key';
+
+  // Browser-public defaults for the demo. These are intentionally overridable
+  // by the manual setup UI. Never place sb_secret_ / service_role credentials
+  // here. Clear an override and config() falls back to these values.
+  const DEFAULT_SUPABASE_URL = 'https://lcxykqgddnekrimawpie.supabase.co';
+  const DEFAULT_SUPABASE_KEY = 'sb_publishable_bF2QF1eJmzhi4Pj-dxE-0g_mnm6zRSh';
+
   const TURN_URL = 'https://beflix-call.hartswf0.workers.dev/turn';
   const MAX_PEERS = 8;
   const CHUNK_SIZE = 12000;
   const MAX_BUFFER = 2 * 1024 * 1024;
   const FALLBACK_ICE = [{ urls: 'stun:stun.cloudflare.com:3478' }];
+  const SIGNAL_HEARTBEAT_MS = 15000;
+  const HOST_MISSING_GRACE_MS = 8000;
+  const PEER_RETRY_MS = 1400;
   const THREE_MODULE_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 
   // THREE r160's Sprite.raycast requires raycaster.camera. TERRARIUM also uses
   // world-space Raycaster.set(origin, direction) for physics, fire and destroy
-  // rays; those rays intentionally have no camera. If a label/marker Sprite is
-  // ever present in a world target list, upstream THREE logs an error and then
-  // dereferences camera.matrixWorld. A world ray must ignore camera-facing UI,
-  // while pointer rays created with setFromCamera must keep normal Sprite picks.
+  // rays; those rays intentionally have no camera. World rays ignore sprites;
+  // pointer rays created with setFromCamera retain normal Sprite picking.
   import(THREE_MODULE_URL).then(THREE => {
     const proto = THREE.Sprite && THREE.Sprite.prototype;
     if (!proto || proto.__terrariumNoCameraRayGuard) return;
@@ -46,14 +55,26 @@
   let roster = new Map();
   let runtimeConfig = { url: '', key: '' };
   let configPersistence = 'none';
+  let hostMissingTimer = null;
+  let guestRetryTimer = null;
   const links = new Map();
   const chunks = new Map();
   const listeners = new Map();
-  const metrics = { signals: 0, sent: 0, received: 0, dropped: 0, links: 0 };
+  const metrics = {
+    signals: 0,
+    sent: 0,
+    received: 0,
+    dropped: 0,
+    links: 0,
+    signalReconnects: 0,
+    peerRetries: 0
+  };
 
   function emit(name, payload) {
     const own = listeners.get(name);
-    if (own) own.forEach(fn => { try { fn(payload); } catch (err) { console.error('[III event]', err); } });
+    if (own) own.forEach(fn => {
+      try { fn(payload); } catch (err) { console.error('[III event]', err); }
+    });
     const legacy = {
       message: '__iiiReceive', roster: '__iiiRoster', status: '__iiiStatus',
       hostgone: '__iiiHostGone', peeropen: '__iiiPeerOpen'
@@ -64,19 +85,25 @@
   }
 
   function status(text, tone = 'info') { emit('status', { text, tone }); }
+
   function randomId(prefix) {
     const bytes = new Uint8Array(10);
     crypto.getRandomValues(bytes);
     return prefix + Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
   }
-  function cleanRoom(value) { return String(value || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64); }
+
+  function cleanRoom(value) {
+    return String(value || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
+  }
 
   function browserStorage(name) {
     try { return global[name] || null; } catch (_) { return null; }
   }
+
   function storageGet(storage, key) {
     try { return storage?.getItem(key) || ''; } catch (_) { return ''; }
   }
+
   function storageSet(storage, key, value) {
     try {
       if (!storage) return false;
@@ -87,12 +114,22 @@
       return false;
     }
   }
+
   function storageRemove(storage, key) {
     try { storage?.removeItem(key); } catch (_) {}
   }
+
+  function builtInConfig() {
+    const metaUrl = document.querySelector('meta[name="terrarium-supabase-url"]')?.content || '';
+    const metaKey = document.querySelector('meta[name="terrarium-supabase-key"]')?.content || '';
+    return {
+      url: String(metaUrl || DEFAULT_SUPABASE_URL).trim().replace(/\/+$/, ''),
+      key: String(metaKey || DEFAULT_SUPABASE_KEY).trim()
+    };
+  }
+
   function config() {
-    const builtInUrl = document.querySelector('meta[name="terrarium-supabase-url"]')?.content || '';
-    const builtInKey = document.querySelector('meta[name="terrarium-supabase-key"]')?.content || '';
+    const builtIn = builtInConfig();
     const local = browserStorage('localStorage');
     const session = browserStorage('sessionStorage');
     const localUrl = storageGet(local, STORE_URL);
@@ -101,13 +138,18 @@
     const sessionKey = storageGet(session, STORE_KEY);
     const persistence = runtimeConfig.url && runtimeConfig.key
       ? configPersistence
-      : (localUrl && localKey ? 'local' : (sessionUrl && sessionKey ? 'session' : (builtInUrl && builtInKey ? 'built-in' : 'none')));
+      : (localUrl && localKey
+        ? 'local'
+        : (sessionUrl && sessionKey ? 'session' : 'built-in'));
+
+    // Manual overrides always win. The embedded pair is the final fallback.
     return {
-      url: (runtimeConfig.url || localUrl || sessionUrl || builtInUrl).trim().replace(/\/+$/, ''),
-      key: (runtimeConfig.key || localKey || sessionKey || builtInKey).trim(),
+      url: (runtimeConfig.url || localUrl || sessionUrl || builtIn.url).trim().replace(/\/+$/, ''),
+      key: (runtimeConfig.key || localKey || sessionKey || builtIn.key).trim(),
       persistence
     };
   }
+
   function keyIsSecret(key) {
     if (/^sb_secret_/i.test(key)) return true;
     try {
@@ -116,14 +158,19 @@
       const padded = part.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - part.length % 4) % 4);
       const payload = JSON.parse(atob(padded));
       return payload?.role === 'service_role';
-    } catch (_) { return false; }
+    } catch (_) {
+      return false;
+    }
   }
+
   function configure(url, key, persist = true) {
     url = String(url || '').trim().replace(/\/+$/, '');
     key = String(key || '').trim();
     if (!/^https?:\/\//i.test(url)) throw new Error('SUPABASE PROJECT URL REQUIRED');
     if (key.length < 20) throw new Error('SUPABASE ANON / PUBLISHABLE KEY REQUIRED');
-    if (keyIsSecret(key)) throw new Error('SECRET / SERVICE-ROLE KEY BLOCKED — COPY THE PUBLISHABLE KEY');
+    if (keyIsSecret(key)) {
+      throw new Error('SECRET / SERVICE-ROLE KEY BLOCKED — COPY THE PUBLISHABLE KEY');
+    }
 
     runtimeConfig = { url, key };
     configPersistence = 'memory';
@@ -147,6 +194,7 @@
     }
     return { url, key, persistence: configPersistence };
   }
+
   function clearConfig() {
     runtimeConfig = { url: '', key: '' };
     configPersistence = 'none';
@@ -156,6 +204,8 @@
     storageRemove(local, STORE_KEY);
     storageRemove(session, STORE_URL);
     storageRemove(session, STORE_KEY);
+    // config() now naturally falls back to the embedded public defaults.
+    return config();
   }
 
   async function getIceServers() {
@@ -176,6 +226,33 @@
       throw new Error('SUPABASE REALTIME LIBRARY DID NOT LOAD');
     }
     return api.createClient.bind(api);
+  }
+
+  // Supabase recommends a Web Worker heartbeat plus explicit reconnect for
+  // backgrounded/mobile browsers. The live world never depends on this socket
+  // after peer links are up, but Presence/signaling must recover cleanly.
+  function resilientSupabaseClient(url, key, options = {}) {
+    let created = null;
+    const requestedRealtime = options.realtime || {};
+    const requestedHeartbeat = requestedRealtime.heartbeatCallback;
+    const realtime = {
+      ...requestedRealtime,
+      worker: true,
+      heartbeatIntervalMs: SIGNAL_HEARTBEAT_MS,
+      heartbeatCallback: state => {
+        try { requestedHeartbeat?.(state); } catch (_) {}
+        if (state === 'disconnected') {
+          metrics.signalReconnects++;
+          status('SIGNAL DESK RECONNECTING…', 'warn');
+          setTimeout(() => {
+            try { created?.realtime?.connect?.(); }
+            catch (err) { console.warn('[III] realtime reconnect', err); }
+          }, 250);
+        }
+      }
+    };
+    created = supabaseFactory()(url, key, { ...options, realtime });
+    return created;
   }
 
   function presenceRows() {
@@ -203,46 +280,114 @@
     }));
   }
 
+  function cancelHostMissingGrace() {
+    if (!hostMissingTimer) return;
+    clearTimeout(hostMissingTimer);
+    hostMissingTimer = null;
+  }
+
+  function armHostMissingGrace() {
+    if (closing || role === 'host' || hostMissingTimer || !sawHost) return;
+    status('HOST SIGNAL LOST · RETRYING…', 'warn');
+    hostMissingTimer = setTimeout(async () => {
+      hostMissingTimer = null;
+      if (closing || role === 'host' || !room) return;
+      const hosts = presenceRows()
+        .filter(p => p.role === 'host')
+        .sort((a, b) => Number(a.joinedAt) - Number(b.joinedAt));
+      if (hosts.length) {
+        hostId = hosts[0].id;
+        sawHost = true;
+        await refreshPresence().catch(() => {});
+        return;
+      }
+      status('HOST LEFT · THIS LIVE VESSEL IS CLOSED', 'error');
+      emit('hostgone', { room });
+    }, HOST_MISSING_GRACE_MS);
+  }
+
+  function scheduleGuestPeerRetry(reason) {
+    if (closing || role !== 'player' || !room || !hostId || guestRetryTimer) return;
+    guestRetryTimer = setTimeout(async () => {
+      guestRetryTimer = null;
+      if (closing || role !== 'player' || !room || !hostId) return;
+      metrics.peerRetries++;
+      status('P2P LINK RETRYING · ' + String(reason || 'NETWORK'), 'warn');
+      try {
+        // reset asks the host to throw away its half of the old PeerConnection
+        // and mint a fresh offer rather than replaying a stale stable offer.
+        await signal({ kind: 'hello', reset: true }, hostId);
+      } catch (err) {
+        console.warn('[III] guest peer retry', err);
+      }
+    }, PEER_RETRY_MS);
+  }
+
   async function refreshPresence() {
     if (closing || !peerId) return;
     const rows = presenceRows();
     roster = new Map(rows.map(p => [p.id, p]));
     if (profile && !roster.has(peerId)) roster.set(peerId, profile);
 
-    const hosts = rows.filter(p => p.role === 'host').sort((a, b) => Number(a.joinedAt) - Number(b.joinedAt));
+    const hosts = rows
+      .filter(p => p.role === 'host')
+      .sort((a, b) => Number(a.joinedAt) - Number(b.joinedAt));
     const chosenHost = hosts[0]?.id || '';
-    if (role === 'host') hostId = peerId;
-    else if (chosenHost) { hostId = chosenHost; sawHost = true; }
+
+    if (role === 'host') {
+      hostId = peerId;
+      cancelHostMissingGrace();
+    } else if (chosenHost) {
+      hostId = chosenHost;
+      sawHost = true;
+      cancelHostMissingGrace();
+    }
 
     for (const id of Array.from(links.keys())) {
       if (!roster.has(id)) destroyLink(id);
     }
 
     if (role === 'host') {
-      const guests = rows.filter(p => p.id !== peerId && p.role !== 'host').slice(0, MAX_PEERS - 1);
+      const guests = rows
+        .filter(p => p.id !== peerId && p.role !== 'host')
+        .slice(0, MAX_PEERS - 1);
       for (const guest of guests) await ensureHostLink(guest.id);
     } else if (hostId && hostId !== peerId) {
       await signal({ kind: 'hello' }, hostId);
     } else if (sawHost && !chosenHost) {
-      status('HOST LEFT · THIS LIVE VESSEL IS CLOSED', 'error');
-      emit('hostgone', { room });
+      armHostMissingGrace();
     }
+
     emit('roster', publicRoster());
   }
 
   function makeLink(id, pc) {
     const link = {
-      id, pc, reliable: null, fast: null, open: false,
-      pendingIce: [], reliableQueue: [], createdAt: Date.now()
+      id,
+      pc,
+      reliable: null,
+      fast: null,
+      open: false,
+      pendingIce: [],
+      reliableQueue: [],
+      createdAt: Date.now()
     };
     links.set(id, link);
+
     pc.onicecandidate = event => {
-      if (event.candidate) signal({ kind: 'ice', candidate: event.candidate.toJSON ? event.candidate.toJSON() : event.candidate }, id);
+      if (event.candidate) {
+        signal({
+          kind: 'ice',
+          candidate: event.candidate.toJSON ? event.candidate.toJSON() : event.candidate
+        }, id);
+      }
     };
+
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
       if (state === 'failed' || state === 'closed') {
         destroyLink(id);
+        if (role === 'player') scheduleGuestPeerRetry(state);
         emit('roster', publicRoster());
       }
     };
@@ -254,9 +399,12 @@
   }
 
   function bindChannel(link, dc, fast) {
-    if (fast) link.fast = dc; else link.reliable = dc;
+    if (fast) link.fast = dc;
+    else link.reliable = dc;
+
     dc.binaryType = 'arraybuffer';
     if (!fast) dc.bufferedAmountLowThreshold = 256 * 1024;
+
     dc.onopen = () => {
       if (!fast) {
         link.open = true;
@@ -267,13 +415,16 @@
         emit('roster', publicRoster());
       }
     };
+
     dc.onclose = () => {
       if (!fast) {
         link.open = false;
         metrics.links = Array.from(links.values()).filter(item => item.open).length;
+        if (role === 'player') scheduleGuestPeerRetry('CHANNEL CLOSED');
         emit('roster', publicRoster());
       }
     };
+
     dc.onerror = err => console.warn('[III data channel]', err);
     dc.onmessage = event => receiveWire(link.id, event.data);
   }
@@ -285,7 +436,9 @@
     try { link.reliable?.close(); } catch (_) {}
     try { link.fast?.close(); } catch (_) {}
     try { link.pc?.close(); } catch (_) {}
-    for (const key of Array.from(chunks.keys())) if (key.startsWith(id + ':')) chunks.delete(key);
+    for (const key of Array.from(chunks.keys())) {
+      if (key.startsWith(id + ':')) chunks.delete(key);
+    }
     metrics.links = Array.from(links.values()).filter(item => item.open).length;
   }
 
@@ -299,6 +452,7 @@
       return existing;
     }
     if (links.size >= MAX_PEERS - 1) return null;
+
     const pc = newPeerConnection();
     const link = makeLink(id, pc);
     bindChannel(link, pc.createDataChannel('terrarium-reliable', { ordered: true }), false);
@@ -311,13 +465,20 @@
 
   async function acceptOffer(from, sdp) {
     if (role === 'host') return;
-    if (!hostId) { hostId = from; sawHost = true; }
+    if (!hostId) {
+      hostId = from;
+      sawHost = true;
+    }
     if (from !== hostId) return;
+
     const prior = links.get(from);
     if (prior?.pc?.remoteDescription?.sdp === sdp?.sdp) {
-      if (prior.pc.localDescription) await signal({ kind: 'answer', sdp: prior.pc.localDescription.toJSON() }, from);
+      if (prior.pc.localDescription) {
+        await signal({ kind: 'answer', sdp: prior.pc.localDescription.toJSON() }, from);
+      }
       return;
     }
+
     destroyLink(from);
     const pc = newPeerConnection();
     const link = makeLink(from, pc);
@@ -342,13 +503,17 @@
     if (!link && role === 'host') link = await ensureHostLink(from);
     if (!link) return;
     if (!link.pc.remoteDescription) link.pendingIce.push(candidate);
-    else await link.pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(err => console.warn('[III ICE]', err));
+    else {
+      await link.pc.addIceCandidate(new RTCIceCandidate(candidate))
+        .catch(err => console.warn('[III ICE]', err));
+    }
   }
 
   async function flushIce(link) {
     const pending = link.pendingIce.splice(0);
     for (const candidate of pending) {
-      await link.pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(err => console.warn('[III ICE queued]', err));
+      await link.pc.addIceCandidate(new RTCIceCandidate(candidate))
+        .catch(err => console.warn('[III ICE queued]', err));
     }
   }
 
@@ -356,7 +521,8 @@
     if (!signalChannel || closing) return;
     metrics.signals++;
     await signalChannel.send({
-      type: 'broadcast', event: 'signal',
+      type: 'broadcast',
+      event: 'signal',
       payload: { ...payload, from: peerId, to, room, at: Date.now() }
     });
   }
@@ -365,15 +531,24 @@
     const msg = event?.payload || event;
     if (!msg || msg.room !== room || msg.from === peerId) return;
     if (msg.to && msg.to !== peerId) return;
+
     try {
-      if (msg.kind === 'hello' && role === 'host') await ensureHostLink(msg.from);
-      else if (msg.kind === 'offer') await acceptOffer(msg.from, msg.sdp);
-      else if (msg.kind === 'answer') await acceptAnswer(msg.from, msg.sdp);
-      else if (msg.kind === 'ice') await acceptIce(msg.from, msg.candidate);
-      else if (msg.kind === 'bye') destroyLink(msg.from);
+      if (msg.kind === 'hello' && role === 'host') {
+        if (msg.reset) destroyLink(msg.from);
+        await ensureHostLink(msg.from);
+      } else if (msg.kind === 'offer') {
+        await acceptOffer(msg.from, msg.sdp);
+      } else if (msg.kind === 'answer') {
+        await acceptAnswer(msg.from, msg.sdp);
+      } else if (msg.kind === 'ice') {
+        await acceptIce(msg.from, msg.candidate);
+      } else if (msg.kind === 'bye') {
+        destroyLink(msg.from);
+      }
     } catch (err) {
       console.error('[III signal]', msg.kind, err);
       status('P2P HANDSHAKE RETRYING', 'warn');
+      if (role === 'player') scheduleGuestPeerRetry('HANDSHAKE');
     }
   }
 
@@ -384,7 +559,14 @@
     const total = Math.ceil(json.length / CHUNK_SIZE);
     const out = [];
     for (let index = 0; index < total; index++) {
-      out.push(JSON.stringify({ __iii: 'chunk', id, from, index, total, data: json.slice(index * CHUNK_SIZE, (index + 1) * CHUNK_SIZE) }));
+      out.push(JSON.stringify({
+        __iii: 'chunk',
+        id,
+        from,
+        index,
+        total,
+        data: json.slice(index * CHUNK_SIZE, (index + 1) * CHUNK_SIZE)
+      }));
     }
     return out;
   }
@@ -401,16 +583,28 @@
       else metrics.dropped++;
       return false;
     }
-    try { dc.send(wire); metrics.sent++; return true; }
-    catch (err) { console.warn('[III send]', err); metrics.dropped++; return false; }
+    try {
+      dc.send(wire);
+      metrics.sent++;
+      return true;
+    } catch (err) {
+      console.warn('[III send]', err);
+      metrics.dropped++;
+      return false;
+    }
   }
 
   function flushQueue(link) {
     if (!link.reliable || link.reliable.readyState !== 'open') return;
     while (link.reliableQueue.length && link.reliable.bufferedAmount < MAX_BUFFER) {
       const wire = link.reliableQueue.shift();
-      try { link.reliable.send(wire); metrics.sent++; }
-      catch (_) { link.reliableQueue.unshift(wire); break; }
+      try {
+        link.reliable.send(wire);
+        metrics.sent++;
+      } catch (_) {
+        link.reliableQueue.unshift(wire);
+        break;
+      }
     }
     if (link.reliableQueue.length) setTimeout(() => flushQueue(link), 60);
   }
@@ -429,7 +623,13 @@
   function receiveWire(linkId, raw) {
     if (typeof raw !== 'string') return;
     let packet;
-    try { packet = JSON.parse(raw); } catch (_) { metrics.dropped++; return; }
+    try {
+      packet = JSON.parse(raw);
+    } catch (_) {
+      metrics.dropped++;
+      return;
+    }
+
     if (packet?.__iii === 'chunk') {
       const key = linkId + ':' + packet.id;
       let bundle = chunks.get(key);
@@ -444,32 +644,58 @@
       }
       return;
     }
+
     if (!packet || !packet.msg || !packet.msg.type) return;
     const from = role === 'host' ? linkId : String(packet.from || hostId);
     deliver(from, packet.msg);
     if (role === 'host') {
-      links.forEach((link, id) => { if (id !== linkId) sendToLink(link, from, packet.msg); });
+      links.forEach((link, id) => {
+        if (id !== linkId) sendToLink(link, from, packet.msg);
+      });
     }
   }
 
   function send(msg) {
     if (!room || !peerId || !msg || !msg.type) return Promise.resolve(null);
-    if (role === 'host') links.forEach(link => sendToLink(link, peerId, msg));
-    else {
+    if (role === 'host') {
+      links.forEach(link => sendToLink(link, peerId, msg));
+    } else {
       const link = links.get(hostId);
       if (link) sendToLink(link, peerId, msg);
-      else metrics.dropped++;
+      else {
+        metrics.dropped++;
+        scheduleGuestPeerRetry('NO HOST LINK');
+      }
     }
     return Promise.resolve({ ok: true });
   }
 
   function waitForSubscribed(channel, timeout = 12000) {
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('SIGNAL DESK TIMED OUT')), timeout);
-      channel.subscribe(async state => {
-        if (state === 'SUBSCRIBED') { clearTimeout(timer); resolve(); }
-        else if (state === 'CHANNEL_ERROR' || state === 'TIMED_OUT') {
-          clearTimeout(timer); reject(new Error('SIGNAL DESK ' + state.replace('_', ' ')));
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        reject(new Error('SIGNAL DESK TIMED OUT'));
+      }, timeout);
+
+      channel.subscribe(state => {
+        if (state === 'SUBSCRIBED') {
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            resolve();
+          }
+        } else if (state === 'CHANNEL_ERROR' || state === 'TIMED_OUT') {
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            reject(new Error('SIGNAL DESK ' + state.replace('_', ' ')));
+          } else {
+            metrics.signalReconnects++;
+            status('SIGNAL DESK RECONNECTING…', 'warn');
+            try { client?.realtime?.connect?.(); } catch (_) {}
+          }
         }
       });
     });
@@ -479,34 +705,55 @@
     if (!global.isSecureContext && !/^http:\/\/(localhost|127\.0\.0\.1)/.test(location.href)) {
       throw new Error('WEBRTC NEEDS HTTPS');
     }
+
     await leave();
     closing = false;
-    const cfg = configure(options.url || config().url, options.key || config().key, options.persist !== false);
+    const current = config();
+    const cfg = configure(
+      options.url || current.url,
+      options.key || current.key,
+      options.persist !== false
+    );
+
     room = cleanRoom(options.room);
     if (room.length < 8) throw new Error('ROOM CODE TOO SHORT');
+
     peerId = randomId('p_');
     role = options.host ? 'host' : 'player';
     hostId = role === 'host' ? peerId : '';
     sawHost = false;
     profile = {
-      id: peerId, role,
+      id: peerId,
+      role,
       name: String(options.name || 'PLAYER').slice(0, 24),
       color: String(options.color || '#ff2e2e').slice(0, 16),
-      rig: options.rig || {}, joinedAt: Date.now()
+      rig: options.rig || {},
+      joinedAt: Date.now()
     };
+
     iceServers = await getIceServers();
-    client = supabaseFactory()(cfg.url, cfg.key, {
-      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    client = resilientSupabaseClient(cfg.url, cfg.key, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false
+      },
       realtime: { params: { eventsPerSecond: 10 } }
     });
+
     signalChannel = client.channel('terrarium-iii:' + room, {
-      config: { broadcast: { self: false, ack: true }, presence: { key: peerId } }
+      config: {
+        broadcast: { self: false, ack: true },
+        presence: { key: peerId }
+      }
     });
+
     signalChannel
       .on('broadcast', { event: 'signal' }, onSignal)
       .on('presence', { event: 'sync' }, refreshPresence)
       .on('presence', { event: 'join' }, refreshPresence)
       .on('presence', { event: 'leave' }, refreshPresence);
+
     status('OPENING SIGNAL DESK…', 'warn');
     await waitForSubscribed(signalChannel);
     await signalChannel.track(profile);
@@ -519,6 +766,12 @@
   async function leave() {
     if (closing) return;
     closing = true;
+    cancelHostMissingGrace();
+    if (guestRetryTimer) {
+      clearTimeout(guestRetryTimer);
+      guestRetryTimer = null;
+    }
+
     const oldLinks = Array.from(links.keys());
     if (signalChannel && peerId) {
       try { await signal({ kind: 'bye' }); } catch (_) {}
@@ -528,34 +781,74 @@
     if (client && signalChannel) {
       try { await client.removeChannel(signalChannel); } catch (_) {}
     }
-    signalChannel = null; client = null; room = ''; peerId = ''; role = '';
-    profile = null; hostId = ''; sawHost = false; roster.clear(); chunks.clear();
+
+    signalChannel = null;
+    client = null;
+    room = '';
+    peerId = '';
+    role = '';
+    profile = null;
+    hostId = '';
+    sawHost = false;
+    roster.clear();
+    chunks.clear();
     metrics.links = 0;
     closing = false;
   }
 
   async function selfTest(url, key) {
-    const cfg = configure(url || config().url, key || config().key, true);
+    const current = config();
+    const cfg = configure(url || current.url, key || current.key, true);
     const started = performance.now();
     const turn = await getIceServers();
-    const probe = supabaseFactory()(cfg.url, cfg.key, {
-      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+    const probe = resilientSupabaseClient(cfg.url, cfg.key, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false
+      }
     });
-    const channel = probe.channel('terrarium-iii:probe-' + randomId(''), { config: { broadcast: { ack: true } } });
+    const channel = probe.channel('terrarium-iii:probe-' + randomId(''), {
+      config: { broadcast: { ack: true } }
+    });
     await waitForSubscribed(channel, 10000);
-    await channel.send({ type: 'broadcast', event: 'signal', payload: { kind: 'probe' } });
+    await channel.send({
+      type: 'broadcast',
+      event: 'signal',
+      payload: { kind: 'probe' }
+    });
     await probe.removeChannel(channel);
     return {
       ok: true,
       signalingMs: Math.round(performance.now() - started),
       iceServers: turn.length,
-      hasTurn: turn.some(server => JSON.stringify(server.urls || '').includes('turn:'))
+      hasTurn: turn.some(server => JSON.stringify(server.urls || '').includes('turn:')),
+      configPersistence: config().persistence
     };
   }
 
+  // When connectivity returns, explicitly wake Realtime. WebRTC links are left
+  // alone unless they have actually failed; the guest retry path then asks the
+  // host for a fresh PeerConnection.
+  global.addEventListener?.('online', () => {
+    try { client?.realtime?.connect?.(); } catch (_) {}
+    if (role === 'player' && hostId && room) scheduleGuestPeerRetry('ONLINE');
+  });
+
+  document.addEventListener?.('visibilitychange', () => {
+    if (document.hidden) return;
+    try { client?.realtime?.connect?.(); } catch (_) {}
+  });
+
   global.TERRARIUM_III = true;
   global.III_NET = {
-    configure, clearConfig, config, join, leave, send, selfTest,
+    configure,
+    clearConfig,
+    config,
+    join,
+    leave,
+    send,
+    selfTest,
     on(name, fn) {
       if (!listeners.has(name)) listeners.set(name, new Set());
       listeners.get(name).add(fn);
@@ -567,8 +860,14 @@
     get role() { return role; },
     stats() {
       return {
-        ...metrics, room, peerId, role, peers: publicRoster(),
+        ...metrics,
+        room,
+        peerId,
+        role,
+        peers: publicRoster(),
         signalConfigPersistence: config().persistence,
+        signalConfigSource: config().persistence,
+        embeddedSignalDefault: true,
         connections: Array.from(links.values()).map(link => ({
           peerId: link.id,
           connection: link.pc.connectionState,
@@ -581,6 +880,8 @@
     }
   };
 
+  // A host invite can still carry browser-public override configuration in its
+  // fragment. It wins for this session and persists when storage allows it.
   try {
     const invite = new URLSearchParams(location.hash.replace(/^#/, ''));
     const inviteUrl = invite.get('sb');
