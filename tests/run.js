@@ -2022,7 +2022,10 @@ group('references', () => {
   // as captureView, arriving by a different route. Text-substitution edits fail
   // quietly; this makes the result loud.
   test('every element the interface reaches for exists in the page', () => {
-    const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+    // app.js's page is engine.html. index.html is the language-first landing
+    // page — a separate program that loads nothing from src/ — so checking
+    // app.js's ids against it compared two different applications.
+    const html = readFileSync(new URL('../engine.html', import.meta.url), 'utf8');
     const present = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
     const missing = new Set();
     for (const file of ['src/ui/app.js']) {

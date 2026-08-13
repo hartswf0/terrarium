@@ -40,9 +40,24 @@ for (const f of readdirSync(placesDir)) {
 }
 const shipped = JSON.stringify({ index, worlds });
 
-// 3 · assemble around the real index.html so the chrome never drifts
-let html = readFileSync(join(root, 'index.html'), 'utf8');
+// 3 · assemble around the ENGINE page so the chrome never drifts.
+//
+// NOT index.html: that is the language-first landing page — its own program,
+// loading nothing from src/. The engine's page is engine.html. Get this wrong
+// and the build still "succeeds": it emits a 20 KB shell with no code and no
+// worlds in it, which is exactly what happened the day the landing page took
+// index.html's name. A builder that can ship an empty page is the defect, so
+// every anchor is checked and a missing one is a hard failure.
+const PAGE = join(root, 'engine.html');
+let html = readFileSync(PAGE, 'utf8');
 const css = readFileSync(join(root, 'app.css'), 'utf8');
+const CSS_TAG = '<link rel="stylesheet" href="app.css">';
+const JS_TAG = '<script type="module" src="src/ui/app.js"></script>';
+for (const [what, tag] of [['stylesheet', CSS_TAG], ['module script', JS_TAG]]) {
+  if (!html.includes(tag)) {
+    throw new Error(`engine.html has no ${what} anchor — refusing to build a page with nothing in it.\n  expected: ${tag}`);
+  }
+}
 // Payloads go in via REPLACEMENT FUNCTIONS, never replacement strings: a
 // string replacement interprets $& and friends, and this bundle genuinely
 // contains "\\$&" (escapeRe) — which re-inserted the matched <script> tag into
@@ -56,6 +71,13 @@ const arm = (s) => s.replace(/<\//g, '<\\/').replace(/<!--/g, '<\\!--');
 html = html.replace(/<script type="module" src="src\/ui\/app.js"><\/script>/,
   () => '<script>window.__SHIPPED_PLACES__ = ' + arm(shipped) + ';</script>\n'
   + '<script type="module">\n' + arm(js) + '\n</script>');
+
+// A last, dumber check that needs no knowledge of anchors: the artifact must
+// be at least as big as the things it is supposed to contain.
+const floor = js.length + shipped.length;
+if (html.length < floor) {
+  throw new Error(`assembled page is ${html.length} bytes but its code and worlds alone are ${floor} — nothing was inlined`);
+}
 
 writeFileSync(out, html);
 const mb = (n) => (n / 1048576).toFixed(2) + ' MB';

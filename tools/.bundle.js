@@ -62,9 +62,24 @@ if (typeof window !== "undefined") {
   addEventListener("pointerdown", arm, true);
   addEventListener("keydown", arm, true);
 }
+var soundOn = false;
+try {
+  soundOn = localStorage.getItem("terrarium.sound") === "on";
+} catch (_) {
+}
+function setEngineSound(on) {
+  soundOn = !!on;
+  try {
+    localStorage.setItem("terrarium.sound", on ? "on" : "off");
+  } catch (_) {
+  }
+  if (!on && gainN) gainN.gain.value = 0;
+  return soundOn;
+}
+var engineSoundOn = () => soundOn;
 function engine(speed, on) {
   try {
-    if (!on) {
+    if (!on || !soundOn) {
       if (gainN) gainN.gain.value = 0;
       return;
     }
@@ -72,10 +87,10 @@ function engine(speed, on) {
     if (!AC) {
       AC = new (window.AudioContext || window.webkitAudioContext)();
       osc = AC.createOscillator();
-      osc.type = "sawtooth";
+      osc.type = "triangle";
       filt = AC.createBiquadFilter();
       filt.type = "lowpass";
-      filt.Q.value = 4;
+      filt.Q.value = 0.7;
       gainN = AC.createGain();
       gainN.gain.value = 0;
       osc.connect(filt);
@@ -85,9 +100,9 @@ function engine(speed, on) {
     }
     if (AC.state === "suspended") AC.resume();
     const s = Math.abs(speed);
-    osc.frequency.value = 58 + s * 7.5;
-    filt.frequency.value = 300 + s * 140;
-    gainN.gain.setTargetAtTime(s < 0.5 ? 0 : Math.min(0.05, 8e-3 + s * 32e-4), AC.currentTime, 0.08);
+    osc.frequency.value = 42 + Math.min(52, s * 1.5);
+    filt.frequency.value = 120 + Math.min(120, s * 3);
+    gainN.gain.setTargetAtTime(s < 0.5 ? 0 : Math.min(0.014, 4e-3 + s * 9e-4), AC.currentTime, 0.12);
   } catch (_) {
   }
 }
@@ -99,11 +114,11 @@ var SWATCHES = [
   ["bone", [0.94, 0.95, 0.96]],
   ["coal", [0.12, 0.13, 0.16]]
 ];
-function obox(B, C, F, Lt, U, sx, sy, sz, col) {
+function obox(B, C2, F, Lt, U, sx, sy, sz, col) {
   const P = (x, y, z) => [
-    C[0] + F[0] * x + Lt[0] * y + U[0] * z,
-    C[1] + F[1] * x + Lt[1] * y + U[1] * z,
-    C[2] + F[2] * x + Lt[2] * y + U[2] * z
+    C2[0] + F[0] * x + Lt[0] * y + U[0] * z,
+    C2[1] + F[1] * x + Lt[1] * y + U[1] * z,
+    C2[2] + F[2] * x + Lt[2] * y + U[2] * z
   ];
   const p = [
     P(-sx, -sy, -sz),
@@ -131,10 +146,10 @@ function dock(rig) {
   }
   dockEl = document.createElement("div");
   dockEl.id = "rig-dock";
-  dockEl.style.cssText = "position:fixed;left:12px;bottom:12px;z-index:61;display:flex;align-items:center;gap:9px;background:rgba(10,14,18,.88);border:1px solid rgba(120,200,170,.35);border-radius:11px;padding:8px 11px;font:600 11px/1 ui-monospace,monospace;color:#cfe8dd;letter-spacing:.05em;";
+  dockEl.style.cssText = "position:fixed;right:12px;bottom:66px;z-index:61;width:214px;box-sizing:border-box;display:flex;align-items:center;gap:6px;justify-content:space-between;background:rgba(10,14,18,.86);border:1px solid rgba(120,200,170,.28);border-radius:8px;padding:4px 7px;font:700 9px/1 ui-monospace,monospace;color:#cfe8dd;letter-spacing:.06em;";
   const btn = document.createElement("button");
-  btn.textContent = "DRIVE \u25B8";
-  btn.style.cssText = "background:#6fe0c0;color:#06251c;border:0;border-radius:8px;font:800 11px/1 ui-monospace,monospace;letter-spacing:.08em;padding:8px 12px;cursor:pointer;";
+  btn.textContent = "DRIVE";
+  btn.style.cssText = "background:#6fe0c0;color:#06251c;border:0;border-radius:6px;font:800 9px/1 ui-monospace,monospace;letter-spacing:.08em;padding:5px 8px;cursor:pointer;";
   btn.addEventListener("click", () => {
     try {
       document.activeElement && document.activeElement.blur();
@@ -145,22 +160,31 @@ function dock(rig) {
   dockEl.appendChild(btn);
   speedEl = document.createElement("span");
   speedEl.textContent = "0 km/h";
-  speedEl.style.cssText = "min-width:58px;text-align:right;color:#8fb8a8;";
+  speedEl.style.cssText = "flex:1;text-align:right;color:#8fb8a8;font-weight:600;";
   dockEl.appendChild(speedEl);
-  for (const [name, col] of SWATCHES) {
-    const s = document.createElement("button");
-    s.title = name;
-    s.style.cssText = "width:18px;height:18px;border-radius:6px;border:1px solid rgba(255,255,255,.25);cursor:pointer;background:rgb(" + col.map((c) => Math.round(c * 255)).join(",") + ");padding:0;";
-    s.addEventListener("click", () => {
-      rig.color = col;
-    });
-    dockEl.appendChild(s);
-  }
+  let ci = 0;
+  const dot2 = document.createElement("button");
+  dot2.title = "paint the rig";
+  const paintDot = () => {
+    const c = SWATCHES[ci][1];
+    dot2.style.background = "rgb(" + c.map((v) => Math.round(v * 255)).join(",") + ")";
+  };
+  dot2.style.cssText = "width:15px;height:15px;border-radius:50%;border:1px solid rgba(255,255,255,.3);cursor:pointer;padding:0;flex:0 0 auto;";
+  dot2.addEventListener("click", () => {
+    ci = (ci + 1) % SWATCHES.length;
+    rig.color = SWATCHES[ci][1];
+    paintDot();
+  });
+  paintDot();
+  dockEl.appendChild(dot2);
   document.body.appendChild(dockEl);
   rig._btn = btn;
 }
+var TOUCH = typeof window !== "undefined" && (navigator.maxTouchPoints > 0 || matchMedia("(pointer: coarse)").matches);
+var hintShown = false;
 var hintEl = null;
 function hint(text) {
+  if (TOUCH) return;
   if (!hintEl) {
     hintEl = document.createElement("div");
     hintEl.id = "rig-hint";
@@ -216,7 +240,16 @@ var RIG = {
     if (this._btn) this._btn.textContent = "DISMOUNT \u2715";
     chrome(this);
     chromeShow(true);
-    hint("DRIVE \xB7 W/S \xB7 A/D \xB7 Space jump \xB7 F fire \xB7 Shift boost \xB7 V dismount");
+    if (!hintShown) {
+      hintShown = true;
+      hint("W/S \xB7 A/D \xB7 Space jump \xB7 F fire \xB7 Shift boost \xB7 V dismount");
+      setTimeout(() => {
+        try {
+          hint("");
+        } catch (_) {
+        }
+      }, 6e3);
+    }
     engine(0, true);
   },
   exit(world, cam) {
@@ -267,7 +300,7 @@ var RIG = {
       if (this.jz <= 0) {
         this.jz = 0;
         this.vz = 0;
-        blip(95, 0.05);
+        thud("land");
       }
     }
     if ((BTN.fire || !typing() && K.KeyF) && now - (this._fireAt || 0) > 260) {
@@ -276,7 +309,14 @@ var RIG = {
     }
     if (this.v > vmax) this.v = vmax;
     if (this.v < -vmax * 0.4) this.v = -vmax * 0.4;
-    this.yaw += st * 2.6 * dt * Math.min(1, Math.abs(this.v) / 3.5) * (this.v < 0 ? -1 : 1);
+    const turn = st * 2.6 * dt * Math.min(1, Math.abs(this.v) / 3.5) * (this.v < 0 ? -1 : 1);
+    this.yaw += turn;
+    const grip = boost ? 4 : 5.4;
+    const bite = Math.max(0, Math.min(1, (Math.abs(this.v) - 9) / 14));
+    this.slip = (this.slip || 0) - turn * Math.abs(this.v) * bite * (boost ? 0.62 : 0.4);
+    this.slip -= this.slip * Math.min(1, grip * dt);
+    if (Math.abs(this.slip) > 11) this.slip = Math.sign(this.slip) * 11;
+    this.drift = Math.min(1, Math.abs(this.slip) / 9);
     if (!this._solidsAt || now - this._solidsAt > 400 || Math.hypot(this.p[0] - (this._solidsP ? this._solidsP[0] : 1e9), this.p[1] - (this._solidsP ? this._solidsP[1] : 1e9)) > 18) {
       this._solidsAt = now;
       this._solidsP = [this.p[0], this.p[1]];
@@ -290,8 +330,9 @@ var RIG = {
     }
     const b = world.place.terrain ? world.place.terrain.bounds : [-50, -50, 50, 50];
     const px = this.p[0], py = this.p[1];
-    const nx = px + Math.cos(this.yaw) * this.v * dt;
-    const ny = py + Math.sin(this.yaw) * this.v * dt;
+    const sideX = -Math.sin(this.yaw), sideY = Math.cos(this.yaw);
+    const nx = px + Math.cos(this.yaw) * this.v * dt + sideX * (this.slip || 0) * dt;
+    const ny = py + Math.sin(this.yaw) * this.v * dt + sideY * (this.slip || 0) * dt;
     this.p[0] = Math.min(Math.max(nx, b[0] + 2), b[2] - 2);
     this.p[1] = Math.min(Math.max(ny, b[1] + 2), b[3] - 2);
     if (this.p[0] !== nx || this.p[1] !== ny) this.v *= 0.4;
@@ -318,12 +359,25 @@ var RIG = {
     const zHere = g(this.p[0], this.p[1]) + (this.jz || 0);
     for (const e of this._solids || []) {
       if ((e.zTop ?? 0) < zHere + 0.2) continue;
-      if (!pointInRing([this.p[0], this.p[1]], e.footprint)) continue;
-      if (pointInRing([px, py], e.footprint)) continue;
+      const wasInside = pointInRing([px, py], e.footprint);
+      if (wasInside) continue;
+      const from = [px, py], to = [this.p[0], this.p[1]];
+      const crossed = stepHitsRing(from, to, e.footprint);
+      if (!crossed && !pointInRing(to, e.footprint) && !bodyHitsRing(to, e.footprint)) continue;
       this.p[0] = px;
       this.p[1] = py;
-      if (Math.abs(this.v) > 6) blip(90, 0.12);
-      this.v *= -0.18;
+      const speed = Math.abs(this.v);
+      if (speed > 12) {
+        this.v = -this.v * 0.5;
+        const back = Math.sign(this.v) * 0.9;
+        this.p[0] += Math.cos(this.yaw) * back;
+        this.p[1] += Math.sin(this.yaw) * back;
+        this._crashAt = now;
+        thud("crash");
+      } else if (speed > 4) {
+        this.v = -this.v * 0.34;
+        blip(88, 0.13);
+      } else this.v *= -0.15;
       break;
     }
     const z = g(this.p[0], this.p[1]);
@@ -337,6 +391,45 @@ var RIG = {
     while (d < -Math.PI) d += 2 * Math.PI;
     cam.yaw += d * Math.min(1, 2.4 * dt * Math.min(1, Math.abs(this.v) / 5));
     cam.dist += (48 + Math.abs(this.v) * 0.7 - cam.dist) * Math.min(1, 3 * dt);
+    if (Math.abs(this.slip || 0) > 2.2 && this.jz <= 0 && now - (this._scuffAt || 0) > 26) {
+      this._scuffAt = now;
+      const sc = this._scuff || (this._scuff = []);
+      const cc = Math.cos(this.yaw), ss = Math.sin(this.yaw);
+      for (const sgn of [-1, 1]) {
+        sc.push({
+          x: this.p[0] - cc * 1.4 - ss * 0.95 * sgn,
+          y: this.p[1] - ss * 1.4 + cc * 0.95 * sgn,
+          z: z + 0.06,
+          yaw: this.yaw,
+          t: now,
+          w: Math.min(1, Math.abs(this.slip) / 9)
+        });
+      }
+      while (sc.length > 260) sc.shift();
+    }
+    const work = Math.abs(this.slip || 0) * 0.11 + (th > 0 && Math.abs(this.v) > 22 ? 0.5 : 0);
+    if (work > 0.9 && this.jz <= 0 && now - (this._puffAt || 0) > 55) {
+      this._puffAt = now;
+      const dl = this._dust || (this._dust = []);
+      if (dl.length < 34) {
+        const back = -1.5, side = 0.95;
+        const cc = Math.cos(this.yaw), ss = Math.sin(this.yaw);
+        const sgn = this._puffSide = -(this._puffSide || 1);
+        dl.push({
+          x: this.p[0] + cc * back - ss * side * sgn + (Math.random() - 0.5) * 0.4,
+          y: this.p[1] + ss * back + cc * side * sgn + (Math.random() - 0.5) * 0.4,
+          z: z + 0.1,
+          t: now,
+          p: Math.min(1, (work - 0.9) / 2.2)
+        });
+      }
+    }
+    if (this._crashAt && now - this._crashAt < 320) {
+      const a = (1 - (now - this._crashAt) / 320) * 0.9;
+      cam.target[0] += Math.sin(now * 0.09) * a;
+      cam.target[1] += Math.cos(now * 0.11) * a;
+      cam.target[2] += Math.sin(now * 0.13) * a * 0.5;
+    }
     engine(this.v, true);
     if (speedEl) speedEl.textContent = Math.round(Math.abs(this.v) * 3.6) + " km/h";
     return true;
@@ -349,8 +442,10 @@ var RIG = {
       return;
     }
     const world = this._world;
-    const p = this.p, yaw = this.yaw, col = this.color;
+    const p = this.p, col = this.color;
     const z = this._z != null ? this._z : 0;
+    const yaw = this.yaw + Math.max(-0.17, Math.min(0.17, (this.slip || 0) * 0.011));
+    const dust = this._dust || (this._dust = []);
     renderer2.setDynamic((B) => {
       const c = Math.cos(yaw), s = Math.sin(yaw);
       const cp = Math.cos(this._pitch || 0), sp = Math.sin(this._pitch || 0);
@@ -367,8 +462,62 @@ var RIG = {
       obox(B, at(-2.02, 0, 0.66), F, Lt, U, 0.06, 0.68, 0.09, [1, 0.3, 0.25]);
       for (const [fx, ly] of [[1.32, 0.94], [1.32, -0.94], [-1.32, 0.94], [-1.32, -0.94]])
         obox(B, at(fx, ly, 0.38), F, Lt, U, 0.42, 0.22, 0.38, dark);
+      const scuff = this._scuff || [];
+      const nowS = performance.now();
+      for (let i = scuff.length - 1; i >= 0; i--) if (nowS - scuff[i].t > 4200) scuff.splice(i, 1);
+      for (const k of scuff) {
+        const age = (nowS - k.t) / 4200;
+        const a = (1 - age) * 0.5 * k.w;
+        const cc = Math.cos(k.yaw) * 0.75, ss = Math.sin(k.yaw) * 0.75;
+        const wx = -Math.sin(k.yaw) * 0.2, wy = Math.cos(k.yaw) * 0.2;
+        const p00 = [k.x - cc - wx, k.y - ss - wy], p10 = [k.x + cc - wx, k.y + ss - wy];
+        const p11 = [k.x + cc + wx, k.y + ss + wy], p01 = [k.x - cc + wx, k.y - ss + wy];
+        const col2 = [0.1, 0.09, 0.08];
+        B.tri([p00[0], p00[1], k.z], [p10[0], p10[1], k.z], [p11[0], p11[1], k.z], [0, 0, 1], col2, a);
+        B.tri([p00[0], p00[1], k.z], [p11[0], p11[1], k.z], [p01[0], p01[1], k.z], [0, 0, 1], col2, a);
+      }
+      const nowD = performance.now();
+      for (let i = dust.length - 1; i >= 0; i--) if (nowD - dust[i].t > 900) dust.splice(i, 1);
+      for (const d of dust) {
+        const age = (nowD - d.t) / 900;
+        const r = 0.26 + age * 0.95;
+        const a = (1 - age) * (1 - age) * 0.22 * (0.35 + d.p);
+        const zz = d.z + age * 0.75;
+        const g = 0.6 - age * 0.08;
+        B.tri([d.x - r, d.y - r, zz], [d.x + r, d.y - r, zz], [d.x + r, d.y + r, zz], [0, 0, 1], [g, g - 0.04, g - 0.11], a);
+        B.tri([d.x - r, d.y - r, zz], [d.x + r, d.y + r, zz], [d.x - r, d.y + r, zz], [0, 0, 1], [g, g - 0.04, g - 0.11], a);
+      }
+      const nowF = performance.now();
+      if (this._flashAt && nowF - this._flashAt < 90) {
+        const k = 1 - (nowF - this._flashAt) / 90;
+        obox(
+          B,
+          at(2.5, 0, 0.72),
+          F,
+          Lt,
+          U,
+          0.5 + k * 0.7,
+          0.16 + k * 0.3,
+          0.16 + k * 0.3,
+          [1, 0.86 + k * 0.14, 0.45 + k * 0.4]
+        );
+      }
+      if (this._burst && nowF - this._burst.t < 260) {
+        const k = 1 - (nowF - this._burst.t) / 260;
+        const bp = this._burst.p, r = (1 - k) * 2.6 + 0.3;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [0.7, 0.7], [-0.7, -0.7]]) {
+          B.tri(
+            [bp[0] + dx * r, bp[1] + dy * r, bp[2]],
+            [bp[0] + dx * r * 0.6 - dy * 0.3, bp[1] + dy * r * 0.6 + dx * 0.3, bp[2] + 0.35],
+            [bp[0] + dx * r * 0.6 + dy * 0.3, bp[1] + dy * r * 0.6 - dx * 0.3, bp[2] + 0.35],
+            [0, 0, 1],
+            [1, 0.72, 0.3],
+            k * 0.85
+          );
+        }
+      }
       const shots = this._shots || [], nowMs = performance.now();
-      for (let i = shots.length - 1; i >= 0; i--) if (nowMs - shots[i].t > 150) shots.splice(i, 1);
+      for (let i = shots.length - 1; i >= 0; i--) if (nowMs - shots[i].t > 260) shots.splice(i, 1);
       for (const sh of shots) {
         const D2 = [sh.b[0] - sh.a[0], sh.b[1] - sh.a[1], sh.b[2] - sh.a[2]];
         const len2 = Math.hypot(D2[0], D2[1], D2[2]) || 1;
@@ -395,13 +544,117 @@ RIG.tick = function(world, cam) {
 };
 var JOY = { x: 0, y: 0, active: false };
 var BTN = { jump: false, fire: false, boost: false };
+function press(name) {
+  if (name === "fire") {
+    BTN.fire = true;
+    setTimeout(() => {
+      BTN.fire = false;
+    }, 60);
+    return true;
+  }
+  if (name === "jump") {
+    BTN.jump = true;
+    return true;
+  }
+  if (name === "boost") {
+    BTN.boost = true;
+    setTimeout(() => {
+      BTN.boost = false;
+    }, 900);
+    return true;
+  }
+  return false;
+}
+var FX = true;
+try {
+  FX = localStorage.getItem("terrarium.fx") !== "off";
+} catch (_) {
+}
+function setEffects(on) {
+  FX = !!on;
+  try {
+    localStorage.setItem("terrarium.fx", on ? "on" : "off");
+  } catch (_) {
+  }
+  return FX;
+}
+var effectsOn = () => FX;
+function ensureAC() {
+  if (!AC && heard) {
+    try {
+      AC = new (window.AudioContext || window.webkitAudioContext)();
+      osc = AC.createOscillator();
+      osc.type = "triangle";
+      filt = AC.createBiquadFilter();
+      filt.type = "lowpass";
+      filt.Q.value = 0.7;
+      gainN = AC.createGain();
+      gainN.gain.value = 0;
+      osc.connect(filt);
+      filt.connect(gainN);
+      gainN.connect(AC.destination);
+      osc.start();
+    } catch (_) {
+    }
+  }
+  if (AC && AC.state === "suspended") AC.resume();
+  return AC;
+}
+function thud(kind) {
+  if (!FX || !ensureAC()) return;
+  const t0 = AC.currentTime;
+  const tone = (type, f0, f1, peak, dur, delay = 0) => {
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, t0 + delay);
+    o.frequency.exponentialRampToValueAtTime(Math.max(24, f1), t0 + delay + dur);
+    g.gain.setValueAtTime(1e-4, t0 + delay);
+    g.gain.exponentialRampToValueAtTime(peak, t0 + delay + 8e-3);
+    g.gain.exponentialRampToValueAtTime(1e-4, t0 + delay + dur);
+    o.connect(g);
+    g.connect(AC.destination);
+    o.start(t0 + delay);
+    o.stop(t0 + delay + dur + 0.02);
+  };
+  const noise = (peak, dur, cut) => {
+    const n = Math.floor(AC.sampleRate * dur);
+    const buf = AC.createBuffer(1, n, AC.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const src = AC.createBufferSource();
+    src.buffer = buf;
+    const bp = AC.createBiquadFilter();
+    bp.type = "lowpass";
+    bp.frequency.value = cut;
+    const g = AC.createGain();
+    g.gain.value = peak;
+    src.connect(bp);
+    bp.connect(g);
+    g.connect(AC.destination);
+    src.start(t0);
+  };
+  if (kind === "shot") {
+    tone("square", 320, 90, 0.05, 0.09);
+    noise(0.05, 0.09, 2600);
+  } else if (kind === "hit") {
+    tone("triangle", 150, 42, 0.1, 0.34);
+    noise(0.1, 0.22, 900);
+    tone("sawtooth", 90, 30, 0.05, 0.26, 0.01);
+  } else if (kind === "crash") {
+    tone("triangle", 110, 34, 0.12, 0.42);
+    noise(0.13, 0.3, 700);
+  } else if (kind === "land") {
+    tone("triangle", 90, 40, 0.05, 0.16);
+    noise(0.04, 0.1, 500);
+  }
+}
 function blip(freq, dur) {
   try {
-    if (!AC) return;
+    if (!AC || !soundOn) return;
     const o = AC.createOscillator(), g2 = AC.createGain();
-    o.type = "square";
+    o.type = "triangle";
     o.frequency.value = freq;
-    g2.gain.value = 0.055;
+    g2.gain.value = 0.018;
     o.connect(g2);
     g2.connect(AC.destination);
     o.start();
@@ -409,6 +662,35 @@ function blip(freq, dur) {
     o.stop(AC.currentTime + dur + 0.02);
   } catch (_) {
   }
+}
+function segCross(a, b, c, d) {
+  const s1x = b[0] - a[0], s1y = b[1] - a[1];
+  const s2x = d[0] - c[0], s2y = d[1] - c[1];
+  const den = -s2x * s1y + s1x * s2y;
+  if (Math.abs(den) < 1e-9) return false;
+  const s = (-s1y * (a[0] - c[0]) + s1x * (a[1] - c[1])) / den;
+  const t = (s2x * (a[1] - c[1]) - s2y * (a[0] - c[0])) / den;
+  return s >= 0 && s <= 1 && t >= 0 && t <= 1;
+}
+function stepHitsRing(a, b, ring3) {
+  for (let i = 0; i < ring3.length; i++) {
+    if (segCross(a, b, ring3[i], ring3[(i + 1) % ring3.length])) return ring3[i];
+  }
+  return null;
+}
+function distToSeg(p, a, b) {
+  const vx = b[0] - a[0], vy = b[1] - a[1];
+  const wx = p[0] - a[0], wy = p[1] - a[1];
+  const L = vx * vx + vy * vy;
+  const t = L < 1e-9 ? 0 : Math.max(0, Math.min(1, (wx * vx + wy * vy) / L));
+  return Math.hypot(p[0] - (a[0] + vx * t), p[1] - (a[1] + vy * t));
+}
+var BODY_R = 1.25;
+function bodyHitsRing(to, ring3) {
+  for (let i = 0; i < ring3.length; i++) {
+    if (distToSeg(to, ring3[i], ring3[(i + 1) % ring3.length]) < BODY_R) return true;
+  }
+  return false;
 }
 function pointInRing(p, ring3) {
   let inside = false;
@@ -428,7 +710,7 @@ function fire(rig, world) {
     cands = world.near([rig.p[0] + c * 24, rig.p[1] + s * 24], 26).map((h) => h.entity);
   } catch (_) {
   }
-  for (let d = 4; d <= 46 && !hitE; d += 3) {
+  for (let d = 2.5; d <= 46 && !hitE; d += 1.1) {
     const x = rig.p[0] + c * d, y = rig.p[1] + s * d;
     for (const e of cands) {
       if (!e || e.type === "terrain" || !e.footprint) continue;
@@ -440,8 +722,11 @@ function fire(rig, world) {
       }
     }
   }
-  rig._shots.push({ a, b: hitP || [rig.p[0] + c * 46, rig.p[1] + s * 46, z0], t: performance.now() });
-  blip(780, 0.05);
+  const end = hitP || [rig.p[0] + c * 46, rig.p[1] + s * 46, z0];
+  rig._shots.push({ a, b: end, t: performance.now(), hit: !!hitE });
+  rig._flashAt = performance.now();
+  if (hitE) rig._burst = { p: end, t: performance.now() };
+  thud("shot");
   if (hitE) {
     try {
       world.removeEntity(hitE.id, { label: "shot away: " + (hitE.name || hitE.type) });
@@ -452,11 +737,7 @@ function fire(rig, world) {
           dispatchEvent(new CustomEvent("rig:worldchanged"));
         });
       }
-      hint("\u26A1 " + (hitE.name || hitE.type).toUpperCase() + " SHOT AWAY \u2014 undo restores it");
-      setTimeout(() => {
-        if (RIG.on) hint("DRIVE \xB7 W/S \xB7 A/D \xB7 Space jump \xB7 F fire \xB7 Shift boost \xB7 V dismount");
-      }, 1700);
-      blip(140, 0.14);
+      thud("hit");
     } catch (_) {
     }
   }
@@ -507,10 +788,11 @@ function chrome(rig) {
   pad.addEventListener("pointercancel", joyEnd);
   chromeEl.appendChild(pad);
   const cluster = document.createElement("div");
-  cluster.style.cssText = "position:absolute;right:22px;bottom:96px;display:flex;align-items:flex-end;gap:14px;pointer-events:auto;";
-  const mk = (label2, size, border, colr, down, up) => {
+  cluster.id = "rig-actions";
+  cluster.style.cssText = "position:absolute;right:14px;bottom:302px;display:flex;align-items:flex-end;gap:10px;pointer-events:auto;";
+  const mk = (label3, size, border, colr, down, up) => {
     const b = document.createElement("button");
-    b.textContent = label2;
+    b.textContent = label3;
     b.style.cssText = "width:" + size + "px;height:" + size + "px;border-radius:50%;cursor:pointer;touch-action:none;border:2px solid " + border + ";color:" + border + ";background:" + colr + ";font:800 12px/1 ui-monospace,monospace;letter-spacing:.08em;";
     b.addEventListener("pointerdown", (ev) => {
       ev.preventDefault();
@@ -1424,10 +1706,13 @@ var BUS = {
 if (typeof window !== "undefined") window.BUS = BUS;
 
 // src/sim/trace.js
-var MAX_STAMPS = 2600;
+var MAX_STAMPS = 1400;
 var A = {
-  stamps: [],
-  // ring buffer of [x, y, yaw]
+  xyz: new Float32Array(MAX_STAMPS * 3),
+  n: 0,
+  // how many stamps are live
+  coarse: 1,
+  // metres of history each stamp now stands for
   head: 0,
   pressure: 38,
   lastLine: "the ground is unmarked",
@@ -1455,12 +1740,15 @@ function paint() {
   if (!d) {
     d = document.createElement("div");
     d.id = "atlas-dock";
-    d.style.cssText = "position:fixed;right:12px;bottom:12px;z-index:61;min-width:200px;max-width:260px;background:rgba(10,14,18,.92);border:1px solid rgba(151,187,213,.25);border-radius:12px;padding:9px 11px;font:700 9px/1.45 ui-monospace,monospace;color:#cfe8dd;letter-spacing:.08em;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);pointer-events:none;";
+    d.style.cssText = "position:fixed;right:12px;bottom:10px;z-index:61;width:214px;font:700 8px/1.3 ui-monospace,monospace;color:#9fb4ad;letter-spacing:.14em;pointer-events:none;text-align:left;";
     document.body.appendChild(d);
   }
+  d.style.width = "214px";
+  d.style.right = "12px";
+  d.style.bottom = "30px";
   const p = Math.round(A.pressure);
   const tone = p > 66 ? "#df5a5d" : p > 33 ? "#ffb45e" : "#6fe0c0";
-  d.innerHTML = "UNSETTLED ATLAS 05" + (A.unsettled ? ' \xB7 <span style="color:#ffb45e">UNSETTLED</span>' : "") + '<div style="margin:6px 0 4px;height:4px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="width:' + p + "%;height:100%;border-radius:2px;background:" + tone + '"></div></div>NORMALIZATION ' + p + '<div style="margin-top:5px;color:#8d9aa5;font-weight:500;letter-spacing:.02em">' + A.lastLine + "</div>";
+  d.innerHTML = '<div style="height:3px;border-radius:2px;background:rgba(255,255,255,.10);overflow:hidden"><div style="width:' + p + "%;height:100%;background:" + tone + '"></div></div><div style="display:flex;justify-content:space-between;margin-top:4px"><span>NORMALIZATION ' + p + (A.unsettled ? ' \xB7 <span style="color:#ffb45e">UNSETTLED</span>' : "") + '</span></div><div style="font:500 9px/1.35 system-ui,sans-serif;letter-spacing:.01em;color:#7d8b95;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + A.lastLine + "</div>";
 }
 var ATLAS = {
   get pressure() {
@@ -1476,8 +1764,9 @@ var ATLAS = {
     if (!world || A._bound === world) return;
     A._bound = world;
     A.homeBranch = world.branch;
-    A.stamps = [];
+    A.n = 0;
     A.head = 0;
+    A.coarse = 1;
     A._lastAt = null;
     A.unsettled = false;
     this.ghosts = [];
@@ -1493,9 +1782,9 @@ var ATLAS = {
       ];
     }
     world.on((kind, ev) => {
-      const label2 = ev?.meta?.label || ev?.label || "";
-      if (/^(add|build)/.test(label2)) drop(2, "ground broken \u2014 pressure falls");
-      else if (/^(remove|destroy)/.test(label2)) drop(2, "the given removed \u2014 pressure falls");
+      const label3 = ev?.meta?.label || ev?.label || "";
+      if (/^(add|build)/.test(label3)) drop(2, "ground broken \u2014 pressure falls");
+      else if (/^(remove|destroy)/.test(label3)) drop(2, "the given removed \u2014 pressure falls");
     });
     paint();
   },
@@ -1510,9 +1799,8 @@ var ATLAS = {
     if (dist(p, A._lastAt) < 2.4) return;
     A._lastAt = [p[0], p[1]];
     let worn = false;
-    for (let i = 0; i < A.stamps.length; i++) {
-      const s = A.stamps[i];
-      const dx = s[0] - p[0], dy = s[1] - p[1];
+    for (let i = Math.max(0, A.n - 220); i < A.n; i++) {
+      const dx = A.xyz[i * 3] - p[0], dy = A.xyz[i * 3 + 1] - p[1];
       if (dx * dx + dy * dy < 2.6) {
         worn = true;
         break;
@@ -1520,12 +1808,20 @@ var ATLAS = {
     }
     if (worn) rise(0.05);
     else A.pressure = Math.max(0, A.pressure - 0.012);
-    const stamp = [p[0], p[1], rig.yaw];
-    if (A.stamps.length < MAX_STAMPS) A.stamps.push(stamp);
-    else {
-      A.stamps[A.head] = stamp;
-      A.head = (A.head + 1) % MAX_STAMPS;
+    if (A.n >= MAX_STAMPS) {
+      let w = 0;
+      for (let r = 0; r < A.n; r += 2, w++) {
+        A.xyz[w * 3] = A.xyz[r * 3];
+        A.xyz[w * 3 + 1] = A.xyz[r * 3 + 1];
+        A.xyz[w * 3 + 2] = A.xyz[r * 3 + 2];
+      }
+      A.n = w;
+      A.coarse *= 2;
     }
+    A.xyz[A.n * 3] = p[0];
+    A.xyz[A.n * 3 + 1] = p[1];
+    A.xyz[A.n * 3 + 2] = rig.yaw;
+    A.n++;
     for (const t of A.thresholds) {
       if (!t.crossed && dist([t.x, t.y], p) < 60) {
         t.crossed = true;
@@ -1548,7 +1844,8 @@ var ATLAS = {
     const g = (x, y) => (renderer2.drawnGroundAt?.(x, y) ?? world.place.groundAt(x, y)) + 0.125;
     const col = [0.16, 0.12, 0.09];
     renderer2.setTrace((B) => {
-      for (const [x, y, yaw] of A.stamps) {
+      for (let i = 0; i < A.n; i++) {
+        const x = A.xyz[i * 3], y = A.xyz[i * 3 + 1], yaw = A.xyz[i * 3 + 2];
         const c = Math.cos(yaw), s = Math.sin(yaw);
         for (const side of [-0.95, 0.95]) {
           const ox = -s * side, oy = c * side;
@@ -1697,6 +1994,394 @@ BUS.register(
 );
 if (typeof window !== "undefined") window.ATLAS = ATLAS;
 
+// src/ai/operator.js
+var KEY_STORE = "creo.ai.key";
+var CFG_STORE = "creo.ai.config";
+var STALE_DEFAULTS = /* @__PURE__ */ new Set(["gpt-4o-mini", "gpt-4o", "gpt-4", "gpt-3.5-turbo"]);
+function getConfig() {
+  try {
+    const cfg = { key: localStorage.getItem(KEY_STORE) || "", ...JSON.parse(localStorage.getItem(CFG_STORE) || "{}") };
+    if (cfg.model && STALE_DEFAULTS.has(cfg.model) && !cfg.modelChosen) cfg.model = "";
+    if (cfg.api && !cfg.apiV2) {
+      delete cfg.api;
+    }
+    return cfg;
+  } catch {
+    return { key: "" };
+  }
+}
+function setConfig(patch = {}) {
+  if (patch.key !== void 0) localStorage.setItem(KEY_STORE, patch.key);
+  const cfg = getConfig();
+  const next = {
+    baseURL: patch.baseURL ?? cfg.baseURL ?? "https://api.openai.com/v1",
+    // No hardcoded default model. Whatever the endpoint reports is the truth;
+    // shipping a stale id was why an old model was the only thing on offer.
+    model: patch.model ?? cfg.model ?? "",
+    // once a model is picked from the endpoint's own list it is a real choice
+    modelChosen: patch.model ? true : cfg.modelChosen ?? false,
+    provider: patch.provider ?? cfg.provider ?? "openai",
+    apiV2: true,
+    dropped: patch.dropped ?? cfg.dropped ?? [],
+    effort: patch.effort ?? cfg.effort ?? "medium",
+    vision: patch.vision ?? cfg.vision ?? "auto",
+    api: patch.api ?? cfg.api ?? "auto"
+  };
+  localStorage.setItem(CFG_STORE, JSON.stringify(next));
+  return next;
+}
+function effortFor(text, fallback = "medium") {
+  const t = String(text).toLowerCase();
+  if (/^(select|show|hide|zoom|go to|take me|look)/.test(t)) return "low";
+  if (/(why|what happens|compare|best|solve|flood|instead|without)/.test(t)) return "high";
+  if (/(build|move|plant|drain|connect|remove|put|add)/.test(t)) return "medium";
+  return fallback;
+}
+var telemetry = [];
+var hasKey = () => !!getConfig().key;
+async function listModels() {
+  const { key: key2, baseURL, provider } = getConfig();
+  if (!key2) throw new Error("no key configured");
+  if (provider === "anthropic") {
+    const r2 = await fetch("https://api.anthropic.com/v1/models", {
+      headers: { "x-api-key": key2, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" }
+    });
+    if (!r2.ok) throw new Error(`${r2.status}: ${(await r2.text()).slice(0, 120)}`);
+    return (await r2.json()).data.map((m) => m.id).sort();
+  }
+  const r = await fetch(`${(baseURL || "https://api.openai.com/v1").replace(/\/$/, "")}/models`, {
+    headers: { authorization: `Bearer ${key2}` }
+  });
+  if (!r.ok) throw new Error(`${r.status}: ${(await r.text()).slice(0, 120)}`);
+  return (await r.json()).data.map((m) => m.id).sort();
+}
+async function complete({ system, prompt, image = null, effort = null }) {
+  const cfg = getConfig();
+  const { key: key2, baseURL, model, provider } = cfg;
+  if (!key2) throw new Error("no API key configured");
+  if (!model) throw new Error("no model chosen \u2014 open the panel and pick one from your endpoint");
+  const started = performance.now();
+  const record = (api, usage) => {
+    telemetry.push({
+      at: Date.now(),
+      model,
+      api,
+      effort: effort || cfg.effort,
+      ms: Math.round(performance.now() - started),
+      inTokens: usage?.input_tokens ?? usage?.prompt_tokens ?? null,
+      outTokens: usage?.output_tokens ?? usage?.completion_tokens ?? null,
+      vision: !!image
+    });
+  };
+  if (provider === "anthropic") {
+    const content2 = [{ type: "text", text: prompt }];
+    if (image) content2.unshift({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: image.split(",")[1] } });
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": key2, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+      body: JSON.stringify({ model, max_tokens: 2e3, temperature: 0, system, messages: [{ role: "user", content: content2 }] })
+    });
+    if (!r.ok) throw new Error(`${r.status}: ${(await r.text()).slice(0, 200)}`);
+    const j = await r.json();
+    record("messages", j.usage);
+    return j.content.filter((c) => c.type === "text").map((c) => c.text).join("");
+  }
+  const base = (baseURL || "https://api.openai.com/v1").replace(/\/$/, "");
+  const content = [{ type: "input_text", text: prompt }];
+  if (image) content.push({ type: "input_image", image_url: image, detail: "low" });
+  const dropped = new Set(cfg.dropped || []);
+  function prune(body) {
+    const out = { ...body };
+    for (const k of dropped) deleteDeep(out, k);
+    return out;
+  }
+  function deleteDeep(obj, path) {
+    const parts = path.split(".");
+    let o = obj;
+    for (let i = 0; i < parts.length - 1; i++) {
+      o = o?.[parts[i]];
+      if (!o) return;
+    }
+    delete o[parts[parts.length - 1]];
+  }
+  async function post(url, body, tries = 4) {
+    for (let attempt = 0; attempt < tries; attempt++) {
+      const r = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${key2}` },
+        body: JSON.stringify(prune(body))
+      });
+      if (r.ok) return r;
+      const text = await r.text();
+      if (r.status !== 400) return { ...r, ok: false, status: r.status, _text: text };
+      const fix = repairFor(text, body);
+      if (!fix) return { ok: false, status: 400, _text: text };
+      if (fix.rename) {
+        body[fix.rename[1]] = body[fix.rename[0]];
+      }
+      dropped.add(fix.drop);
+      setConfig({ dropped: [...dropped] });
+      console.warn(`[CREO] ${model} refuses "${fix.drop}" \u2014 dropping it and retrying`);
+    }
+    return { ok: false, status: 400, _text: "gave up repairing the request" };
+  }
+  const responsesBody = {
+    model,
+    instructions: system,
+    input: [{ role: "user", content }],
+    ...effort || cfg.effort ? { reasoning: { effort: effort || cfg.effort } } : {},
+    text: { verbosity: "low" }
+  };
+  if (cfg.api !== "chat") {
+    let r = null;
+    try {
+      r = await post(`${base}/responses`, responsesBody);
+    } catch {
+      r = null;
+    }
+    if (r && r.ok) {
+      const j = await r.json();
+      record("responses", j.usage);
+      if (cfg.api !== "responses") setConfig({ api: "responses" });
+      const text = j.output_text ?? (j.output || []).flatMap((o) => (o.content || []).filter((c) => c.type === "output_text").map((c) => c.text)).join("");
+      if (text) return text;
+    } else if (r && r.status === 400) {
+      throw new Error(`400: ${String(r._text).slice(0, 200)}`);
+    } else if (r && r.status && r.status !== 404) {
+      throw new Error(`${r.status}: ${String(r._text).slice(0, 200)}`);
+    } else {
+      setConfig({ api: "chat" });
+    }
+  }
+  const msgContent = image ? [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: image, detail: "low" } }] : prompt;
+  const r2 = await post(`${base}/chat/completions`, {
+    model,
+    response_format: { type: "json_object" },
+    messages: [{ role: "system", content: system }, { role: "user", content: msgContent }]
+  });
+  if (!r2.ok) throw new Error(`${r2.status}: ${String(r2._text).slice(0, 200)}`);
+  const j2 = await r2.json();
+  record("chat", j2.usage);
+  return j2.choices[0].message.content;
+}
+function repairFor(errorText, body = {}) {
+  let msg = errorText;
+  try {
+    msg = JSON.parse(errorText).error?.message || errorText;
+  } catch {
+  }
+  const lower = String(msg).toLowerCase();
+  const named = String(errorText).match(/"param"\s*:\s*"([^"]+)"/)?.[1] || lower.match(/unsupported (?:value|parameter): '([^']+)'/)?.[1] || lower.match(/unknown parameter: '([^']+)'/)?.[1] || lower.match(/'([a-z_.]+)' is not supported/)?.[1] || lower.match(/unsupported_(?:value|parameter).*'([a-z_.]+)'/)?.[1];
+  if (named === "max_tokens" || /use ['"]?max_completion_tokens/.test(lower)) {
+    return { drop: "max_tokens", rename: ["max_tokens", "max_completion_tokens"] };
+  }
+  if (named && has(body, named)) return { drop: named };
+  if (named === "verbosity" || /verbosity/.test(lower)) return { drop: "text.verbosity" };
+  if (/reasoning/.test(lower) && has(body, "reasoning")) return { drop: "reasoning" };
+  if (/response_format|json_object/.test(lower)) return { drop: "response_format" };
+  if (/temperature/.test(lower)) return { drop: "temperature" };
+  return null;
+}
+var has = (obj, path) => {
+  let o = obj;
+  for (const part of String(path).split(".")) {
+    if (!o || !(part in o)) return false;
+    o = o[part];
+  }
+  return true;
+};
+function digest(world, { camera, selection = [], pointer = null, limit = 90 }) {
+  const focus = [camera.target[0], camera.target[1]];
+  const radius = Math.max(80, camera.dist * 0.9);
+  const near = world.index.near(focus, radius);
+  const seen = /* @__PURE__ */ new Set();
+  const rows = [];
+  for (const hit of near) {
+    if (rows.length >= limit) break;
+    const e = world.get(hit.id);
+    if (!e || seen.has(e.id)) continue;
+    seen.add(e.id);
+    if (["opening", "furniture", "room"].includes(e.type)) continue;
+    const ring3 = world.ringOf(e);
+    if (!ring3) continue;
+    const c = centroid(ring3);
+    const ob = orientedBounds(ring3);
+    rows.push({
+      id: e.id,
+      type: e.type + (e.subtype ? `/${e.subtype}` : ""),
+      name: e.name && e.name !== "Building" ? e.name : void 0,
+      use: e.use || void 0,
+      at: [Math.round(c[0]), Math.round(c[1])],
+      size: `${ob.width.toFixed(0)}x${ob.depth.toFixed(0)}m`,
+      height: e.zTop - e.zBase > 0.4 ? `${(e.zTop - e.zBase).toFixed(0)}m` : void 0,
+      said: e.type === "observation" ? e.evidence?.[0]?.text || e.name : void 0
+    });
+  }
+  const b = world.place.bounds();
+  return {
+    place: world.place.name,
+    bounds: { x: [Math.round(b[0]), Math.round(b[2])], y: [Math.round(b[1]), Math.round(b[3])] },
+    units: "metres, local grid; +x is east, +y is north",
+    camera: { looking_at: [Math.round(focus[0]), Math.round(focus[1])], height_of_view: Math.round(camera.dist) },
+    selection,
+    pointer: pointer ? [Math.round(pointer[0]), Math.round(pointer[1])] : null,
+    ground: world.place.terrain ? { relief_m: +Math.max(...world.place.terrain.data).toFixed(1) } : null,
+    nearby: rows,
+    truncated: near.length > rows.length ? `${near.length - rows.length} more things not listed` : void 0
+  };
+}
+var SYSTEM = `You operate a spatial design tool called CREO. You are not drawing geometry and you are not deciding what is true about the place \u2014 you are working the interface the way a person works it with their hands.
+
+You will be given the user's request and a digest of what is currently in view: named things with ids, positions in metres on a local grid, and sizes.
+
+Return ONLY a JSON object of this shape:
+{"reasoning":"<one short sentence>","operations":[ ... ]}
+
+Each operation is one of:
+  {"op":"look","at":[x,y],"distance":<metres>}          move the view
+  {"op":"point","at":[x,y]}                              tap a location
+  {"op":"select","ids":["..."]}                          select existing things by id
+  {"op":"circle","points":[[x,y],[x,y],...]}             draw a closed area (4-12 points)
+  {"op":"line","points":[[x,y],[x,y],...]}               trace a route (2-12 points)
+  {"op":"say","text":"<an ordinary sentence>"}           speak to the place
+  {"op":"note","at":[x,y],"text":"<what you observed>"}  leave an observation
+
+Rules you must follow:
+- Every id must appear in the digest. Never invent one.
+- Every coordinate must lie inside the stated bounds.
+- Prefer selecting a named thing over circling near it.
+- A "circle" is for an AREA the request is about; a "line" is for a ROUTE.
+- Put the gesture BEFORE the sentence: circle or select first, then say. The tool resolves "this" and "here" from what you just indicated.
+- Sentences must be plain English of the kind a resident would use: "this floods when it rains", "we need a drain here", "there should be trees here", "connect these", "why is this here?".
+- Do not propose more than one intervention per request.
+- If the request cannot be grounded in what is in view, return an empty operations list and say why in reasoning.`;
+var OPS = /* @__PURE__ */ new Set(["look", "point", "select", "circle", "line", "say", "note"]);
+function validate(world, ops, digestObj) {
+  const known = new Set(digestObj.nearby.map((r) => r.id));
+  const b = world.place.bounds();
+  const inBounds = ([x, y]) => Number.isFinite(x) && Number.isFinite(y) && x >= b[0] - 50 && x <= b[2] + 50 && y >= b[1] - 50 && y <= b[3] + 50;
+  const ok = [];
+  const refused = [];
+  for (const raw of ops || []) {
+    const op = raw && raw.op;
+    if (!OPS.has(op)) {
+      refused.push({ raw, why: `unknown operation "${op}"` });
+      continue;
+    }
+    if (op === "select") {
+      const ids = (raw.ids || []).filter((id) => world.get(id));
+      const bad = (raw.ids || []).filter((id) => !world.get(id));
+      if (bad.length) refused.push({ raw, why: `no such thing: ${bad.join(", ")}` });
+      if (!ids.length) continue;
+      if (ids.some((id) => !known.has(id))) refused.push({ raw, why: "selected something that was not in view" });
+      ok.push({ op: "select", ids });
+      continue;
+    }
+    if (op === "point" || op === "note" || op === "look") {
+      if (!Array.isArray(raw.at) || !inBounds(raw.at)) {
+        refused.push({ raw, why: "point is outside this place" });
+        continue;
+      }
+      ok.push({ ...raw, at: [Number(raw.at[0]), Number(raw.at[1])] });
+      continue;
+    }
+    if (op === "circle" || op === "line") {
+      const pts = (raw.points || []).filter((p) => Array.isArray(p) && inBounds(p)).map((p) => [Number(p[0]), Number(p[1])]);
+      if (pts.length < (op === "circle" ? 3 : 2)) {
+        refused.push({ raw, why: "not enough points inside this place" });
+        continue;
+      }
+      if (op === "circle" && area(pts) < 4) {
+        refused.push({ raw, why: "that area is too small to mean anything" });
+        continue;
+      }
+      ok.push({ op, points: pts.slice(0, 12) });
+      continue;
+    }
+    if (op === "say") {
+      const text = String(raw.text || "").trim();
+      if (!text) {
+        refused.push({ raw, why: "empty sentence" });
+        continue;
+      }
+      if (text.length > 200) {
+        refused.push({ raw, why: "sentence too long to be an utterance" });
+        continue;
+      }
+      ok.push({ op: "say", text });
+    }
+  }
+  return { operations: ok, refused };
+}
+async function proposeOperations(world, request, view, opts = {}) {
+  const cfg = getConfig();
+  const d = digest(world, view);
+  const visionMode = opts.vision || cfg.vision;
+  const wantsVision = visionMode === "always" || visionMode === "auto" && (view.selection?.length || view.pointer || /\b(this|that|here|there|looks|see|behind|beside|left|right)\b/i.test(request));
+  const prompt = [
+    `Request: ${request}`,
+    opts.findings ? `
+What CREO has already established by looking:
+${opts.findings}` : "",
+    opts.critique ? `
+A previous attempt was rejected. The single largest problem was:
+${opts.critique}
+Address that.` : "",
+    "",
+    "What is in view:",
+    JSON.stringify(d, null, 1)
+  ].filter(Boolean).join("\n");
+  const raw = await complete({
+    system: SYSTEM,
+    prompt,
+    image: wantsVision ? view.image || null : null,
+    effort: opts.effort || effortFor(request, cfg.effort)
+  });
+  let parsed;
+  try {
+    parsed = JSON.parse(String(raw).replace(/^```(?:json)?\s*|\s*```$/g, "").trim());
+  } catch {
+    const m = /\{[\s\S]*\}/.exec(raw);
+    if (!m) throw new Error("the model did not return JSON");
+    parsed = JSON.parse(m[0]);
+  }
+  const { operations, refused } = validate(world, parsed.operations, d);
+  return { reasoning: String(parsed.reasoning || "").slice(0, 240), operations, refused, digest: d, raw };
+}
+var CRITIC_SYSTEM = `You are an independent reviewer of a proposed change to a real place.
+
+You did not make this proposal and you must not assume it is good. You are shown the goal, the hard constraints, what the world's own models measured, and an image of the result as a participant would see it.
+
+Judge only what is in front of you. You have not been told the proposer's reasoning and must not imagine it.
+
+Return ONLY JSON:
+{"verdict":"PASS"|"FAIL","largestProblem":"<one sentence, or empty if PASS>","whatAParticipantWouldSee":"<one sentence>"}
+
+FAIL if any hard constraint is broken, if a measured consequence got worse, or if a participant looking at the image could not tell what changed or why. Say the single largest problem, not a list.`;
+async function critique({ goal, constraints = [], metrics = [], image = null, effort = "max" }) {
+  const prompt = [
+    `Goal: ${goal}`,
+    constraints.length ? `Hard constraints:
+${constraints.map((c) => `- ${c}`).join("\n")}` : "Hard constraints: none stated.",
+    metrics.length ? `What the world's models measured:
+${metrics.map((m) => `- ${m.label}: ${m.before} \u2192 ${m.after}`).join("\n")}` : "No measurements available.",
+    image ? "An image of the result is attached." : "No image is available; judge on the measurements alone."
+  ].join("\n\n");
+  const raw = await complete({ system: CRITIC_SYSTEM, prompt, image, effort });
+  try {
+    return JSON.parse(String(raw).replace(/^```(?:json)?\s*|\s*```$/g, "").trim());
+  } catch {
+    const m = /\{[\s\S]*\}/.exec(raw);
+    if (m) {
+      try {
+        return JSON.parse(m[0]);
+      } catch {
+      }
+    }
+    return { verdict: "FAIL", largestProblem: "the reviewer did not return a usable judgement", whatAParticipantWouldSee: "" };
+  }
+}
+
 // src/ui/console.js
 var MODES = [
   [
@@ -1771,22 +2456,17 @@ BUS.register(
 );
 BUS.register(
   "fire",
-  (t) => /^(fire|shoot)\b/.test(t),
+  (t) => /^(fire|shoot|destroy)\b/.test(t),
   () => {
-    key("f");
+    press("fire");
     return "fired";
   },
-  "fire \u2014 the laser"
+  "fire \u2014 the laser takes what it hits, and undo puts it back"
 );
-BUS.register(
-  "jump",
-  (t) => /^jump\b/.test(t),
-  () => {
-    dispatchEvent(new KeyboardEvent("keydown", { code: "Space" }));
-    return "jumped";
-  },
-  "jump"
-);
+BUS.register("jump", (t) => /^jump\b/.test(t), () => {
+  press("jump");
+  return "jumped";
+}, "jump");
 BUS.register(
   "colour",
   (t) => t.match(/\b(teal|ember|amber|violet|bone|coal)\b/),
@@ -1865,6 +2545,16 @@ BUS.register(
   "labels off / on \u2014 the name tags"
 );
 BUS.register(
+  "sound",
+  (t) => /^(sound|audio|engine)\b/.test(t),
+  (m, ctx, raw) => {
+    const off = /\b(off|no|mute|stop)\b/.test(raw.toLowerCase());
+    setEngineSound(!off);
+    return off ? "sound off" : "sound on \u2014 a low motor, no mosquito";
+  },
+  "sound on / off \u2014 the engine (off by default)"
+);
+BUS.register(
   "help",
   (t) => /^(help|verbs|\?)$/.test(t),
   () => {
@@ -1880,6 +2570,105 @@ function mountConsole(S3) {
     body.cockpit #viewTools, body.cockpit #say,
     body.cockpit #whereAmI, body.cockpit #themeChip, body.cockpit #findChip,
     body.cockpit #setup { display: none !important; }
+    /* The header row is GONE from the cockpit: the place is a chip on the line
+       (\u25F5), undo/redo and your name are in the menu, and the licence sits with
+       the map it belongs to. Two rows fighting for the top of a phone screen
+       was the whole problem \u2014 bounding them was treating a symptom. */
+    body.cockpit #top { display: none !important; }
+    /* Every edge, or none: overriding right/bottom while the sheet still set
+       top/left stretched the licence into a 664px-tall invisible slab down the
+       right of the world \u2014 a panel nobody could see and everybody could hit. */
+    body.cockpit #attribution {
+      top: auto !important; left: auto !important;
+      right: 12px !important; bottom: 4px !important;
+      width: 214px !important; max-width: 214px !important; height: auto !important;
+      font-size: 8px !important; line-height: 1.3 !important; opacity: .5;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      pointer-events: none;
+    }
+    /* THE RIGHT COLUMN, pinned bottom-up: licence, meter, the thin dock, the
+       plan, then the actions. Fixed offsets, so nothing floats into anything. */
+    body.cockpit #plan { bottom: 100px !important; }
+
+    /* EVERYTHING THAT SPEAKS COMES DOWN FROM THE LINE.
+       CREO's panels \u2014 what you selected, a proposal, an answer, the futures \u2014
+       were anchored to the bottom-right, which is now where the ring lives, so
+       they opened directly behind the biggest tool on screen. They belong to
+       the bar (that is where the question was asked), so they drop from it,
+       centred, and the bottom of the screen stays clear. */
+    body.cockpit #tools, body.cockpit #proposal,
+    body.cockpit #answer, body.cockpit #branches {
+      left: 50% !important; right: auto !important;
+      top: 66px !important; bottom: auto !important;
+      transform: translateX(-50%) !important;
+      width: min(560px, 92vw) !important; max-width: min(560px, 92vw) !important;
+      max-height: min(62vh, 520px) !important; overflow: auto !important;
+      border-radius: 14px !important; z-index: 64 !important;
+    }
+    body.cockpit #working {
+      left: 50% !important; right: auto !important; transform: translateX(-50%) !important;
+      top: 66px !important; bottom: auto !important; z-index: 65 !important;
+    }
+    /* The panels are bounded so they can never reach the ring's corner: they
+       stop well above it, and the ring is never dimmed or disabled. */
+    body.cockpit #tools, body.cockpit #proposal,
+    body.cockpit #answer, body.cockpit #branches { max-height: min(58vh, 470px) !important; }
+
+    /* \u2500\u2500 EVERY MENU IS AN ARC \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+       CREO's own lists \u2014 the place picker, the subject's actions \u2014 were tall
+       rectangles dropped over the world. They are the same content as a curved
+       strip: one row, scrolled sideways, hugging the line above it. Nothing
+       here changes what they DO; it changes how much sky they take. */
+    body.cockpit .menu.arc {
+      position: fixed !important; top: 56px !important; left: 50% !important;
+      transform: translateX(-50%) perspective(820px) rotateX(8deg) !important;
+      transform-origin: 50% 0% !important; right: auto !important;
+      display: flex !important; flex-direction: row !important;
+      width: min(880px, 98vw) !important; max-width: none !important;
+      max-height: none !important; height: auto !important;
+      overflow-x: auto !important; overflow-y: visible !important;
+      gap: 5px !important; padding: 9px 12px 12px !important;
+      border-radius: 0 0 22px 22px !important;
+      scrollbar-width: none;
+      mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent);
+      -webkit-mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent);
+    }
+    body.cockpit .menu.arc::-webkit-scrollbar { display: none; }
+    body.cockpit .menu.arc > button, body.cockpit .menu.arc > .menuLabel {
+      flex: 0 0 auto !important; width: auto !important; max-width: 168px;
+      border-radius: 10px !important; padding: 8px 10px !important;
+      border: 1px solid rgba(151,187,213,.2) !important; background: rgba(10,14,18,.9) !important;
+      transform-origin: 50% 140%; text-align: left !important; white-space: normal !important;
+    }
+    body.cockpit .menu.arc > .menuLabel {
+      background: transparent !important; border: 0 !important; color: #7d8b95 !important;
+      align-self: center; letter-spacing: .2em;
+    }
+    /* THE SEARCH PANEL stays a form (a text field is not a chip), but it drops
+       from the line like everything else and is bounded so it never reaches the
+       ring. "Take me anywhere\u2026" opens this. */
+    body.cockpit .menu.importPanel {
+      position: fixed !important; top: 56px !important; left: 50% !important;
+      transform: translateX(-50%) !important; right: auto !important;
+      width: min(520px, 94vw) !important; max-height: min(60vh, 480px) !important;
+      overflow: auto !important; border-radius: 14px !important; z-index: 66 !important;
+    }
+    /* THE KEY PANEL \u2014 where the AI features are switched on. It was hidden by
+       cockpit mode with no way back except a menu item nobody could find. */
+    body.cockpit #setup.show {
+      display: block !important; position: fixed !important;
+      top: 56px !important; left: 50% !important; transform: translateX(-50%) !important;
+      right: auto !important; bottom: auto !important;
+      width: min(460px, 94vw) !important; z-index: 67 !important;
+    }
+    /* the subject panel's actions become a swept row rather than a wrapped grid */
+    body.cockpit #tools .row {
+      display: flex !important; flex-wrap: nowrap !important; overflow-x: auto !important;
+      gap: 5px !important; padding-bottom: 4px; scrollbar-width: none;
+    }
+    body.cockpit #tools .row::-webkit-scrollbar { display: none; }
+    body.cockpit #tools .row > * { flex: 0 0 auto !important; }
+    body.cockpit #tools .thread { max-height: 130px !important; overflow: auto !important; }
     /* FILM MODE \u2014 a clean frame for recording: everything but the world (and
        its labels, and the licence) steps aside. Say "film", or press H. */
     body.film #rig-console, body.film #build-rail, body.film #atlas-dock,
@@ -1910,13 +2699,13 @@ function mountConsole(S3) {
   const cockpit = (on) => {
     document.body.classList.toggle("cockpit", on);
     try {
-      localStorage.setItem("terrarium.cockpit", on ? "1" : "");
+      localStorage.setItem("terrarium.cockpit", on ? "on" : "off");
     } catch (_) {
     }
   };
   let cockpitOn = true;
   try {
-    cockpitOn = localStorage.getItem("terrarium.cockpit") !== "";
+    cockpitOn = localStorage.getItem("terrarium.cockpit") !== "off";
   } catch (_) {
   }
   cockpit(cockpitOn);
@@ -1924,6 +2713,22 @@ function mountConsole(S3) {
   bar.id = "rig-console";
   bar.style.cssText = "position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:62;display:flex;align-items:center;gap:8px;width:min(560px,92vw);background:rgba(10,14,18,.92);border:1px solid rgba(151,187,213,.25);border-radius:14px;padding:7px 9px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);";
   let mi = 0;
+  const placeBtn = document.createElement("button");
+  placeBtn.title = "where you are \u2014 tap for the places, or say: land <anywhere>";
+  placeBtn.style.cssText = "flex:0 0 auto;max-width:116px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-radius:8px;cursor:pointer;padding:7px 8px;border:1px solid rgba(151,187,213,.28);background:rgba(255,255,255,.05);color:#cfe8dd;font:700 9px/1 ui-monospace,monospace;letter-spacing:.06em;";
+  const paintPlace = () => {
+    const n = document.getElementById("placeName");
+    placeBtn.textContent = "\u25F5 " + (n && n.textContent || "PLACE").toUpperCase();
+  };
+  placeBtn.addEventListener("click", () => {
+    const c = document.getElementById("placeChip");
+    if (c) c.click();
+  });
+  paintPlace();
+  const nameEl = document.getElementById("placeName");
+  if (nameEl && typeof MutationObserver === "function") {
+    new MutationObserver(paintPlace).observe(nameEl, { childList: true, characterData: true, subtree: true });
+  }
   const chip = document.createElement("button");
   chip.style.cssText = "flex:0 0 auto;border-radius:8px;font:800 9px/1 ui-monospace,monospace;letter-spacing:.1em;padding:7px 9px;cursor:pointer;";
   const inp = document.createElement("input");
@@ -1991,113 +2796,225 @@ function mountConsole(S3) {
   const burger = document.createElement("button");
   burger.textContent = "\u2261";
   burger.style.cssText = "flex:0 0 auto;width:32px;height:32px;border-radius:9px;cursor:pointer;border:1px solid rgba(151,187,213,.3);background:rgba(255,255,255,.05);color:#cfe8dd;font-size:15px;";
-  bar.append(chip, inp, send, burger);
+  bar.append(placeBtn, chip, inp, send, burger);
   document.body.appendChild(bar);
   const menu = document.createElement("div");
-  menu.style.cssText = "position:fixed;top:56px;right:12px;z-index:63;display:none;flex-direction:column;gap:3px;width:196px;max-height:76vh;overflow:auto;background:rgba(10,14,18,.95);border:1px solid rgba(151,187,213,.25);border-radius:12px;padding:8px;backdrop-filter:blur(14px);box-shadow:0 14px 40px rgba(0,0,0,.55);";
-  const section = (label2) => {
-    const h = document.createElement("div");
-    h.textContent = label2;
-    h.style.cssText = "font:800 8px/1 ui-monospace,monospace;letter-spacing:.28em;color:#7d8b95;padding:8px 6px 4px;";
-    menu.appendChild(h);
+  menu.style.cssText = "position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:63;display:none;flex-direction:column;gap:5px;width:min(760px,98vw);padding:0 2px;pointer-events:none;";
+  const arcRow = (curve) => {
+    const wrap2 = document.createElement("div");
+    wrap2.style.cssText = "display:flex;gap:5px;overflow-x:auto;overflow-y:visible;padding:8px 10px 10px;scrollbar-width:none;-ms-overflow-style:none;pointer-events:auto;mask-image:linear-gradient(90deg,transparent,#000 26px,#000 calc(100% - 26px),transparent);-webkit-mask-image:linear-gradient(90deg,transparent,#000 26px,#000 calc(100% - 26px),transparent);";
+    wrap2.dataset.curve = curve;
+    return wrap2;
   };
-  const item = (label2, hintText, fn) => {
+  const curveChips = (row) => {
+    for (const k of row.children) k.style.transform = "";
+    row.style.transformOrigin = "50% 0%";
+    row.style.transform = "perspective(820px) rotateX(8deg)";
+  };
+  if (typeof MutationObserver === "function") {
+    new MutationObserver((records) => {
+      for (const r of records) {
+        for (const n of r.addedNodes) {
+          if (!(n instanceof HTMLElement) || !n.classList.contains("menu")) continue;
+          if (n.classList.contains("importPanel")) continue;
+          n.classList.add("arc");
+        }
+      }
+    }).observe(document.body, { childList: true });
+  }
+  const subjects = arcRow("top");
+  const verbs = arcRow("bottom");
+  menu.append(subjects, verbs);
+  const GROUPS = [];
+  let current = null;
+  const section = (label3, tint) => {
+    GROUPS.push({ name: label3, tint: tint || "#9fb4ad", items: [] });
+  };
+  const item = (label3, hintText, fn) => {
+    if (GROUPS.length) GROUPS[GROUPS.length - 1].items.push({ label: label3, hint: hintText, fn });
+  };
+  const arcChip = (label3, hint2, tint, on, fn) => {
     const b = document.createElement("button");
-    b.innerHTML = '<span style="font:800 10px/1 ui-monospace,monospace;letter-spacing:.1em">' + label2 + '</span><span style="display:block;font:500 9px/1.3 system-ui,sans-serif;color:#7d8b95;margin-top:3px">' + hintText + "</span>";
-    b.style.cssText = "text-align:left;background:transparent;border:0;border-radius:8px;color:#cfe8dd;padding:7px 6px;cursor:pointer;";
-    b.addEventListener("mouseenter", () => {
-      b.style.background = "rgba(255,255,255,.06)";
-    });
-    b.addEventListener("mouseleave", () => {
-      b.style.background = "transparent";
-    });
-    b.addEventListener("click", () => {
-      fn();
-      menu.style.display = "none";
-    });
-    menu.appendChild(b);
+    b.innerHTML = '<span style="font:800 9px/1 ui-monospace,monospace;letter-spacing:.12em">' + label3 + "</span>" + (hint2 ? '<span style="display:block;font:500 8px/1.25 system-ui,sans-serif;color:#8d9aa5;margin-top:3px;max-width:104px;white-space:normal">' + hint2 + "</span>" : "");
+    b.style.cssText = "flex:0 0 auto;text-align:left;border-radius:10px;cursor:pointer;padding:8px 10px;background:" + (on ? "rgba(255,255,255,.12)" : "rgba(10,14,18,.92)") + ";border:1px solid " + (on ? tint : "rgba(151,187,213,.22)") + ";color:" + (on ? tint : "#cfe8dd") + ";backdrop-filter:blur(12px);transition:transform .12s,background .12s;transform-origin:50% 120%;";
+    b.addEventListener("click", fn);
+    return b;
+  };
+  const openKeyPanel = () => {
+    const el = document.getElementById("setup");
+    if (!el) return flash("no key panel in this build");
+    el.hidden = false;
+    el.classList.add("show");
+    const done = document.getElementById("setupDone");
+    const close = document.getElementById("setupClose");
+    const hide2 = () => {
+      el.classList.remove("show");
+      el.hidden = true;
+    };
+    if (done) done.onclick = hide2;
+    if (close) close.onclick = hide2;
+    setTimeout(() => {
+      const k = document.getElementById("setupKey");
+      if (k) k.focus();
+    }, 60);
+    flash("paste a key \u2014 it stays in this browser");
+  };
+  BUS.register(
+    "key",
+    (t) => /^(key|api key|add a key|sign in)\b/.test(t),
+    () => {
+      openKeyPanel();
+      return "the key panel is open \u2014 it stays in this browser";
+    },
+    "key \u2014 where the AI features are switched on"
+  );
+  const paintArc = () => {
+    subjects.textContent = "";
+    for (const g of GROUPS) {
+      subjects.appendChild(arcChip(g.name.toUpperCase(), "", g.tint, g === current, () => {
+        current = g === current ? null : g;
+        paintArc();
+      }));
+    }
+    verbs.textContent = "";
+    verbs.style.display = current ? "flex" : "none";
+    if (current) {
+      for (const it of current.items) {
+        verbs.appendChild(arcChip(it.label, it.hint, current.tint, false, () => {
+          it.fn();
+          menu.style.display = "none";
+          markOpen();
+        }));
+      }
+    }
+    curveChips(subjects);
+    if (current) curveChips(verbs);
   };
   const speak = (text) => flash(BUS.dispatch(text, { S: S3, RIG }) || "\u2026");
-  section("play");
-  item("DRIVE / PARK", "the rig \u2014 V", () => speak(RIG.on ? "park" : "drive"));
-  item("FRAME ALL", "see the whole place \u2014 F", () => key("f"));
-  item("GO TO", "fly to a building by name \u2014 G", () => key("g"));
-  item("EXPLORE", "fetch the neighbouring ground \u2014 X", () => key("x"));
-  section("atlas \xB7 unsettled 05");
-  item("UNSETTLE", "the alternative arrangement \u2014 a branch", () => speak("unsettle"));
-  item("RESETTLE", "the given returns, remembered", () => speak("resettle"));
-  item("PRESSURE", "read the dock aloud", () => speak("pressure"));
-  item("TESTIFY", 'say "note: \u2026" on the line', () => {
-    mi = 2;
-    paintMode();
-    inp.value = "note: ";
-    inp.focus();
+  section("place", "#6fe0c0");
+  item("PLACES", "everywhere in this browser", () => {
+    const c = document.getElementById("placeChip");
+    if (c) c.click();
   });
-  section("parts \xB7 unset");
-  for (const k of Object.keys(PARTS)) {
-    const P = PARTS[k];
-    item(P.name.toUpperCase(), P.hint + " \u2014 placed ahead, gate willing", () => speak("a " + k));
-  }
-  section("ground");
-  item("LAND ANYWHERE", "the whole Earth answers \u2014 land <place>", () => {
+  item("LAND ANYWHERE", "real ground \u2014 land <place>", () => {
     mi = 3;
     paintMode();
     inp.value = "land ";
     inp.focus();
   });
-  item("AERIAL ON", "drape the real photograph \u2014 Esri", () => speak("aerial"));
-  item("AERIAL OFF", "back to the palette", () => speak("aerial off"));
-  item("HOUSE", "a massed house \u2014 wings, roof, deck", () => speak("a house"));
-  section("build");
-  item("DRAW AN AREA", "a loop becomes a region \u2014 D", () => key("d"));
-  item("SUMMON", "ask the operator to build it", () => {
-    mi = 0;
+  item("GO TO", "fly to a building by name \u2014 G", () => key("g"));
+  item("AERIAL", "the real photograph, on / off", () => speak(IMAGERY2.on ? "aerial off" : "aerial"));
+  section("build", "#ffd9a8");
+  item("TESTIFY", "plant a standing note here", () => {
+    mi = 2;
     paintMode();
+    inp.value = "note: ";
     inp.focus();
   });
-  item("PROPOSE A TOWER", "a watchtower on this spot", () => say("a watchtower here"));
-  item("PROPOSE A GARDEN", "planting on open ground", () => say("a garden here"));
-  item("DOES IT FLOOD?", "run the water over this ground", () => say("does this flood?"));
-  section("system");
-  item("EXPORT", "take the place away \u2014 GeoJSON", () => click("exportBtn"));
+  item("DRAW AN AREA", "a loop becomes a region \u2014 D", () => key("d"));
+  item("UNSETTLE", "the alternative arrangement \u2014 a branch", () => speak("unsettle"));
+  item("RESETTLE", "the given returns, remembered", () => speak("resettle"));
   item("UNDO", "the world remembers", () => key("z"));
-  item("CREO PANELS", "show / hide the editor instruments", () => {
+  item("REDO", "put it back", () => {
+    const r = document.getElementById("redoBtn");
+    if (r) r.click();
+  });
+  item("EXPORT", "take the place away \u2014 GeoJSON", () => click("exportBtn"));
+  item("YOUR NAME", "who changed what", () => {
+    const a = document.getElementById("authorChip");
+    if (a) a.click();
+  });
+  section("view", "#9ec9ff");
+  item("LABELS", "name tags, on / off", () => speak(S3.labels === false ? "labels on" : "labels off"));
+  item("MAP", "stow the ring \u2014 M", () => speak(document.body.classList.contains("ring-stowed") ? "map on" : "map off"));
+  item("ENGINE", "the motor drone \u2014 off by default", () => speak(engineSoundOn() ? "sound off" : "sound on"));
+  item("EFFECTS", "shots, hits, crashes \u2014 on", () => {
+    const on = setEffects(!effectsOn());
+    flash(on ? "effects on \u2014 shots and crashes speak" : "effects off");
+  });
+  item("FILM MODE", "a clean frame for recording \u2014 H", () => film(true));
+  item("CREO PANELS", "the editor instruments, on / off", () => {
     cockpitOn = !cockpitOn;
     cockpit(cockpitOn);
     flash(cockpitOn ? "cockpit \u2014 the instruments are stowed" : "the editor instruments are out");
   });
-  item("FILM MODE", "a clean frame for recording \u2014 H toggles", () => film(true));
   item("HELP", "every verb the commons knows", () => speak("help"));
+  if (hasKey()) {
+    section("ask", "#d8c9ff");
+    item("PROPOSE A TOWER", "a watchtower on this spot", () => say("a watchtower here"));
+    item("DOES IT FLOOD?", "run the water over this ground", () => say("does this flood?"));
+    item("THE KEY", "change or remove it \u2014 stays in this browser", () => openKeyPanel());
+  } else {
+    section("ask", "#d8c9ff");
+    item("ADD A KEY", "switch on the thinking \u2014 Anthropic or OpenAI", () => openKeyPanel());
+  }
   document.body.appendChild(menu);
   burger.addEventListener("click", () => {
-    menu.style.display = menu.style.display === "flex" ? "none" : "flex";
+    const opening = menu.style.display === "none" || !menu.style.display;
+    if (opening) paintArc();
+    menu.style.display = opening ? "flex" : "none";
+    markOpen();
   });
   addEventListener("keydown", (e) => {
-    if (e.key === "Escape") menu.style.display = "none";
+    if (e.key === "Escape") {
+      menu.style.display = "none";
+      markOpen();
+    }
   });
+  addEventListener("pointerdown", (e) => {
+    if (menu.style.display === "flex" && !menu.contains(e.target) && e.target !== burger) {
+      menu.style.display = "none";
+      markOpen();
+    }
+  }, true);
   const rail = document.createElement("div");
   rail.id = "build-rail";
-  rail.style.cssText = "position:fixed;right:10px;top:50%;transform:translateY(-58%);z-index:60;display:flex;flex-direction:column;gap:5px;";
-  const railChip = (label2, title, utter) => {
+  rail.style.cssText = "position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:63;display:flex;flex-direction:column;align-items:center;width:min(560px,92vw);";
+  const railBtn = document.createElement("button");
+  railBtn.textContent = "\u229E";
+  railBtn.title = "the parts palette \u2014 ramps, blocks, a house, a note (B)";
+  railBtn.style.cssText = "flex:0 0 auto;width:32px;height:32px;border-radius:9px;cursor:pointer;border:1px solid rgba(255,180,80,.4);background:rgba(28,19,8,.86);color:#ffd9a8;font:700 15px/1 ui-monospace,monospace;";
+  const palette = document.createElement("div");
+  palette.style.cssText = "display:none;flex-direction:row;gap:5px;width:100%;overflow-x:auto;overflow-y:visible;scrollbar-width:none;padding:8px 10px 12px;background:rgba(10,14,18,.95);border:1px solid rgba(151,187,213,.25);border-radius:0 0 20px 20px;backdrop-filter:blur(12px);box-shadow:0 12px 34px rgba(0,0,0,.55);mask-image:linear-gradient(90deg,transparent,#000 22px,#000 calc(100% - 22px),transparent);-webkit-mask-image:linear-gradient(90deg,transparent,#000 22px,#000 calc(100% - 22px),transparent);";
+  const paletteBtn = (label3, title, utter) => {
     const b = document.createElement("button");
-    b.textContent = label2;
+    b.textContent = label3;
     b.title = title;
-    b.style.cssText = "width:52px;padding:7px 4px;border-radius:9px;cursor:pointer;border:1px solid rgba(151,187,213,.28);background:rgba(10,14,18,.86);color:#cfe8dd;font:800 8px/1 ui-monospace,monospace;letter-spacing:.08em;backdrop-filter:blur(10px);";
+    b.style.cssText = "flex:0 0 auto;padding:9px 12px;border-radius:10px;cursor:pointer;border:1px solid rgba(151,187,213,.22);background:rgba(255,255,255,.04);color:#cfe8dd;font:800 8px/1 ui-monospace,monospace;letter-spacing:.1em;transform-origin:50% 140%;";
     b.addEventListener("mouseenter", () => {
       b.style.background = "rgba(255,180,80,.18)";
     });
     b.addEventListener("mouseleave", () => {
-      b.style.background = "rgba(10,14,18,.86)";
+      b.style.background = "rgba(255,255,255,.04)";
     });
     b.addEventListener("click", () => speak(utter));
-    rail.appendChild(b);
+    palette.appendChild(b);
     return b;
   };
-  for (const k of Object.keys(PARTS)) railChip(PARTS[k].name.toUpperCase(), PARTS[k].hint, "a " + k);
-  railChip("HOUSE", "a massed house, gate willing", "a house");
-  railChip("NOTE", "plant testimony here", "note: I was here");
-  railChip("UNDO", "the world remembers", "undo");
+  for (const k of Object.keys(PARTS)) paletteBtn(PARTS[k].name.toUpperCase(), PARTS[k].hint, "a " + k);
+  paletteBtn("HOUSE", "a massed house, gate willing", "a house");
+  paletteBtn("NOTE", "plant testimony here", "note: I was here");
+  paletteBtn("UNDO", "the world remembers", "undo");
+  const markOpen = () => document.body.classList.toggle(
+    "menu-open",
+    palette.style.display !== "none" || menu.style.display === "flex"
+  );
+  const showPalette = (on) => {
+    palette.style.display = on ? "flex" : "none";
+    if (on) requestAnimationFrame(() => curveChips(palette));
+    railBtn.style.background = on ? "rgba(255,180,80,.26)" : "rgba(28,19,8,.86)";
+    markOpen();
+  };
+  railBtn.addEventListener("click", () => showPalette(palette.style.display === "none"));
+  addEventListener("keydown", (e) => {
+    if (e.key === "Escape") showPalette(false);
+    if ((e.key === "b" || e.key === "B") && !/INPUT|TEXTAREA/.test(document.activeElement?.tagName || "")) {
+      showPalette(palette.style.display === "none");
+    }
+  });
+  rail.append(palette);
   document.body.appendChild(rail);
+  bar.insertBefore(railBtn, burger);
   BUS.register("undo", (t) => /^undo\b/.test(t), () => {
     key("z");
     return "undone";
@@ -2107,7 +3024,7 @@ function mountConsole(S3) {
     (t) => /^rail\b/.test(t),
     (m, ctx, raw) => {
       const off = /\b(off|hide|no)\b/.test(raw.toLowerCase());
-      rail.style.display = off ? "none" : "flex";
+      rail.style.display = off ? "none" : "grid";
       return off ? "rail stowed" : "rail out";
     },
     "rail off / on \u2014 the build chips"
@@ -2157,11 +3074,11 @@ function mountDoor(S3, enterWorld) {
   const row = document.createElement("div");
   row.style.cssText = "display:flex;gap:8px;margin:12px 0 18px;";
   let chosen = SWATCHES2[0][1];
-  for (const [label2, rgb] of SWATCHES2) {
+  for (const [label3, rgb] of SWATCHES2) {
     const b = document.createElement("button");
-    b.title = label2;
+    b.title = label3;
     b.style.cssText = "width:30px;height:30px;border-radius:50%;cursor:pointer;border:2px solid transparent;background:rgb(" + rgb.map((v) => Math.round(v * 255)).join(",") + ");";
-    if (label2 === "teal") b.style.borderColor = "#fff";
+    if (label3 === "teal") b.style.borderColor = "#fff";
     b.addEventListener("click", () => {
       chosen = rgb;
       for (const o of row.children) o.style.borderColor = "transparent";
@@ -2199,6 +3116,227 @@ function mountDoor(S3, enterWorld) {
     waitThen(enterWorld);
   });
   return veil;
+}
+
+// src/ui/ring.js
+var SIZE = 244;
+var C = SIZE / 2;
+var RI = 82;
+var RO = 118;
+var RAD2 = Math.PI / 180;
+var arc = (a0, a1) => {
+  const p = (a, r) => [C + Math.cos(a * RAD2) * r, C + Math.sin(a * RAD2) * r];
+  const [x0, y0] = p(a0, RO), [x1, y1] = p(a1, RO);
+  const [x2, y2] = p(a1, RI), [x3, y3] = p(a0, RI);
+  const big = a1 - a0 > 180 ? 1 : 0;
+  return `M${x0} ${y0}A${RO} ${RO} 0 ${big} 1 ${x1} ${y1}L${x2} ${y2}A${RI} ${RI} 0 ${big} 0 ${x3} ${y3}Z`;
+};
+var label = (a, r) => [C + Math.cos(a * RAD2) * r, C + Math.sin(a * RAD2) * r + 3];
+var SEGMENTS = [
+  { key: "boost", label: "BOOST", a0: 148, a1: 186, colour: "#ff5f5f", at: label(167, 100) },
+  { key: "jump", label: "JUMP", a0: 190, a1: 228, colour: "#e8eef2", at: label(209, 100) },
+  { key: "fire", label: "FIRE", a0: 232, a1: 270, colour: "#19e6c8", at: label(251, 100) },
+  { key: "dismount", label: "EJECT", a0: 62, a1: 140, colour: "#9fb4ad", at: label(101, 100) }
+];
+var MAP_OPS = [
+  { glyph: "+", title: "closer", at: -70, id: "planIn" },
+  { glyph: "\u2212", title: "wider", at: -46, id: "planOut" },
+  { glyph: "\u26F6", title: "MAXIMISE the map \u2014 tap a neighbour to travel", at: -22, max: true },
+  { glyph: "\u2295", title: "fetch neighbouring ground (X)", at: 2, id: "exploreBtn" },
+  { glyph: "\u2922", title: "frame the whole place (F)", at: 26, key: "f" }
+];
+function mountRing(S3) {
+  if (document.getElementById("rig-ring")) return null;
+  const plan2 = document.getElementById("plan");
+  if (!plan2) return null;
+  const css = document.createElement("style");
+  css.textContent = `
+    #rig-ring { position: fixed; right: 14px; bottom: 58px; width: ${SIZE}px; height: ${SIZE}px;
+      z-index: 61; transition: opacity .18s, transform .18s; }
+    #rig-ring svg { position: absolute; inset: 0; overflow: visible; }
+    #rig-ring .seg { cursor: pointer; fill: rgba(10,14,18,.82); stroke: rgba(151,187,213,.22);
+      stroke-width: 1; transition: fill .12s; }
+    #rig-ring .seg:hover, #rig-ring .seg.down { fill: rgba(255,255,255,.10); }
+    #rig-ring text { font: 800 9px/1 ui-monospace, monospace; letter-spacing: .12em;
+      text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+    #rig-ring .mapop { position: absolute; transform: translate(-50%, -50%);
+      width: 26px; height: 26px; border-radius: 50%; cursor: pointer; padding: 0;
+      border: 1px solid rgba(151,187,213,.3); background: rgba(10,14,18,.9); color: #cfe8dd;
+      font: 700 13px/1 ui-monospace, monospace; }
+    #rig-ring .mapop:hover { background: rgba(255,255,255,.14); }
+    /* the map, round, in the middle \u2014 CREO's own plan, moved not rebuilt */
+    #rig-ring #plan { position: absolute !important; left: ${C - 74}px !important; top: ${C - 74}px !important;
+      right: auto !important; bottom: auto !important; width: 148px !important; height: 148px !important;
+      border-radius: 50% !important; overflow: hidden !important;
+      border: 2px solid rgba(180,200,210,.5) !important; box-shadow: 0 6px 22px rgba(0,0,0,.5);
+      background: rgba(8,11,14,.9) !important; }
+    #rig-ring #plan #planCanvas { width: 100% !important; height: 100% !important; }
+    /* the plan's own tool buttons are not cockpit controls; the ring is */
+    #rig-ring #plan > button { display: none !important; }
+    /* THE CONTROLS ARE NEVER TAKEN AWAY. An earlier pass had the ring fade to
+       12% whenever a menu opened \u2014 which solved the overlap by disabling the
+       thing you steer with. Wrong trade: nothing may cover the ring and
+       nothing may switch it off, so the MENUS moved instead (they drop from
+       the line, see console.js) and the ring stays lit and live. */
+    body.ring #rig-actions, body.ring #rig-dock { display: none !important; }
+    body.ring-stowed #rig-ring { transform: scale(.34); opacity: .5; transform-origin: 82% 82%; }
+    body.ring-stowed #rig-ring:hover { opacity: .9; }
+    body.film #rig-ring { display: none !important; }
+    body.map-max #rig-ring #plan {
+      position: fixed !important; left: 50% !important; top: 50% !important;
+      width: min(72vmin, 620px) !important; height: min(72vmin, 620px) !important;
+      transform: translate(-50%, -50%) !important; z-index: 70 !important;
+      border-width: 3px !important; box-shadow: 0 22px 70px rgba(0,0,0,.7);
+    }
+    body.map-max #rig-ring #plan > button { display: flex !important; }
+    @media (max-width: 560px) { #rig-ring { transform: scale(.86); transform-origin: 100% 100%; } }
+  `;
+  document.head.appendChild(css);
+  const ring3 = document.createElement("div");
+  ring3.id = "rig-ring";
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${SIZE} ${SIZE}`);
+  svg.setAttribute("width", SIZE);
+  svg.setAttribute("height", SIZE);
+  for (const seg of SEGMENTS) {
+    const path = document.createElementNS(svgNS, "path");
+    path.setAttribute("d", arc(seg.a0, seg.a1));
+    path.setAttribute("class", "seg");
+    const act = () => {
+      if (seg.key === "dismount") {
+        try {
+          document.activeElement && document.activeElement.blur();
+        } catch (_) {
+        }
+        dispatchEvent(new KeyboardEvent("keydown", { key: "v" }));
+      } else press(seg.key);
+    };
+    path.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      path.classList.add("down");
+      act();
+    });
+    path.addEventListener("pointerup", () => path.classList.remove("down"));
+    path.addEventListener("pointerleave", () => path.classList.remove("down"));
+    svg.appendChild(path);
+    const text = document.createElementNS(svgNS, "text");
+    text.setAttribute("x", seg.at[0]);
+    text.setAttribute("y", seg.at[1]);
+    text.setAttribute("fill", seg.colour);
+    text.textContent = seg.label;
+    svg.appendChild(text);
+  }
+  const n = document.createElementNS(svgNS, "path");
+  const ny = C - 70;
+  n.setAttribute("d", `M${C} ${ny - 7}L${C + 5} ${ny + 4}L${C} ${ny + 1}L${C - 5} ${ny + 4}Z`);
+  n.setAttribute("fill", "#e86a4e");
+  svg.appendChild(n);
+  const nt = document.createElementNS(svgNS, "text");
+  nt.setAttribute("x", C);
+  nt.setAttribute("y", ny + 13);
+  nt.setAttribute("fill", "rgba(232,238,242,.75)");
+  nt.setAttribute("style", "font:800 8px/1 ui-monospace,monospace;letter-spacing:.1em");
+  nt.textContent = "N";
+  svg.appendChild(nt);
+  ring3.appendChild(svg);
+  for (const op of MAP_OPS) {
+    const b = document.createElement("button");
+    b.textContent = op.glyph;
+    b.title = op.title;
+    b.className = "mapop";
+    const [x, y] = [C + Math.cos(op.at * RAD2) * 100, C + Math.sin(op.at * RAD2) * 100];
+    b.style.left = x + "px";
+    b.style.top = y + "px";
+    b.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (op.max) {
+        maximise(!document.body.classList.contains("map-max"));
+        return;
+      }
+      const target = op.id && document.getElementById(op.id);
+      if (target) target.click();
+      else if (op.key) dispatchEvent(new KeyboardEvent("keydown", { key: op.key, bubbles: true }));
+      try {
+        window.TERRA && window.TERRA.redrawPlan && window.TERRA.redrawPlan();
+      } catch (_) {
+      }
+      if (window.TERRA && window.TERRA.S) window.TERRA.S.dirty = true;
+    });
+    ring3.appendChild(b);
+  }
+  const speed = document.createElement("div");
+  speed.id = "ring-speed";
+  speed.style.cssText = "position:absolute;left:0;right:0;top:" + (C + 58) + "px;text-align:center;font:700 9px/1 ui-monospace,monospace;letter-spacing:.14em;color:#8fb8a8;pointer-events:none;";
+  speed.textContent = "0 km/h";
+  ring3.appendChild(speed);
+  document.body.appendChild(ring3);
+  ring3.appendChild(plan2);
+  plan2.hidden = false;
+  document.body.classList.add("ring");
+  ring3.addEventListener("wheel", (e) => {
+    const b = document.getElementById(e.deltaY > 0 ? "planOut" : "planIn");
+    if (b) {
+      e.preventDefault();
+      b.click();
+    }
+  }, { passive: false });
+  setInterval(() => {
+    const s = document.querySelector("#rig-dock span");
+    if (s) speed.textContent = s.textContent;
+  }, 250);
+  const maximise = (on) => {
+    document.body.classList.toggle("map-max", on);
+    try {
+      window.TERRA && window.TERRA.redrawPlan && window.TERRA.redrawPlan();
+    } catch (_) {
+    }
+    setTimeout(() => {
+      try {
+        window.TERRA.redrawPlan();
+      } catch (_) {
+      }
+    }, 60);
+  };
+  addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && document.body.classList.contains("map-max")) maximise(false);
+  });
+  BUS.register(
+    "maximise",
+    (t) => /^(maximi[sz]e|big map|expand map)\b/.test(t),
+    () => {
+      maximise(!document.body.classList.contains("map-max"));
+      return "the map fills the frame \u2014 tap a neighbour, or Escape";
+    },
+    "maximise \u2014 the map big, for choosing where to go"
+  );
+  const stow = (on) => {
+    document.body.classList.toggle("ring-stowed", on);
+    try {
+      localStorage.setItem("terrarium.ring", on ? "stowed" : "out");
+    } catch (_) {
+    }
+  };
+  try {
+    if (localStorage.getItem("terrarium.ring") === "stowed") stow(true);
+  } catch (_) {
+  }
+  BUS.register(
+    "map",
+    (t) => /^(map|ring|plan)\b/.test(t),
+    (m, ctx, raw) => {
+      const off = /\b(off|hide|stow|no)\b/.test(raw.toLowerCase());
+      stow(off);
+      return off ? "the ring is stowed \u2014 say map on to bring it back" : "the ring is out";
+    },
+    "map off / on \u2014 stow the control ring"
+  );
+  addEventListener("keydown", (e) => {
+    if ((e.key === "m" || e.key === "M") && !/INPUT|TEXTAREA/.test(document.activeElement?.tagName || "")) {
+      stow(!document.body.classList.contains("ring-stowed"));
+    }
+  });
+  return { ring: ring3, stow };
 }
 
 // src/import/geocode.js
@@ -2333,19 +3471,19 @@ async function resolvePlace(query, { metres = 900, fetchImpl = fetch } = {}) {
 var marks = /* @__PURE__ */ new Map();
 var loads = [];
 var warnOver = 0;
-function note(label2, ms) {
-  let m = marks.get(label2);
+function note(label3, ms) {
+  let m = marks.get(label3);
   if (!m) {
     m = { n: 0, total: 0, max: 0, last: 0 };
-    marks.set(label2, m);
+    marks.set(label3, m);
   }
   m.n++;
   m.total += ms;
   m.last = ms;
   if (ms > m.max) m.max = ms;
-  if (warnOver && ms > warnOver) console.warn("[perf] " + label2 + " " + ms.toFixed(1) + "ms");
+  if (warnOver && ms > warnOver) console.warn("[perf] " + label3 + " " + ms.toFixed(1) + "ms");
 }
-function wrap(obj, method, label2) {
+function wrap(obj, method, label3) {
   if (!obj || typeof obj[method] !== "function" || obj[method].__perf) return false;
   const orig = obj[method];
   const f2 = function(...a) {
@@ -2353,7 +3491,7 @@ function wrap(obj, method, label2) {
     try {
       return orig.apply(this, a);
     } finally {
-      note(label2 || method, performance.now() - t0);
+      note(label3 || method, performance.now() - t0);
     }
   };
   f2.__perf = true;
@@ -2415,8 +3553,8 @@ var PERF = {
     return loads.length + " fetches";
   },
   report() {
-    const rows = [...marks.entries()].map(([label2, m]) => ({
-      label: label2,
+    const rows = [...marks.entries()].map(([label3, m]) => ({
+      label: label3,
       calls: m.n,
       "mean ms": +(m.total / m.n).toFixed(1),
       "worst ms": +m.max.toFixed(1),
@@ -5383,7 +6521,7 @@ function toSkeleton(json, projection) {
 
 // src/import/terrain.js
 var TILE = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium";
-var SIZE = 256;
+var SIZE2 = 256;
 var lon2x = (lon, z) => (lon + 180) / 360 * 2 ** z;
 var lat2y = (lat, z) => (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * 2 ** z;
 var pixelMetres = (lat, z) => 156543.03392 * Math.cos(lat * Math.PI / 180) / 2 ** z;
@@ -5430,12 +6568,12 @@ async function sampleTerrain(bbox2, projection, bounds, {
     const tx = Math.floor(fx), ty = Math.floor(fy);
     const tile = tiles.find((t) => t.tx === tx && t.ty === ty);
     if (!tile) return null;
-    const u = (fx - tx) * SIZE, v = (fy - ty) * SIZE;
-    const i0 = Math.max(0, Math.min(SIZE - 1, Math.floor(u)));
-    const j0 = Math.max(0, Math.min(SIZE - 1, Math.floor(v)));
-    const i1 = Math.min(SIZE - 1, i0 + 1), j1 = Math.min(SIZE - 1, j0 + 1);
+    const u = (fx - tx) * SIZE2, v = (fy - ty) * SIZE2;
+    const i0 = Math.max(0, Math.min(SIZE2 - 1, Math.floor(u)));
+    const j0 = Math.max(0, Math.min(SIZE2 - 1, Math.floor(v)));
+    const i1 = Math.min(SIZE2 - 1, i0 + 1), j1 = Math.min(SIZE2 - 1, j0 + 1);
     const du = u - i0, dv = v - j0;
-    const at = (i, j) => tile.px[j * SIZE + i];
+    const at = (i, j) => tile.px[j * SIZE2 + i];
     const a = at(i0, j0), b = at(i1, j0), c = at(i0, j1), d = at(i1, j1);
     return (a * (1 - du) + b * du) * (1 - dv) + (c * (1 - du) + d * du) * dv;
   };
@@ -5478,12 +6616,12 @@ async function decodeInBrowser(url) {
     img.src = url;
   });
   const canvas2 = document.createElement("canvas");
-  canvas2.width = SIZE;
-  canvas2.height = SIZE;
+  canvas2.width = SIZE2;
+  canvas2.height = SIZE2;
   const ctx = canvas2.getContext("2d", { willReadFrequently: true });
-  ctx.drawImage(img, 0, 0, SIZE, SIZE);
-  const d = ctx.getImageData(0, 0, SIZE, SIZE).data;
-  const out = new Float32Array(SIZE * SIZE);
+  ctx.drawImage(img, 0, 0, SIZE2, SIZE2);
+  const d = ctx.getImageData(0, 0, SIZE2, SIZE2).data;
+  const out = new Float32Array(SIZE2 * SIZE2);
   for (let k = 0, p = 0; k < out.length; k++, p += 4) {
     out[k] = d[p] * 256 + d[p + 1] + d[p + 2] / 256 - 32768;
   }
@@ -5693,6 +6831,21 @@ async function idb(mode, fn) {
 var cachePut = (key2, value) => idb("readwrite", (s) => s.put(value, key2));
 var cacheGet = (key2) => idb("readonly", (s) => s.get(key2));
 var cacheKeys = () => idb("readonly", (s) => s.getAllKeys());
+var cacheDel = (key2) => idb("readwrite", (s) => s.delete(key2));
+async function pruneCache(keep = 14, protectKey = null) {
+  const keys = await cacheKeys() || [];
+  const rows = [];
+  for (const k of keys) {
+    if (String(k).startsWith("autosave.")) continue;
+    const rec = await cacheGet(k);
+    if (rec?.meta) rows.push({ key: k, at: Date.parse(rec.meta.fetchedAt || "") || 0 });
+  }
+  if (rows.length <= keep) return [];
+  rows.sort((a, b) => a.at - b.at);
+  const doomed = rows.slice(0, rows.length - keep).filter((r) => r.key !== protectKey);
+  for (const d of doomed) await cacheDel(d.key);
+  return doomed.map((d) => d.key);
+}
 async function listCached() {
   const keys = await cacheKeys() || [];
   const out = [];
@@ -5715,9 +6868,9 @@ function openImportPanel({ anchorEl, onLoaded, toast: toast2 }) {
   panel.style.left = `${Math.max(8, r.left)}px`;
   panel.style.top = `${r.bottom + 8}px`;
   panel.style.width = "min(380px, calc(100vw - 24px))";
-  const label2 = document.createElement("div");
-  label2.className = "menuLabel";
-  label2.textContent = "Take me anywhere \u2014 a name, a coordinate, or a pasted map link";
+  const label3 = document.createElement("div");
+  label3.className = "menuLabel";
+  label3.textContent = "Take me anywhere \u2014 a name, a coordinate, or a pasted map link";
   const input = document.createElement("input");
   input.className = "nameInput";
   input.placeholder = "a street, a village \u2014 or 25.7867, -80.1750";
@@ -5725,7 +6878,7 @@ function openImportPanel({ anchorEl, onLoaded, toast: toast2 }) {
   const status = document.createElement("div");
   status.className = "importStatus";
   const results = document.createElement("div");
-  panel.append(label2, input, status, results);
+  panel.append(label3, input, status, results);
   document.body.append(panel);
   input.focus();
   const say2 = (m) => {
@@ -5852,13 +7005,13 @@ function openReframePanel({ anchorEl, world, camera, currentMetres = 900, onLoad
   panel.style.left = `${Math.max(8, r.left)}px`;
   panel.style.top = `${r.bottom + 8}px`;
   panel.style.width = "min(380px, calc(100vw - 24px))";
-  const label2 = document.createElement("div");
-  label2.className = "menuLabel";
-  label2.textContent = "Show more ground, around where you are looking";
+  const label3 = document.createElement("div");
+  label3.className = "menuLabel";
+  label3.textContent = "Show more ground, around where you are looking";
   const status = document.createElement("div");
   status.className = "importStatus";
   const results = document.createElement("div");
-  panel.append(label2, status, results);
+  panel.append(label3, status, results);
   document.body.append(panel);
   const say2 = (m) => {
     status.textContent = m;
@@ -5937,394 +7090,6 @@ async function previewGround(world, { span = 3, log = () => {
     (world.place.terrain.bounds[3] - world.place.terrain.bounds[1]) / 2
   ] : [450, 450];
   return { field: field2, centre, half, span, bbox: wide, relief: sampled.relief, tiles: sampled.tiles };
-}
-
-// src/ai/operator.js
-var KEY_STORE = "creo.ai.key";
-var CFG_STORE = "creo.ai.config";
-var STALE_DEFAULTS = /* @__PURE__ */ new Set(["gpt-4o-mini", "gpt-4o", "gpt-4", "gpt-3.5-turbo"]);
-function getConfig() {
-  try {
-    const cfg = { key: localStorage.getItem(KEY_STORE) || "", ...JSON.parse(localStorage.getItem(CFG_STORE) || "{}") };
-    if (cfg.model && STALE_DEFAULTS.has(cfg.model) && !cfg.modelChosen) cfg.model = "";
-    if (cfg.api && !cfg.apiV2) {
-      delete cfg.api;
-    }
-    return cfg;
-  } catch {
-    return { key: "" };
-  }
-}
-function setConfig(patch = {}) {
-  if (patch.key !== void 0) localStorage.setItem(KEY_STORE, patch.key);
-  const cfg = getConfig();
-  const next = {
-    baseURL: patch.baseURL ?? cfg.baseURL ?? "https://api.openai.com/v1",
-    // No hardcoded default model. Whatever the endpoint reports is the truth;
-    // shipping a stale id was why an old model was the only thing on offer.
-    model: patch.model ?? cfg.model ?? "",
-    // once a model is picked from the endpoint's own list it is a real choice
-    modelChosen: patch.model ? true : cfg.modelChosen ?? false,
-    provider: patch.provider ?? cfg.provider ?? "openai",
-    apiV2: true,
-    dropped: patch.dropped ?? cfg.dropped ?? [],
-    effort: patch.effort ?? cfg.effort ?? "medium",
-    vision: patch.vision ?? cfg.vision ?? "auto",
-    api: patch.api ?? cfg.api ?? "auto"
-  };
-  localStorage.setItem(CFG_STORE, JSON.stringify(next));
-  return next;
-}
-function effortFor(text, fallback = "medium") {
-  const t = String(text).toLowerCase();
-  if (/^(select|show|hide|zoom|go to|take me|look)/.test(t)) return "low";
-  if (/(why|what happens|compare|best|solve|flood|instead|without)/.test(t)) return "high";
-  if (/(build|move|plant|drain|connect|remove|put|add)/.test(t)) return "medium";
-  return fallback;
-}
-var telemetry = [];
-var hasKey = () => !!getConfig().key;
-async function listModels() {
-  const { key: key2, baseURL, provider } = getConfig();
-  if (!key2) throw new Error("no key configured");
-  if (provider === "anthropic") {
-    const r2 = await fetch("https://api.anthropic.com/v1/models", {
-      headers: { "x-api-key": key2, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" }
-    });
-    if (!r2.ok) throw new Error(`${r2.status}: ${(await r2.text()).slice(0, 120)}`);
-    return (await r2.json()).data.map((m) => m.id).sort();
-  }
-  const r = await fetch(`${(baseURL || "https://api.openai.com/v1").replace(/\/$/, "")}/models`, {
-    headers: { authorization: `Bearer ${key2}` }
-  });
-  if (!r.ok) throw new Error(`${r.status}: ${(await r.text()).slice(0, 120)}`);
-  return (await r.json()).data.map((m) => m.id).sort();
-}
-async function complete({ system, prompt, image = null, effort = null }) {
-  const cfg = getConfig();
-  const { key: key2, baseURL, model, provider } = cfg;
-  if (!key2) throw new Error("no API key configured");
-  if (!model) throw new Error("no model chosen \u2014 open the panel and pick one from your endpoint");
-  const started = performance.now();
-  const record = (api, usage) => {
-    telemetry.push({
-      at: Date.now(),
-      model,
-      api,
-      effort: effort || cfg.effort,
-      ms: Math.round(performance.now() - started),
-      inTokens: usage?.input_tokens ?? usage?.prompt_tokens ?? null,
-      outTokens: usage?.output_tokens ?? usage?.completion_tokens ?? null,
-      vision: !!image
-    });
-  };
-  if (provider === "anthropic") {
-    const content2 = [{ type: "text", text: prompt }];
-    if (image) content2.unshift({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: image.split(",")[1] } });
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-api-key": key2, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-      body: JSON.stringify({ model, max_tokens: 2e3, temperature: 0, system, messages: [{ role: "user", content: content2 }] })
-    });
-    if (!r.ok) throw new Error(`${r.status}: ${(await r.text()).slice(0, 200)}`);
-    const j = await r.json();
-    record("messages", j.usage);
-    return j.content.filter((c) => c.type === "text").map((c) => c.text).join("");
-  }
-  const base = (baseURL || "https://api.openai.com/v1").replace(/\/$/, "");
-  const content = [{ type: "input_text", text: prompt }];
-  if (image) content.push({ type: "input_image", image_url: image, detail: "low" });
-  const dropped = new Set(cfg.dropped || []);
-  function prune(body) {
-    const out = { ...body };
-    for (const k of dropped) deleteDeep(out, k);
-    return out;
-  }
-  function deleteDeep(obj, path) {
-    const parts = path.split(".");
-    let o = obj;
-    for (let i = 0; i < parts.length - 1; i++) {
-      o = o?.[parts[i]];
-      if (!o) return;
-    }
-    delete o[parts[parts.length - 1]];
-  }
-  async function post(url, body, tries = 4) {
-    for (let attempt = 0; attempt < tries; attempt++) {
-      const r = await fetch(url, {
-        method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${key2}` },
-        body: JSON.stringify(prune(body))
-      });
-      if (r.ok) return r;
-      const text = await r.text();
-      if (r.status !== 400) return { ...r, ok: false, status: r.status, _text: text };
-      const fix = repairFor(text, body);
-      if (!fix) return { ok: false, status: 400, _text: text };
-      if (fix.rename) {
-        body[fix.rename[1]] = body[fix.rename[0]];
-      }
-      dropped.add(fix.drop);
-      setConfig({ dropped: [...dropped] });
-      console.warn(`[CREO] ${model} refuses "${fix.drop}" \u2014 dropping it and retrying`);
-    }
-    return { ok: false, status: 400, _text: "gave up repairing the request" };
-  }
-  const responsesBody = {
-    model,
-    instructions: system,
-    input: [{ role: "user", content }],
-    ...effort || cfg.effort ? { reasoning: { effort: effort || cfg.effort } } : {},
-    text: { verbosity: "low" }
-  };
-  if (cfg.api !== "chat") {
-    let r = null;
-    try {
-      r = await post(`${base}/responses`, responsesBody);
-    } catch {
-      r = null;
-    }
-    if (r && r.ok) {
-      const j = await r.json();
-      record("responses", j.usage);
-      if (cfg.api !== "responses") setConfig({ api: "responses" });
-      const text = j.output_text ?? (j.output || []).flatMap((o) => (o.content || []).filter((c) => c.type === "output_text").map((c) => c.text)).join("");
-      if (text) return text;
-    } else if (r && r.status === 400) {
-      throw new Error(`400: ${String(r._text).slice(0, 200)}`);
-    } else if (r && r.status && r.status !== 404) {
-      throw new Error(`${r.status}: ${String(r._text).slice(0, 200)}`);
-    } else {
-      setConfig({ api: "chat" });
-    }
-  }
-  const msgContent = image ? [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: image, detail: "low" } }] : prompt;
-  const r2 = await post(`${base}/chat/completions`, {
-    model,
-    response_format: { type: "json_object" },
-    messages: [{ role: "system", content: system }, { role: "user", content: msgContent }]
-  });
-  if (!r2.ok) throw new Error(`${r2.status}: ${String(r2._text).slice(0, 200)}`);
-  const j2 = await r2.json();
-  record("chat", j2.usage);
-  return j2.choices[0].message.content;
-}
-function repairFor(errorText, body = {}) {
-  let msg = errorText;
-  try {
-    msg = JSON.parse(errorText).error?.message || errorText;
-  } catch {
-  }
-  const lower = String(msg).toLowerCase();
-  const named = String(errorText).match(/"param"\s*:\s*"([^"]+)"/)?.[1] || lower.match(/unsupported (?:value|parameter): '([^']+)'/)?.[1] || lower.match(/unknown parameter: '([^']+)'/)?.[1] || lower.match(/'([a-z_.]+)' is not supported/)?.[1] || lower.match(/unsupported_(?:value|parameter).*'([a-z_.]+)'/)?.[1];
-  if (named === "max_tokens" || /use ['"]?max_completion_tokens/.test(lower)) {
-    return { drop: "max_tokens", rename: ["max_tokens", "max_completion_tokens"] };
-  }
-  if (named && has(body, named)) return { drop: named };
-  if (named === "verbosity" || /verbosity/.test(lower)) return { drop: "text.verbosity" };
-  if (/reasoning/.test(lower) && has(body, "reasoning")) return { drop: "reasoning" };
-  if (/response_format|json_object/.test(lower)) return { drop: "response_format" };
-  if (/temperature/.test(lower)) return { drop: "temperature" };
-  return null;
-}
-var has = (obj, path) => {
-  let o = obj;
-  for (const part of String(path).split(".")) {
-    if (!o || !(part in o)) return false;
-    o = o[part];
-  }
-  return true;
-};
-function digest(world, { camera, selection = [], pointer = null, limit = 90 }) {
-  const focus = [camera.target[0], camera.target[1]];
-  const radius = Math.max(80, camera.dist * 0.9);
-  const near = world.index.near(focus, radius);
-  const seen = /* @__PURE__ */ new Set();
-  const rows = [];
-  for (const hit of near) {
-    if (rows.length >= limit) break;
-    const e = world.get(hit.id);
-    if (!e || seen.has(e.id)) continue;
-    seen.add(e.id);
-    if (["opening", "furniture", "room"].includes(e.type)) continue;
-    const ring3 = world.ringOf(e);
-    if (!ring3) continue;
-    const c = centroid(ring3);
-    const ob = orientedBounds(ring3);
-    rows.push({
-      id: e.id,
-      type: e.type + (e.subtype ? `/${e.subtype}` : ""),
-      name: e.name && e.name !== "Building" ? e.name : void 0,
-      use: e.use || void 0,
-      at: [Math.round(c[0]), Math.round(c[1])],
-      size: `${ob.width.toFixed(0)}x${ob.depth.toFixed(0)}m`,
-      height: e.zTop - e.zBase > 0.4 ? `${(e.zTop - e.zBase).toFixed(0)}m` : void 0,
-      said: e.type === "observation" ? e.evidence?.[0]?.text || e.name : void 0
-    });
-  }
-  const b = world.place.bounds();
-  return {
-    place: world.place.name,
-    bounds: { x: [Math.round(b[0]), Math.round(b[2])], y: [Math.round(b[1]), Math.round(b[3])] },
-    units: "metres, local grid; +x is east, +y is north",
-    camera: { looking_at: [Math.round(focus[0]), Math.round(focus[1])], height_of_view: Math.round(camera.dist) },
-    selection,
-    pointer: pointer ? [Math.round(pointer[0]), Math.round(pointer[1])] : null,
-    ground: world.place.terrain ? { relief_m: +Math.max(...world.place.terrain.data).toFixed(1) } : null,
-    nearby: rows,
-    truncated: near.length > rows.length ? `${near.length - rows.length} more things not listed` : void 0
-  };
-}
-var SYSTEM = `You operate a spatial design tool called CREO. You are not drawing geometry and you are not deciding what is true about the place \u2014 you are working the interface the way a person works it with their hands.
-
-You will be given the user's request and a digest of what is currently in view: named things with ids, positions in metres on a local grid, and sizes.
-
-Return ONLY a JSON object of this shape:
-{"reasoning":"<one short sentence>","operations":[ ... ]}
-
-Each operation is one of:
-  {"op":"look","at":[x,y],"distance":<metres>}          move the view
-  {"op":"point","at":[x,y]}                              tap a location
-  {"op":"select","ids":["..."]}                          select existing things by id
-  {"op":"circle","points":[[x,y],[x,y],...]}             draw a closed area (4-12 points)
-  {"op":"line","points":[[x,y],[x,y],...]}               trace a route (2-12 points)
-  {"op":"say","text":"<an ordinary sentence>"}           speak to the place
-  {"op":"note","at":[x,y],"text":"<what you observed>"}  leave an observation
-
-Rules you must follow:
-- Every id must appear in the digest. Never invent one.
-- Every coordinate must lie inside the stated bounds.
-- Prefer selecting a named thing over circling near it.
-- A "circle" is for an AREA the request is about; a "line" is for a ROUTE.
-- Put the gesture BEFORE the sentence: circle or select first, then say. The tool resolves "this" and "here" from what you just indicated.
-- Sentences must be plain English of the kind a resident would use: "this floods when it rains", "we need a drain here", "there should be trees here", "connect these", "why is this here?".
-- Do not propose more than one intervention per request.
-- If the request cannot be grounded in what is in view, return an empty operations list and say why in reasoning.`;
-var OPS = /* @__PURE__ */ new Set(["look", "point", "select", "circle", "line", "say", "note"]);
-function validate(world, ops, digestObj) {
-  const known = new Set(digestObj.nearby.map((r) => r.id));
-  const b = world.place.bounds();
-  const inBounds = ([x, y]) => Number.isFinite(x) && Number.isFinite(y) && x >= b[0] - 50 && x <= b[2] + 50 && y >= b[1] - 50 && y <= b[3] + 50;
-  const ok = [];
-  const refused = [];
-  for (const raw of ops || []) {
-    const op = raw && raw.op;
-    if (!OPS.has(op)) {
-      refused.push({ raw, why: `unknown operation "${op}"` });
-      continue;
-    }
-    if (op === "select") {
-      const ids = (raw.ids || []).filter((id) => world.get(id));
-      const bad = (raw.ids || []).filter((id) => !world.get(id));
-      if (bad.length) refused.push({ raw, why: `no such thing: ${bad.join(", ")}` });
-      if (!ids.length) continue;
-      if (ids.some((id) => !known.has(id))) refused.push({ raw, why: "selected something that was not in view" });
-      ok.push({ op: "select", ids });
-      continue;
-    }
-    if (op === "point" || op === "note" || op === "look") {
-      if (!Array.isArray(raw.at) || !inBounds(raw.at)) {
-        refused.push({ raw, why: "point is outside this place" });
-        continue;
-      }
-      ok.push({ ...raw, at: [Number(raw.at[0]), Number(raw.at[1])] });
-      continue;
-    }
-    if (op === "circle" || op === "line") {
-      const pts = (raw.points || []).filter((p) => Array.isArray(p) && inBounds(p)).map((p) => [Number(p[0]), Number(p[1])]);
-      if (pts.length < (op === "circle" ? 3 : 2)) {
-        refused.push({ raw, why: "not enough points inside this place" });
-        continue;
-      }
-      if (op === "circle" && area(pts) < 4) {
-        refused.push({ raw, why: "that area is too small to mean anything" });
-        continue;
-      }
-      ok.push({ op, points: pts.slice(0, 12) });
-      continue;
-    }
-    if (op === "say") {
-      const text = String(raw.text || "").trim();
-      if (!text) {
-        refused.push({ raw, why: "empty sentence" });
-        continue;
-      }
-      if (text.length > 200) {
-        refused.push({ raw, why: "sentence too long to be an utterance" });
-        continue;
-      }
-      ok.push({ op: "say", text });
-    }
-  }
-  return { operations: ok, refused };
-}
-async function proposeOperations(world, request, view, opts = {}) {
-  const cfg = getConfig();
-  const d = digest(world, view);
-  const visionMode = opts.vision || cfg.vision;
-  const wantsVision = visionMode === "always" || visionMode === "auto" && (view.selection?.length || view.pointer || /\b(this|that|here|there|looks|see|behind|beside|left|right)\b/i.test(request));
-  const prompt = [
-    `Request: ${request}`,
-    opts.findings ? `
-What CREO has already established by looking:
-${opts.findings}` : "",
-    opts.critique ? `
-A previous attempt was rejected. The single largest problem was:
-${opts.critique}
-Address that.` : "",
-    "",
-    "What is in view:",
-    JSON.stringify(d, null, 1)
-  ].filter(Boolean).join("\n");
-  const raw = await complete({
-    system: SYSTEM,
-    prompt,
-    image: wantsVision ? view.image || null : null,
-    effort: opts.effort || effortFor(request, cfg.effort)
-  });
-  let parsed;
-  try {
-    parsed = JSON.parse(String(raw).replace(/^```(?:json)?\s*|\s*```$/g, "").trim());
-  } catch {
-    const m = /\{[\s\S]*\}/.exec(raw);
-    if (!m) throw new Error("the model did not return JSON");
-    parsed = JSON.parse(m[0]);
-  }
-  const { operations, refused } = validate(world, parsed.operations, d);
-  return { reasoning: String(parsed.reasoning || "").slice(0, 240), operations, refused, digest: d, raw };
-}
-var CRITIC_SYSTEM = `You are an independent reviewer of a proposed change to a real place.
-
-You did not make this proposal and you must not assume it is good. You are shown the goal, the hard constraints, what the world's own models measured, and an image of the result as a participant would see it.
-
-Judge only what is in front of you. You have not been told the proposer's reasoning and must not imagine it.
-
-Return ONLY JSON:
-{"verdict":"PASS"|"FAIL","largestProblem":"<one sentence, or empty if PASS>","whatAParticipantWouldSee":"<one sentence>"}
-
-FAIL if any hard constraint is broken, if a measured consequence got worse, or if a participant looking at the image could not tell what changed or why. Say the single largest problem, not a list.`;
-async function critique({ goal, constraints = [], metrics = [], image = null, effort = "max" }) {
-  const prompt = [
-    `Goal: ${goal}`,
-    constraints.length ? `Hard constraints:
-${constraints.map((c) => `- ${c}`).join("\n")}` : "Hard constraints: none stated.",
-    metrics.length ? `What the world's models measured:
-${metrics.map((m) => `- ${m.label}: ${m.before} \u2192 ${m.after}`).join("\n")}` : "No measurements available.",
-    image ? "An image of the result is attached." : "No image is available; judge on the measurements alone."
-  ].join("\n\n");
-  const raw = await complete({ system: CRITIC_SYSTEM, prompt, image, effort });
-  try {
-    return JSON.parse(String(raw).replace(/^```(?:json)?\s*|\s*```$/g, "").trim());
-  } catch {
-    const m = /\{[\s\S]*\}/.exec(raw);
-    if (m) {
-      try {
-        return JSON.parse(m[0]);
-      } catch {
-      }
-    }
-    return { verdict: "FAIL", largestProblem: "the reviewer did not return a usable judgement", whatAParticipantWouldSee: "" };
-  }
 }
 
 // src/ai/modes.js
@@ -7163,38 +7928,71 @@ var Minimap = class {
         g.stroke();
       }
     };
-    for (const e of world.entities()) {
-      if (hidden.has(e.type)) continue;
-      const ring3 = world.ringOf(e);
-      if (!ring3) continue;
-      if (e.type === "surface" || e.type === "parcel") drawRing(ring3, "rgba(120,150,110,.16)");
-      else if (e.type === "water" || e.type === "stream") drawRing(ring3, "rgba(90,150,200,.5)");
+    const stamp = [
+      world.place.tick,
+      world.branch,
+      w,
+      h,
+      Math.round(scale * 1e4),
+      Math.round(X(0)),
+      Math.round(Y(0)),
+      [...hidden].sort().join(",")
+    ].join("|");
+    if (this._layerStamp !== stamp) {
+      if (!this._layer) this._layer = document.createElement("canvas");
+      const lc = this._layer;
+      if (lc.width !== w * dpr || lc.height !== h * dpr) {
+        lc.width = w * dpr;
+        lc.height = h * dpr;
+      }
+      const lg = lc.getContext("2d");
+      lg.setTransform(dpr, 0, 0, dpr, 0, 0);
+      lg.clearRect(0, 0, w, h);
+      const ringTo = (ctx, ring3, fill) => {
+        ctx.beginPath();
+        ctx.moveTo(X(ring3[0][0]), Y(ring3[0][1]));
+        for (let i = 1; i < ring3.length; i++) ctx.lineTo(X(ring3[i][0]), Y(ring3[i][1]));
+        ctx.closePath();
+        ctx.fillStyle = fill;
+        ctx.fill();
+      };
+      for (const e of world.entities()) {
+        if (hidden.has(e.type)) continue;
+        const ring3 = world.ringOf(e);
+        if (!ring3) continue;
+        if (e.type === "surface" || e.type === "parcel") ringTo(lg, ring3, "rgba(120,150,110,.16)");
+        else if (e.type === "water" || e.type === "stream") ringTo(lg, ring3, "rgba(90,150,200,.5)");
+      }
+      lg.lineWidth = 1;
+      lg.strokeStyle = "rgba(220,225,230,.30)";
+      lg.beginPath();
+      for (const e of world.entities()) {
+        if (hidden.has(e.type)) continue;
+        if (e.type !== "road" && e.type !== "path" && e.type !== "rail") continue;
+        const line2 = e.path;
+        if (!line2 || line2.length < 2) continue;
+        lg.moveTo(X(line2[0][0]), Y(line2[0][1]));
+        for (let i = 1; i < line2.length; i++) lg.lineTo(X(line2[i][0]), Y(line2[i][1]));
+      }
+      lg.stroke();
+      lg.fillStyle = "rgba(200,190,175,.55)";
+      for (const e of world.entities()) {
+        if (hidden.has(e.type) || e.type !== "structure") continue;
+        const r = bbox(world.ringOf(e));
+        lg.fillRect(X(r[0]), Y(r[3]), Math.max(1, (r[2] - r[0]) * scale), Math.max(1, (r[3] - r[1]) * scale));
+      }
+      this._layerStamp = stamp;
     }
-    g.lineWidth = 1;
-    g.strokeStyle = "rgba(220,225,230,.30)";
-    g.beginPath();
-    for (const e of world.entities()) {
-      if (hidden.has(e.type)) continue;
-      if (e.type !== "road" && e.type !== "path" && e.type !== "rail") continue;
-      const line2 = e.path;
-      if (!line2 || line2.length < 2) continue;
-      g.moveTo(X(line2[0][0]), Y(line2[0][1]));
-      for (let i = 1; i < line2.length; i++) g.lineTo(X(line2[i][0]), Y(line2[i][1]));
-    }
-    g.stroke();
-    g.fillStyle = "rgba(200,190,175,.55)";
-    for (const e of world.entities()) {
-      if (hidden.has(e.type) || e.type !== "structure") continue;
-      const r = bbox(world.ringOf(e));
-      g.fillRect(X(r[0]), Y(r[3]), Math.max(1, (r[2] - r[0]) * scale), Math.max(1, (r[3] - r[1]) * scale));
-    }
-    for (const e of world.entities()) {
-      if (e.type !== "observation" || hidden.has(e.type)) continue;
-      const c2 = centroid(world.ringOf(e));
+    g.drawImage(this._layer, 0, 0, w, h);
+    if (!hidden.has("observation")) {
       g.fillStyle = "#f3c25e";
-      g.beginPath();
-      g.arc(X(c2[0]), Y(c2[1]), 2.6, 0, 7);
-      g.fill();
+      for (const e of world.entities()) {
+        if (e.type !== "observation") continue;
+        const c2 = centroid(world.ringOf(e));
+        g.beginPath();
+        g.arc(X(c2[0]), Y(c2[1]), 2.6, 0, 7);
+        g.fill();
+      }
     }
     for (const id of selection) {
       const e = world.get(id);
@@ -7303,6 +8101,7 @@ var HELP = [
   ["Leave a note", "Tap a spot, then <b>Note here</b>. What you write stays on that spot, with your name on it."],
   ["Draw an area", "Press <b>D</b> or \u25CC, then drag a loop. Draw a line instead and it becomes a route."],
   ["Let it help", "Press \u2726 and describe what you want. It will circle, select and speak on your behalf \u2014 you still approve everything."],
+  ["What is this?", 'Terrarium combines <a href="https://github.com/hartswf0/unsettled-atlas" target="_blank" rel="noopener noreferrer">Unsettled Atlas</a> with <a href="https://hartswf0.github.io/motor/" target="_blank" rel="noopener noreferrer">MOTOR</a>: accountable ground, a drivable body, and traces that can unsettle the standing world.'],
   ["Keyboard", "<b>arrows</b> move \xB7 <b>shift+arrows</b> turn and zoom \xB7 <b>Enter</b> choose what the crosshair is on \xB7 <b>N</b> note \xB7 <b>D</b> draw \xB7 <b>L</b> names \xB7 <b>M</b> plan \xB7 <b>F</b> fit \xB7 <b>?</b> this"]
 ];
 function openHelp() {
@@ -8482,7 +9281,7 @@ function certify(world, ghosts, opts = {}) {
             "warning",
             g.id,
             [id],
-            `Requires removal of ${label(other)}.`,
+            `Requires removal of ${label2(other)}.`,
             { area: overlapArea }
           ));
           continue;
@@ -8495,7 +9294,7 @@ function certify(world, ghosts, opts = {}) {
             serious ? "error" : "warning",
             g.id,
             [id],
-            serious ? `That ground is occupied by ${label(other)} \u2014 ${overlapArea.toFixed(1)} m\xB2 of this lies on top of a building.` : `Clips the corner of ${label(other)} by ${overlapArea.toFixed(2)} m\xB2 \u2014 worth adjusting on site.`,
+            serious ? `That ground is occupied by ${label2(other)} \u2014 ${overlapArea.toFixed(1)} m\xB2 of this lies on top of a building.` : `Clips the corner of ${label2(other)} by ${overlapArea.toFixed(2)} m\xB2 \u2014 worth adjusting on site.`,
             { area: overlapArea }
           ));
         } else {
@@ -8504,7 +9303,7 @@ function certify(world, ghosts, opts = {}) {
             "error",
             g.id,
             [id],
-            `Intersects existing structure ${label(other)} over ${overlapArea.toFixed(1)} m\xB2.`,
+            `Intersects existing structure ${label2(other)} over ${overlapArea.toFixed(1)} m\xB2.`,
             { area: overlapArea }
           ));
         }
@@ -8545,7 +9344,7 @@ function certify(world, ghosts, opts = {}) {
             "warning",
             g.id,
             [other.id],
-            `Only ${(g.zBase - other.zTop).toFixed(2)} m of headroom over ${label(other)}.`,
+            `Only ${(g.zBase - other.zTop).toFixed(2)} m of headroom over ${label2(other)}.`,
             { clearance: g.zBase - other.zTop }
           ));
         }
@@ -8559,7 +9358,7 @@ function certify(world, ghosts, opts = {}) {
             "warning",
             g.id,
             [other.id],
-            `Crosses ${label(other)} \u2014 needs a culvert or a crossing here.`
+            `Crosses ${label2(other)} \u2014 needs a culvert or a crossing here.`
           ));
         }
         continue;
@@ -8570,7 +9369,7 @@ function certify(world, ghosts, opts = {}) {
         "error",
         g.id,
         [other.id],
-        other.type === "drain" || other.type === "stream" ? `Blocks ${label(other)} \u2014 water arriving here has nowhere to go.` : `Blocks ${label(other)}${used ? ` used by ${used}` : ""}.`
+        other.type === "drain" || other.type === "stream" ? `Blocks ${label2(other)} \u2014 water arriving here has nowhere to go.` : `Blocks ${label2(other)}${used ? ` used by ${used}` : ""}.`
       ));
     }
     for (const hit of index.near(centroid(ring3), 12)) {
@@ -8586,7 +9385,7 @@ function certify(world, ghosts, opts = {}) {
           "warning",
           g.id,
           [other.id],
-          `Leaves only ${d.toFixed(2)} m beside ${label(other)} (${need} m needed).`,
+          `Leaves only ${d.toFixed(2)} m beside ${label2(other)} (${need} m needed).`,
           { clearance: d, need }
         ));
       }
@@ -8603,7 +9402,7 @@ function certify(world, ghosts, opts = {}) {
           "warning",
           g.id,
           [other.id],
-          `Extends into ${label(other)}, claimed by ${claimed.from}.`
+          `Extends into ${label2(other)}, claimed by ${claimed.from}.`
         ));
       }
       if (other.props?.airspace && g.zTop > (other.props.airspaceLimit ?? 0)) {
@@ -8612,7 +9411,7 @@ function certify(world, ghosts, opts = {}) {
           "warning",
           g.id,
           [other.id],
-          `Rises ${(g.zTop - other.props.airspaceLimit).toFixed(1)} m above the height limit for ${label(other)}.`
+          `Rises ${(g.zTop - other.props.airspaceLimit).toFixed(1)} m above the height limit for ${label2(other)}.`
         ));
       }
     }
@@ -8642,7 +9441,7 @@ function certify(world, ghosts, opts = {}) {
               "error",
               g.id,
               [id],
-              `Would remove ${label(keep)}, which you asked to keep.`,
+              `Would remove ${label2(keep)}, which you asked to keep.`,
               { constraint: true }
             ));
           }
@@ -8725,7 +9524,7 @@ function zSpanAt(world, e, point) {
   const bed = inv[0] + (inv[1] - inv[0]) * frac;
   return [bed, ground];
 }
-function label(e) {
+function label2(e) {
   if (!e) return "something";
   return e.name ? `${e.name} (${e.id})` : `${e.type} ${e.id}`;
 }
@@ -9324,10 +10123,10 @@ function planMeasure(world, intent, base) {
 }
 function commitPlan(world, p, meta = {}) {
   const author = meta.author || p.intent?.author || "you";
-  const label2 = p.title || "change";
+  const label3 = p.title || "change";
   let createdBranches = [];
   const out = world.transact({
-    label: label2,
+    label: label3,
     author,
     intent: p.intent ? { operation: p.intent.operation, secondary: p.intent.secondary, thing: p.intent.thing, confidence: p.intent.confidence } : null,
     utterance: p.intent ? { text: p.intent.original, lang: p.intent.lang } : null
@@ -9469,7 +10268,7 @@ function ask(world, intent, ctx = {}) {
         const first = hist[0];
         rows.push({
           id,
-          name: label(e),
+          name: label2(e),
           who: e.author || "unknown",
           when: first ? `tick ${first.event.tick}` : "seeded with the place",
           how: first?.event.utterance ? `"${first.event.utterance.text}"` : first?.event.label || "imported",
@@ -9501,7 +10300,7 @@ function ask(world, intent, ctx = {}) {
       const blockers = world.index.overlapping(ring3, ground - 0.5, ground + 4).map((id) => world.get(id)).filter(Boolean);
       const blocked = obstruction(world, ring3, ground - 0.5, ground + 3);
       const reasons = [];
-      for (const b of blockers) reasons.push(`${label(b)} is already there (${b.type})`);
+      for (const b of blockers) reasons.push(`${label2(b)} is already there (${b.type})`);
       for (const b of blocked) reasons.push(`it would ${b.severed ? "sever" : "narrow"} ${b.name}`);
       if (world.place.terrain) {
         const s = world.place.terrain.slopeAt(point[0], point[1]);
@@ -9544,7 +10343,7 @@ function ask(world, intent, ctx = {}) {
         highlight: changed,
         rows: changed.map((id) => {
           const h = world.journal.historyOf(id).slice(-1)[0];
-          return { id, name: label(world.get(id)), by: h?.event.author, what: h?.event.label, said: h?.event.utterance?.text || null };
+          return { id, name: label2(world.get(id)), by: h?.event.author, what: h?.event.label, said: h?.event.utterance?.text || null };
         })
       };
     }
@@ -9558,7 +10357,7 @@ function ask(world, intent, ctx = {}) {
       const ids2 = [...new Set(blockers.concat(severed.map((s) => s.blockedBy)))];
       return {
         ...empty,
-        text: ids2.length ? `${ids2.map((id) => label(world.get(id))).join(", ")} ${ids2.length === 1 ? "blocks" : "block"} ${label(target)}.` : `Nothing blocks ${label(target)} \u2014 it runs clear.`,
+        text: ids2.length ? `${ids2.map((id) => label2(world.get(id))).join(", ")} ${ids2.length === 1 ? "blocks" : "block"} ${label2(target)}.` : `Nothing blocks ${label2(target)} \u2014 it runs clear.`,
         highlight: ids2.concat([target.id]),
         trace: severed.map((s) => [graph.nodes[s.a].p, graph.nodes[s.b].p])
       };
@@ -9583,9 +10382,9 @@ function ask(world, intent, ctx = {}) {
       const hit = world.index.overlapping(ring3, -1, 99).map((id) => world.get(id)).filter((e) => e && e.type !== "observation" && e.type !== "surface");
       return {
         ...empty,
-        text: hit.length ? `It would remove ${hit.map((e) => label(e)).join(", ")}.` : "It would remove nothing.",
+        text: hit.length ? `It would remove ${hit.map((e) => label2(e)).join(", ")}.` : "It would remove nothing.",
         highlight: hit.map((e) => e.id),
-        rows: hit.map((e) => ({ id: e.id, name: label(e), type: e.type, area: area(world.ringOf(e)).toFixed(1) }))
+        rows: hit.map((e) => ({ id: e.id, name: label2(e), type: e.type, area: area(world.ringOf(e)).toFixed(1) }))
       };
     }
     // --------------------------------------------------------------- which ---
@@ -9599,7 +10398,7 @@ function ask(world, intent, ctx = {}) {
           text: `${w.pondCount} places hold water in ${w.model.assumptions.rainfall_mm.heavy} mm rain; ${wet.length} built things get wet; deepest ${w.maxDepth.toFixed(2)} m.`,
           highlight: wet.map(([id]) => id),
           overlay: { kind: "water", water: w },
-          rows: wet.map(([id, v]) => ({ id, name: label(world.get(id)), depth: `${v.maxDepth.toFixed(2)} m`, wet: `${(v.wetFraction * 100).toFixed(0)}%` }))
+          rows: wet.map(([id, v]) => ({ id, name: label2(world.get(id)), depth: `${v.maxDepth.toFixed(2)} m`, wet: `${(v.wetFraction * 100).toFixed(0)}%` }))
         };
       }
       if (/shade|shadow|sun|hot/.test(norm2)) {
@@ -9670,7 +10469,7 @@ function whatIsHere(world, ref, empty) {
   const obs = ents.filter((e) => e.type === "observation");
   const rest = ents.filter((e) => e.type !== "observation");
   const lines = [];
-  if (rest.length) lines.push(rest.map((e) => label(e)).join(", "));
+  if (rest.length) lines.push(rest.map((e) => label2(e)).join(", "));
   for (const o of obs) lines.push(`someone said: "${o.evidence?.[0]?.text || o.name}" (${o.author})`);
   return { ...empty, text: lines.join("\n"), highlight: ents.map((e) => e.id), rows: ents.map((e) => ({ id: e.id, type: e.type, epistemic: e.epistemic, author: e.author })) };
 }
@@ -10160,6 +10959,8 @@ var Renderer = class {
     const epoch = [
       detail,
       cutawayAt ? Math.round(cutawayAt[0]) + "," + Math.round(cutawayAt[1]) : "",
+      Math.round(metresPerPixel * 4),
+      // water widening answers to the zoom
       PALETTE.sky.join(",")
     ].join("|");
     if (!this._entCache || this._entSurf !== surf || this._entEpoch !== epoch) {
@@ -10167,7 +10968,7 @@ var Renderer = class {
       this._entSurf = surf;
       this._entEpoch = epoch;
     }
-    const NOCACHE = /* @__PURE__ */ new Set(["observation", "parcel", "water", "stream"]);
+    const NOCACHE = /* @__PURE__ */ new Set();
     const around = opts.around || null;
     const near2 = around ? around.r * around.r : 0;
     const far2 = around ? (around.farR || around.r * 3) * (around.farR || around.r * 3) : 0;
@@ -10196,8 +10997,9 @@ var Renderer = class {
       if (cached) {
         S3.append(cached.s);
         T.append(cached.t);
+        L.append(cached.l);
       } else {
-        const sMark = S3.mark(), tMark = T.mark();
+        const sMark = S3.mark(), tMark = T.mark(), lMark = L.mark();
         if (e.type === "tree") {
           this.buildTree(S3, e, ring3, detail);
         } else if (e.type === "observation") {
@@ -10231,7 +11033,7 @@ var Renderer = class {
           }
           if (cutaway) L.ring(ring3, e.zTop, [1, 1, 1], 0.28);
         }
-        if (!NOCACHE.has(e.type)) this._entCache.set(e, { s: S3.since(sMark), t: T.since(tMark) });
+        if (!NOCACHE.has(e.type)) this._entCache.set(e, { s: S3.since(sMark), t: T.since(tMark), l: L.since(lMark) });
       }
       if (sel) L.ring(ring3, e.zTop + 0.06, PALETTE.select, 1);
       else if (hi) L.ring(ring3, e.zTop + 0.06, PALETTE.highlight, 1);
@@ -10845,8 +11647,8 @@ var Builder = class {
       const idx = triangulate(ccw);
       for (let i = 0; i < idx.length; i += 3) {
         const a = ccw[idx[i]], b = ccw[idx[i + 1]], c = ccw[idx[i + 2]];
-        const A2 = [a[0], a[1], zOf(a)], B = [b[0], b[1], zOf(b)], C = [c[0], c[1], zOf(c)];
-        this.tri(A2, B, C, normalOf(A2, B, C), col, 1);
+        const A2 = [a[0], a[1], zOf(a)], B = [b[0], b[1], zOf(b)], C2 = [c[0], c[1], zOf(c)];
+        this.tri(A2, B, C2, normalOf(A2, B, C2), col, 1);
       }
       for (let i = 0, n = ccw.length; i < n; i++) {
         const a = ccw[i], b = ccw[(i + 1) % n];
@@ -10888,6 +11690,17 @@ var LineBuilder = class {
     this.pos = [];
     this.col = [];
     this.count = 0;
+  }
+  mark() {
+    return [this.pos.length, this.col.length, this.count];
+  }
+  since(m) {
+    return { pos: this.pos.slice(m[0]), col: this.col.slice(m[1]), count: this.count - m[2] };
+  }
+  append(seg) {
+    for (let i = 0; i < seg.pos.length; i++) this.pos.push(seg.pos[i]);
+    for (let i = 0; i < seg.col.length; i++) this.col.push(seg.col[i]);
+    this.count += seg.count;
   }
   segment(a, b, col, alpha) {
     this.pos.push(a[0], a[1], a[2], b[0], b[1], b[2]);
@@ -11324,9 +12137,13 @@ function frame() {
       if (Date.now() - (frame._labelsAt || 0) > 1200) {
         frame._labelsAt = Date.now();
         try {
-          drawLabels();
+          labelPlan = gatherLabels();
         } catch (_) {
         }
+      }
+      try {
+        placeLabels(labelPlan);
+      } catch (_) {
       }
       requestAnimationFrame(frame);
       return;
@@ -11357,9 +12174,13 @@ function frame() {
   }
   requestAnimationFrame(frame);
 }
-var LABEL_JUNK = /^(bench(es)?|waste ?basket|waste ?bin|recycling|post ?box|mail ?box|bicycle parking|bike rack|toilets?|drinking water|water fountain|vending machine|atm|bollard|bin|charging station|parcel locker|fire hydrant|street ?lamp|manhole|telephone|payphone|grit bin)$/i;
-function drawLabels() {
-  const host = $("labels");
+var LABEL_JUNK = /^(bench(es)?|waste ?basket|waste ?bin|recycling|post ?box|mail ?box|bicycle parking|bike rack|toilets?|drinking water|water fountain|vending machine|atm|bollard|bin|charging station|parcel locker|fire hydrant|street ?lamp|manhole|telephone|payphone|grit bin|ground|terrain|building|house|hut|shed|roof|wall|structure|surface|area|region|yes|no|entrance|door|window|path|track|footway|service|driveway|parking|parking space|garden|grass|tree|water|stream|drain|room|floor|unnamed|untitled)$/i;
+var labelPlan = [];
+function drawLabels(gather = true) {
+  if (gather) labelPlan = gatherLabels();
+  placeLabels(labelPlan);
+}
+function gatherLabels() {
   const wanted = [];
   const w = S2.world;
   if (S2.fidelity !== "symbolic" && (RIG.on || w.index.boxes.size > 1500)) {
@@ -11371,18 +12192,15 @@ function drawLabels() {
         hits = w.nearby(center, radius);
       } catch (_) {
       }
+      hits.sort((a, b) => a.d - b.d);
+      const CAP = RIG.on ? 8 : 12;
+      const quiet = RIG.on;
       const seenStreet = /* @__PURE__ */ new Set();
       for (const { entity: e } of hits) {
-        if (wanted.length >= 14) break;
+        if (wanted.length >= CAP) break;
         if (!e || !e.name) continue;
-        if (e.props?.part || e.props?.house || e.props?.testimony) {
-          if (e.props.house && e.props.role !== "main wing") continue;
-          if (e.props.testimony) continue;
-          const c = centroid(w.ringOf(e));
-          const text = e.props.part ? e.props.part : "house";
-          wanted.push({ id: `stk_${e.id}`, text, at: [c[0], c[1], e.zTop + 0.9], cls: "sticker" });
-          continue;
-        }
+        if (quiet && e.type === "marker") continue;
+        if (e.props?.part || e.props?.house || e.props?.built) continue;
         if (e.type === "observation") {
           wanted.push({ id: e.id, text: e.evidence?.[0]?.text || e.name, at: [...centroid(w.ringOf(e)), e.zTop + 3.6], cls: "obs" });
         } else if (e.type === "marker") {
@@ -11399,7 +12217,9 @@ function drawLabels() {
             if (p[1] < y0) y0 = p[1];
             if (p[1] > y1) y1 = p[1];
           }
-          if ((x1 - x0) * (y1 - y0) < 2600 && e.zTop - e.zBase < 35) continue;
+          const minArea = quiet ? 9e3 : 2600, minTall = quiet ? 60 : 35;
+          if ((x1 - x0) * (y1 - y0) < minArea && e.zTop - e.zBase < minTall) continue;
+          if (LABEL_JUNK.test(e.name)) continue;
           wanted.push({ id: `lm_${e.id}`, text: e.name, at: [(x0 + x1) / 2, (y0 + y1) / 2, e.zTop + 2], cls: "poi" });
         } else if ((e.type === "road" || e.type === "path") && !seenStreet.has(e.name)) {
           seenStreet.add(e.name);
@@ -11410,13 +12230,8 @@ function drawLabels() {
       }
     }
   } else if (S2.fidelity !== "symbolic") {
-    const wantStickers = S2.labels !== false && S2.cam.dist < 420;
     for (const e of w.entities()) {
       if (e.type === "observation") wanted.push({ id: e.id, text: e.evidence?.[0]?.text || e.name, at: [...centroid(w.ringOf(e)), e.zTop + 3.6], cls: "obs" });
-      else if (wantStickers && (e.props?.part || e.props?.house && e.props.role === "main wing")) {
-        const c = centroid(w.ringOf(e));
-        wanted.push({ id: `stk_${e.id}`, text: e.props.part || "house", at: [c[0], c[1], e.zTop + 0.9], cls: "sticker" });
-      }
     }
     if (S2.labels !== false && S2.cam.dist < 700) {
       const streets = /* @__PURE__ */ new Map();
@@ -11453,6 +12268,10 @@ function drawLabels() {
     if (!ring3) continue;
     wanted.push({ id: `sel_${id}`, text: labelFor(e), at: [...centroid(ring3), e.zTop + 1.2], cls: "sel" });
   }
+  return wanted;
+}
+function placeLabels(wanted) {
+  const host = $("labels");
   const placed = [];
   const blocked = [
     { x0: 0, y0: 0, x1: 260, y1: 108 },
@@ -12094,10 +12913,10 @@ function openModeMenu() {
   const r = $("modeChip").getBoundingClientRect();
   menu.style.left = `${Math.max(8, r.left)}px`;
   menu.style.bottom = `calc(${innerHeight - r.top + 8}px)`;
-  const row = (key2, label2, hint2) => {
+  const row = (key2, label3, hint2) => {
     const b = document.createElement("button");
     b.className = S2.commitment === key2 ? "on" : "";
-    b.innerHTML = `<span>${label2}</span><span class="mHint">${hint2}</span>`;
+    b.innerHTML = `<span>${label3}</span><span class="mHint">${hint2}</span>`;
     b.onclick = () => {
       menu.remove();
       setMode_(key2);
@@ -12171,10 +12990,10 @@ function showProposal(p) {
   $("propImpact").replaceChildren();
   $("propAlts").replaceChildren();
   if (p.alternatives?.length) {
-    const mk = (label2, i) => {
+    const mk = (label3, i) => {
       const b = document.createElement("button");
       b.className = `tool${S2.altIndex === i ? " on" : ""}`;
-      b.textContent = label2;
+      b.textContent = label3;
       b.onclick = () => {
         S2.altIndex = i;
         S2.dirty = true;
@@ -12552,7 +13371,7 @@ function showTools() {
   title.textContent = kind === "area" ? "This area" : kind === "line" ? "This line" : ids.length === 1 ? labelFor(S2.world.get(ids[0])) : `${ids.length} things`;
   $("subjectFacts").textContent = subjectFacts().join(" \xB7 ");
   $("subjectInput").placeholder = kind === "thing" ? "Ask about this" : `Ask about this ${kind}`;
-  for (const [label2, sentence] of SUBJECT_ASKS[kind]) row.append(mk(label2, () => askSubject(sentence)));
+  for (const [label3, sentence] of SUBJECT_ASKS[kind]) row.append(mk(label3, () => askSubject(sentence)));
   row.append(mk("Note here", () => openNote(), "note"));
   if (kind === "thing" && ids.length === 1) {
     const e = S2.world.get(ids[0]);
@@ -12604,14 +13423,14 @@ function openFindPanel() {
   panel.style.left = `${Math.max(8, r.left)}px`;
   panel.style.top = `${r.bottom + 8}px`;
   panel.style.width = "min(360px, calc(100vw - 24px))";
-  const label2 = document.createElement("div");
-  label2.className = "menuLabel";
-  label2.textContent = "Go to something in this place";
+  const label3 = document.createElement("div");
+  label3.className = "menuLabel";
+  label3.textContent = "Go to something in this place";
   const input = document.createElement("input");
   input.className = "nameInput";
   input.placeholder = "a building, a street, a shop\u2026";
   const results = document.createElement("div");
-  panel.append(label2, input, results);
+  panel.append(label3, input, results);
   document.body.append(panel);
   input.focus();
   const named = S2.world.entities().filter((e) => (e.name || e.use) && !["opening", "furniture", "room"].includes(e.type));
@@ -12923,9 +13742,9 @@ function openNote() {
   panel.style.left = "12px";
   panel.style.bottom = `calc(150px + var(--safe))`;
   panel.style.width = "min(400px, calc(100vw - 24px))";
-  const label2 = document.createElement("div");
-  label2.className = "menuLabel";
-  label2.textContent = "What do you want to say about this spot?";
+  const label3 = document.createElement("div");
+  label3.className = "menuLabel";
+  label3.textContent = "What do you want to say about this spot?";
   const input = document.createElement("input");
   input.className = "nameInput";
   input.placeholder = "it floods here when the rain is bad";
@@ -12945,7 +13764,7 @@ function openNote() {
     if (e.key === "Enter") submit();
     if (e.key === "Escape") panel.remove();
   };
-  panel.append(label2, input, go);
+  panel.append(label3, input, go);
   document.body.append(panel);
   input.focus();
 }
@@ -13009,9 +13828,9 @@ $("exportBtn").onclick = (ev) => {
   panel.append(head);
   const notes = S2.world.entities().filter((e) => e.type === "observation");
   const mine = S2.world.entities().filter((e) => e.epistemic === "PROPOSED" || e.type === "observation");
-  const opt = (label2, sub2, fn) => {
+  const opt = (label3, sub2, fn) => {
     const b = document.createElement("button");
-    b.innerHTML = `${label2}<span class="sub">${sub2}</span>`;
+    b.innerHTML = `${label3}<span class="sub">${sub2}</span>`;
     b.onclick = () => {
       panel.remove();
       fn();
@@ -13211,9 +14030,9 @@ $("authorChip").onclick = (ev) => {
   const r = ev.currentTarget.getBoundingClientRect();
   menu.style.left = `${Math.max(8, r.left)}px`;
   menu.style.top = `${r.bottom + 8}px`;
-  const label2 = document.createElement("div");
-  label2.className = "menuLabel";
-  label2.textContent = "Who is making these changes?";
+  const label3 = document.createElement("div");
+  label3.className = "menuLabel";
+  label3.textContent = "Who is making these changes?";
   const input = document.createElement("input");
   input.className = "nameInput";
   input.value = S2.author;
@@ -13230,7 +14049,7 @@ $("authorChip").onclick = (ev) => {
   const ok = document.createElement("button");
   ok.textContent = "That's me";
   ok.onclick = done;
-  menu.append(label2, input, ok);
+  menu.append(label3, input, ok);
   document.body.append(menu);
   input.focus();
   setTimeout(() => document.addEventListener("pointerdown", function off(e) {
@@ -13521,10 +14340,10 @@ async function exploreTo(at, metres, whereName) {
   try {
     const { bbox: bbox2 } = reframe(S2.world, { at, metres });
     const base = (S2.world.place.name || "here").split(" \xB7 ")[0].split(" \u2014 ")[0];
-    const label2 = `${base} \xB7 ${whereName}`;
+    const label3 = `${base} \xB7 ${whereName}`;
     const { world, key: key2, name, stats: stats2 } = await importPlace({
       bbox: bbox2,
-      name: label2,
+      name: label3,
       metres,
       log: (m) => {
         where.textContent = String(m).slice(0, 64);
@@ -13838,6 +14657,15 @@ mountDoor(S2, () => {
   S2.dirty = true;
 });
 mountConsole(S2);
+setTimeout(() => {
+  try {
+    mountRing(S2);
+    S2.showPlan = true;
+    S2.dirty = true;
+  } catch (e) {
+    console.warn("[ring]", e);
+  }
+}, 300);
 async function landAt(query) {
   if (S2.busy) return "still fetching the last ground";
   let q = String(query || "").trim();
@@ -13861,13 +14689,17 @@ async function landAt(query) {
       });
       q = pos.latitude.toFixed(5) + ", " + pos.longitude.toFixed(5);
     }
-    toast(`LAND \u2014 finding \u201C${q}\u201D\u2026`);
+    landCard("\u25CD LANDING");
+    landGrid(false);
+    landStep(`finding \u201C${q}\u201D on Earth\u2026`);
     const found = await resolvePlace(q, { metres: metres || 900 });
+    landCard("\u25CD " + String(found.short || found.name || q).split(",")[0].toUpperCase());
+    landStep("reading the ground\u2026");
     const { world, key: key2, name, stats: stats2 } = await importPlace({
       bbox: found.bbox,
       name: found.short || found.name,
       metres: metres || 900,
-      log: (m) => toast(String(m).slice(0, 70))
+      log: (m) => landStep(m)
     });
     await cachePut(key2, {
       payload: world.save(),
@@ -13882,13 +14714,65 @@ async function landAt(query) {
       }
     });
     adoptWorld(world, key2, name);
-    toast(`LAND \u2014 ${name}: ${stats2.buildings || 0} buildings, ${world.place.meta?.relief || 0} m relief.`);
+    const gone = await pruneCache(14, key2);
+    _metasCache.list = null;
+    landDone(`${stats2.buildings || 0} buildings \xB7 ${world.place.meta?.relief || 0} m relief` + (gone.length ? ` \xB7 ${gone.length} oldest window${gone.length > 1 ? "s" : ""} released` : ""));
   } catch (err) {
+    landDone(null);
     toast("TERRA: " + String(err.message || err).slice(0, 80));
   } finally {
     S2.busy = false;
   }
 }
+var LAND = { el: null, grid: null, step: null, head: null, cells: [] };
+function landCard(head) {
+  if (!LAND.el) {
+    const el = document.createElement("div");
+    el.id = "land-card";
+    el.style.cssText = "position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:88;min-width:250px;max-width:min(400px,92vw);background:rgba(10,14,18,.94);border:1px solid rgba(120,200,170,.42);border-radius:14px;padding:16px 20px;color:#cfe8dd;font:700 12px/1.4 ui-monospace,monospace;letter-spacing:.08em;text-align:center;box-shadow:0 14px 44px rgba(0,0,0,.6);backdrop-filter:blur(12px);";
+    const h = document.createElement("div");
+    const g = document.createElement("div");
+    g.style.cssText = "display:grid;grid-template-columns:repeat(3,16px);gap:3px;justify-content:center;margin:11px 0 9px;";
+    for (let i = 0; i < 9; i++) {
+      const c = document.createElement("div");
+      c.style.cssText = "width:16px;height:16px;border-radius:3px;border:1px solid rgba(151,187,213,.3);background:transparent;";
+      g.appendChild(c);
+      LAND.cells.push(c);
+    }
+    const s = document.createElement("div");
+    s.style.cssText = "font:500 10px/1.4 system-ui,sans-serif;letter-spacing:.02em;color:#8fb8a8;min-height:14px;";
+    el.append(h, g, s);
+    document.body.appendChild(el);
+    LAND.el = el;
+    LAND.grid = g;
+    LAND.step = s;
+    LAND.head = h;
+  }
+  LAND.el.style.display = "block";
+  if (head) LAND.head.textContent = head;
+  return LAND;
+}
+var landStep = (text) => {
+  if (LAND.step) LAND.step.textContent = String(text).slice(0, 90);
+};
+var landGrid = (on) => {
+  if (LAND.grid) LAND.grid.style.display = on ? "grid" : "none";
+};
+function landCell(i, state) {
+  const c = LAND.cells[i];
+  if (!c) return;
+  c.style.background = state === "done" ? "#6fe0c0" : state === "busy" ? "rgba(111,224,192,.42)" : state === "failed" ? "rgba(223,90,93,.55)" : "transparent";
+}
+var landDone = (msg) => {
+  if (!LAND.el) return;
+  if (msg) {
+    landStep(msg);
+    setTimeout(() => {
+      if (LAND.el) LAND.el.style.display = "none";
+    }, 2600);
+  } else LAND.el.style.display = "none";
+};
+var CELL_OF = { "0,0": 4, "0,1": 1, "1,0": 5, "0,-1": 7, "-1,0": 3, "1,1": 2, "1,-1": 8, "-1,-1": 6, "-1,1": 0 };
 var _packRun = 0;
 async function landPack(q, metres) {
   const run = ++_packRun;
@@ -13896,15 +14780,18 @@ async function landPack(q, metres) {
   const covered = tileM * 3;
   let found;
   S2.busy = true;
+  landCard("\u25CD CITYPACK");
+  landGrid(true);
+  for (let i = 0; i < 9; i++) landCell(i, "idle");
+  landStep(`finding \u201C${q}\u201D on Earth\u2026`);
   try {
-    toast(`PACK \u2014 finding \u201C${q}\u201D\u2026`);
     found = await resolvePlace(q, { metres: tileM });
   } catch (err) {
     S2.busy = false;
+    landDone(null);
     toast("TERRA: " + String(err.message || err).slice(0, 80));
     return;
   }
-  if (metres > covered + 200) toast(`a 3\xD73 pack covers ${covered} m of the @${metres} asked \u2014 land again further on for more`);
   const lat0 = found.lat ?? (found.bbox[0] + found.bbox[2]) / 2;
   const lon0 = found.lon ?? (found.bbox[1] + found.bbox[3]) / 2;
   const base = (found.short || found.name || q).split(",")[0];
@@ -13912,6 +14799,8 @@ async function landPack(q, metres) {
   const dLon = tileM / (111320 * Math.max(0.05, Math.cos(lat0 * Math.PI / 180)));
   const ORDER = [[0, 0], [0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [1, -1], [-1, -1], [-1, 1]];
   const tag2 = ([di, dj]) => di || dj ? (dj > 0 ? "N" : dj < 0 ? "S" : "") + (di > 0 ? "E" : di < 0 ? "W" : "") : "\xB7";
+  landCard("\u25CD CITYPACK \u2014 " + base.toUpperCase());
+  if (metres > covered + 200) landStep(`a 3\xD73 pack covers ${covered} m of the @${metres} asked`);
   let landed = 0, uncached = 0;
   for (let k = 0; k < ORDER.length; k++) {
     if (run !== _packRun) {
@@ -13920,16 +14809,18 @@ async function landPack(q, metres) {
     }
     const [di, dj] = ORDER[k];
     const centre = di === 0 && dj === 0;
+    const cell = CELL_OF[`${di},${dj}`];
     const latC = lat0 + dj * dLat, lonC = lon0 + di * dLon;
     const bbox2 = [latC - dLat / 2, lonC - dLon / 2, latC + dLat / 2, lonC + dLon / 2];
     const name = `${base} \xB7 ${tag2(ORDER[k])}`;
     try {
-      toast(`PACK ${k + 1}/9 \u2014 ${name}\u2026`);
+      landCell(cell, "busy");
+      landStep(`${k + 1}/9 \xB7 ${centre ? "the centre" : tag2(ORDER[k])} \u2014 asking OpenStreetMap\u2026`);
       const { world, key: key2, name: got, stats: stats2 } = await importPlace({
         bbox: bbox2,
         name,
         metres: tileM,
-        log: (m) => toast(String(m).slice(0, 70))
+        log: (m) => landStep(`${k + 1}/9 \xB7 ${m}`)
       });
       if (run !== _packRun) return;
       try {
@@ -13951,21 +14842,28 @@ async function landPack(q, metres) {
         uncached++;
       }
       landed++;
-      if (centre) adoptWorld(world, key2, got);
-    } catch (err) {
+      landCell(cell, "done");
       if (centre) {
-        toast("PACK \u2014 the centre failed (" + String(err.message || err).slice(0, 50) + "); nothing landed.");
+        adoptWorld(world, key2, got);
+        landStep(`the centre stands \u2014 drive it while the ring arrives (${8 - k} to go)`);
+      }
+    } catch (err) {
+      landCell(cell, "failed");
+      if (centre) {
+        landDone("the centre failed \u2014 " + String(err.message || err).slice(0, 50));
         S2.busy = false;
         return;
       }
-      toast(`PACK ${k + 1}/9 failed \u2014 ` + String(err.message || err).slice(0, 60));
+      landStep(`${k + 1}/9 \xB7 ${tag2(ORDER[k])} failed \u2014 ` + String(err.message || err).slice(0, 50));
     } finally {
       if (centre) S2.busy = false;
     }
     if (k < ORDER.length - 1) await new Promise((res) => setTimeout(res, 1400));
   }
   if (run === _packRun) {
-    toast(`PACK \u2014 ${landed}/9 windows of ${base} in this browser` + (uncached ? ` (${uncached} would not cache \u2014 storage is full)` : "") + ". Drive to an edge to cross.");
+    const gone = await pruneCache(20, S2.placeKey);
+    _metasCache.list = null;
+    landDone(`${landed}/9 windows in this browser` + (uncached ? ` (${uncached} would not cache \u2014 storage is full)` : "") + (gone.length ? ` \xB7 ${gone.length} older released` : "") + " \xB7 drive to an edge to cross");
   }
 }
 var _metasCache = { at: 0, list: null };
@@ -14077,7 +14975,12 @@ PERF.install({ renderer });
 setTimeout(() => {
   if (S2.world) PERF.install({ world: S2.world });
 }, 1500);
-if (typeof window !== "undefined") window.TERRA = { S: S2, RIG, renderer, ATLAS };
+if (typeof window !== "undefined") window.TERRA = { S: S2, RIG, renderer, ATLAS, plan: () => minimap, redrawPlan: () => {
+  try {
+    if (minimap && S2.showPlan) minimap.draw(S2.world, { camera: S2.cam, selection: S2.selection, hidden: hiddenTypes(S2.layersOff) });
+  } catch (_) {
+  }
+} };
 console.info("%c[creo-unset-04] PERF ready \u2014 press P \xB7 PERF.report() \xB7 PERF.loads() \xB7 PERF.watch(120)", "color:#6fe0c0");
 export {
   MOBILE,

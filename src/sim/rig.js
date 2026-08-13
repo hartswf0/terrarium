@@ -56,24 +56,43 @@ if (typeof window !== 'undefined') {
   addEventListener('pointerdown', arm, true);
   addEventListener('keydown', arm, true);
 }
+// SOUND IS OFF UNTIL ASKED FOR, AND IT IS NOT A MOSQUITO.
+//
+// A raw sawtooth with a resonant filter at 58–400 Hz is, precisely, an insect:
+// thin, buzzing, and rising into the ear with every throttle press. A motor
+// heard from inside is mostly what you FEEL — low, soft, and dull. So: a
+// triangle (no harsh upper harmonics), a fundamental that stays under 100 Hz,
+// a lowpass that never opens past 240 Hz, no resonance, and a quarter of the
+// gain. And it stays SILENT unless the driver turns it on, because a sound
+// nobody asked for is a sound that is wrong by default.
+let soundOn = false;
+try { soundOn = localStorage.getItem('terrarium.sound') === 'on'; } catch (_) {}
+export function setEngineSound(on) {
+  soundOn = !!on;
+  try { localStorage.setItem('terrarium.sound', on ? 'on' : 'off'); } catch (_) {}
+  if (!on && gainN) gainN.gain.value = 0;
+  return soundOn;
+}
+export const engineSoundOn = () => soundOn;
+
 function engine(speed, on) {
   try {
-    if (!on) { if (gainN) gainN.gain.value = 0; return; }
+    if (!on || !soundOn) { if (gainN) gainN.gain.value = 0; return; }
     if (!heard) return;
     if (!AC) {
       AC = new (window.AudioContext || window.webkitAudioContext)();
-      osc = AC.createOscillator(); osc.type = 'sawtooth';
-      filt = AC.createBiquadFilter(); filt.type = 'lowpass'; filt.Q.value = 4;
+      osc = AC.createOscillator(); osc.type = 'triangle';
+      filt = AC.createBiquadFilter(); filt.type = 'lowpass'; filt.Q.value = 0.7;
       gainN = AC.createGain(); gainN.gain.value = 0;
       osc.connect(filt); filt.connect(gainN); gainN.connect(AC.destination); osc.start();
     }
     if (AC.state === 'suspended') AC.resume();
     const s = Math.abs(speed);
-    // A motor at rest makes no sound. The old constant floor was a drone that
-    // never stopped and never told you anything: level now IS the throttle.
-    osc.frequency.value = 58 + s * 7.5;
-    filt.frequency.value = 300 + s * 140;
-    gainN.gain.setTargetAtTime(s < 0.5 ? 0 : Math.min(0.05, 0.008 + s * 0.0032), AC.currentTime, 0.08);
+    // A motor at rest makes no sound. Level IS the throttle, and the pitch
+    // barely moves — a rig is a chest note, not a whine.
+    osc.frequency.value = 42 + Math.min(52, s * 1.5);
+    filt.frequency.value = 120 + Math.min(120, s * 3);
+    gainN.gain.setTargetAtTime(s < 0.5 ? 0 : Math.min(0.014, 0.004 + s * 0.0009), AC.currentTime, 0.12);
   } catch (_) {}
 }
 
@@ -101,35 +120,60 @@ function obox(B, C, F, Lt, U, sx, sy, sz, col) {
 let dockEl = null, speedEl = null;
 function dock(rig) {
   if (dockEl) { dockEl.style.display = 'flex'; return; }
+  // THE DOCK JOINS THE MAP COLUMN. Mount, speed and paint were a bar across
+  // the bottom-left, opposite the plan, with the thumb's whole reach between
+  // them — and on a phone the middle of the screen (the world) was the only
+  // place NOT holding a control. Everything that is an instrument now stacks
+  // on the right: dismount, speed, paint, then the plan, then the meter.
+  // A THIN STRIP, TUCKED UNDER THE MAP. Mount, speed and paint were a fat
+  // panel floating in the middle of the right-hand side, in front of the
+  // world, taking as much room as the map itself — for one button, one
+  // number, and six squares that matter once. Now: one small mount/dismount
+  // control, the speed, and a single dot that CYCLES the paint. Everything it
+  // used to spend space saying is in the menu or on the line.
   dockEl = document.createElement('div');
   dockEl.id = 'rig-dock';
-  dockEl.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:61;display:flex;align-items:center;gap:9px;'
-    + 'background:rgba(10,14,18,.88);border:1px solid rgba(120,200,170,.35);border-radius:11px;padding:8px 11px;'
-    + 'font:600 11px/1 ui-monospace,monospace;color:#cfe8dd;letter-spacing:.05em;';
+  dockEl.style.cssText = 'position:fixed;right:12px;bottom:66px;z-index:61;width:214px;box-sizing:border-box;'
+    + 'display:flex;align-items:center;gap:6px;justify-content:space-between;'
+    + 'background:rgba(10,14,18,.86);border:1px solid rgba(120,200,170,.28);border-radius:8px;padding:4px 7px;'
+    + 'font:700 9px/1 ui-monospace,monospace;color:#cfe8dd;letter-spacing:.06em;';
   const btn = document.createElement('button');
-  btn.textContent = 'DRIVE ▸';
-  btn.style.cssText = 'background:#6fe0c0;color:#06251c;border:0;border-radius:8px;font:800 11px/1 ui-monospace,monospace;'
-    + 'letter-spacing:.08em;padding:8px 12px;cursor:pointer;';
+  btn.textContent = 'DRIVE';
+  btn.style.cssText = 'background:#6fe0c0;color:#06251c;border:0;border-radius:6px;'
+    + 'font:800 9px/1 ui-monospace,monospace;letter-spacing:.08em;padding:5px 8px;cursor:pointer;';
   btn.addEventListener('click', () => { try { document.activeElement && document.activeElement.blur(); } catch (_) {} dispatchEvent(new KeyboardEvent('keydown', { key: 'v' })); });
   dockEl.appendChild(btn);
   speedEl = document.createElement('span');
   speedEl.textContent = '0 km/h';
-  speedEl.style.cssText = 'min-width:58px;text-align:right;color:#8fb8a8;';
+  speedEl.style.cssText = 'flex:1;text-align:right;color:#8fb8a8;font-weight:600;';
   dockEl.appendChild(speedEl);
-  for (const [name, col] of SWATCHES) {
-    const s = document.createElement('button');
-    s.title = name;
-    s.style.cssText = 'width:18px;height:18px;border-radius:6px;border:1px solid rgba(255,255,255,.25);cursor:pointer;'
-      + 'background:rgb(' + col.map(c => Math.round(c * 255)).join(',') + ');padding:0;';
-    s.addEventListener('click', () => { rig.color = col; });
-    dockEl.appendChild(s);
-  }
+  let ci = 0;
+  const dot = document.createElement('button');
+  dot.title = 'paint the rig';
+  const paintDot = () => {
+    const c = SWATCHES[ci][1];
+    dot.style.background = 'rgb(' + c.map((v) => Math.round(v * 255)).join(',') + ')';
+  };
+  dot.style.cssText = 'width:15px;height:15px;border-radius:50%;border:1px solid rgba(255,255,255,.3);'
+    + 'cursor:pointer;padding:0;flex:0 0 auto;';
+  dot.addEventListener('click', () => { ci = (ci + 1) % SWATCHES.length; rig.color = SWATCHES[ci][1]; paintDot(); });
+  paintDot();
+  dockEl.appendChild(dot);
   document.body.appendChild(dockEl);
   rig._btn = btn;
 }
 
+// A KEY LIST IS NOT AN INTERFACE. The controls bar sat across the bottom of
+// every frame forever, naming keys that a touch screen does not have, in front
+// of the world it was describing. It now appears ONCE, briefly, on the first
+// mount of a session — and never on a touch device, where the joystick and the
+// buttons are the controls and a keyboard legend is a lie.
+const TOUCH = typeof window !== 'undefined'
+  && (navigator.maxTouchPoints > 0 || matchMedia('(pointer: coarse)').matches);
+let hintShown = false;
 let hintEl = null;
 function hint(text) {
+  if (TOUCH) return;                       // the thumb already knows
   if (!hintEl) {
     hintEl = document.createElement('div');
     hintEl.id = 'rig-hint';
@@ -164,7 +208,12 @@ export const RIG = {
     this.on = true;
     if (this._btn) this._btn.textContent = 'DISMOUNT ✕';
     chrome(this); chromeShow(true);
-    hint('DRIVE · W/S · A/D · Space jump · F fire · Shift boost · V dismount');
+    // once per session, then it gets out of the way
+    if (!hintShown) {
+      hintShown = true;
+      hint('W/S · A/D · Space jump · F fire · Shift boost · V dismount');
+      setTimeout(() => { try { hint(''); } catch (_) {} }, 6000);
+    }
     engine(0, true);
   },
 
@@ -200,11 +249,28 @@ export const RIG = {
     // JUMP — the ground can be left, and it comes back
     if ((BTN.jump || (!typing() && K.Space)) && this.jz <= 0) { this.vz = 7.4; this.jz = 0.01; blip(320, 0.08); }
     BTN.jump = false;
-    if (this.jz > 0) { this.vz -= 20 * dt; this.jz += this.vz * dt; if (this.jz <= 0) { this.jz = 0; this.vz = 0; blip(95, 0.05); } }
+    if (this.jz > 0) { this.vz -= 20 * dt; this.jz += this.vz * dt; if (this.jz <= 0) { this.jz = 0; this.vz = 0; thud('land'); } }
     // FIRE — the shot is a world event: what it hits leaves the world, journaled
     if ((BTN.fire || (!typing() && K.KeyF)) && now - (this._fireAt || 0) > 260) { this._fireAt = now; fire(this, world); }
     if (this.v > vmax) this.v = vmax; if (this.v < -vmax * 0.4) this.v = -vmax * 0.4;
-    this.yaw += st * 2.6 * dt * Math.min(1, Math.abs(this.v) / 3.5) * (this.v < 0 ? -1 : 1);
+    const turn = st * 2.6 * dt * Math.min(1, Math.abs(this.v) / 3.5) * (this.v < 0 ? -1 : 1);
+    this.yaw += turn;
+
+    // DRIFT. A rig that turns instantly is a cursor. The body's heading now
+    // leads its momentum: hard steering at speed builds SLIP — a sideways
+    // velocity that carries you wide, decays as the tyres bite, and is what
+    // makes a corner cost something. Boost feeds it, so the fastest line is
+    // never the tightest one.
+    // Tuned DOWN after driving it: the first pass threw the tail out on every
+    // corner, which is a stunt, not a feel. Slip now needs real speed before
+    // it appears at all (below ~9 m/s the tyres simply hold), builds a third
+    // as fast, bites back harder, and tops out at a slide you can still steer.
+    const grip = boost ? 4.0 : 5.4;
+    const bite = Math.max(0, Math.min(1, (Math.abs(this.v) - 9) / 14));   // 0 under 9 m/s
+    this.slip = (this.slip || 0) - turn * Math.abs(this.v) * bite * (boost ? 0.62 : 0.4);
+    this.slip -= this.slip * Math.min(1, grip * dt);
+    if (Math.abs(this.slip) > 11) this.slip = Math.sign(this.slip) * 11;
+    this.drift = Math.min(1, Math.abs(this.slip) / 9);           // 0..1, how sideways
     // SOLIDS — gathered on a slow clock because the world is not what is
     // moving; only the rig is. One index query per 400 ms, then pure geometry.
     if (!this._solidsAt || now - this._solidsAt > 400
@@ -217,8 +283,9 @@ export const RIG = {
     }
     const b = world.place.terrain ? world.place.terrain.bounds : [-50, -50, 50, 50];
     const px = this.p[0], py = this.p[1];
-    const nx = px + Math.cos(this.yaw) * this.v * dt;
-    const ny = py + Math.sin(this.yaw) * this.v * dt;
+    const sideX = -Math.sin(this.yaw), sideY = Math.cos(this.yaw);
+    const nx = px + Math.cos(this.yaw) * this.v * dt + sideX * (this.slip || 0) * dt;
+    const ny = py + Math.sin(this.yaw) * this.v * dt + sideY * (this.slip || 0) * dt;
     this.p[0] = Math.min(Math.max(nx, b[0] + 2), b[2] - 2);
     this.p[1] = Math.min(Math.max(ny, b[1] + 2), b[3] - 2);
     if (this.p[0] !== nx || this.p[1] !== ny) this.v *= 0.4;     // the edge of the ground is the edge
@@ -243,15 +310,30 @@ export const RIG = {
     const zHere = g(this.p[0], this.p[1]) + (this.jz || 0);
     for (const e of (this._solids || [])) {
       if ((e.zTop ?? 0) < zHere + 0.2) continue;                 // driven over, not into
-      if (!pointInRing([this.p[0], this.p[1]], e.footprint)) continue;
       // Only a step that ENTERS a solid is refused. If the rig is already
       // inside — spawned there, or the wall was built around it — every
       // direction would be refused and it would be walled in forever; the way
       // OUT must stay open. A door that only opens inward is a trap.
-      if (pointInRing([px, py], e.footprint)) continue;          // escaping: allowed
+      const wasInside = pointInRing([px, py], e.footprint);
+      if (wasInside) continue;                                   // escaping: allowed
+      const from = [px, py], to = [this.p[0], this.p[1]];
+      const crossed = stepHitsRing(from, to, e.footprint);
+      if (!crossed && !pointInRing(to, e.footprint) && !bodyHitsRing(to, e.footprint)) continue;
       this.p[0] = px; this.p[1] = py;                            // refuse the step
-      if (Math.abs(this.v) > 6) blip(90, 0.12);
-      this.v *= -0.18;                                           // a knock, not a bounce
+      // A WALL IS A WALL, AND SPEED IS THE PRICE. Hitting one should throw you
+      // back and cost you everything you had built up — the old knock read as
+      // sliding into scenery. A hard crash also shoves the body clear so you
+      // are never left grinding against a face you cannot leave.
+      const speed = Math.abs(this.v);
+      if (speed > 12) {
+        this.v = -this.v * 0.5;
+        const back = Math.sign(this.v) * 0.9;                    // shoved off the wall
+        this.p[0] += Math.cos(this.yaw) * back;
+        this.p[1] += Math.sin(this.yaw) * back;
+        this._crashAt = now;                                     // the camera feels it
+        thud('crash');
+      } else if (speed > 4) { this.v = -this.v * 0.34; blip(88, 0.13); }
+      else this.v *= -0.15;
       break;
     }
     const z = g(this.p[0], this.p[1]);
@@ -264,6 +346,47 @@ export const RIG = {
     let d = want - cam.yaw; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
     cam.yaw += d * Math.min(1, 2.4 * dt * Math.min(1, Math.abs(this.v) / 5));
     cam.dist += ((48 + Math.abs(this.v) * 0.7) - cam.dist) * Math.min(1, 3 * dt);
+    // the tyres throw dust when they are working: sliding, or hard on the gas
+    // SCUFF — the black mark a slide leaves ON the ground. Smoke says the
+    // tyres are working; the scuff says where they worked, and it is what
+    // makes a drift satisfying after the fact: you can see the line you took.
+    if (Math.abs(this.slip || 0) > 2.2 && this.jz <= 0 && now - (this._scuffAt || 0) > 26) {
+      this._scuffAt = now;
+      const sc = this._scuff || (this._scuff = []);
+      const cc = Math.cos(this.yaw), ss = Math.sin(this.yaw);
+      for (const sgn of [-1, 1]) {
+        sc.push({ x: this.p[0] - cc * 1.4 - ss * 0.95 * sgn, y: this.p[1] - ss * 1.4 + cc * 0.95 * sgn,
+          z: z + 0.06, yaw: this.yaw, t: now, w: Math.min(1, Math.abs(this.slip) / 9) });
+      }
+      while (sc.length > 260) sc.shift();
+    }
+    // SMOKE, NOT A DUST STORM. Sliding earns it; merely moving does not. One
+    // puff at a time, alternating wheels, and only while the tyres are truly
+    // working — a thin trail you notice rather than a cloud you drive inside.
+    const work = Math.abs(this.slip || 0) * 0.11 + (th > 0 && Math.abs(this.v) > 22 ? 0.5 : 0);
+    if (work > 0.9 && this.jz <= 0 && now - (this._puffAt || 0) > 55) {
+      this._puffAt = now;
+      const dl = this._dust || (this._dust = []);
+      if (dl.length < 34) {
+        const back = -1.5, side = 0.95;
+        const cc = Math.cos(this.yaw), ss = Math.sin(this.yaw);
+        const sgn = (this._puffSide = -(this._puffSide || 1));
+        dl.push({
+          x: this.p[0] + cc * back - ss * side * sgn + (Math.random() - 0.5) * 0.4,
+          y: this.p[1] + ss * back + cc * side * sgn + (Math.random() - 0.5) * 0.4,
+          z: z + 0.1, t: now, p: Math.min(1, (work - 0.9) / 2.2),
+        });
+      }
+    }
+    // A CRASH IS FELT. For a third of a second after a hard impact the eye is
+    // knocked about — the one thing that makes speed mean something, since a
+    // wall that merely stops you teaches nothing about how fast you were going.
+    if (this._crashAt && now - this._crashAt < 320) {
+      const a = (1 - (now - this._crashAt) / 320) * 0.9;
+      cam.target[0] += Math.sin(now * 0.09) * a;
+      cam.target[1] += Math.cos(now * 0.11) * a;
+      cam.target[2] += Math.sin(now * 0.13) * a * 0.5;
+    }
     engine(this.v, true);
     if (speedEl) speedEl.textContent = Math.round(Math.abs(this.v) * 3.6) + ' km/h';
     return true;
@@ -274,8 +397,14 @@ export const RIG = {
     this.r = renderer;
     if (!this.on) { renderer.setDynamic(null); return; }
     const world = this._world; // set by app hook? no — we take ground from cached tick values
-    const p = this.p, yaw = this.yaw, col = this.color;
+    const p = this.p, col = this.color;
     const z = this._z != null ? this._z : 0;
+    // THE BODY LEANS INTO THE SLIDE. Drawing it square to its heading while it
+    // travels sideways is what made fast driving read as sliding a sticker
+    // across a map; a counter-steer of up to ~22° is the whole visual language
+    // of drift, and it costs one angle.
+    const yaw = this.yaw + Math.max(-0.17, Math.min(0.17, (this.slip || 0) * 0.011));
+    const dust = this._dust || (this._dust = []);
     renderer.setDynamic((B) => {
       const c = Math.cos(yaw), s = Math.sin(yaw);
       const cp = Math.cos(this._pitch || 0), sp = Math.sin(this._pitch || 0);
@@ -290,8 +419,60 @@ export const RIG = {
       obox(B, at(-2.02, 0, 0.66), F, Lt, U, 0.06, 0.68, 0.09, [1, 0.3, 0.25]); // tail
       for (const [fx, ly] of [[1.32, 0.94], [1.32, -0.94], [-1.32, 0.94], [-1.32, -0.94]])
         obox(B, at(fx, ly, 0.38), F, Lt, U, 0.42, 0.22, 0.38, dark);     // wheels
+      // the scuff first, so smoke drifts over it
+      const scuff = this._scuff || [];
+      const nowS = performance.now();
+      for (let i = scuff.length - 1; i >= 0; i--) if (nowS - scuff[i].t > 4200) scuff.splice(i, 1);
+      for (const k of scuff) {
+        const age = (nowS - k.t) / 4200;
+        const a = (1 - age) * 0.5 * k.w;
+        const cc = Math.cos(k.yaw) * 0.75, ss = Math.sin(k.yaw) * 0.75;
+        const wx = -Math.sin(k.yaw) * 0.2, wy = Math.cos(k.yaw) * 0.2;
+        const p00 = [k.x - cc - wx, k.y - ss - wy], p10 = [k.x + cc - wx, k.y + ss - wy];
+        const p11 = [k.x + cc + wx, k.y + ss + wy], p01 = [k.x - cc + wx, k.y - ss + wy];
+        const col = [0.10, 0.09, 0.08];
+        B.tri([p00[0], p00[1], k.z], [p10[0], p10[1], k.z], [p11[0], p11[1], k.z], [0, 0, 1], col, a);
+        B.tri([p00[0], p00[1], k.z], [p11[0], p11[1], k.z], [p01[0], p01[1], k.z], [0, 0, 1], col, a);
+      }
+
+      // DUST. Thrown from the rear wheels when the tyres are working — hard
+      // acceleration, or a slide. It is weather in the strictest sense: it
+      // lives in the dynamic pass, is never journaled, and is gone in a second.
+      const nowD = performance.now();
+      for (let i = dust.length - 1; i >= 0; i--) if (nowD - dust[i].t > 900) dust.splice(i, 1);
+      for (const d of dust) {
+        const age = (nowD - d.t) / 900;
+        const r = 0.26 + age * 0.95;                 // smaller, slower bloom
+        const a = (1 - age) * (1 - age) * 0.22 * (0.35 + d.p);   // faint, fading fast
+        const zz = d.z + age * 0.75;
+        const g = 0.6 - age * 0.08;
+        B.tri([d.x - r, d.y - r, zz], [d.x + r, d.y - r, zz], [d.x + r, d.y + r, zz], [0, 0, 1], [g, g - 0.04, g - 0.11], a);
+        B.tri([d.x - r, d.y - r, zz], [d.x + r, d.y + r, zz], [d.x - r, d.y + r, zz], [0, 0, 1], [g, g - 0.04, g - 0.11], a);
+      }
+
+      // MUZZLE FLASH — a shot you can see leaving the gun. A tracer alone
+      // reads as a scratch on the screen; the flash is what makes it fire.
+      const nowF = performance.now();
+      if (this._flashAt && nowF - this._flashAt < 90) {
+        const k = 1 - (nowF - this._flashAt) / 90;
+        obox(B, at(2.5, 0, 0.72), F, Lt, U, 0.5 + k * 0.7, 0.16 + k * 0.3, 0.16 + k * 0.3,
+          [1, 0.86 + k * 0.14, 0.45 + k * 0.4]);
+      }
+      // IMPACT — a burst where the beam landed, so a hit is an event and not
+      // merely an absence where a thing used to be.
+      if (this._burst && nowF - this._burst.t < 260) {
+        const k = 1 - (nowF - this._burst.t) / 260;
+        const bp = this._burst.p, r = (1 - k) * 2.6 + 0.3;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [0.7, 0.7], [-0.7, -0.7]]) {
+          B.tri([bp[0] + dx * r, bp[1] + dy * r, bp[2]],
+            [bp[0] + dx * r * 0.6 - dy * 0.3, bp[1] + dy * r * 0.6 + dx * 0.3, bp[2] + 0.35],
+            [bp[0] + dx * r * 0.6 + dy * 0.3, bp[1] + dy * r * 0.6 - dx * 0.3, bp[2] + 0.35],
+            [0, 0, 1], [1, 0.72, 0.3], k * 0.85);
+        }
+      }
+
       const shots = this._shots || [], nowMs = performance.now();
-      for (let i = shots.length - 1; i >= 0; i--) if (nowMs - shots[i].t > 150) shots.splice(i, 1);
+      for (let i = shots.length - 1; i >= 0; i--) if (nowMs - shots[i].t > 260) shots.splice(i, 1);
       for (const sh of shots) {
         const D = [sh.b[0] - sh.a[0], sh.b[1] - sh.a[1], sh.b[2] - sh.a[2]];
         const len = Math.hypot(D[0], D[1], D[2]) || 1;
@@ -327,15 +508,142 @@ RIG.tick = function (world, cam) {
 const JOY = { x: 0, y: 0, active: false };
 const BTN = { jump: false, fire: false, boost: false };
 
+/**
+ * PRESS A CONTROL BY NAME. The console's menu, palette and line all "pressed"
+ * keys by dispatching KeyboardEvent({key:'f'}) — but the rig listens on
+ * e.code, which a synthetic event of that shape does not carry. So FIRE from
+ * anywhere except the physical F key or the on-screen button silently did
+ * nothing. Speech should not have to imitate a keyboard: it asks for the verb.
+ */
+export function press(name) {
+  if (name === 'fire') { BTN.fire = true; setTimeout(() => { BTN.fire = false; }, 60); return true; }
+  if (name === 'jump') { BTN.jump = true; return true; }
+  if (name === 'boost') { BTN.boost = true; setTimeout(() => { BTN.boost = false; }, 900); return true; }
+  return false;
+}
+
+/**
+ * THE THUD. Effects are not the engine: a drone you did not ask for is noise,
+ * but a shot with no sound is a shot that did not happen. So impacts, hits and
+ * shots speak by default (they are transient and they are FEEDBACK), while the
+ * motor stays silent until asked. Two envelopes stacked — a low body and a
+ * short crack — because a single sine is a beep and a beep is not a weapon.
+ */
+let FX = true;
+try { FX = localStorage.getItem('terrarium.fx') !== 'off'; } catch (_) {}
+export function setEffects(on) {
+  FX = !!on;
+  try { localStorage.setItem('terrarium.fx', on ? 'on' : 'off'); } catch (_) {}
+  return FX;
+}
+export const effectsOn = () => FX;
+
+function ensureAC() {
+  if (!AC && heard) {
+    try {
+      AC = new (window.AudioContext || window.webkitAudioContext)();
+      osc = AC.createOscillator(); osc.type = 'triangle';
+      filt = AC.createBiquadFilter(); filt.type = 'lowpass'; filt.Q.value = 0.7;
+      gainN = AC.createGain(); gainN.gain.value = 0;
+      osc.connect(filt); filt.connect(gainN); gainN.connect(AC.destination); osc.start();
+    } catch (_) {}
+  }
+  if (AC && AC.state === 'suspended') AC.resume();
+  return AC;
+}
+
+/** A layered impact: body + crack + a breath of noise. */
+function thud(kind) {
+  if (!FX || !ensureAC()) return;
+  const t0 = AC.currentTime;
+  const tone = (type, f0, f1, peak, dur, delay = 0) => {
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, t0 + delay);
+    o.frequency.exponentialRampToValueAtTime(Math.max(24, f1), t0 + delay + dur);
+    g.gain.setValueAtTime(0.0001, t0 + delay);
+    g.gain.exponentialRampToValueAtTime(peak, t0 + delay + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + delay + dur);
+    o.connect(g); g.connect(AC.destination);
+    o.start(t0 + delay); o.stop(t0 + delay + dur + 0.02);
+  };
+  const noise = (peak, dur, cut) => {
+    const n = Math.floor(AC.sampleRate * dur);
+    const buf = AC.createBuffer(1, n, AC.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const src = AC.createBufferSource(); src.buffer = buf;
+    const bp = AC.createBiquadFilter(); bp.type = 'lowpass'; bp.frequency.value = cut;
+    const g = AC.createGain(); g.gain.value = peak;
+    src.connect(bp); bp.connect(g); g.connect(AC.destination);
+    src.start(t0);
+  };
+  if (kind === 'shot') { tone('square', 320, 90, 0.05, 0.09); noise(0.05, 0.09, 2600); }
+  else if (kind === 'hit') { tone('triangle', 150, 42, 0.10, 0.34); noise(0.10, 0.22, 900); tone('sawtooth', 90, 30, 0.05, 0.26, 0.01); }
+  else if (kind === 'crash') { tone('triangle', 110, 34, 0.12, 0.42); noise(0.13, 0.3, 700); }
+  else if (kind === 'land') { tone('triangle', 90, 40, 0.05, 0.16); noise(0.04, 0.1, 500); }
+}
+
 function blip(freq, dur) {
   try {
-    if (!AC) return;
+    if (!AC || !soundOn) return;
     const o = AC.createOscillator(), g2 = AC.createGain();
-    o.type = 'square'; o.frequency.value = freq; g2.gain.value = 0.055;
+    // a square wave is the other insect; a triangle at a third the level
+    // still reads as an impact without drilling into the ear
+    o.type = 'triangle'; o.frequency.value = freq; g2.gain.value = 0.018;
     o.connect(g2); g2.connect(AC.destination); o.start();
     g2.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + dur);
     o.stop(AC.currentTime + dur + 0.02);
   } catch (_) {}
+}
+
+/** Do the segments a→b and c→d cross? The test a moving body needs. */
+function segCross(a, b, c, d) {
+  const s1x = b[0] - a[0], s1y = b[1] - a[1];
+  const s2x = d[0] - c[0], s2y = d[1] - c[1];
+  const den = -s2x * s1y + s1x * s2y;
+  if (Math.abs(den) < 1e-9) return false;
+  const s = (-s1y * (a[0] - c[0]) + s1x * (a[1] - c[1])) / den;
+  const t = (s2x * (a[1] - c[1]) - s2y * (a[0] - c[0])) / den;
+  return s >= 0 && s <= 1 && t >= 0 && t <= 1;
+}
+
+/**
+ * Does the step from a to b cross this wall? A CENTRE POINT INSIDE A FOOTPRINT
+ * IS NOT A COLLISION TEST: at 46 m/s a frame moves the rig ~0.75 m and a panel
+ * is 0.4 m thick, so the body arrived on the far side without ever having its
+ * centre inside — which is exactly what "we go into walls" looked like. The
+ * step is a segment, so the wall is asked whether the segment crossed it, and
+ * the answer is the same at any speed.
+ */
+function stepHitsRing(a, b, ring) {
+  for (let i = 0; i < ring.length; i++) {
+    if (segCross(a, b, ring[i], ring[(i + 1) % ring.length])) return ring[i];
+  }
+  return null;
+}
+
+/** Distance from point p to segment a→b — the rig has a body, not a pinprick. */
+function distToSeg(p, a, b) {
+  const vx = b[0] - a[0], vy = b[1] - a[1];
+  const wx = p[0] - a[0], wy = p[1] - a[1];
+  const L = vx * vx + vy * vy;
+  const t = L < 1e-9 ? 0 : Math.max(0, Math.min(1, (wx * vx + wy * vy) / L));
+  return Math.hypot(p[0] - (a[0] + vx * t), p[1] - (a[1] + vy * t));
+}
+
+/**
+ * THE RIG IS 2.6 m LONG AND 1.6 m WIDE, and it was colliding as a single
+ * point at its centre — so its nose and flanks slid visibly INTO walls before
+ * anything stopped, which is exactly what "we go into walls" looks like. The
+ * body is now a disc: a wall is hit when any edge comes within its radius.
+ */
+const BODY_R = 1.25;
+function bodyHitsRing(to, ring) {
+  for (let i = 0; i < ring.length; i++) {
+    if (distToSeg(to, ring[i], ring[(i + 1) % ring.length]) < BODY_R) return true;
+  }
+  return false;
 }
 
 function pointInRing(p, ring) {
@@ -354,7 +662,8 @@ function fire(rig, world) {
   // one index query, not 20: sweep candidates near the line, take the first the ray meets
   let cands = [];
   try { cands = world.near([rig.p[0] + c * 24, rig.p[1] + s * 24], 26).map(h => h.entity); } catch (_) {}
-  for (let d = 4; d <= 46 && !hitE; d += 3) {
+  // a fine step, because a panel is 0.4 m thick and a 3 m stride shot past it
+  for (let d = 2.5; d <= 46 && !hitE; d += 1.1) {
     const x = rig.p[0] + c * d, y = rig.p[1] + s * d;
     for (const e of cands) {
       if (!e || e.type === 'terrain' || !e.footprint) continue;
@@ -362,15 +671,16 @@ function fire(rig, world) {
       if (pointInRing([x, y], e.footprint)) { hitP = [x, y, z0]; hitE = e; break; }
     }
   }
-  rig._shots.push({ a, b: hitP || [rig.p[0] + c * 46, rig.p[1] + s * 46, z0], t: performance.now() });
-  blip(780, 0.05);
+  const end = hitP || [rig.p[0] + c * 46, rig.p[1] + s * 46, z0];
+  rig._shots.push({ a, b: end, t: performance.now(), hit: !!hitE });
+  rig._flashAt = performance.now();                       // muzzle
+  if (hitE) rig._burst = { p: end, t: performance.now() };  // impact
+  thud('shot');
   if (hitE) {
     try {
       world.removeEntity(hitE.id, { label: 'shot away: ' + (hitE.name || hitE.type) });
       if (!fire._pending) { fire._pending = true; requestAnimationFrame(() => { fire._pending = false; dispatchEvent(new CustomEvent('rig:worldchanged')); }); }
-      hint('⚡ ' + (hitE.name || hitE.type).toUpperCase() + ' SHOT AWAY — undo restores it');
-      setTimeout(() => { if (RIG.on) hint('DRIVE · W/S · A/D · Space jump · F fire · Shift boost · V dismount'); }, 1700);
-      blip(140, 0.14);
+      thud('hit');
     } catch (_) {}
   }
 }
@@ -407,7 +717,15 @@ function chrome(rig) {
   chromeEl.appendChild(pad);
   // JUMP / FIRE / BOOST — bottom-right cluster, unset's colours
   const cluster = document.createElement('div');
-  cluster.style.cssText = 'position:absolute;right:22px;bottom:96px;display:flex;align-items:flex-end;gap:14px;pointer-events:auto;';
+  // The action cluster used to sit on top of the plan — two instruments in one
+  // corner, the map unreadable behind three buttons. The right edge belongs to
+  // the plan and its meter; the actions take the middle-bottom, beside them.
+  // the action buttons hug the map column too — thumb-reachable on a phone,
+  // and the centre of the screen stays the world
+  // above the plan, hugging the same column — thumb-reachable, centre clear.
+  // When the RING is mounted these become the ring's arcs and this is hidden.
+  cluster.id = 'rig-actions';
+  cluster.style.cssText = 'position:absolute;right:14px;bottom:302px;display:flex;align-items:flex-end;gap:10px;pointer-events:auto;';
   const mk = (label, size, border, colr, down, up) => {
     const b = document.createElement('button');
     b.textContent = label;
