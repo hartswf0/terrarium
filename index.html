@@ -175,9 +175,31 @@ main { position: fixed; inset: 0; z-index: 2; pointer-events: none; }
 .say .mic { color: var(--cyan); font-size: 15px; }
 .say .mic.listening { background: var(--cyan); color: var(--panel); }
 .say .send { background: var(--cyan); color: var(--panel); font-size: 18px; }
-.doors { display: flex; justify-content: center; gap: 20px; margin-top: 10px; }
-.doors a { color: rgba(24, 33, 39, .64); font-size: 7px; font-weight: 700; letter-spacing: .12em; text-decoration: none; text-transform: uppercase; }
-.doors a:hover { color: var(--panel); }
+/* THE DOORS LEAD. They were 7px of grey typography UNDER a 64px dark slab —
+   the only ways into the work, whispered beneath the thing that shouts. They
+   now sit ABOVE the say bar as real targets: readable, bordered, thumb-sized,
+   with the engine itself taking the lead. */
+.doors { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 0 0 10px; }
+.doors .door {
+  display: inline-flex; align-items: center; gap: 7px;
+  min-height: 40px; padding: 0 16px;
+  border: 1px solid rgba(24, 33, 39, .28);
+  background: rgba(237, 244, 242, .82);
+  color: var(--panel);
+  font-size: 10px; font-weight: 700; letter-spacing: .14em;
+  text-decoration: none; text-transform: uppercase; white-space: nowrap;
+  transition: background .16s, color .16s, border-color .16s, transform .16s;
+}
+.doors .door b { font-weight: 700; opacity: .5; }
+.doors .door:hover { background: var(--panel); color: var(--glass); border-color: var(--panel); transform: translateY(-1px); }
+.doors .door:hover b { opacity: 1; }
+.doors .door.primary {
+  background: var(--cyan); border-color: var(--cyan); color: var(--panel);
+  box-shadow: 0 8px 22px rgba(24, 33, 39, .22);
+}
+.doors .door.primary:hover { background: var(--panel); color: var(--cyan); border-color: var(--panel); }
+.doors .door.quiet { background: transparent; color: rgba(24, 33, 39, .66); }
+.doors .door.quiet:hover { background: rgba(24, 33, 39, .08); color: var(--panel); }
 
 @media (max-width: 700px) {
   .wash { background: linear-gradient(180deg, rgba(191, 223, 242, .72) 0, rgba(191, 223, 242, .32) 34%, transparent 55%); }
@@ -193,8 +215,13 @@ main { position: fixed; inset: 0; z-index: 2; pointer-events: none; }
   .dock-meta { margin-bottom: 6px; font-size: 6px; }
   .say { min-height: 58px; grid-template-columns: 1fr 50px 50px; }
   .say input { padding-inline: 14px; font-size: 10px; }
-  .doors { justify-content: space-between; padding: 0 3px; gap: 8px; }
-  .doors a { font-size: 6px; }
+  .doors {
+    flex-wrap: nowrap; justify-content: flex-start; gap: 6px; margin-bottom: 8px;
+    overflow-x: auto; scrollbar-width: none; padding-bottom: 2px;
+    -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent);
+  }
+  .doors::-webkit-scrollbar { display: none; }
+  .doors .door { min-height: 38px; padding: 0 13px; font-size: 9px; flex: 0 0 auto; }
 }
 
 @media (max-width: 350px) {
@@ -230,17 +257,17 @@ main { position: fixed; inset: 0; z-index: 2; pointer-events: none; }
 
 <div class="dock">
   <div class="dock-meta"><b>Hablando me creo.</b><span>Drag to inspect</span></div>
+  <nav class="doors" aria-label="Enter TERRARIUM">
+    <a class="door primary" href="TERRARIUM.html">Drive the ground <b>↗</b></a>
+    <a class="door" href="unset-04-hartsoe-iii.html">Live vessel <b>↗</b></a>
+    <a class="door" href="unset-04-hartsoe-jr.html">JR <b>↗</b></a>
+    <a class="door quiet" href="https://github.com/hartswf0/terrarium">Source <b>↗</b></a>
+  </nav>
   <form class="say" id="say">
     <input id="sayInput" name="say" type="text" maxlength="120" autocomplete="off" enterkeyhint="send" placeholder="Say something to the world…" aria-label="Say something to the world">
     <button class="mic" id="mic" type="button" aria-label="Speak to the world">●</button>
     <button class="send" type="submit" aria-label="Send words into the world">↑</button>
   </form>
-  <nav class="doors" aria-label="Enter TERRARIUM">
-    <a href="TERRARIUM.html">Ground ↗</a>
-    <a href="unset-04-hartsoe-iii.html">Live vessel ↗</a>
-    <a href="unset-04-hartsoe-jr.html">JR ↗</a>
-    <a href="https://github.com/hartswf0/terrarium">Source ↗</a>
-  </nav>
 </div>
 
 <script type="module">
