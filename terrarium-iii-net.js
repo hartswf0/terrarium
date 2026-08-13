@@ -26,6 +26,8 @@
   let closing = false;
   let iceServers = FALLBACK_ICE;
   let roster = new Map();
+  let runtimeConfig = { url: '', key: '' };
+  let configPersistence = 'none';
   const links = new Map();
   const chunks = new Map();
   const listeners = new Map();
@@ -50,12 +52,42 @@
     return prefix + Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
   }
   function cleanRoom(value) { return String(value || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64); }
+
+  function browserStorage(name) {
+    try { return global[name] || null; } catch (_) { return null; }
+  }
+  function storageGet(storage, key) {
+    try { return storage?.getItem(key) || ''; } catch (_) { return ''; }
+  }
+  function storageSet(storage, key, value) {
+    try {
+      if (!storage) return false;
+      storage.setItem(key, value);
+      return true;
+    } catch (err) {
+      console.warn('[III] storage unavailable for ' + key + '; signal setup stays usable in memory', err);
+      return false;
+    }
+  }
+  function storageRemove(storage, key) {
+    try { storage?.removeItem(key); } catch (_) {}
+  }
   function config() {
     const builtInUrl = document.querySelector('meta[name="terrarium-supabase-url"]')?.content || '';
     const builtInKey = document.querySelector('meta[name="terrarium-supabase-key"]')?.content || '';
+    const local = browserStorage('localStorage');
+    const session = browserStorage('sessionStorage');
+    const localUrl = storageGet(local, STORE_URL);
+    const localKey = storageGet(local, STORE_KEY);
+    const sessionUrl = storageGet(session, STORE_URL);
+    const sessionKey = storageGet(session, STORE_KEY);
+    const persistence = runtimeConfig.url && runtimeConfig.key
+      ? configPersistence
+      : (localUrl && localKey ? 'local' : (sessionUrl && sessionKey ? 'session' : (builtInUrl && builtInKey ? 'built-in' : 'none')));
     return {
-      url: (localStorage.getItem(STORE_URL) || builtInUrl).trim().replace(/\/+$/, ''),
-      key: (localStorage.getItem(STORE_KEY) || builtInKey).trim()
+      url: (runtimeConfig.url || localUrl || sessionUrl || builtInUrl).trim().replace(/\/+$/, ''),
+      key: (runtimeConfig.key || localKey || sessionKey || builtInKey).trim(),
+      persistence
     };
   }
   function keyIsSecret(key) {
@@ -74,15 +106,38 @@
     if (!/^https?:\/\//i.test(url)) throw new Error('SUPABASE PROJECT URL REQUIRED');
     if (key.length < 20) throw new Error('SUPABASE ANON / PUBLISHABLE KEY REQUIRED');
     if (keyIsSecret(key)) throw new Error('SECRET / SERVICE-ROLE KEY BLOCKED — COPY THE PUBLISHABLE KEY');
+
+    runtimeConfig = { url, key };
+    configPersistence = 'memory';
+
     if (persist) {
-      localStorage.setItem(STORE_URL, url);
-      localStorage.setItem(STORE_KEY, key);
+      const local = browserStorage('localStorage');
+      const session = browserStorage('sessionStorage');
+      const localUrlOk = storageSet(local, STORE_URL, url);
+      const localKeyOk = storageSet(local, STORE_KEY, key);
+      if (localUrlOk && localKeyOk) {
+        configPersistence = 'local';
+        storageRemove(session, STORE_URL);
+        storageRemove(session, STORE_KEY);
+      } else {
+        storageRemove(local, STORE_URL);
+        storageRemove(local, STORE_KEY);
+        const sessionUrlOk = storageSet(session, STORE_URL, url);
+        const sessionKeyOk = storageSet(session, STORE_KEY, key);
+        configPersistence = sessionUrlOk && sessionKeyOk ? 'session' : 'memory';
+      }
     }
-    return { url, key };
+    return { url, key, persistence: configPersistence };
   }
   function clearConfig() {
-    localStorage.removeItem(STORE_URL);
-    localStorage.removeItem(STORE_KEY);
+    runtimeConfig = { url: '', key: '' };
+    configPersistence = 'none';
+    const local = browserStorage('localStorage');
+    const session = browserStorage('sessionStorage');
+    storageRemove(local, STORE_URL);
+    storageRemove(local, STORE_KEY);
+    storageRemove(session, STORE_URL);
+    storageRemove(session, STORE_KEY);
   }
 
   async function getIceServers() {
@@ -220,8 +275,6 @@
     if (role !== 'host' || id === peerId) return links.get(id);
     const existing = links.get(id);
     if (existing) {
-      // A guest can appear in Presence a few milliseconds after the first offer
-      // passed it. HELLO asks the host to repeat that same introduction.
       if (!existing.open && existing.pc.localDescription) {
         await signal({ kind: 'offer', sdp: existing.pc.localDescription.toJSON() }, id);
       }
@@ -240,8 +293,6 @@
 
   async function acceptOffer(from, sdp) {
     if (role === 'host') return;
-    // The first addressed offer establishes the host even if it races the
-    // initial Presence sync. Subsequent offers must come from that same host.
     if (!hostId) { hostId = from; sawHost = true; }
     if (from !== hostId) return;
     const prior = links.get(from);
@@ -499,6 +550,7 @@
     stats() {
       return {
         ...metrics, room, peerId, role, peers: publicRoster(),
+        signalConfigPersistence: config().persistence,
         connections: Array.from(links.values()).map(link => ({
           peerId: link.id,
           connection: link.pc.connectionState,
@@ -511,8 +563,6 @@
     }
   };
 
-  // A host invite carries only browser-public configuration in its fragment.
-  // Consuming it here makes scan → ritual → join a one-tap path for guests.
   try {
     const invite = new URLSearchParams(location.hash.replace(/^#/, ''));
     const inviteUrl = invite.get('sb');
