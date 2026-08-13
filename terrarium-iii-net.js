@@ -891,3 +891,7 @@
     console.warn('[III] invite signal configuration rejected', err);
   }
 })(window);
+
+// Durable artifact persistence is a sidecar, never a prerequisite for III_NET.
+// Dynamic import keeps its auth/database failures isolated from the live vessel.
+import('./terrarium-iii-store.js').catch(err => console.warn('[III STORE] sidecar unavailable', err));
