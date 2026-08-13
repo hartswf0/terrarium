@@ -22174,6 +22174,11 @@ resetDrive(); requestAnimationFrame(frame);
     '  doors are at least 3 ft wide and land on a deck, slab or stair; a raised floor gets stairs to grade;',
     '  wall head heights equal the roof low edge; label every room; nothing floats.',
     'Keep it under 90 statements.',
+  'EVERY number you pass must be a FINITE value in feet — define every variable before use.',
+  'A single undefined variable becomes NaN geometry and the whole draft is rejected.',
+  'The kit is RECTILINEAR: there are no curved primitives. A round or circular plan must be',
+  'approximated as a polygon of 8–12 short straight walls (compute the corner coordinates',
+  'first as consts, then run wall/room segments between them).',
   ].join('\n');
   async function generateHouse(promptText) {
     let mod;
@@ -22210,11 +22215,37 @@ resetDrive(); requestAnimationFrame(frame);
       const g0 = new THREE.Group();
       const before = kit.CRITIC.length;
       kit.setCUR('GENERATED');
+      // the kit was written for authored code and trusts its caller — model
+      // arithmetic must not get that trust. Any non-finite numeric argument
+      // fails HERE, by name, and the message becomes the retry lesson.
+      const guarded = {};
+      for (const k of Object.keys(kit.api)) {
+        const v = kit.api[k];
+        guarded[k] = (typeof v === 'function') ? function (...args) {
+          for (let i = 0; i < args.length; i++)
+            if (typeof args[i] === 'number' && !Number.isFinite(args[i]))
+              throw new Error(k + '(): argument ' + (i + 1) + ' is ' + args[i]
+                + ' — an undefined or miscomputed variable reached the kit; every number must be finite feet');
+          return v.apply(this, args);
+        } : v;
+      }
       try {
         new Function('g', 'A',
           'const {mbox,wall,room,shed,gable,stairs,deck,flue,door,pier,kitchen,bathset,bed,sofa,dine,floorSlab,part,core,mudroom,roomLabel,M} = A;\n'
-          + code)(g0, kit.api);
+          + code)(g0, guarded);
       } catch (e) { lastFails = 'runtime error: ' + e.message; continue; }
+      // absolute backstop: nothing with a NaN vertex may reach the land
+      let nanPieces = 0;
+      g0.traverse((o) => {
+        if (!o.isMesh || !o.geometry || !o.geometry.attributes.position) return;
+        const a = o.geometry.attributes.position.array;
+        for (let i = 0; i < a.length; i++) if (!Number.isFinite(a[i])) { nanPieces++; break; }
+      });
+      if (nanPieces) {
+        lastFails = nanPieces + ' pieces came out with NaN geometry — some dimension was undefined or'
+          + ' miscomputed. Compute all coordinates as consts first, then build; finite feet only.';
+        continue;
+      }
       const fails = kit.CRITIC.slice(before).filter((c) => !c.pass);
       if (fails.length) { lastFails = fails.map((c) => c.name + ': ' + c.detail).join('\n'); continue; }
       if (!g0.children.length) { lastFails = 'the group g is empty — nothing was built'; continue; }
@@ -22227,6 +22258,7 @@ resetDrive(); requestAnimationFrame(frame);
     return null;
   }
   window.generateHouse = generateHouse;
+  window.__depotModule = depotModule;
   // ── WHAT GETS BUILT ON REAL LAND ─────────────────────────────────────────
   // Two changes to the game's own generator, both aimed at the same thing:
   // stop producing props. (1) A prompt that names a BUILDING is routed to the
