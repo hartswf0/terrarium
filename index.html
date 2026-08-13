@@ -248,6 +248,14 @@ body { overflow: visible !important; height: auto; }
 #world { position: fixed; inset: 0; z-index: 0; }
 .wash, .grain { position: fixed; }
 main { position: relative; z-index: 20; }
+/* THE PAGE WAS UNCLICKABLE. In the old locked-viewport design <main> was a
+   pass-through overlay (pointer-events:none) so you could drag the world
+   through it — with the whole story now living inside <main>, that made every
+   link dead and left the say bar as the only thing on the page you could
+   touch. The gaps still pass through to the world; the CONTENT does not. */
+main { pointer-events: none; }
+main .card, main .cta, main .door, main .lede, main .grid, main .work,
+main .worksHead, main .foot, main h1, main .spoken { pointer-events: auto; }
 .chapter {
   position: relative; min-height: 100vh; display: flex; flex-direction: column;
   justify-content: center; padding: 96px max(24px, 5vw) 120px;
@@ -294,6 +302,11 @@ main { position: relative; z-index: 20; }
   background: var(--panel); color: var(--cyan); padding: 1px 7px;
   font-size: 12px; letter-spacing: .04em;
 }
+.said {
+  margin: 14px 0 0; padding-top: 12px; border-top: 1px solid rgba(24,33,39,.14);
+  color: rgba(24,33,39,.62); font-size: 11px; letter-spacing: .04em;
+}
+.said b { color: var(--panel); }
 .tag { color: var(--panel); font-size: 8px; font-weight: 700; letter-spacing: .3em; }
 
 /* ══ THE INDEX ══ the part that grows as works come online ══ */
@@ -366,7 +379,7 @@ main { position: relative; z-index: 20; }
   </section>
 
   <!-- CHAPTERS 1–3 · what it is, told against the world behind them -->
-  <section class="chapter" id="ch-ground" data-yaw="1.05" data-pitch=".46" data-night="0">
+  <section class="chapter" id="ch-ground" data-yaw="1.05" data-pitch=".46" data-night="0" data-say="a path here">
     <div class="card">
       <span class="tag">THE GROUND</span>
       <h2>Real places, at their real size.</h2>
@@ -374,10 +387,11 @@ main { position: relative; z-index: 20; }
         buildings arrive as one window you can drive across. Ask for more than a
         neighbourhood and it lands a pack of adjacent windows instead — you cross
         between them at the seams, and your deeds travel with you.</p>
+      <p class="said">↓ this page just said <b>“a path here”</b> — look behind it.</p>
     </div>
   </section>
 
-  <section class="chapter" id="ch-gate" data-yaw="2.2" data-pitch=".8" data-night="0">
+  <section class="chapter" id="ch-gate" data-yaw="2.2" data-pitch=".8" data-night="0" data-say="a house here">
     <div class="card">
       <span class="tag">THE GATE</span>
       <h2>The world interrogates the act.</h2>
@@ -385,10 +399,11 @@ main { position: relative; z-index: 20; }
         is refused by name; one that blocks a right of way is refused for blocking it;
         anything else steps clear and says how far it moved. Every commitment carries
         its cause, and undo means it.</p>
+      <p class="said">↓ it just said <b>“a house here”</b>. The house is there now.</p>
     </div>
   </section>
 
-  <section class="chapter" id="ch-atlas" data-yaw="3.4" data-pitch=".52" data-night="1">
+  <section class="chapter" id="ch-atlas" data-yaw="3.4" data-pitch=".52" data-night="1" data-say="night">
     <div class="card">
       <span class="tag">THE ATLAS · UNSETTLED 05</span>
       <h2>A place can stop being questioned.</h2>
@@ -396,11 +411,12 @@ main { position: relative; z-index: 20; }
         breaking ground, building, testifying and unsettling lower it. <b>Unsettle</b>
         swaps the standing arrangement for its alternative and keeps the given one on
         a branch — remembered, not inevitable.</p>
+      <p class="said">↓ it just said <b>“night”</b>.</p>
     </div>
   </section>
 
   <!-- CHAPTER 4 · THE INDEX. This is the part that grows. -->
-  <section class="chapter works" id="works" data-yaw="4.5" data-pitch=".7" data-night="0">
+  <section class="chapter works" id="works" data-yaw="4.5" data-pitch=".7" data-night="0" data-say="day">
     <div class="worksHead">
       <span class="tag">THE WORKS</span>
       <h2>Ways in.</h2>
@@ -763,6 +779,34 @@ const chapters = [...document.querySelectorAll('.chapter')];
 let wantYaw = 0, wantPitch = .62, wantNight = 0, current = null;
 
 
+// A WORD MAKES THE WORLD, AND SCROLLING IS HOW YOU WATCH IT HAPPEN.
+// Each chapter carries the word it says. Entering it types that word into the
+// line and speaks it into the world behind the page — so the claim in the
+// heading is not described, it is performed, and by the time you reach the
+// works you have already seen language do the thing.
+function utter(word) {
+  if (!word) return;
+  const input = document.querySelector('#sayInput');
+  // never take the line out of someone's hands: if they are typing, the page
+  // speaks straight into the world instead of over their sentence
+  if (input && (document.activeElement === input || input.value.trim())) {
+    speakIntoWorld(word);
+    return;
+  }
+  if (input) {
+    input.value = '';
+    let i = 0;
+    clearInterval(utter._t);
+    utter._t = setInterval(() => {
+      input.value = word.slice(0, ++i);
+      if (i >= word.length) {
+        clearInterval(utter._t);
+        setTimeout(() => { speakIntoWorld(word); input.value = ''; }, 260);
+      }
+    }, 34);
+  } else speakIntoWorld(word);
+}
+
 function enter(c) {
   if (!c || c === current) return;
   current = c;
@@ -770,6 +814,7 @@ function enter(c) {
   wantYaw = parseFloat(c.dataset.yaw || 0);
   wantPitch = parseFloat(c.dataset.pitch || .62);
   wantNight = parseFloat(c.dataset.night || 0);
+  if (c.dataset.say && !c.dataset.said) { c.dataset.said = '1'; utter(c.dataset.say); }
 }
 // THE STORY IS READ FROM THE RENDER LOOP, not from a scroll event and not
 // from an observer. Either can be silenced — a scroll listener hears nothing
