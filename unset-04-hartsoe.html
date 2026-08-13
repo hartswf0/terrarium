@@ -22159,27 +22159,203 @@ resetDrive(); requestAnimationFrame(frame);
   // rules pass — riser ranges, gutters on the low edge, the fire keeping
   // common company. Fail twice and the draft is refused, with reasons.
   const HOUSE_CONTRACT = [
-    'You design ONE small building as JavaScript statements (no function wrapper, no imports, no markdown fences).',
-    'Units are FEET. Frame: x along the plan, y across (y=0 is the south face), z up. Everything attaches to the group `g`.',
-    'Use ONLY these functions, exactly as the worked examples do:',
-    '  mbox(x0,x1,y0,y1,z0,z1,mat,tile) — a box; mats: M.siding M.roof M.masonry M.concrete M.timber M.steel M.glass',
-    '  room(g,x0,x1,y0,y1,z0,z1,{s,n,w,e}) — openings are [a0,a1,sill,head]; a DOOR adds a 5th element: "d"',
-    '  shed(g,x0,x1,y0,y1,zLo,zHi,oh,grade) / gable(g,x0,x1,y0,y1,zEave,zRidge,oh,grade) — roofs with real eaves',
-    '  stairs(g,{x,y,zTop,zBot,grade,heading:"N|S|E|W",width}) — risers derived, never authored',
-    '  deck(g,x0,x1,y0,y1,z,grade,{gap:[a,b]}|false) · floorSlab(g,x0,x1,y0,y1,z) · part(g,dir,a0,a1,b,z0,z1,[[gapA,gapB]])',
-    '  flue(g,x,y,zBase,zTop,w) · kitchen(g,x0,x1,yWall,z0) · bathset(g,x,y,z0) · bed(g,x,y,z0) · sofa(g,x,y,z0,len)',
-    '  dine(g,x,y,z0) · core(g,x0,x1,y0,y1,z0,z1,dir) · mudroom(g,xa,xb,yFace,z0,headZ) · roomLabel(g,text,x,y,z)',
-    'HARD RULES (machine-checked; the draft is rejected on failure):',
-    '  the flue sits in a COMMON room (living/study/hall) — never a bed or bath;',
-    '  doors are at least 3 ft wide and land on a deck, slab or stair; a raised floor gets stairs to grade;',
-    '  wall head heights equal the roof low edge; label every room; nothing floats.',
-    'Keep it under 90 statements.',
-  'EVERY number you pass must be a FINITE value in feet — define every variable before use.',
-  'A single undefined variable becomes NaN geometry and the whole draft is rejected.',
-  'The kit is RECTILINEAR: there are no curved primitives. A round or circular plan must be',
-  'approximated as a polygon of 8–12 short straight walls (compute the corner coordinates',
-  'first as consts, then run wall/room segments between them).',
+    'You are an architect. Respond with ONE JSON object only — no prose, no markdown, no code.',
+    'You do NOT write geometry. You declare a PLAN; a deterministic compiler derives every wall,',
+    'door, window, slab, roof and fixture. Translate ANY request into this massing language:',
+    '{ "name": "…", "wallZ": 9,',
+    '  "rooms": [ {"id":"living","use":"living","rect":[x0,y0,x1,y1]}, … ],',
+    '  "entry": {"room":"living","side":"S"},',
+    '  "doors": [{"from":"living","to":"bed1"}, …],',
+    '  "roof": {"type":"gable","rise":4.5,"overhang":1.5},',
+    '  "deck": {"side":"S","depth":8},',
+    '  "fireplace": "living" }',
+    'Units are FEET. roof.type: gable | shed | flat. uses: living kitchen dining bed bath study hall mud porch.',
+    'doors, deck and fireplace are optional — doorways are derived from adjacency when omitted.',
+    'RULES the compiler enforces (a broken plan is rejected with the reason):',
+    '  rooms are rectangles that TILE the footprint — they share edges of 4 ft or more, never overlap;',
+    '  every room needs a doorway path back to the entry room; the entry side must face outdoors;',
+    '  a bath is at least 20 sq ft, other rooms at least 48; fireplaces live in common rooms only.',
+    'Fanciful shapes are translated into massing, keeping the SPIRIT: a round cabin becomes a square',
+    'core with a bump-out on each side; a tower becomes a compact footprint; a courtyard house is a',
+    'ring of rooms. Anything lived-in gets a kitchen, a bath, and bedrooms of 10x10 or more.',
+    'Example — "a small lake cabin":',
+    '{"name":"LAKE CABIN","wallZ":9,',
+    ' "rooms":[{"id":"living","use":"living","rect":[0,0,16,14]},{"id":"kit","use":"kitchen","rect":[16,0,28,8]},',
+    '          {"id":"bed","use":"bed","rect":[16,8,28,14]},{"id":"bath","use":"bath","rect":[10,14,16,19]},',
+    '          {"id":"hall","use":"hall","rect":[0,14,10,19]}],',
+    ' "entry":{"room":"living","side":"S"},"roof":{"type":"gable","rise":5,"overhang":1.5},',
+    ' "deck":{"side":"S","depth":8},"fireplace":"living"}',
   ].join('\n');
+  // ── THE PLAN COMPILER ──────────────────────────────────────────────────────
+  // The model no longer writes geometry code. It declares a PLAN — rooms as
+  // rectangles with uses, an entry, a roof — and this compiler derives every
+  // wall run, partition, opening, slab, roof and fixture deterministically
+  // through the kit. The model composes; the compiler computes. A prompt the
+  // schema can't express gets translated into massing by the model, and the
+  // worst possible outcome is a dull valid house — never broken geometry.
+  function compileHousePlan(plan, kit, g) {
+    const A = kit.api, M = A.M;
+    const oops = (m) => { throw new Error(m); };
+    const num = (v, lo, hi, what) => {
+      if (typeof v !== 'number' || !Number.isFinite(v)) oops(what + ' must be a finite number, got ' + v);
+      if (v < lo || v > hi) oops(what + ' = ' + v + ' is outside ' + lo + '..' + hi);
+      return v;
+    };
+    if (!plan || typeof plan !== 'object') oops('the plan is not an object');
+    const wallZ = num(plan.wallZ === undefined ? 9 : plan.wallZ, 7, 14, 'wallZ');
+    const T = 0.7, EPS = 0.05;
+    // ── rooms: normalized, finite, sized, non-overlapping ──
+    if (!Array.isArray(plan.rooms) || !plan.rooms.length) oops('rooms must be a non-empty array');
+    if (plan.rooms.length > 14) oops('at most 14 rooms');
+    const USES = ['living', 'kitchen', 'dining', 'bed', 'bath', 'study', 'hall', 'mud', 'porch'];
+    const rooms = plan.rooms.map((r, i) => {
+      if (!r || !Array.isArray(r.rect) || r.rect.length !== 4) oops('room ' + i + ' needs rect:[x0,y0,x1,y1]');
+      const [a, b, c, d] = r.rect.map((v, j) => num(v, -200, 200, 'room ' + i + ' rect[' + j + ']'));
+      const x0 = Math.min(a, c), x1 = Math.max(a, c), y0 = Math.min(b, d), y1 = Math.max(b, d);
+      const use = USES.includes(r.use) ? r.use : 'hall';
+      const minA = use === 'bath' ? 20 : 48;
+      if ((x1 - x0) < 4 || (y1 - y0) < 4) oops('room ' + (r.id || i) + ' is under 4 ft in one direction');
+      if ((x1 - x0) * (y1 - y0) < minA) oops('room ' + (r.id || i) + ' is under ' + minA + ' sq ft');
+      return { id: String(r.id || use + i), use, x0, x1, y0, y1 };
+    });
+    const ids = new Set();
+    rooms.forEach((r) => { if (ids.has(r.id)) oops('duplicate room id ' + r.id); ids.add(r.id); });
+    for (let i = 0; i < rooms.length; i++) for (let j = i + 1; j < rooms.length; j++) {
+      const p = rooms[i], q = rooms[j];
+      const ox = Math.min(p.x1, q.x1) - Math.max(p.x0, q.x0), oy = Math.min(p.y1, q.y1) - Math.max(p.y0, q.y0);
+      if (ox > EPS && oy > EPS) oops('rooms ' + p.id + ' and ' + q.id + ' overlap — rooms must tile, not stack');
+    }
+    // ── adjacency: shared edges ≥ 3.4 ft; the footprint must be one building ──
+    const shared = [];   // {a,b,dir,lo,hi,at}  dir 'x': runs along x at y=at
+    for (let i = 0; i < rooms.length; i++) for (let j = i + 1; j < rooms.length; j++) {
+      const p = rooms[i], q = rooms[j];
+      const ox0 = Math.max(p.x0, q.x0), ox1 = Math.min(p.x1, q.x1);
+      const oy0 = Math.max(p.y0, q.y0), oy1 = Math.min(p.y1, q.y1);
+      if (Math.abs(p.y1 - q.y0) < EPS && ox1 - ox0 >= 3.4) shared.push({ a: p, b: q, dir: 'x', lo: ox0, hi: ox1, at: p.y1 });
+      else if (Math.abs(q.y1 - p.y0) < EPS && ox1 - ox0 >= 3.4) shared.push({ a: q, b: p, dir: 'x', lo: ox0, hi: ox1, at: q.y1 });
+      else if (Math.abs(p.x1 - q.x0) < EPS && oy1 - oy0 >= 3.4) shared.push({ a: p, b: q, dir: 'y', lo: oy0, hi: oy1, at: p.x1 });
+      else if (Math.abs(q.x1 - p.x0) < EPS && oy1 - oy0 >= 3.4) shared.push({ a: q, b: p, dir: 'y', lo: oy0, hi: oy1, at: q.x1 });
+    }
+    if (rooms.length > 1) {
+      const seen = new Set([rooms[0].id]); let grew = true;
+      while (grew) { grew = false; shared.forEach((s) => {
+        if (seen.has(s.a.id) !== seen.has(s.b.id)) { seen.add(s.a.id); seen.add(s.b.id); grew = true; } }); }
+      if (seen.size < rooms.length) oops('rooms ' + rooms.filter((r) => !seen.has(r.id)).map((r) => r.id).join(', ')
+        + ' do not touch the rest — every room must share a wall of at least 4 ft with the building');
+    }
+    // ── doors: a spanning tree from the entry room, so every room is reachable ──
+    const entry = plan.entry || {};
+    const entryRoom = rooms.find((r) => r.id === entry.room) || rooms.find((r) => r.use === 'living') || rooms[0];
+    const entrySide = ['N', 'S', 'E', 'W'].includes(entry.side) ? entry.side : 'S';
+    const doorPairs = new Set();
+    const want = Array.isArray(plan.doors) ? plan.doors : [];
+    want.forEach((d) => {
+      if (!d || !d.from || !d.to) return;
+      const hit = shared.find((s) => (s.a.id === d.from && s.b.id === d.to) || (s.a.id === d.to && s.b.id === d.from));
+      if (!hit) oops('door ' + d.from + '->' + d.to + ' joins rooms that share no wall');
+      doorPairs.add(hit.a.id + '|' + hit.b.id);
+    });
+    { // grow connectivity over the door graph until every room is walkable
+      const reach = new Set([entryRoom.id]); let grew = true;
+      while (grew) {
+        grew = false;
+        shared.forEach((s) => {
+          const k = s.a.id + '|' + s.b.id;
+          if (doorPairs.has(k) && reach.has(s.a.id) !== reach.has(s.b.id)) { reach.add(s.a.id); reach.add(s.b.id); grew = true; }
+        });
+        if (!grew && reach.size < rooms.length) {
+          const s = shared.find((t) => reach.has(t.a.id) !== reach.has(t.b.id));
+          if (!s) break;
+          doorPairs.add(s.a.id + '|' + s.b.id); grew = true;
+        }
+      }
+    }
+    // ── walls: for each room side, exterior runs = side minus neighbours ──
+    const subtract = (a0, a1, cuts) => {
+      let segs = [[a0, a1]];
+      for (const [s, e] of cuts) {
+        const out = [];
+        for (const [p, q] of segs) {
+          if (e <= p + EPS || s >= q - EPS) { out.push([p, q]); continue; }
+          if (s > p + EPS) out.push([p, s]);
+          if (e < q - EPS) out.push([e, q]);
+        }
+        segs = out;
+      }
+      return segs.filter(([p, q]) => q - p > 1.2);
+    };
+    const bbox = { x0: Math.min(...rooms.map((r) => r.x0)), x1: Math.max(...rooms.map((r) => r.x1)),
+                   y0: Math.min(...rooms.map((r) => r.y0)), y1: Math.max(...rooms.map((r) => r.y1)) };
+    let entryRunOK = false;
+    rooms.forEach((r) => {
+      const sides = [
+        { key: 'S', dir: 'x', a0: r.x0, a1: r.x1, at: r.y0, b0: r.y0, b1: r.y0 + T },
+        { key: 'N', dir: 'x', a0: r.x0, a1: r.x1, at: r.y1, b0: r.y1 - T, b1: r.y1 },
+        { key: 'W', dir: 'y', a0: r.y0, a1: r.y1, at: r.x0, b0: r.x0, b1: r.x0 + T },
+        { key: 'E', dir: 'y', a0: r.y0, a1: r.y1, at: r.x1, b0: r.x1 - T, b1: r.x1 },
+      ];
+      sides.forEach((sd) => {
+        const cuts = shared.filter((s) => s.dir === sd.dir && Math.abs(s.at - sd.at) < EPS
+          && (s.a.id === r.id || s.b.id === r.id)).map((s) => [s.lo, s.hi]);
+        subtract(sd.a0, sd.a1, cuts).forEach(([p, q]) => {
+          const ops = [];
+          const len = q - p, c = (p + q) / 2;
+          const isEntry = r.id === entryRoom.id && sd.key === entrySide && len >= 4.2 && !entryRunOK;
+          if (isEntry) { ops.push([c - 1.8, c + 1.8, 0, 7.2, 'd']); entryRunOK = true; }
+          if (len >= 7 && !isEntry) {
+            if (r.use === 'bath') ops.push([c - 1.1, c + 1.1, 4.6, 6.6]);
+            else ops.push([c - 1.7, c + 1.7, 3, 6.6]);
+          } else if (len >= 13 && isEntry) {
+            ops.push([p + 2, p + 5, 3, 6.6]);
+          }
+          A.wall(g, sd.dir, p, q, sd.b0, sd.b1, 0, wallZ, ops, M.siding);
+        });
+      });
+      A.floorSlab(g, r.x0, r.x1, r.y0, r.y1, 0);
+      const cx = (r.x0 + r.x1) / 2, cy = (r.y0 + r.y1) / 2;
+      A.roomLabel(g, r.use.toUpperCase(), cx, cy, wallZ - 1.2);
+      if (r.use === 'kitchen' && r.x1 - r.x0 >= 8) A.kitchen(g, r.x0 + 1.4, Math.min(r.x0 + 11, r.x1 - 1.4), r.y1 - T, 0);
+      if (r.use === 'bath') A.bathset(g, cx, cy, 0);
+      if (r.use === 'bed') A.bed(g, cx, cy, 0);
+      if (r.use === 'living') A.sofa(g, cx, cy - 1, 0, Math.min(7, r.x1 - r.x0 - 3));
+      if (r.use === 'dining') A.dine(g, cx, cy, 0);
+    });
+    if (!entryRunOK) oops('the entry (' + entryRoom.id + ' side ' + entrySide + ') is not an exterior wall — pick a side that faces out');
+    // ── partitions: each shared edge built ONCE, with a doorway when doored ──
+    shared.forEach((s) => {
+      const gap = doorPairs.has(s.a.id + '|' + s.b.id)
+        ? [[(s.lo + s.hi) / 2 - 1.7, (s.lo + s.hi) / 2 + 1.7]] : undefined;
+      A.part(g, s.dir, s.lo + 0.4, s.hi - 0.4, s.at, 0, wallZ, gap);
+    });
+    // ── roof over the whole footprint, from the proven vertex-built builders ──
+    const roof = plan.roof || {};
+    const rise = num(roof.rise === undefined ? 4.5 : roof.rise, 0.8, 9, 'roof.rise');
+    const oh = num(roof.overhang === undefined ? 1.5 : roof.overhang, 0.5, 3, 'roof.overhang');
+    if (roof.type === 'shed' || roof.type === 'flat') {
+      A.shed(g, bbox.x0, bbox.x1, bbox.y0, bbox.y1, wallZ, wallZ + (roof.type === 'flat' ? 0.9 : rise), oh, 0);
+    } else {
+      A.gable(g, bbox.x0, bbox.x1, bbox.y0, bbox.y1, wallZ, wallZ + rise, oh, 0);
+    }
+    // ── fire keeps common company — structurally, not as an afterthought ──
+    if (plan.fireplace) {
+      const fr = rooms.find((r) => r.id === plan.fireplace);
+      if (!fr) oops('fireplace names room ' + plan.fireplace + ' which does not exist');
+      if (!['living', 'dining', 'study', 'hall'].includes(fr.use))
+        oops('the fireplace is in a ' + fr.use + ' — fire keeps common company (living, dining, study, hall)');
+      A.flue(g, (fr.x0 + fr.x1) / 2, fr.y1 - T - 0.6, 0, wallZ + rise + 2.5, 3.5);
+    }
+    // ── deck at the entry, so the front door lands on something ──
+    if (plan.deck) {
+      const dp = num(plan.deck.depth === undefined ? 8 : plan.deck.depth, 4, 16, 'deck.depth');
+      const side = ['N', 'S', 'E', 'W'].includes(plan.deck.side) ? plan.deck.side : entrySide;
+      const r = entryRoom;
+      if (side === 'S') A.deck(g, r.x0, r.x1, r.y0 - dp, r.y0, 0.35, 0, false);
+      else if (side === 'N') A.deck(g, r.x0, r.x1, r.y1, r.y1 + dp, 0.35, 0, false);
+      else if (side === 'W') A.deck(g, r.x0 - dp, r.x0, r.y0, r.y1, 0.35, 0, false);
+      else A.deck(g, r.x1, r.x1 + dp, r.y0, r.y1, 0.35, 0, false);
+    }
+    return { rooms: rooms.length, doors: doorPairs.size, bbox };
+  }
   async function generateHouse(promptText) {
     let mod;
     try { mod = await depotModule(); } catch (e) { try { notify('DEPOT UNREACHABLE — ' + e.message.slice(0, 40)); } catch (_) {} return null; }
@@ -22192,73 +22368,50 @@ resetDrive(); requestAnimationFrame(frame);
       try { notify('NO MODEL CONFIGURED — SETTING THE NEAREST SPECIES'); } catch (_) {}
       return placeDepotHouse(hit >= 0 ? hit : 1);
     }
-    let corpus = '';
-    try {
-      const src = localStorage.getItem(DEPOT_SRC_KEY) || '';
-      const a = src.indexOf('THE NINE'), b = src.indexOf('const roster');
-      if (a > -1 && b > a) corpus = src.slice(src.indexOf('*/', a) + 2, b);
-    } catch (_) {}
-    const sys = HOUSE_CONTRACT + '\n\nTHE NINE WORKED EXAMPLES (write in exactly this style):\n' + corpus.slice(0, 24000);
     try { notify('DRAFTING A HOUSE — ' + String(promptText).slice(0, 40).toUpperCase() + '…'); } catch (_) {}
     let lastFails = '';
-    for (let attempt = 0; attempt < 2; attempt++) {
+    for (let attempt = 0; attempt < 3; attempt++) {
       let raw;
       try {
         raw = await callConfiguredLLM('Design: ' + promptText
-          + (lastFails ? '\n\nYour previous draft broke these machine checks — fix them:\n' + lastFails : ''),
-          sys, cfg, null, 3800);
+          + (lastFails ? '\n\nYour previous plan was rejected — fix this and return the full corrected JSON:\n' + lastFails : ''),
+          HOUSE_CONTRACT, cfg, null, 2400);
       } catch (e) { try { notify('MODEL FAILED — ' + String(e && e.message).slice(0, 44)); } catch (_) {} return null; }
-      let code = String(raw || '');
-      const fence = code.match(/```(?:js|javascript)?\n([\s\S]*?)```/);
-      if (fence) code = fence[1];
-      code = code.trim();
+      let txt = String(raw || '');
+      const fence = txt.match(/```(?:json)?\n([\s\S]*?)```/);
+      if (fence) txt = fence[1];
+      const a = txt.indexOf('{'), b = txt.lastIndexOf('}');
+      if (a < 0 || b <= a) { lastFails = 'no JSON object found in the reply — return the plan JSON only'; continue; }
+      let plan;
+      try { plan = JSON.parse(txt.slice(a, b + 1).replace(/,\s*([}\]])/g, '$1')); }
+      catch (e) { lastFails = 'invalid JSON: ' + e.message; continue; }
       const g0 = new THREE.Group();
       const before = kit.CRITIC.length;
       kit.setCUR('GENERATED');
-      // the kit was written for authored code and trusts its caller — model
-      // arithmetic must not get that trust. Any non-finite numeric argument
-      // fails HERE, by name, and the message becomes the retry lesson.
-      const guarded = {};
-      for (const k of Object.keys(kit.api)) {
-        const v = kit.api[k];
-        guarded[k] = (typeof v === 'function') ? function (...args) {
-          for (let i = 0; i < args.length; i++)
-            if (typeof args[i] === 'number' && !Number.isFinite(args[i]))
-              throw new Error(k + '(): argument ' + (i + 1) + ' is ' + args[i]
-                + ' — an undefined or miscomputed variable reached the kit; every number must be finite feet');
-          return v.apply(this, args);
-        } : v;
-      }
-      try {
-        new Function('g', 'A',
-          'const {mbox,wall,room,shed,gable,stairs,deck,flue,door,pier,kitchen,bathset,bed,sofa,dine,floorSlab,part,core,mudroom,roomLabel,M} = A;\n'
-          + code)(g0, guarded);
-      } catch (e) { lastFails = 'runtime error: ' + e.message; continue; }
-      // absolute backstop: nothing with a NaN vertex may reach the land
+      try { compileHousePlan(plan, kit, g0); }
+      catch (e) { lastFails = e.message; continue; }
+      const fails = kit.CRITIC.slice(before).filter((c) => !c.pass);
+      if (fails.length) { lastFails = fails.map((c) => c.name + ': ' + c.detail).join('\n'); continue; }
+      // the compiler is ours, but vertices don't lie — the backstop stays
       let nanPieces = 0;
       g0.traverse((o) => {
         if (!o.isMesh || !o.geometry || !o.geometry.attributes.position) return;
-        const a = o.geometry.attributes.position.array;
-        for (let i = 0; i < a.length; i++) if (!Number.isFinite(a[i])) { nanPieces++; break; }
+        const arr = o.geometry.attributes.position.array;
+        for (let i = 0; i < arr.length; i++) if (!Number.isFinite(arr[i])) { nanPieces++; break; }
       });
-      if (nanPieces) {
-        lastFails = nanPieces + ' pieces came out with NaN geometry — some dimension was undefined or'
-          + ' miscomputed. Compute all coordinates as consts first, then build; finite feet only.';
-        continue;
-      }
-      const fails = kit.CRITIC.slice(before).filter((c) => !c.pass);
-      if (fails.length) { lastFails = fails.map((c) => c.name + ': ' + c.detail).join('\n'); continue; }
-      if (!g0.children.length) { lastFails = 'the group g is empty — nothing was built'; continue; }
-      const nm = String(promptText).replace(/[^a-z0-9 ]/gi, '').trim().slice(0, 22).toUpperCase() || 'GENERATED HOUSE';
+      if (nanPieces) { lastFails = nanPieces + ' pieces compiled with NaN geometry — report this plan'; continue; }
+      if (!g0.children.length) { lastFails = 'the plan compiled to nothing — add rooms'; continue; }
+      const nm = String(plan.name || promptText).replace(/[^a-z0-9 ]/gi, '').trim().slice(0, 22).toUpperCase() || 'GENERATED HOUSE';
       const b2 = installDepotGroup(g0, nm);
-      if (b2) { try { notify(nm + ' — DRAFTED, CHECKED, AND SET ON THE LAND'); } catch (_) {} }
+      if (b2) { try { notify(nm + ' — PLANNED, COMPILED, CHECKED, SET ON THE LAND'); } catch (_) {} }
       return b2;
     }
-    try { notify('THE DRAFT KEPT FAILING ITS CHECKS — ' + lastFails.split('\n')[0].slice(0, 60)); } catch (_) {}
+    try { notify('THE PLAN KEPT FAILING ITS CHECKS — ' + lastFails.split('\n')[0].slice(0, 60)); } catch (_) {}
     return null;
   }
   window.generateHouse = generateHouse;
   window.__depotModule = depotModule;
+  window.__compileHousePlan = compileHousePlan;
   // ── WHAT GETS BUILT ON REAL LAND ─────────────────────────────────────────
   // Two changes to the game's own generator, both aimed at the same thing:
   // stop producing props. (1) A prompt that names a BUILDING is routed to the
