@@ -11729,7 +11729,25 @@ function parseAICommands(rawText) {
         parsed = JSON.parse(text.slice(start, end + 1));
     }
     const commands = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.commands) ? parsed.commands : []);
-    return commands.filter(cmd => cmd && cmd.action === 'add' && cmd.partType);
+    // A MODEL THAT OMITS A DIMENSION USED TO REACH THE GEOMETRY AND MAKE NaN
+    // BOXES — hundreds of them, unrenderable and uncollidable, with nothing in
+    // the log but three.js complaining. Coerce every number here, give missing
+    // sizes an honest default, and drop anything still not finite.
+    const num = (v, dflt) => { const n = typeof v === 'string' ? parseFloat(v) : v;
+        return Number.isFinite(n) ? n : dflt; };
+    return commands
+        .filter(cmd => cmd && cmd.action === 'add' && cmd.partType)
+        .map(cmd => {
+            const c = Object.assign({}, cmd);
+            c.l = Math.min(400, Math.abs(num(c.l, num(c.d, 2)))) || 2;   // some models say d for depth
+            c.w = Math.min(400, Math.abs(num(c.w, 2))) || 2;
+            c.h = Math.min(400, Math.abs(num(c.h, 2))) || 2;
+            c.x = num(c.x, 0); c.y = num(c.y, c.h / 2); c.z = num(c.z, 0);
+            c.ry = num(c.ry, 0);
+            ['animSpeed', 'animRange'].forEach(k => { if (k in c) c[k] = num(c[k], 0); });
+            return c;
+        })
+        .filter(c => [c.l, c.w, c.h, c.x, c.y, c.z, c.ry].every(Number.isFinite));
 }
 async function callConfiguredLLM(promptText, systemPrompt, config = getAIConfig(), imageDataUrl = null, maxTokens = 3000, options = {}) {
     if (config.provider !== 'thunder' && !config.apiKey) throw new Error('NO LOCAL API KEY');
@@ -22176,13 +22194,14 @@ resetDrive(); requestAnimationFrame(frame);
       '',
       'Existing objects (build with them, do not duplicate): ' + JSON.stringify(sceneSummary).slice(0, 900),
       '',
-      'Respond ONLY with a JSON array of commands, schema:',
-      '  {"action":"add","partType":"block"|"panel"|"beam"|"cylinder","x":n,"y":n,"z":n,',
-      '   "w":n,"h":n,"d":n,"ry":radians,"color":"#rrggbb","name":"WHAT IT IS"}',
-      'y is the CENTRE height of the piece. Use "block" for walls, mass and roofs (a roof is a thin',
-      'block, wider than the wall it covers, its two ends at different heights is not possible here —',
-      'so give the roof a shallow separate slab per slope). Use "panel" for thin plates, "beam" for',
-      'posts and lintels, "cylinder" for flues and columns. 12-40 pieces. Name every piece.',
+      'Respond ONLY with a JSON Array of commands (no markdown, no prose). EXACTLY this schema —',
+      'l, w and h are REQUIRED on every piece and must be finite numbers in world units:',
+      '[ { "action": "add", "partType": "block"|"panel"|"beam"|"cylinder",',
+      '    "l": 6, "w": 6, "h": 0.2, "x": 0, "y": 0.1, "z": 0, "ry": 0 } ]',
+      'l = length along x, w = width along z, h = height. y is the CENTRE height of the piece,',
+      'so a wall h units tall standing on the ground has y = h/2.',
+      'Use "block" for walls, mass and roof slabs; "panel" for thin plates; "beam" for posts and',
+      'lintels; "cylinder" for flues and columns. Never "ramp" or "quarterpipe". 12-40 pieces.',
     ].filter(Boolean).join('\n');
   };
   // route building prompts to the house pipeline before the arena ever sees them
