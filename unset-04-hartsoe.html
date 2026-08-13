@@ -11673,6 +11673,16 @@ function updateAIStatus() {
     renderBotList();
 }
 function buildAISystemPrompt(sceneSummary) {
+    // ON REAL LAND YOU ARE NOT BUILDING A PLAYGROUND. Standing on a fetched
+    // parcel, the arena vocabulary (ramps, quarterpipes, flippers) produces
+    // toys at game scale on ground that is measured in metres. Swap the whole
+    // brief for an architectural one, with the depot houses as the examples.
+    try {
+      if (window.HARTSOE_GROUND && window.HARTSOE_GROUND.on && typeof window.__archSystemPrompt === 'function') {
+        const a = window.__archSystemPrompt(sceneSummary);
+        if (a) return a;
+      }
+    } catch (_) {}
     return `You are the MASTER ARENA ARCHITECT for a neon 3D driving game. A player describes a WORLD in their own words; translate that mood into an AMBITIOUS, drivable playground — never a flat slab. Be bold, thematic, and generous.
 
 Current Scene Objects (build WITH and AROUND these — you may extend, frame, or combine; do not duplicate them): ${JSON.stringify(sceneSummary)}
@@ -11964,6 +11974,14 @@ async function runAIAgent() {
         setCarLoadingProgress(playerCar, progress / 100, true);
     }, 100);
     
+    // a prompt that names a building becomes a BUILDING, not an arena piece
+    try {
+        if (window.__routeBuildingPrompt && window.__routeBuildingPrompt(promptText)) {
+            clearInterval(aiProgressInterval);
+            try { progressBar.style.width = '0%'; setCarLoadingProgress(playerCar, 0, false); } catch(_){}
+            return;
+        }
+    } catch(_){}
     const sceneSummary = physicsMeshes.map(m => ({ type: m.userData.type, pos: m.getWorldPosition(new THREE.Vector3()).toArray() }));
     const systemPrompt = buildAISystemPrompt(sceneSummary);
 
@@ -22117,6 +22135,63 @@ resetDrive(); requestAnimationFrame(frame);
     return null;
   }
   window.generateHouse = generateHouse;
+  // ── WHAT GETS BUILT ON REAL LAND ─────────────────────────────────────────
+  // Two changes to the game's own generator, both aimed at the same thing:
+  // stop producing props. (1) A prompt that names a BUILDING is routed to the
+  // house pipeline — real grammar, real feet, checked by the critic. (2) Any
+  // other prompt, while a land pack is mounted, is briefed as ARCHITECTURE
+  // with the nine as worked examples and the game's own metres-per-unit.
+  const BUILDING_WORDS = /\b(house|home|cabin|cottage|dwelling|shelter|hut|shed|barn|studio|workshop|garage|bunkhouse|lodge|pavilion|hall|chapel|shack|bothy|annexe|annex|guest|residence|villa|farmhouse|outbuilding|porch|loft|bungalow)\b/i;
+  window.__isBuildingPrompt = (t) => BUILDING_WORDS.test(String(t || ''));
+  window.__archSystemPrompt = function (sceneSummary) {
+    const S = (curLand && curLand.scale) || 1.84;             // metres per world unit
+    const ft = (1 / (S * 3.280839895)).toFixed(3);            // units per foot
+    let ex = '';
+    try {
+      const src = localStorage.getItem(DEPOT_SRC_KEY) || '';
+      const a = src.indexOf('1 · HEART HOUSE'), b = src.indexOf('4 · WORK HOUSE');
+      if (a > -1 && b > a) ex = src.slice(a, b);
+    } catch (_) {}
+    return [
+      'You are an ARCHITECT working on a REAL SITE — fetched terrain, at true scale.',
+      'This is not a playground. Do not produce ramps, quarterpipes, flippers, spinning gates,',
+      'floating platforms, jump lines, or anything whose purpose is a stunt. Produce a BUILDING',
+      'or a piece of real site work (a wall, a terrace, a shed) that a builder could set out.',
+      '',
+      'SCALE IS REAL AND IT IS THE FIRST THING YOU GET RIGHT.',
+      '  1 world unit = ' + S.toFixed(2) + ' m = ' + (S * 3.280839895).toFixed(1) + ' ft.  1 foot = ' + ft + ' units.',
+      '  A storey is 10 ft (' + (10 / (S * 3.280839895)).toFixed(1) + ' units). A door is 3 ft x 6 ft 10 in.',
+      '  A room is 10-16 ft across. A single-storey house is 20-30 ft deep and 8-11 ft to the eave.',
+      '  If a piece would be under 1 ft or over 40 ft in any dimension, it is wrong.',
+      '',
+      'HOW A BUILDING IS MADE (this is what the nine reference houses do):',
+      '  a plinth or piers on the ground; walls with real openings (windows have sills at 2 ft 6 in',
+      '  and heads at 6 ft 10 in; doors reach the floor); a roof with a FALL and an eave that oversails',
+      '  the wall; a chimney if there is a fire, and the fire belongs to a common room, never a bedroom',
+      '  or a bathroom; a deck or a threshold where a door meets the outside; stairs wherever a floor',
+      '  is above grade — 7 in risers, 11 in treads, never a ladder of blocks.',
+      '  NOTHING FLOATS. Every piece rests on something that reaches the ground.',
+      '',
+      ex ? 'TWO OF THE NINE, FOR PROPORTION (they are written in feet):\n' + ex.slice(0, 3000) : '',
+      '',
+      'Existing objects (build with them, do not duplicate): ' + JSON.stringify(sceneSummary).slice(0, 900),
+      '',
+      'Respond ONLY with a JSON array of commands, schema:',
+      '  {"action":"add","partType":"block"|"panel"|"beam"|"cylinder","x":n,"y":n,"z":n,',
+      '   "w":n,"h":n,"d":n,"ry":radians,"color":"#rrggbb","name":"WHAT IT IS"}',
+      'y is the CENTRE height of the piece. Use "block" for walls, mass and roofs (a roof is a thin',
+      'block, wider than the wall it covers, its two ends at different heights is not possible here —',
+      'so give the roof a shallow separate slab per slope). Use "panel" for thin plates, "beam" for',
+      'posts and lintels, "cylinder" for flues and columns. 12-40 pieces. Name every piece.',
+    ].filter(Boolean).join('\n');
+  };
+  // route building prompts to the house pipeline before the arena ever sees them
+  window.__routeBuildingPrompt = function (promptText) {
+    if (!(window.HARTSOE_GROUND && window.HARTSOE_GROUND.on)) return false;
+    if (!window.__isBuildingPrompt(promptText)) return false;
+    generateHouse(promptText);
+    return true;
+  };
   function henryTube(pts, radius, color, closed, lift) {
     const v = [], N = pts.length, segs = closed ? N : N - 1;
     for (let i = 0; i < segs; i++) {

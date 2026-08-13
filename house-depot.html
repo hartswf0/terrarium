@@ -35,7 +35,26 @@
   .spec b{display:block;font-size:10px;letter-spacing:.28em;text-transform:uppercase;color:var(--amber);margin-bottom:3px}
   .hint{position:fixed;left:18px;bottom:18px;z-index:5;font-size:10px;letter-spacing:.26em;
     color:var(--dim);text-transform:uppercase;line-height:1.8}
-  .hint kbd{border:1px solid var(--line);padding:1px 5px;border-radius:2px;color:#cfd5df;font-family:inherit}
+  .hint kbd{border:1px solid var(--line);padding:1px 5px;border-radius:2px;color:#cfd5df;font-family:inherit;
+    display:inline-block;min-width:18px;text-align:center}
+  /* TOUCH BAR — the same three switches as R/W/B, but for a thumb */
+  #touchbar{position:fixed;left:0;right:0;bottom:0;z-index:9;display:none;gap:6px;padding:8px 10px
+    calc(8px + env(safe-area-inset-bottom,0px));background:linear-gradient(0deg,rgba(10,13,18,.96),rgba(10,13,18,.72))}
+  #touchbar button{flex:1;min-height:52px;border:1px solid var(--line);border-radius:10px;
+    background:rgba(24,28,36,.92);color:#dfe5ec;font:800 12px/1.2 inherit;letter-spacing:.16em;
+    text-transform:uppercase;-webkit-tap-highlight-color:transparent}
+  #touchbar button.on{background:var(--amber);color:#10191b;border-color:var(--amber)}
+  @media (pointer:coarse), (max-width:820px){
+    #touchbar{display:flex}
+    .hint{display:none}
+    .legend{right:8px;bottom:76px;max-width:none;left:8px;padding:9px 10px}
+    .legend ol{columns:3;font-size:11px;line-height:1.75}
+    .kit{top:auto;bottom:210px;left:8px;padding:7px 9px;max-width:132px}
+    .kit .sw{font-size:8.5px;margin:2px 0}
+    .kit .sw i{width:9px;height:9px}
+    .spec{left:8px;right:8px;bottom:196px;max-width:none;font-size:12px}
+    .hud{padding:10px 12px}
+  }
   .tag{position:fixed;z-index:4;pointer-events:none;transform:translate(-50%,-100%);
     font-size:10px;letter-spacing:.22em;text-transform:uppercase;white-space:nowrap;
     padding:3px 7px;border:1px solid var(--line);background:rgba(12,14,18,.92);opacity:0;transition:opacity .15s}
@@ -67,6 +86,11 @@
 <div class="hint">drag orbit · wheel zoom · click to focus · <kbd>esc</kbd> back<br><kbd id="roofbtn" style="cursor:pointer;pointer-events:auto">R</kbd> roofs off ·
  <kbd id="wallbtn" style="cursor:pointer;pointer-events:auto">W</kbd> walls off ·
  <kbd id="auditbtn" style="cursor:pointer;pointer-events:auto">B</kbd> buildability check</div>
+<div id="touchbar">
+  <button id="tb-roof" type="button">Roofs</button>
+  <button id="tb-wall" type="button">Walls</button>
+  <button id="tb-check" type="button">Check</button>
+</div>
 <div class="tag" id="tag"><span class="n"></span><span class="t"></span><span class="f"></span></div>
 
 <script type="importmap">
@@ -110,12 +134,12 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.42;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.72;
 app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x2b333d);
-scene.fog = new THREE.Fog(0x2b333d, 60, 150);
+scene.background = new THREE.Color(0x8fa4b8);
+scene.fog = new THREE.Fog(0x8fa4b8, 90, 210);
 const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 300);
 
 function buildEnvMap() {
@@ -134,15 +158,15 @@ function buildEnvMap() {
 }
 const envMap = buildEnvMap(); scene.environment = envMap;
 
-scene.add(new THREE.HemisphereLight(0xa8bcd6, 0x272d36, 0.95));
-scene.add(new THREE.AmbientLight(0xffffff, 0.46));
-const key = new THREE.DirectionalLight(0xfff2dd, 2.1);
+scene.add(new THREE.HemisphereLight(0xcfe0f2, 0x5a5f52, 1.25));
+scene.add(new THREE.AmbientLight(0xffffff, 0.62));
+const key = new THREE.DirectionalLight(0xfff6e8, 2.5);
 key.position.set(13, 23, 15); key.castShadow = true; key.shadow.mapSize.set(2048, 2048);
 { const d = 26, c = key.shadow.camera; c.left = -d; c.right = d; c.top = d; c.bottom = -d; c.near = 1; c.far = 76;
   key.shadow.bias = -0.0004; key.shadow.normalBias = 0.02; }
 scene.add(key);
 const rim = new THREE.DirectionalLight(0x6f8bd0, 0.5);
-rim.position.set(-12, 9, -10); rim.intensity = 0.75; scene.add(rim);   // .position is read-only; set through it, never over it
+rim.position.set(-12, 9, -10); rim.intensity = 0.9; scene.add(rim);   // .position is read-only; set through it, never over it
 
 /* ═══ KIT START ═══ everything between these markers is self-contained
    (given THREE + an optional envMap) and is what other pages import. */
@@ -1145,7 +1169,7 @@ roster.forEach((r, i) => {
   tile.position.set(x, -0.06, z); tile.receiveShadow = true; scene.add(tile);
   const frame = new THREE.LineSegments(
     new THREE.EdgesGeometry(new THREE.BoxGeometry(GAP - 0.5, 0.12, GAP - 0.5)),
-    new THREE.LineBasicMaterial({ color: 0x394150 }));
+    new THREE.LineBasicMaterial({ color: 0x596450 }));
   frame.position.copy(tile.position); scene.add(frame);
 
   CUR = r[1];
@@ -1326,6 +1350,21 @@ function toggleWalls() {
 { const b = document.getElementById('roofbtn'); if (b) b.addEventListener('click', toggleRoofs); }
 { const b = document.getElementById('wallbtn'); if (b) b.addEventListener('click', toggleWalls); }
 { const b = document.getElementById('auditbtn'); if (b) b.addEventListener('click', runAudit); }
+/* the touch bar drives the same three switches, and reflects their state */
+{
+  const tb = { roof: document.getElementById('tb-roof'), wall: document.getElementById('tb-wall'), check: document.getElementById('tb-check') };
+  const sync = () => {
+    tb.roof && tb.roof.classList.toggle('on', !roofsOn);
+    tb.wall && tb.wall.classList.toggle('on', !wallsOn);
+    tb.check && tb.check.classList.toggle('on', auditOn);
+    if (tb.roof) tb.roof.textContent = roofsOn ? 'Roofs off' : 'Roofs on';
+    if (tb.wall) tb.wall.textContent = wallsOn ? 'Walls off' : 'Walls on';
+  };
+  tb.roof && tb.roof.addEventListener('click', () => { toggleRoofs(); sync(); });
+  tb.wall && tb.wall.addEventListener('click', () => { toggleWalls(); sync(); });
+  tb.check && tb.check.addEventListener('click', () => { runAudit(); sync(); });
+  sync();
+}
 
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 const tag = document.getElementById('tag');
