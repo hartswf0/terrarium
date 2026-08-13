@@ -42,6 +42,32 @@ async function idb(mode, fn) {
 export const cachePut = (key, value) => idb('readwrite', (s) => s.put(value, key));
 export const cacheGet = (key) => idb('readonly', (s) => s.get(key));
 export const cacheKeys = () => idb('readonly', (s) => s.getAllKeys());
+export const cacheDel = (key) => idb('readwrite', (s) => s.delete(key));
+
+/**
+ * THE DRAWER HAS A BOTTOM. Every landed window is 1–3 MB of saved world, and
+ * nothing ever removed one: land twenty places and the browser's quota is
+ * gone, at which point every future save fails silently and the ground you
+ * are standing on stops being remembered. So the cache is a fixed number of
+ * places, oldest evicted first — except the one you are in, and except
+ * autosaves, which belong to worlds still open.
+ *
+ * Returns the keys it removed, so the interface can say so out loud.
+ */
+export async function pruneCache(keep = 14, protectKey = null) {
+  const keys = (await cacheKeys()) || [];
+  const rows = [];
+  for (const k of keys) {
+    if (String(k).startsWith('autosave.')) continue;
+    const rec = await cacheGet(k);
+    if (rec?.meta) rows.push({ key: k, at: Date.parse(rec.meta.fetchedAt || '') || 0 });
+  }
+  if (rows.length <= keep) return [];
+  rows.sort((a, b) => a.at - b.at);                 // oldest first
+  const doomed = rows.slice(0, rows.length - keep).filter((r) => r.key !== protectKey);
+  for (const d of doomed) await cacheDel(d.key);
+  return doomed.map((d) => d.key);
+}
 
 /** Places the user has pulled in during this or an earlier session. */
 export async function listCached() {

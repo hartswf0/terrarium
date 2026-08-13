@@ -341,40 +341,66 @@ export class Minimap {
       if (stroke) { g.strokeStyle = stroke; g.stroke(); }
     };
 
-    // ground, water, then streets, then buildings — cheapest legible order
-    for (const e of world.entities()) {
-      if (hidden.has(e.type)) continue;
-      const ring = world.ringOf(e);
-      if (!ring) continue;
-      if (e.type === 'surface' || e.type === 'parcel') drawRing(ring, 'rgba(120,150,110,.16)');
-      else if (e.type === 'water' || e.type === 'stream') drawRing(ring, 'rgba(90,150,200,.5)');
+    // THE PLAN IS MOSTLY STILL. Ground, water, streets and buildings change
+    // only when the world does — but this redrew all four with a full sweep of
+    // every entity, twice a second, while driving. They are painted once into
+    // an offscreen canvas and blitted after that; only the marks that MOVE
+    // (the eye, the selection, what people said) are drawn per frame.
+    const stamp = [world.place.tick, world.branch, w, h, Math.round(scale * 1e4),
+      Math.round(X(0)), Math.round(Y(0)), [...hidden].sort().join(',')].join('|');
+    if (this._layerStamp !== stamp) {
+      if (!this._layer) this._layer = document.createElement('canvas');
+      const lc = this._layer;
+      if (lc.width !== w * dpr || lc.height !== h * dpr) { lc.width = w * dpr; lc.height = h * dpr; }
+      const lg = lc.getContext('2d');
+      lg.setTransform(dpr, 0, 0, dpr, 0, 0);
+      lg.clearRect(0, 0, w, h);
+      const ringTo = (ctx, ring, fill) => {
+        ctx.beginPath();
+        ctx.moveTo(X(ring[0][0]), Y(ring[0][1]));
+        for (let i = 1; i < ring.length; i++) ctx.lineTo(X(ring[i][0]), Y(ring[i][1]));
+        ctx.closePath();
+        ctx.fillStyle = fill; ctx.fill();
+      };
+      // ground, water, then streets, then buildings — cheapest legible order
+      for (const e of world.entities()) {
+        if (hidden.has(e.type)) continue;
+        const ring = world.ringOf(e);
+        if (!ring) continue;
+        if (e.type === 'surface' || e.type === 'parcel') ringTo(lg, ring, 'rgba(120,150,110,.16)');
+        else if (e.type === 'water' || e.type === 'stream') ringTo(lg, ring, 'rgba(90,150,200,.5)');
+      }
+      lg.lineWidth = 1;
+      lg.strokeStyle = 'rgba(220,225,230,.30)';
+      lg.beginPath();
+      for (const e of world.entities()) {
+        if (hidden.has(e.type)) continue;
+        if (e.type !== 'road' && e.type !== 'path' && e.type !== 'rail') continue;
+        const line = e.path;
+        if (!line || line.length < 2) continue;
+        lg.moveTo(X(line[0][0]), Y(line[0][1]));
+        for (let i = 1; i < line.length; i++) lg.lineTo(X(line[i][0]), Y(line[i][1]));
+      }
+      lg.stroke();
+      lg.fillStyle = 'rgba(200,190,175,.55)';
+      for (const e of world.entities()) {
+        if (hidden.has(e.type) || e.type !== 'structure') continue;
+        const r = G.bbox(world.ringOf(e));
+        lg.fillRect(X(r[0]), Y(r[3]), Math.max(1, (r[2] - r[0]) * scale), Math.max(1, (r[3] - r[1]) * scale));
+      }
+      this._layerStamp = stamp;
     }
-    g.lineWidth = 1;
-    g.strokeStyle = 'rgba(220,225,230,.30)';
-    g.beginPath();
-    for (const e of world.entities()) {
-      if (hidden.has(e.type)) continue;
-      if (e.type !== 'road' && e.type !== 'path' && e.type !== 'rail') continue;
-      const line = e.path;
-      if (!line || line.length < 2) continue;
-      g.moveTo(X(line[0][0]), Y(line[0][1]));
-      for (let i = 1; i < line.length; i++) g.lineTo(X(line[i][0]), Y(line[i][1]));
-    }
-    g.stroke();
+    g.drawImage(this._layer, 0, 0, w, h);
 
-    g.fillStyle = 'rgba(200,190,175,.55)';
-    for (const e of world.entities()) {
-      if (hidden.has(e.type) || e.type !== 'structure') continue;
-      const r = G.bbox(world.ringOf(e));
-      g.fillRect(X(r[0]), Y(r[3]), Math.max(1, (r[2] - r[0]) * scale), Math.max(1, (r[3] - r[1]) * scale));
-    }
-
-    // what people said, and what is selected
-    for (const e of world.entities()) {
-      if (e.type !== 'observation' || hidden.has(e.type)) continue;
-      const c2 = G.centroid(world.ringOf(e));
+    // what people said — few, and they move (testimony is planted live), so
+    // they stay on the live pass; the index answers where they are
+    if (!hidden.has('observation')) {
       g.fillStyle = '#f3c25e';
-      g.beginPath(); g.arc(X(c2[0]), Y(c2[1]), 2.6, 0, 7); g.fill();
+      for (const e of world.entities()) {
+        if (e.type !== 'observation') continue;
+        const c2 = G.centroid(world.ringOf(e));
+        g.beginPath(); g.arc(X(c2[0]), Y(c2[1]), 2.6, 0, 7); g.fill();
+      }
     }
     for (const id of selection) {
       const e = world.get(id);

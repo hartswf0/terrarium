@@ -22,10 +22,22 @@
 import * as G from '../core/geom.js';
 import { BUS } from '../core/bus.js';
 
-const MAX_STAMPS = 2600;
+// THE BED HAS A FLOOR — memory is finite, and a rut is not worth a crash.
+//
+// The old bed was an array of [x,y,yaw] arrays that grew to 2,600 objects and
+// re-tessellated all of them, from scratch, four times a second, forever. Two
+// changes make it bounded for any length of play: the stamps live in ONE
+// preallocated Float32Array (no per-stamp objects to allocate or collect), and
+// when it fills, the history is DECIMATED rather than truncated — every other
+// mark is dropped, halving the resolution of the past while keeping its whole
+// extent. You can drive for an hour: the oldest tracks fade in detail, never
+// in reach, and the memory ceiling never moves.
+const MAX_STAMPS = 1400;               // × 3 floats = 16.8 KB, forever
 
 const A = {
-  stamps: [],            // ring buffer of [x, y, yaw]
+  xyz: new Float32Array(MAX_STAMPS * 3),
+  n: 0,                                // how many stamps are live
+  coarse: 1,                           // metres of history each stamp now stands for
   head: 0,
   pressure: 38,
   lastLine: 'the ground is unmarked',
@@ -44,25 +56,40 @@ function drop(n, why) {
   if (why) { A.lastLine = why; paint(); }
 }
 
+/**
+ * THE ATLAS IS A BAR, NOT A PANEL.
+ *
+ * Normalization pressure was a whole floating card competing with the plan,
+ * the rail, the dock and the line — five panels arguing in one corner. It is
+ * one number and one sentence, so it is now a strip UNDER THE PLAN, in the
+ * same column, reading as part of the same instrument: a meter, its word, and
+ * the last thing the ground said. Everything else the atlas has to say is
+ * spoken on the line, where speech belongs.
+ */
 function paint() {
   if (typeof document === 'undefined') return;
   let d = document.getElementById('atlas-dock');
   if (!d) {
     d = document.createElement('div');
     d.id = 'atlas-dock';
-    d.style.cssText = 'position:fixed;right:12px;bottom:12px;z-index:61;min-width:200px;max-width:260px;'
-      + 'background:rgba(10,14,18,.92);border:1px solid rgba(151,187,213,.25);border-radius:12px;'
-      + 'padding:9px 11px;font:700 9px/1.45 ui-monospace,monospace;color:#cfe8dd;letter-spacing:.08em;'
-      + 'backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);pointer-events:none;';
+    d.style.cssText = 'position:fixed;right:12px;bottom:10px;z-index:61;width:214px;'
+      + 'font:700 8px/1.3 ui-monospace,monospace;color:#9fb4ad;letter-spacing:.14em;'
+      + 'pointer-events:none;text-align:left;';
     document.body.appendChild(d);
   }
+  // sit directly beneath the plan when the plan is out, so the two read as one
+  // pinned to the foot of the right column: plan, dock, then this meter
+  d.style.width = '214px';
+  d.style.right = '12px';
+  d.style.bottom = '30px';
   const p = Math.round(A.pressure);
   const tone = p > 66 ? '#df5a5d' : p > 33 ? '#ffb45e' : '#6fe0c0';
-  d.innerHTML = 'UNSETTLED ATLAS 05' + (A.unsettled ? ' · <span style="color:#ffb45e">UNSETTLED</span>' : '')
-    + '<div style="margin:6px 0 4px;height:4px;border-radius:2px;background:rgba(255,255,255,.08)">'
-    + '<div style="width:' + p + '%;height:100%;border-radius:2px;background:' + tone + '"></div></div>'
-    + 'NORMALIZATION ' + p
-    + '<div style="margin-top:5px;color:#8d9aa5;font-weight:500;letter-spacing:.02em">' + A.lastLine + '</div>';
+  d.innerHTML = '<div style="height:3px;border-radius:2px;background:rgba(255,255,255,.10);overflow:hidden">'
+    + '<div style="width:' + p + '%;height:100%;background:' + tone + '"></div></div>'
+    + '<div style="display:flex;justify-content:space-between;margin-top:4px">'
+    + '<span>NORMALIZATION ' + p + (A.unsettled ? ' · <span style="color:#ffb45e">UNSETTLED</span>' : '') + '</span></div>'
+    + '<div style="font:500 9px/1.35 system-ui,sans-serif;letter-spacing:.01em;color:#7d8b95;margin-top:2px;'
+    + 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + A.lastLine + '</div>';
 }
 
 export const ATLAS = {
@@ -77,7 +104,7 @@ export const ATLAS = {
     A.homeBranch = world.branch;
     // a new place is new ground: the sediment, the ghosts and the unsettled
     // state belong to the world that made them, not to whoever comes next
-    A.stamps = []; A.head = 0; A._lastAt = null;
+    A.n = 0; A.head = 0; A.coarse = 1; A._lastAt = null;
     A.unsettled = false;
     this.ghosts = [];
     A.lastLine = 'the ground is unmarked';
@@ -108,18 +135,30 @@ export const ATLAS = {
     if (G.dist(p, A._lastAt) < 2.4) return;
     A._lastAt = [p[0], p[1]];
 
-    // your own ruts normalize you; fresh ground resists a little
+    // your own ruts normalize you; fresh ground resists a little. Only the
+    // recent tail is consulted — the whole bed was scanned per stamp, which is
+    // the same O(n) sin as everything else this program has had to unlearn.
     let worn = false;
-    for (let i = 0; i < A.stamps.length; i++) {
-      const s = A.stamps[i];
-      const dx = s[0] - p[0], dy = s[1] - p[1];
+    for (let i = Math.max(0, A.n - 220); i < A.n; i++) {
+      const dx = A.xyz[i * 3] - p[0], dy = A.xyz[i * 3 + 1] - p[1];
       if (dx * dx + dy * dy < 2.6) { worn = true; break; }
     }
     if (worn) rise(0.05); else A.pressure = Math.max(0, A.pressure - 0.012);
 
-    const stamp = [p[0], p[1], rig.yaw];
-    if (A.stamps.length < MAX_STAMPS) A.stamps.push(stamp);
-    else { A.stamps[A.head] = stamp; A.head = (A.head + 1) % MAX_STAMPS; }
+    if (A.n >= MAX_STAMPS) {
+      // DECIMATE, don't forget: keep every other mark, halve the resolution of
+      // the past, keep all of its extent, and free half the bed at once.
+      let w = 0;
+      for (let r = 0; r < A.n; r += 2, w++) {
+        A.xyz[w * 3] = A.xyz[r * 3];
+        A.xyz[w * 3 + 1] = A.xyz[r * 3 + 1];
+        A.xyz[w * 3 + 2] = A.xyz[r * 3 + 2];
+      }
+      A.n = w;
+      A.coarse *= 2;
+    }
+    A.xyz[A.n * 3] = p[0]; A.xyz[A.n * 3 + 1] = p[1]; A.xyz[A.n * 3 + 2] = rig.yaw;
+    A.n++;
 
     for (const t of A.thresholds) {
       if (!t.crossed && G.dist([t.x, t.y], p) < 60) {
@@ -139,7 +178,8 @@ export const ATLAS = {
     const g = (x, y) => (renderer.drawnGroundAt?.(x, y) ?? world.place.groundAt(x, y)) + 0.125;
     const col = [0.16, 0.12, 0.09];
     renderer.setTrace((B) => {
-      for (const [x, y, yaw] of A.stamps) {
+      for (let i = 0; i < A.n; i++) {
+        const x = A.xyz[i * 3], y = A.xyz[i * 3 + 1], yaw = A.xyz[i * 3 + 2];
         const c = Math.cos(yaw), s = Math.sin(yaw);
         for (const side of [-0.95, 0.95]) {
           const ox = -s * side, oy = c * side;

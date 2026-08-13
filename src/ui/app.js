@@ -1,6 +1,7 @@
 import { RIG, autoMount } from '../sim/rig.js';
 import { mountConsole } from './console.js';
 import { mountDoor } from './door.js';
+import { mountRing } from './ring.js';
 import { ATLAS } from '../sim/trace.js';
 import { BUS } from '../core/bus.js';
 import { resolvePlace } from '../import/geocode.js';
@@ -15,7 +16,7 @@ import { PERF } from './perf.js';
 import * as G from '../core/geom.js';
 import { buildPlace, PLACES } from '../places/index.js';
 import { listImported, loadImported, attribution } from '../places/imported.js';
-import { openImportPanel, openReframePanel, reframe, previewGround, cachePut, listCached, loadCached } from './importui.js';
+import { openImportPanel, openReframePanel, reframe, previewGround, cachePut, listCached, loadCached, pruneCache } from './importui.js';
 import { importPlace, slug } from '../import/place.js';
 import { proposeOperations, critique, hasKey, getConfig, setConfig, listModels, EFFORTS, lastCalls } from '../ai/operator.js';
 import { MODES, MODE_ORDER, routeMode, STEP_LABELS } from '../ai/modes.js';
@@ -285,10 +286,13 @@ function frame() {
       // labels follow the world you are IN, on their own slower clock — the
       // gathering is index-backed while driving, but even cheap work has no
       // business running twice a second
+      // the plan is refreshed slowly; the placement runs EVERY frame, which is
+      // what keeps a name on its building instead of trailing a second behind
       if (Date.now() - (frame._labelsAt || 0) > 1200) {
         frame._labelsAt = Date.now();
-        try { drawLabels(); } catch (_) {}
+        try { labelPlan = gatherLabels(); } catch (_) {}
       }
+      try { placeLabels(labelPlan); } catch (_) {}
       requestAnimationFrame(frame);
       return;
     }
@@ -318,10 +322,28 @@ function frame() {
 }
 
 /** Labels live in the DOM: real text, selectable, readable by a screen reader. */
-const LABEL_JUNK = /^(bench(es)?|waste ?basket|waste ?bin|recycling|post ?box|mail ?box|bicycle parking|bike rack|toilets?|drinking water|water fountain|vending machine|atm|bollard|bin|charging station|parcel locker|fire hydrant|street ?lamp|manhole|telephone|payphone|grit bin)$/i;
+// A NAME THAT NAMES NOTHING IS NOT A LABEL. Street furniture was the first
+// half of this; the second is the class-noun — "Ground", "Building", "Wall",
+// "yes" — which OSM uses where a thing has no name at all. Printing those over
+// a place tells you only that the program can read its own schema.
+const LABEL_JUNK = /^(bench(es)?|waste ?basket|waste ?bin|recycling|post ?box|mail ?box|bicycle parking|bike rack|toilets?|drinking water|water fountain|vending machine|atm|bollard|bin|charging station|parcel locker|fire hydrant|street ?lamp|manhole|telephone|payphone|grit bin|ground|terrain|building|house|hut|shed|roof|wall|structure|surface|area|region|yes|no|entrance|door|window|path|track|footway|service|driveway|parking|parking space|garden|grass|tree|water|stream|drain|room|floor|unnamed|untitled)$/i;
 
-function drawLabels() {
-  const host = $('labels');
+// THE LABELS STOP HANGING.
+//
+// They were GATHERED and POSITIONED on the same 1.2 s clock, so while driving
+// every name floated at the place it had been a second ago — sliding across
+// the world, attached to nothing. Gathering is the expensive half (it asks the
+// index what is near); PLACING is a matrix multiply per label. So the plan is
+// refreshed slowly and the placement runs every frame, which is what makes a
+// name sit on its building instead of trailing behind it.
+let labelPlan = [];
+
+function drawLabels(gather = true) {
+  if (gather) labelPlan = gatherLabels();
+  placeLabels(labelPlan);
+}
+
+function gatherLabels() {
   const wanted = [];
   const w = S.world;
   if (S.fidelity !== 'symbolic' && (RIG.on || w.index.boxes.size > 1500)) {
@@ -336,19 +358,22 @@ function drawLabels() {
       const radius = RIG.on ? 250 : Math.min(650, S.cam.dist * 1.2);
       let hits = [];
       try { hits = w.nearby(center, radius); } catch (_) {}
+      // NEAREST FIRST, AND FEW. A screen of forty names is not a map, it is a
+      // fog; and driving asks for a street sign, not a directory. Shops and
+      // stops stay quiet at speed — streets and landmarks are what you steer by.
+      hits.sort((a, b) => a.d - b.d);
+      const CAP = RIG.on ? 8 : 12;
+      const quiet = RIG.on;                    // no POI chatter while moving
       const seenStreet = new Set();
       for (const { entity: e } of hits) {
-        if (wanted.length >= 14) break;
+        if (wanted.length >= CAP) break;
         if (!e || !e.name) continue;
-        // STICKERS: what you built announces itself — part kind, house, sign
-        if (e.props?.part || e.props?.house || e.props?.testimony) {
-          if (e.props.house && e.props.role !== 'main wing') continue;   // one sticker per house
-          if (e.props.testimony) continue;                               // testimony is already an observation
-          const c = G.centroid(w.ringOf(e));
-          const text = e.props.part ? e.props.part : 'house';
-          wanted.push({ id: `stk_${e.id}`, text, at: [c[0], c[1], e.zTop + 0.9], cls: 'sticker' });
-          continue;
-        }
+        if (quiet && e.type === 'marker') continue;
+        // A THING YOU BUILT DOES NOT NEED A NAME TAG. You placed it, you are
+        // looking at it, and its shape says what it is — the RAMP/PANEL chips
+        // floating over your own parts were the program narrating you back to
+        // yourself. What earns a label is what you did NOT put there.
+        if (e.props?.part || e.props?.house || e.props?.built) continue;
         if (e.type === 'observation') {
           wanted.push({ id: e.id, text: e.evidence?.[0]?.text || e.name, at: [...G.centroid(w.ringOf(e)), e.zTop + 3.6], cls: 'obs' });
         } else if (e.type === 'marker') {
@@ -364,7 +389,10 @@ function drawLabels() {
           const r2 = w.ringOf(e); if (!r2) continue;
           let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
           for (const p of r2) { if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0]; if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1]; }
-          if ((x1 - x0) * (y1 - y0) < 2600 && (e.zTop - e.zBase) < 35) continue;
+          // a landmark at speed is a big one: the museum, not the corner shop
+          const minArea = quiet ? 9000 : 2600, minTall = quiet ? 60 : 35;
+          if ((x1 - x0) * (y1 - y0) < minArea && (e.zTop - e.zBase) < minTall) continue;
+          if (LABEL_JUNK.test(e.name)) continue;      // a big shed is still a shed
           wanted.push({ id: `lm_${e.id}`, text: e.name, at: [(x0 + x1) / 2, (y0 + y1) / 2, e.zTop + 2], cls: 'poi' });
         } else if ((e.type === 'road' || e.type === 'path') && !seenStreet.has(e.name)) {
           seenStreet.add(e.name);
@@ -375,13 +403,8 @@ function drawLabels() {
       }
     }
   } else if (S.fidelity !== 'symbolic') {
-    const wantStickers = S.labels !== false && S.cam.dist < 420;
     for (const e of w.entities()) {
       if (e.type === 'observation') wanted.push({ id: e.id, text: e.evidence?.[0]?.text || e.name, at: [...G.centroid(w.ringOf(e)), e.zTop + 3.6], cls: 'obs' });
-      else if (wantStickers && (e.props?.part || (e.props?.house && e.props.role === 'main wing'))) {
-        const c = G.centroid(w.ringOf(e));
-        wanted.push({ id: `stk_${e.id}`, text: e.props.part || 'house', at: [c[0], c[1], e.zTop + 0.9], cls: 'sticker' });
-      }
     }
     // Street names, where the source names them. A place whose streets are
     // nameless does not read as anywhere in particular.
@@ -425,6 +448,11 @@ function drawLabels() {
   }
   // Two people who spoke about the same spot must both stay readable — and no
   // label belongs underneath a button.
+  return wanted;
+}
+
+function placeLabels(wanted) {
+  const host = $('labels');
   const placed = [];
   const blocked = [
     { x0: 0, y0: 0, x1: 260, y1: 108 },                               // place chip + licence
@@ -2885,6 +2913,8 @@ mountDoor(S, () => {
   S.dirty = true;
 });
 mountConsole(S);
+// the map, the acts and the eject are one object — see src/ui/ring.js
+setTimeout(() => { try { mountRing(S); S.showPlan = true; S.dirty = true; } catch (e) { console.warn('[ring]', e); } }, 300);
 // THE INSTRUMENT PANEL: press P for the table, PERF.loads() for load times,
 // PERF.watch(120) to be told in-line about anything slow. Measure, then argue.
 // ── TERRA — unset-04's landing verb, in concordance ─────────────────────────
@@ -2914,11 +2944,13 @@ async function landAt(query) {
       });
       q = pos.latitude.toFixed(5) + ', ' + pos.longitude.toFixed(5);
     }
-    toast(`LAND — finding “${q}”…`);
+    landCard('◍ LANDING'); landGrid(false); landStep(`finding “${q}” on Earth…`);
     const found = await resolvePlace(q, { metres: metres || 900 });
+    landCard('◍ ' + String(found.short || found.name || q).split(',')[0].toUpperCase());
+    landStep('reading the ground…');
     const { world, key, name, stats } = await importPlace({
       bbox: found.bbox, name: found.short || found.name, metres: metres || 900,
-      log: (m) => toast(String(m).slice(0, 70)),
+      log: (m) => landStep(m),
     });
     await cachePut(key, {
       payload: world.save(),
@@ -2931,13 +2963,66 @@ async function landAt(query) {
       },
     });
     adoptWorld(world, key, name);
-    toast(`LAND — ${name}: ${stats.buildings || 0} buildings, ${world.place.meta?.relief || 0} m relief.`);
+    // the drawer has a bottom, and it says so when it empties one
+    const gone = await pruneCache(14, key);
+    _metasCache.list = null;
+    landDone(`${stats.buildings || 0} buildings · ${world.place.meta?.relief || 0} m relief`
+      + (gone.length ? ` · ${gone.length} oldest window${gone.length > 1 ? 's' : ''} released` : ''));
   } catch (err) {
+    landDone(null);
     toast('TERRA: ' + String(err.message || err).slice(0, 80));
   } finally {
     S.busy = false;
   }
 }
+// ── THE LANDING CARD — what is happening, while it happens ─────────────────
+// A toast erases itself after four seconds; a land takes forty and has eight
+// stages. The card stays until the ground does, names the step, and — for a
+// pack — draws the nine windows filling in, so waiting is legible instead of
+// mysterious. It is the same law as the atlas dock: the instrument tells you.
+const LAND = { el: null, grid: null, step: null, head: null, cells: [] };
+function landCard(head) {
+  if (!LAND.el) {
+    const el = document.createElement('div');
+    el.id = 'land-card';
+    el.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:88;'
+      + 'min-width:250px;max-width:min(400px,92vw);background:rgba(10,14,18,.94);'
+      + 'border:1px solid rgba(120,200,170,.42);border-radius:14px;padding:16px 20px;'
+      + 'color:#cfe8dd;font:700 12px/1.4 ui-monospace,monospace;letter-spacing:.08em;'
+      + 'text-align:center;box-shadow:0 14px 44px rgba(0,0,0,.6);backdrop-filter:blur(12px);';
+    const h = document.createElement('div');
+    const g = document.createElement('div');
+    g.style.cssText = 'display:grid;grid-template-columns:repeat(3,16px);gap:3px;justify-content:center;margin:11px 0 9px;';
+    for (let i = 0; i < 9; i++) {
+      const c = document.createElement('div');
+      c.style.cssText = 'width:16px;height:16px;border-radius:3px;border:1px solid rgba(151,187,213,.3);background:transparent;';
+      g.appendChild(c); LAND.cells.push(c);
+    }
+    const s = document.createElement('div');
+    s.style.cssText = 'font:500 10px/1.4 system-ui,sans-serif;letter-spacing:.02em;color:#8fb8a8;min-height:14px;';
+    el.append(h, g, s);
+    document.body.appendChild(el);
+    LAND.el = el; LAND.grid = g; LAND.step = s; LAND.head = h;
+  }
+  LAND.el.style.display = 'block';
+  if (head) LAND.head.textContent = head;
+  return LAND;
+}
+const landStep = (text) => { if (LAND.step) LAND.step.textContent = String(text).slice(0, 90); };
+const landGrid = (on) => { if (LAND.grid) LAND.grid.style.display = on ? 'grid' : 'none'; };
+function landCell(i, state) {
+  const c = LAND.cells[i]; if (!c) return;
+  c.style.background = state === 'done' ? '#6fe0c0' : state === 'busy' ? 'rgba(111,224,192,.42)'
+    : state === 'failed' ? 'rgba(223,90,93,.55)' : 'transparent';
+}
+const landDone = (msg) => {
+  if (!LAND.el) return;
+  if (msg) { landStep(msg); setTimeout(() => { if (LAND.el) LAND.el.style.display = 'none'; }, 2600); }
+  else LAND.el.style.display = 'none';
+};
+// the 3×3 pack, in the order it is fetched, laid out as it sits on the ground
+const CELL_OF = { '0,0': 4, '0,1': 1, '1,0': 5, '0,-1': 7, '-1,0': 3, '1,1': 2, '1,-1': 8, '-1,-1': 6, '-1,1': 0 };
+
 // ── THE CITYPACK — a metropolis as adjacent worlds, not one giant one ───────
 // unset GEO's move, made native: big ground arrives as a 3×3 pack of cached
 // street-scale windows. Each is a full world (its own journal, atlas, deeds);
@@ -2950,15 +3035,17 @@ async function landPack(q, metres) {
   const covered = tileM * 3;
   let found;
   S.busy = true;                     // the centre leg owns the world; the ring does not
+  landCard('◍ CITYPACK'); landGrid(true);
+  for (let i = 0; i < 9; i++) landCell(i, 'idle');
+  landStep(`finding “${q}” on Earth…`);
   try {
-    toast(`PACK — finding “${q}”…`);
     found = await resolvePlace(q, { metres: tileM });
   } catch (err) {
     S.busy = false;
+    landDone(null);
     toast('TERRA: ' + String(err.message || err).slice(0, 80));
     return;
   }
-  if (metres > covered + 200) toast(`a 3×3 pack covers ${covered} m of the @${metres} asked — land again further on for more`);
   const lat0 = found.lat ?? (found.bbox[0] + found.bbox[2]) / 2;
   const lon0 = found.lon ?? (found.bbox[1] + found.bbox[3]) / 2;
   const base = (found.short || found.name || q).split(',')[0];
@@ -2967,18 +3054,22 @@ async function landPack(q, metres) {
   // centre first — you start driving while the ring is still arriving
   const ORDER = [[0, 0], [0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [1, -1], [-1, -1], [-1, 1]];
   const tag = ([di, dj]) => (di || dj) ? (dj > 0 ? 'N' : dj < 0 ? 'S' : '') + (di > 0 ? 'E' : di < 0 ? 'W' : '') : '·';
+  landCard('◍ CITYPACK — ' + base.toUpperCase());
+  if (metres > covered + 200) landStep(`a 3×3 pack covers ${covered} m of the @${metres} asked`);
   let landed = 0, uncached = 0;
   for (let k = 0; k < ORDER.length; k++) {
     if (run !== _packRun) { if (k === 0) S.busy = false; return; }   // a newer land wins
     const [di, dj] = ORDER[k];
     const centre = di === 0 && dj === 0;
+    const cell = CELL_OF[`${di},${dj}`];
     const latC = lat0 + dj * dLat, lonC = lon0 + di * dLon;
     const bbox = [latC - dLat / 2, lonC - dLon / 2, latC + dLat / 2, lonC + dLon / 2];
     const name = `${base} · ${tag(ORDER[k])}`;
     try {
-      toast(`PACK ${k + 1}/9 — ${name}…`);
+      landCell(cell, 'busy');
+      landStep(`${k + 1}/9 · ${centre ? 'the centre' : tag(ORDER[k])} — asking OpenStreetMap…`);
       const { world, key, name: got, stats } = await importPlace({
-        bbox, name, metres: tileM, log: (m) => toast(String(m).slice(0, 70)),
+        bbox, name, metres: tileM, log: (m) => landStep(`${k + 1}/9 · ${m}`),
       });
       if (run !== _packRun) return;                    // a newer land raced this fetch
       try {
@@ -2995,15 +3086,20 @@ async function landPack(q, metres) {
         _metasCache.list = null;
       } catch (_) { uncached++; }                      // quota is a fact, not a secret
       landed++;
-      if (centre) adoptWorld(world, key, got);
+      landCell(cell, 'done');
+      if (centre) {
+        adoptWorld(world, key, got);
+        landStep(`the centre stands — drive it while the ring arrives (${8 - k} to go)`);
+      }
     } catch (err) {
+      landCell(cell, 'failed');
       if (centre) {
         // no centre, no pack: fetching a ring around a hole would be theatre
-        toast('PACK — the centre failed (' + String(err.message || err).slice(0, 50) + '); nothing landed.');
+        landDone('the centre failed — ' + String(err.message || err).slice(0, 50));
         S.busy = false;
         return;
       }
-      toast(`PACK ${k + 1}/9 failed — ` + String(err.message || err).slice(0, 60));
+      landStep(`${k + 1}/9 · ${tag(ORDER[k])} failed — ` + String(err.message || err).slice(0, 50));
     } finally {
       if (centre) S.busy = false;
     }
@@ -3011,8 +3107,13 @@ async function landPack(q, metres) {
     if (k < ORDER.length - 1) await new Promise((res) => setTimeout(res, 1400));
   }
   if (run === _packRun) {
-    toast(`PACK — ${landed}/9 windows of ${base} in this browser`
-      + (uncached ? ` (${uncached} would not cache — storage is full)` : '') + '. Drive to an edge to cross.');
+    // a pack is nine worlds: keep room for two of them, not for every place
+    // ever landed, or the tenth land is the one that cannot be saved
+    const gone = await pruneCache(20, S.placeKey);
+    _metasCache.list = null;
+    landDone(`${landed}/9 windows in this browser`
+      + (uncached ? ` (${uncached} would not cache — storage is full)` : '')
+      + (gone.length ? ` · ${gone.length} older released` : '') + ' · drive to an edge to cross');
   }
 }
 
@@ -3132,5 +3233,5 @@ PERF.install({ renderer });
 setTimeout(() => { if (S.world) PERF.install({ world: S.world }); }, 1500);
 // THE WORKBENCH: one handle for the console — the state, the rig, the renderer,
 // the atlas. Debugging a world you cannot touch is reading a map with no legend.
-if (typeof window !== 'undefined') window.TERRA = { S, RIG, renderer, ATLAS };
+if (typeof window !== 'undefined') window.TERRA = { S, RIG, renderer, ATLAS, plan: () => minimap, redrawPlan: () => { try { if (minimap && S.showPlan) minimap.draw(S.world, { camera: S.cam, selection: S.selection, hidden: hiddenTypes(S.layersOff) }); } catch (_) {} } };
 console.info('%c[creo-unset-04] PERF ready — press P · PERF.report() · PERF.loads() · PERF.watch(120)', 'color:#6fe0c0');
