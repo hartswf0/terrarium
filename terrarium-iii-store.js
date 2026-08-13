@@ -9,7 +9,7 @@
   'use strict';
 
   const TABLE = 'iii_artifacts';
-  const CLIENT_VERSION = 'iii-store-0.1-provisional';
+  const CLIENT_VERSION = 'iii-store-0.2-provisional';
   const AUTH_STORAGE_KEY = 'terrarium-iii-auth';
   const IDB_NAME = 'terrarium-iii-store';
   const IDB_STORE = 'queue';
@@ -20,6 +20,7 @@
   const FLUSH_BATCH = 20;
   const RETRY_STEPS = [1500, 5000, 15000, 30000, 60000];
   const ALLOWED_TYPES = new Set(['prompt', 'geometry', 'build', 'world_snapshot']);
+  const SESSION_ID = crypto.randomUUID ? crypto.randomUUID() : ('s-' + Date.now().toString(36) + Math.random().toString(36).slice(2));
 
   let client = null;
   let clientKey = '';
@@ -36,6 +37,7 @@
   let lastFlushAt = 0;
   let written = 0;
   let failed = 0;
+  let autoCaptured = 0;
   const memoryQueue = new Map();
   const authMemory = new Map();
 
@@ -280,7 +282,6 @@
       };
     }
     if (metaBase.omitted) {
-      // Do not retain a giant metadata object merely to explain that it was giant.
       Object.keys(metadata).forEach(key => delete metadata[key]);
       metadata.persistence = {
         metadata_omitted: true,
@@ -294,7 +295,7 @@
       created_at: input.created_at || new Date().toISOString(),
       artifact_type: type,
       room_code: String(input.room_code ?? input.roomCode ?? global.III_NET?.room ?? '').slice(0, 64) || null,
-      session_id: String(input.session_id ?? input.sessionId ?? '').slice(0, 128) || null,
+      session_id: String(input.session_id ?? input.sessionId ?? SESSION_ID).slice(0, 128) || SESSION_ID,
       prompt,
       geometry_json: geometry.value,
       metadata_json: metadata,
@@ -364,10 +365,7 @@
 
       let flushed = 0;
       for (const queued of batch) {
-        const row = {
-          ...queued,
-          user_id: identity.userId
-        };
+        const row = { ...queued, user_id: identity.userId };
         try {
           const result = await identity.client.from(TABLE).insert(row);
           if (result.error) throw result.error;
@@ -444,16 +442,94 @@
     return {
       version: CLIENT_VERSION,
       table: TABLE,
+      sessionId: SESSION_ID,
       auth: authState,
       userId: userId || null,
       queueMemory: memoryQueue.size,
       queuePersistence: persistenceAvailable ? 'indexeddb' : 'memory',
       written,
       failed,
+      autoCaptured,
       lastWriteAt: lastWriteAt || null,
       lastFlushAt: lastFlushAt || null,
       lastError: lastError || null
     };
+  }
+
+  // Snapshot the build BEFORE the page's commit handler clears its draft state,
+  // then persist only AFTER the proposal UI confirms that the commit completed.
+  // This avoids storing discarded blueprints and avoids modifying the 1.7 MB page.
+  function captureDraftBeforeCommit() {
+    const proposal = document.getElementById('proposal-ui');
+    if (!proposal || proposal.classList.contains('gone')) return null;
+
+    const wgDraft = global.__wgDraft;
+    if (wgDraft?.code) {
+      let anchor = null;
+      try {
+        const p = wgDraft.wg?.root?.position;
+        if (p) anchor = { x: +p.x || 0, y: +p.y || 0, z: +p.z || 0 };
+      } catch (_) {}
+      return {
+        prompt: String(global.__lastDraftPrompt || 'construction'),
+        geometry: {
+          format: 'terrarium-wg-code',
+          code: String(wgDraft.code),
+          cert: wgDraft.cert || null,
+          anchor
+        },
+        metadata: {
+          source: 'wg-blueprint',
+          capture: 'commit-boundary',
+          cert: wgDraft.cert || null
+        }
+      };
+    }
+
+    const ai = global.__ai?.last;
+    if (ai && (ai.task === 'arena' || ai.task === 'forge') && (ai.reply || ai.prompt)) {
+      return {
+        prompt: String(ai.prompt || ''),
+        geometry: {
+          format: 'model-reply',
+          task: String(ai.task || 'arena'),
+          reply: String(ai.reply || '')
+        },
+        metadata: {
+          source: 'legacy-ai-blueprint',
+          capture: 'commit-boundary',
+          task: String(ai.task || 'arena')
+        }
+      };
+    }
+    return null;
+  }
+
+  function installCommitCapture() {
+    const attach = () => {
+      const button = document.getElementById('btn-draft-commit');
+      if (!button || button.__iiiStoreCaptureInstalled) return !!button;
+      button.__iiiStoreCaptureInstalled = true;
+      button.addEventListener('click', () => {
+        const candidate = captureDraftBeforeCommit();
+        if (!candidate) return;
+        // Main-page commit listeners now run. A successful commit hides proposal-ui.
+        setTimeout(() => {
+          const proposal = document.getElementById('proposal-ui');
+          if (!proposal || !proposal.classList.contains('gone')) return;
+          autoCaptured++;
+          recordBuild(candidate).catch(() => {});
+        }, 0);
+      }, true);
+      return true;
+    };
+
+    if (attach()) return;
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', attach, { once: true });
+    } else {
+      setTimeout(attach, 0);
+    }
   }
 
   global.III_STORE = {
@@ -465,11 +541,12 @@
     recordGeometry,
     recordWorldSnapshot,
     stats,
-    get userId() { return userId || null; }
+    get userId() { return userId || null; },
+    get sessionId() { return SESSION_ID; }
   };
 
-  // Generic integration seam. Builders can persist an artifact without taking a
-  // dependency on this module: dispatch CustomEvent('terrarium:artifact', {detail}).
+  // Generic integration seam. Any future builder can persist an artifact without
+  // taking a dependency on this module.
   global.addEventListener('terrarium:artifact', event => {
     recordArtifact(event?.detail || {}).catch(() => {});
   });
@@ -478,6 +555,8 @@
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) flush().catch(() => {});
   });
+
+  installCommitCapture();
 
   // Initialization is opportunistic. Anonymous Auth may not be enabled or the
   // SQL migration may not yet exist; either case leaves III_STORE non-fatal.
