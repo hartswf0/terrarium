@@ -14,6 +14,24 @@
   const CHUNK_SIZE = 12000;
   const MAX_BUFFER = 2 * 1024 * 1024;
   const FALLBACK_ICE = [{ urls: 'stun:stun.cloudflare.com:3478' }];
+  const THREE_MODULE_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+  // THREE r160's Sprite.raycast requires raycaster.camera. TERRARIUM also uses
+  // world-space Raycaster.set(origin, direction) for physics, fire and destroy
+  // rays; those rays intentionally have no camera. If a label/marker Sprite is
+  // ever present in a world target list, upstream THREE logs an error and then
+  // dereferences camera.matrixWorld. A world ray must ignore camera-facing UI,
+  // while pointer rays created with setFromCamera must keep normal Sprite picks.
+  import(THREE_MODULE_URL).then(THREE => {
+    const proto = THREE.Sprite && THREE.Sprite.prototype;
+    if (!proto || proto.__terrariumNoCameraRayGuard) return;
+    const spriteRaycast = proto.raycast;
+    Object.defineProperty(proto, '__terrariumNoCameraRayGuard', { value: true });
+    proto.raycast = function terrariumSpriteRaycast(raycaster, intersects) {
+      if (!raycaster || !raycaster.camera) return;
+      return spriteRaycast.call(this, raycaster, intersects);
+    };
+  }).catch(err => console.warn('[III] THREE sprite ray guard unavailable', err));
 
   let client = null;
   let signalChannel = null;
