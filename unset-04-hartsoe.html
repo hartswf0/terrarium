@@ -10494,9 +10494,19 @@ function __setArena(half) {
     // 900-unit arena that is 2 px per unit and street names turn to mush, so
     // big land gets a bigger sheet to draw on
     try { if (window.__geoDebug && window.__geoDebug.ground) {
-        const im = window.__geoDebug.ground.material.map.image;
+        // resizing the canvas under a live CanvasTexture leaves the GPU copy at
+        // the old size — every later update then throws GL_INVALID_VALUE
+        // "offset overflows texture dimensions". Recreate the texture instead.
+        const gr = window.__geoDebug.ground;
+        const im = gr.material.map.image;
         const want = HW > 200 ? 4096 : 2048;
-        if (im && im.width !== want) { im.width = im.height = want; }
+        if (im && im.width !== want) {
+            im.width = im.height = want;
+            gr.material.map.dispose();
+            gr.material.map = new THREE.CanvasTexture(im);
+            gr.material.map.anisotropy = 8;
+            gr.material.needsUpdate = true;
+        }
     } } catch (_) {}
     try { if (window.__geoDebug && window.__geoDebug.ground) {
         const gr = window.__geoDebug.ground;
@@ -10508,6 +10518,67 @@ function __setArena(half) {
     return HW;
 }
 window.__setArena = __setArena;
+
+// ── NaN FORENSICS ───────────────────────────────────────────────────────────
+// The NaN BoxGeometry flood could not be reproduced here, so the page now
+// testifies for itself. Every geometry whose bounds compute to NaN is logged
+// ONCE with its construction parameters, and a sweeper removes NaN meshes
+// from the scene — reporting each one's name, group, dims and parent chain.
+// Paste the [NAN REPORT] console block back and the producer is named.
+window.__NAN_LOG = [];
+{
+    const bb0 = THREE.BufferGeometry.prototype.computeBoundingBox;
+    THREE.BufferGeometry.prototype.computeBoundingBox = function () {
+        bb0.call(this);
+        if (this.boundingBox && !Number.isFinite(this.boundingBox.min.x) && !this.__nanSeen) {
+            this.__nanSeen = true;
+            try { window.__NAN_LOG.push({ type: this.type,
+                params: this.parameters ? JSON.parse(JSON.stringify(this.parameters)) : null }); } catch (_) {}
+        }
+    };
+}
+function __nanSweep(tag) {
+    let removed = 0; const report = [];
+    try {
+        const bad = [];
+        scene.traverse((o) => {
+            if (!o.isMesh || !o.geometry) return;
+            const pa = o.geometry.attributes && o.geometry.attributes.position;
+            if (!pa) return;
+            const a = pa.array;
+            let nan = !Number.isFinite(a[0]) || !Number.isFinite(a[a.length - 1]);
+            if (!nan) for (let i = 0; i < a.length; i += 97) if (!Number.isFinite(a[i])) { nan = true; break; }
+            if (nan) bad.push(o);
+        });
+        bad.forEach((o) => {
+            const chain = []; let p = o;
+            while (p && chain.length < 5) { chain.push((p.userData && (p.userData.name || p.userData.label)) || p.name || p.type); p = p.parent; }
+            report.push({ geo: o.geometry.type,
+                params: o.geometry.parameters ? JSON.stringify(o.geometry.parameters) : null,
+                name: o.userData && o.userData.name, group: o.userData && o.userData.group,
+                dims: o.userData && o.userData.dims ? JSON.stringify(o.userData.dims) : null,
+                chain: chain.join(' < ') });
+            [physicsMeshes, selectableObjects].forEach((arr) => { const i = arr.indexOf(o); if (i > -1) arr.splice(i, 1); });
+            try { o.parent && o.parent.remove(o); } catch (_) {}
+            removed++;
+        });
+    } catch (e) { report.push({ sweepError: e.message }); }
+    if (removed || (window.__NAN_LOG.length && !__nanSweep.__logged)) {
+        __nanSweep.__logged = true;
+        console.error('[NAN REPORT · ' + tag + '] removed ' + removed
+            + ' NaN meshes · NaN constructions seen: ' + window.__NAN_LOG.length);
+        if (report.length) (console.table || console.error).call(console, report);
+        if (window.__NAN_LOG.length) console.error('[NAN REPORT · constructions] '
+            + JSON.stringify(window.__NAN_LOG.slice(0, 15)));
+        try { if (removed) notify('NaN GEOMETRY SWEPT — ' + removed + ' bad pieces removed (details in console)'); } catch (_) {}
+    }
+    return removed;
+}
+window.__nanSweep = __nanSweep;
+{   // the first minute after boot is when the flood has been seen — watch it
+    let n = 0;
+    const t = setInterval(() => { n++; try { __nanSweep('boot#' + n); } catch (_) {} if (n >= 12) clearInterval(t); }, 5000);
+}
 
 function applyWorldMode(mode, announce = true) {
     if (!WORLD_MODE_CONFIG[mode]) mode = 'dark';
@@ -22039,7 +22110,9 @@ resetDrive(); requestAnimationFrame(frame);
       m.updateMatrixWorld(true);
       if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
       const bc = new THREE.Vector3(); m.geometry.boundingBox.getCenter(bc);
-      if (bc.lengthSq() > 1e-8) {
+      // an EMPTY geometry has an infinite bounding box — its centre is NaN,
+      // and translating by NaN poisons every vertex. Guard the centre.
+      if ([bc.x, bc.y, bc.z].every(Number.isFinite) && bc.lengthSq() > 1e-8) {
         m.geometry.translate(-bc.x, -bc.y, -bc.z); m.geometry.computeBoundingBox();
         pos.add(bc.multiply(scl).applyQuaternion(qua));
         m.position.copy(pos); m.updateMatrixWorld(true);
@@ -22066,6 +22139,7 @@ resetDrive(); requestAnimationFrame(frame);
     const b = buildingAdd(name.toUpperCase(), { x: at.x, y: base, z: at.z }, 0, placed);
     b.cols = [col];
     try { updateSceneGraph(); notify(name.toUpperCase() + ' SET ON THE LAND · ' + placed.length + ' PIECES'); } catch (_) {}
+    setTimeout(() => { try { window.__nanSweep && window.__nanSweep('install:' + name); } catch (_) {} }, 600);
     return b;
   }
   // place a depot species at the car
@@ -22392,6 +22466,7 @@ resetDrive(); requestAnimationFrame(frame);
         let off = geoOff.get(m.geometry);
         if (off === undefined) {
           off = new THREE.Vector3(); m.geometry.boundingBox.getCenter(off);
+          if (![off.x, off.y, off.z].every(Number.isFinite)) off.set(0, 0, 0);   // infinite box → NaN centre → poison
           if (off.lengthSq() > 1e-8) { m.geometry.translate(-off.x, -off.y, -off.z); m.geometry.computeBoundingBox(); }
           geoOff.set(m.geometry, off.clone());
         }
@@ -22490,6 +22565,7 @@ resetDrive(); requestAnimationFrame(frame);
       }, 900);
       try { notify('THE HENRY HOUSE — ' + nSel + ' PIECES IN ' + tally.size
         + ' TRADES, EACH EDITABLE · ' + nPhys + ' SOLID'); } catch (_) {}
+      setTimeout(() => { try { window.__nanSweep && window.__nanSweep('henry-import'); } catch (_) {} }, 900);
     }).catch((e) => {
       console.warn('[henry] module import failed, drawing massing', e);
       try { drawMassing(); notify('HENRY HOUSE OFFLINE — MASSING ONLY (' + e.message.slice(0, 40) + ')'); } catch (_) {}
