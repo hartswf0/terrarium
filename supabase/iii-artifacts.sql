@@ -26,6 +26,10 @@ create table if not exists public.iii_artifacts (
     check (session_id is null or char_length(session_id) <= 128),
   constraint iii_artifacts_prompt_len
     check (prompt is null or char_length(prompt) <= 20000),
+  constraint iii_artifacts_geometry_size
+    check (geometry_json is null or octet_length(geometry_json::text) <= 2000000),
+  constraint iii_artifacts_metadata_size
+    check (octet_length(metadata_json::text) <= 350000),
   constraint iii_artifacts_client_version_len
     check (client_version is null or char_length(client_version) <= 96)
 );
