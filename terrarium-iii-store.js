@@ -65,3 +65,7 @@ global.III_STORE={ready,flush,recordArtifact,recordBuild,recordWorldSnapshot,rec
 global.addEventListener('terrarium:artifact',e=>recordArtifact(e?.detail||{}).catch(()=>{}));global.addEventListener('online',()=>flush().catch(()=>{}));document.addEventListener('visibilitychange',()=>{if(!document.hidden)flush().catch(()=>{})});
 installLoadoutStorageShim();installCommit();setTimeout(()=>{installBakeGuard();ready().catch(()=>{})},0);setTimeout(installBakeGuard,1500);
 })(window);
+
+// Garage is a separate presentation layer over III_STORE. A garage UI failure
+// must never affect durable capture or the live vessel.
+import('./terrarium-iii-garage.js').catch(err=>console.warn('[III GARAGE] sidecar unavailable',err));
