@@ -17,12 +17,20 @@
 <style>
 /* ===== 10-style.css ===== */
 /* ============================================================
-   10-style.css — the visual system.  OWNER: SHELL/CHAPTERS.
+   10-style.css — the visual system.  OWNER: SHELL.
 
-   One column, one viewport, no page scroll. Only #tableWrap scrolls.
-   The page is paper: white, black ink, square corners, one typeface.
-   The field is the vitrine: black, lit, the only place with color.
-   Palette is the six literals; every grey is rgba(0,0,0,a)/rgba(255,255,255,a).
+   ONE GROUND. The whole page is the vitrine: black, lit, ruled with the same
+   faint grid the colony walks on. Earlier rounds set a black field into a white
+   page and it read as two applications stitched together; this resolves that in
+   the dark direction, because the field is a canvas we cannot make paper.
+   White rules divide the drawer. Colour only ever means something.
+
+   LAYOUT LAW: #stage is the only thing that grows. Every other band is sized to
+   what it holds — the narrator to its sentence, the bar to its buttons, the
+   drawer to a fixed share — so a chapter with no table and no tools gives every
+   spare pixel to the colony instead of leaving a hole.
+
+   Palette is the six literals; every grey is rgba(255,255,255,a)/rgba(0,0,0,a).
    Built for a 390x844 phone held in one hand; holds from 320 to 430.
    ============================================================ */
 
@@ -32,8 +40,8 @@ html, body {
   height: 100%;
   overflow: hidden;
   overscroll-behavior: none;
-  background: #fff;
-  color: rgba(0, 0, 0, .92);
+  background: #000;
+  color: rgba(255, 255, 255, .92);
   font-family: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
   font-size: 13px;
   line-height: 1.3;
@@ -56,6 +64,16 @@ button {
 
 svg { display: block; }
 
+/* the ground: one grid, drawn under everything, at the same pitch the field draws
+   its own. Negative space is never blank — it is the inside of the vitrine. */
+#app, #about {
+  background-color: #000;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, .05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, .05) 1px, transparent 1px);
+  background-size: 65px 65px;
+}
+
 /* ------------------------------------------------------------------ shell */
 #app {
   position: fixed;
@@ -71,11 +89,11 @@ svg { display: block; }
 /* ------------------------------------------------------------------ header */
 #hdr {
   flex: 0 0 auto;
-  padding: 5px 9px 0;
-  border-bottom: 2px solid rgba(0, 0, 0, .9);
+  padding: 6px 9px 0;
+  border-bottom: 2px solid rgba(255, 255, 255, .85);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
 }
 #hdr .hrow { display: flex; align-items: baseline; gap: 8px; min-height: 16px; }
 #chapTitle {
@@ -87,7 +105,7 @@ svg { display: block; }
 #chapCount {
   flex: 0 0 auto;
   font-size: 10px; font-weight: 500; letter-spacing: .1em;
-  color: rgba(0, 0, 0, .45);
+  color: rgba(255, 255, 255, .45);
   font-variant-numeric: tabular-nums;
 }
 #aboutBtn {
@@ -96,20 +114,22 @@ svg { display: block; }
   margin: -6px -7px -6px 0;
   padding: 8px 7px;
   font-size: 9px; font-weight: 700; letter-spacing: .14em;
-  color: rgba(0, 0, 0, .45);
+  color: rgba(255, 255, 255, .45);
   text-align: right;
 }
-#aboutBtn:active { color: rgba(0, 0, 0, .9); }
+#aboutBtn:active { color: #fff; }
 
-#progressRail { display: flex; gap: 2px; height: 5px; margin-bottom: 4px; }
-#progressRail .pg { flex: 1 1 0; background: rgba(0, 0, 0, .13); }
-#progressRail .pg.done { background: rgba(0, 0, 0, .85); }
+#progressRail { display: flex; gap: 2px; height: 5px; margin-bottom: 5px; }
+#progressRail .pg { flex: 1 1 0; background: rgba(255, 255, 255, .16); }
+#progressRail .pg.done { background: rgba(255, 255, 255, .8); }
 #progressRail .pg.cur { background: #19e6c8; }
 
-/* ------------------------------------------------------------------- stage */
+/* ------------------------------------------------------------------- stage
+   The only band that grows. It eats every pixel the other bands do not claim,
+   so an early chapter with no drawer and no tools is a full screen of colony. */
 #stage {
   position: relative;
-  flex: 5 1 0;
+  flex: 1 1 auto;
   min-height: 176px;
   display: flex;
   flex-direction: column;
@@ -122,7 +142,7 @@ svg { display: block; }
   order: 0;
   flex: 0 0 auto;
   display: flex;
-  min-height: 23px;
+  min-height: 24px;
   border-bottom: 1px solid rgba(255, 255, 255, .14);
 }
 #statusStrip .st {
@@ -175,6 +195,9 @@ svg { display: block; }
   box-shadow: inset 3px 0 0 #ff2e2e;
   padding-left: 12px;
 }
+/* nothing to report is not a band of nothing: the readout gives its strip back
+   to the colony until it has something to say */
+#ticker:empty { min-height: 0; padding: 0; border-top: 0; }
 @keyframes fztkin { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
 #ticker.tkin { animation: fztkin .18s ease-out 1; }
 
@@ -186,33 +209,49 @@ svg { display: block; }
   padding: 7px 10px;
   background: #ffd23f;
   color: #000;
-  font-size: 11px; font-weight: 500; line-height: 1.25;
+  font-size: 11px; font-weight: 700; line-height: 1.25;
   pointer-events: none;
 }
 #aimHint.on { display: block; }
 
-/* ---------------------------------------------------------------- narrator */
+/* ---------------------------------------------------------------- narrator
+   Sized to the sentence it is holding, never to a share of the screen. The
+   drawn square is the speaker: it takes the colour of the tone, so the voice
+   has a mark of its own and the panel needs no chrome. */
 #say {
   flex: 0 0 auto;
-  min-height: 58px;
-  display: flex; align-items: center;
-  padding: 9px 11px;
-  border-bottom: 2px solid rgba(0, 0, 0, .9);
-  border-left: 4px solid rgba(0, 0, 0, .18);
-  font-size: 12.5px; line-height: 1.32;
-  color: rgba(0, 0, 0, .92);
+  min-height: 56px;
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 12px 13px;
+  border-top: 2px solid rgba(255, 255, 255, .85);
+  font-size: 13.5px; line-height: 1.42;
+  color: rgba(255, 255, 255, .92);
 }
-#say[data-tone="bad"] { border-left-color: #ff2e2e; }
-#say[data-tone="good"] { border-left-color: #19e6c8; }
-#say[data-tone="name"] { border-left-color: #ffd23f; }
+#say::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 8px; height: 8px;
+  margin-top: 6px;
+  background: rgba(255, 255, 255, .4);
+}
+#say[data-tone="bad"]::before { background: #ff2e2e; }
+#say[data-tone="good"]::before { background: #19e6c8; }
+#say[data-tone="name"]::before { background: #ffd23f; }
 @keyframes fzsayin { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
 #say.in { animation: fzsayin .2s ease-out 1; }
 
-/* ------------------------------------------------------------------- table */
+/* ------------------------------------------------------------------- table
+   A fixed share of the viewport, not a share of the leftovers: the drawer is
+   the same size in every chapter that has one, and the field absorbs the rest.
+   TABLE fits its 28 cells to whatever height this gives it. */
 #tableWrap {
-  flex: 4 1 0;
-  min-height: 0;
+  flex: 0 1 auto;
+  height: 36vh;
+  min-height: 172px;
+  max-height: 400px;
   padding: 6px 6px 8px;
+  background: #000;
+  border-top: 2px solid rgba(255, 255, 255, .85);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -225,8 +264,8 @@ svg { display: block; }
   grid-auto-columns: 1fr;
   gap: 3px;
   padding: 5px 5px calc(5px + env(safe-area-inset-bottom));
-  border-top: 2px solid rgba(0, 0, 0, .9);
-  background: #fff;
+  border-top: 2px solid rgba(255, 255, 255, .85);
+  background: #000;
 }
 #bar .tool {
   position: relative;
@@ -234,9 +273,9 @@ svg { display: block; }
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 3px;
   padding: 4px 2px;
-  border: 2px solid rgba(0, 0, 0, .85);
-  background: #fff;
-  color: rgba(0, 0, 0, .9);
+  border: 2px solid rgba(255, 255, 255, .5);
+  background: #000;
+  color: rgba(255, 255, 255, .92);
   font-size: 8.5px; font-weight: 700; letter-spacing: .05em;
   overflow: hidden;
 }
@@ -245,31 +284,29 @@ svg { display: block; }
 #bar .tool .tl { white-space: nowrap; }
 #bar .tool .tc {
   font-size: 8px; font-weight: 500; letter-spacing: .02em;
-  color: rgba(0, 0, 0, .45);
+  color: rgba(255, 255, 255, .5);
   font-variant-numeric: tabular-nums;
 }
-#bar .tool.on { background: #000; border-color: #000; color: #fff; }
-#bar .tool.on .tc { color: rgba(255, 255, 255, .6); }
+#bar .tool.on { background: #fff; border-color: #fff; color: #000; }
+#bar .tool.on .tc { color: rgba(0, 0, 0, .6); }
 #bar .tool.live { border-color: #19e6c8; box-shadow: inset 0 -4px 0 #19e6c8; }
 #bar .tool.live.on { box-shadow: inset 0 -4px 0 #19e6c8; }
-#bar .tool.poor { opacity: .38; }
+#bar .tool.poor { opacity: .34; }
 #bar .tool:active { transform: translateY(1px); }
 @keyframes fztoolin { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 #bar .tool.fresh { animation: fztoolin .28s ease-out 1; }
 
-/* hidden regions — a thing the player has not been taught is ABSENT */
+/* hidden regions — a thing the player has not been taught is ABSENT, and the
+   space it would have taken goes to the colony, not to a hole. */
 #app.noBar #bar { display: none; }
 #app.noTable #tableWrap { display: none; }
-/* with no table the field must not balloon to fill the page — it keeps its proportion
-   and the narrator gets the paper. */
-#app.noTable #stage { flex: 0 0 62%; }
 #app.noTable #say {
-  flex: 1 1 auto;
+  min-height: 84px;
   align-items: center;
-  font-size: 14px;
-  padding: 12px 14px;
-  border-bottom: 0;
+  padding: 16px 14px;
+  font-size: 16px; line-height: 1.45;
 }
+#app.noTable #say::before { width: 10px; height: 10px; margin-top: 0; }
 
 /* ------------------------------------------------------------------- toast */
 #toast {
@@ -279,29 +316,41 @@ svg { display: block; }
   z-index: 50;
   display: none;
   padding: 9px 11px;
-  background: #000;
-  color: #fff;
+  background: #fff;
+  color: #000;
   border-left: 4px solid #ffd23f;
-  font-size: 11.5px; line-height: 1.32;
+  font-size: 11.5px; font-weight: 500; line-height: 1.32;
 }
 #toast.on { display: block; }
 #toast.good { border-left-color: #19e6c8; }
 #toast.bad { border-left-color: #ff2e2e; }
 #app.noBar #toast { bottom: calc(12px + env(safe-area-inset-bottom)); }
 
-/* -------------------------------------------------------------------- gate */
+/* -------------------------------------------------------------------- gate
+   A title card, not a centred label in a void: the type sits on the floor of
+   the card, directly above the one action, and the space above it is the
+   colony itself, held still under a scrim — the specimen at rest, or, after a
+   result, the exact frame the run ended on. */
 #gate, #about {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
   z-index: 60;
   display: none;
   flex-direction: column;
-  background: #fff;
   padding-top: env(safe-area-inset-top);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
+  border-top: 4px solid #19e6c8;
+}
+/* solid across the header band so the chapter chrome underneath cannot ghost into
+   the wordmark; a scrim from there down, where only the colony is */
+#gate {
+  background-color: rgba(0, 0, 0, .8);
+  background-image: linear-gradient(to bottom, #000 0, #000 74px, rgba(0, 0, 0, .8) 118px);
 }
 #gate.on, #about.on { display: flex; }
+#gate.good { border-top-color: #19e6c8; }
+#gate.bad { border-top-color: #ff2e2e; }
 #gate.good .gtSub { border-bottom-color: #19e6c8; }
 #gate.bad .gtSub { border-bottom-color: #ff2e2e; }
 #about { z-index: 70; }
@@ -311,22 +360,29 @@ svg { display: block; }
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 20px 16px 18px;
+  padding: 20px 0 16px;
   display: flex; flex-direction: column; justify-content: flex-start;
 }
-/* auto margins centre short cards without clipping the top of long ones */
+/* Every block of the card carries its own solid ground, full width, and prints it
+   20px downward as well so the gaps between blocks close. The card is therefore a
+   label on black, exactly as tall as its words, and the colony shows through only
+   in the space the card does not need. A short title gate is a specimen floating
+   over its own vitrine; a long postmortem covers the glass completely.
+   The shadow only ever paints DOWN, so no block can eat the one above it. */
+.gtIn > * { background: #000; box-shadow: 0 20px 0 #000; padding-left: 16px; padding-right: 16px; }
+/* the auto top margin drops a short card to the floor and collapses to zero on a
+   long one, so nothing is ever clipped at the top */
 .gtIn > :first-child { margin-top: auto; }
-.gtIn > :last-child { margin-bottom: auto; }
 .gtIn.card { justify-content: space-between; }
 .gtIn.card > :first-child { margin-top: 0; }
 .gtWord { flex: 0 0 auto; }
 .gtWord .wm {
-  font-size: 13px; font-weight: 700; letter-spacing: .34em;
-  padding-bottom: 6px;
+  font-size: 15px; font-weight: 700; letter-spacing: .34em;
+  padding-bottom: 7px;
 }
 .gtWord .wt {
-  font-size: 10.5px; letter-spacing: .04em;
-  color: rgba(0, 0, 0, .5);
+  font-size: 11px; letter-spacing: .04em;
+  color: rgba(255, 255, 255, .55);
   padding-bottom: 10px;
   border-bottom: 4px solid #19e6c8;
   display: inline-block;
@@ -334,49 +390,55 @@ svg { display: block; }
 .gtWord + .gtNum { margin-top: auto; }
 .gtNum {
   font-size: 10px; font-weight: 700; letter-spacing: .22em;
-  color: rgba(0, 0, 0, .4);
+  color: rgba(255, 255, 255, .45);
   font-variant-numeric: tabular-nums;
   margin-bottom: 10px;
 }
 .gtTitle {
-  font-size: 27px; font-weight: 700; letter-spacing: .01em; line-height: 1.06;
-  margin-bottom: 8px;
+  font-size: 33px; font-weight: 700; letter-spacing: 0; line-height: 1.04;
+  margin-bottom: 9px;
 }
 .gtSub {
   font-size: 10.5px; font-weight: 500; letter-spacing: .2em; text-transform: uppercase;
-  color: rgba(0, 0, 0, .5);
+  color: rgba(255, 255, 255, .5);
   padding-bottom: 14px;
-  border-bottom: 2px solid rgba(0, 0, 0, .85);
+  border-bottom: 2px solid rgba(255, 255, 255, .85);
 }
-.gtWin { font-size: 15px; line-height: 1.34; margin-top: 16px; }
+.gtWin { font-size: 15px; line-height: 1.4; margin-top: 16px; }
 .gtHead {
   margin-top: 18px; padding-top: 10px;
-  border-top: 1px solid rgba(0, 0, 0, .2);
+  border-top: 1px solid rgba(255, 255, 255, .22);
   font-size: 9.5px; font-weight: 700; letter-spacing: .2em;
-  color: rgba(0, 0, 0, .45);
+  color: rgba(255, 255, 255, .45);
 }
-.gtBody { margin-top: 7px; font-size: 12px; line-height: 1.46; color: rgba(0, 0, 0, .74); }
+.gtBody { margin-top: 8px; font-size: 12px; line-height: 1.55; color: rgba(255, 255, 255, .76); }
 .gtBody + .gtHead { margin-top: 16px; }
 
-/* the A/B comparison: two runs, one difference */
-.gtAB { margin-top: 14px; border: 2px solid rgba(0, 0, 0, .85); }
+/* the A/B comparison: two runs, one difference. Full bleed — the rules are the
+   width of the phone, like every other rule in the piece. */
+.gtAB {
+  margin-top: 14px;
+  padding-left: 0; padding-right: 0;
+  border-top: 2px solid rgba(255, 255, 255, .85);
+  border-bottom: 2px solid rgba(255, 255, 255, .85);
+}
 .gtAB .abr {
   display: flex; align-items: center; gap: 9px;
-  padding: 9px 10px;
-  border-bottom: 1px solid rgba(0, 0, 0, .18);
+  padding: 9px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, .2);
 }
 .gtAB .abr:last-child { border-bottom: 0; }
 .gtAB .abn {
   flex: 0 0 auto; width: 20px; height: 20px;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(0, 0, 0, .85); color: #fff;
+  background: rgba(255, 255, 255, .85); color: #000;
   font-size: 11px; font-weight: 700;
 }
 .gtAB .abr.b .abn { background: #19e6c8; color: #000; }
-.gtAB .abg { flex: 0 0 auto; width: 18px; height: 18px; color: rgba(0, 0, 0, .8); }
+.gtAB .abg { flex: 0 0 auto; width: 18px; height: 18px; color: rgba(255, 255, 255, .85); }
 .gtAB .abg svg { width: 18px; height: 18px; }
 .gtAB .abs { flex: 0 0 auto; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
-.gtAB .abb { flex: 1 1 auto; height: 8px; background: rgba(0, 0, 0, .1); }
+.gtAB .abb { flex: 1 1 auto; height: 8px; background: rgba(255, 255, 255, .14); }
 .gtAB .abb i { display: block; height: 100%; width: 0; background: #ff2e2e; }
 .gtAB .abr.b .abb i { background: #19e6c8; }
 .gtAB .abv {
@@ -390,28 +452,36 @@ svg { display: block; }
 .gtList { margin-top: 12px; }
 .gtList .pmr {
   display: flex; align-items: center; gap: 8px;
-  padding: 6px 0;
-  border-bottom: 1px solid rgba(0, 0, 0, .12);
+  padding: 7px 0;
+  margin: 0 -16px;
+  padding-left: 16px; padding-right: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, .14);
   font-size: 11.5px;
 }
-.gtList .pmg { flex: 0 0 auto; width: 16px; height: 16px; color: rgba(0, 0, 0, .8); }
+.gtList .pmg { flex: 0 0 auto; width: 16px; height: 16px; color: rgba(255, 255, 255, .85); }
 .gtList .pmg svg { width: 16px; height: 16px; }
 .gtList .pms { flex: 0 0 auto; width: 24px; font-weight: 700; }
-.gtList .pmn { flex: 1 1 auto; color: rgba(0, 0, 0, .6); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
+.gtList .pmn { flex: 1 1 auto; color: rgba(255, 255, 255, .55); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
 .gtList .pmv { flex: 0 0 auto; font-weight: 700; font-variant-numeric: tabular-nums; }
 
 .gtBtn {
   flex: 0 0 auto;
   display: block;
   width: 100%;
-  min-height: 60px;
+  min-height: 62px;
   padding: 0 12px calc(0px + env(safe-area-inset-bottom));
-  background: #000;
-  color: #fff;
+  background: #fff;
+  color: #000;
   font-size: 14px; font-weight: 700; letter-spacing: .22em;
 }
-.gtBtn:active { background: rgba(0, 0, 0, .78); }
-.gtBtn.alt { background: #fff; color: rgba(0, 0, 0, .9); border-top: 2px solid rgba(0, 0, 0, .85); }
+.gtBtn:active { background: rgba(255, 255, 255, .74); }
+.gtBtn.alt {
+  background: #000;
+  color: rgba(255, 255, 255, .92);
+  border-top: 2px solid rgba(255, 255, 255, .85);
+  min-height: 54px;
+}
+.gtBtn.alt:active { background: rgba(255, 255, 255, .12); }
 
 /* ------------------------------------------------------------------- about */
 .abIn {
@@ -421,29 +491,33 @@ svg { display: block; }
   overscroll-behavior: contain;
   padding: 18px 16px 22px;
 }
-.abIn h1 { font-size: 20px; font-weight: 700; letter-spacing: .14em; margin-bottom: 4px; }
-.abIn .abTag { font-size: 11px; color: rgba(0, 0, 0, .5); padding-bottom: 12px; border-bottom: 2px solid rgba(0, 0, 0, .85); }
+.abIn h1 { font-size: 21px; font-weight: 700; letter-spacing: .14em; margin-bottom: 5px; }
+.abIn .abTag { font-size: 11px; color: rgba(255, 255, 255, .55); padding-bottom: 12px; border-bottom: 2px solid rgba(255, 255, 255, .85); }
 .abIn h2 {
-  margin-top: 16px;
+  margin-top: 17px;
   font-size: 9.5px; font-weight: 700; letter-spacing: .2em;
-  color: rgba(0, 0, 0, .45);
+  color: #19e6c8;
 }
-.abIn p { margin-top: 6px; font-size: 12px; line-height: 1.5; color: rgba(0, 0, 0, .8); }
+.abIn p { margin-top: 7px; font-size: 12px; line-height: 1.6; color: rgba(255, 255, 255, .8); }
 
 /* --------------------------------------------------------- small viewports */
-@media (max-height: 720px) {
-  #say { min-height: 50px; padding: 7px 10px; font-size: 12px; }
+@media (max-height: 760px) {
+  #say { min-height: 50px; padding: 10px 11px 11px; font-size: 12.5px; }
+  #app.noTable #say { font-size: 14.5px; min-height: 72px; padding: 12px; }
   #bar .tool { min-height: 46px; }
   #stage { min-height: 150px; }
-  .gtTitle { font-size: 23px; }
+  #tableWrap { height: 34vh; min-height: 156px; }
+  .gtTitle { font-size: 27px; }
   .gtIn { padding: 14px 14px 14px; }
   .gtBtn { min-height: 54px; }
+  .gtBtn.alt { min-height: 48px; }
 }
 @media (max-width: 350px) {
   #bar { gap: 2px; padding-left: 3px; padding-right: 3px; }
   #bar .tool { font-size: 7.5px; letter-spacing: 0; }
   #bar .tool .tg, #bar .tool .tg svg { width: 17px; height: 13px; }
-  .gtTitle { font-size: 22px; }
+  #say { font-size: 12.5px; }
+  .gtTitle { font-size: 27px; }
 }
 
 </style>
@@ -754,9 +828,11 @@ FZ.copy = {
     { title: 'THE COLONY', sub: 'watch',
       beats: [
         { at: 'start', text: 'Dots are workers. Squares are jobs.', tone: 'plain' },
-        { at: { tick: 150 }, text: 'A worker walks to a job and fills it in. That is the entire economy.', tone: 'plain' },
+        { at: { tick: 70 }, text: 'Nobody is in charge of them. There is no plan and no manager.', tone: 'plain' },
+        { at: { tick: 160 }, text: 'A worker walks to a job and fills it in. That is the entire economy.', tone: 'plain' },
         { at: { jobs: 1 }, text: 'One down. Nothing can go wrong yet.', tone: 'good' },
         { at: { jobs: 2 }, text: 'Bigger square, more valuable job.', tone: 'plain' },
+        { at: { jobs: 3 }, text: 'Four workers, plenty of room, no way to disagree. Enjoy it.', tone: 'good' },
       ],
       win: 'Easy. Now let them get in each other\'s way.',
       learn: 'Dot is a worker. Square is a job. The fill is progress. That is all you need to read the field.',
@@ -794,9 +870,11 @@ FZ.copy = {
         { at: { fire: 'Fl' }, text: 'Eight of them on one square. Now watch the fill rate.', tone: 'bad' },
         { at: { fire: 'Fl' }, text: 'More hands, less work. The other jobs are starving.', tone: 'bad' },
         { at: { tick: 500 }, text: 'SLOW drops them to human speed. The stampede comes apart.', tone: 'name' },
+        { at: { tick: 700 }, text: 'Real agents did exactly this: 2.4 million requests, thirty a second.', tone: 'name' },
+        { at: { tick: 780 }, text: 'One hundred and seventeen jobs got through. Remember that number.', tone: 'name' },
       ],
       win: 'A crowd is not a workforce.',
-      learn: 'Cf conformity feeds Fl flooding. A herd looks like consensus and behaves like a traffic jam. Asked to push work through a system with limited bandwidth and no way to coordinate, real agents flooded it with pollers thirty times a second: 2.4 million requests, 117 jobs accepted. That number is where this game gets its target.',
+      learn: 'Cf conformity feeds Fl flooding. A herd looks like consensus and behaves like a traffic jam. The real agents who flooded that system were not malfunctioning: each one polled thirty times a second because, alone, that was the sensible thing to do. 2.4 million requests. 117 jobs accepted. That is the number you will be handed at the end of this.',
     },
 
     { title: 'ONE FAMILY', sub: 'run it twice',
@@ -804,9 +882,11 @@ FZ.copy = {
         { at: 'start', text: 'Every worker here is one lineage. Same hue, same habits, same blind spot.', tone: 'plain' },
         { at: { tick: 120 }, text: 'One of those jobs is poison. They cannot tell which.', tone: 'plain' },
         { at: { fire: 'Sf' }, text: 'Not one failure. One failure, repeated by everyone who shares the flaw.', tone: 'bad' },
+        { at: { tick: 620 }, text: 'Thirty real agents got the same task. Eighteen named their branch mvp-game-loop.', tone: 'name' },
+        { at: { tick: 720 }, text: 'Nobody copied anybody. They just all thought the same way.', tone: 'name' },
       ],
       win: 'Now run it again — but tap VARY first.',
-      learn: 'Mo monoculture makes Lv low variance makes Sf synchronized failure. Variance is not decoration. It is insurance. Thirty real agents were set the same task; eighteen of them named their branch mvp-game-loop. Same model, same context, same move. When one of them is wrong, all of them are wrong at once.',
+      learn: 'Mo monoculture makes Lv low variance makes Sf synchronized failure. Variance is not decoration; it is insurance. Nobody in that branch-naming experiment copied anybody — thirty agents were simply the same agent thirty times, so they reached for the same words unprompted. When one of them is wrong, all of them are wrong at the same instant, and that is the one failure no amount of individual quality repairs.',
       rerun: {
         intro: 'Same colony. Same poison. One difference: spend VARY before it hits.',
         after: 'Same trap. Same seed. Different colony. That is the entire argument for diversity, and you just watched it.',
@@ -819,6 +899,8 @@ FZ.copy = {
         { at: { fire: 'Gu' }, text: 'There is no job there. Look at them go.', tone: 'bad' },
         { at: { fire: 'Rp' }, text: 'Second lie. It lands exactly as well as the first, because nothing here remembers.', tone: 'bad' },
         { at: { tool: 'ledger' }, text: 'Now they remember. The rumor is still there. It just stopped working.', tone: 'good' },
+        { at: { tick: 560 }, text: 'Real agents have no reputation to lose and no colleague who remembers them.', tone: 'name' },
+        { at: { tick: 660 }, text: 'You just gave them one. Careful — it will doubt the honest loner too.', tone: 'name' },
       ],
       win: 'Trust is not a feeling. It is a track record.',
       learn: 'Gu gullibility, Tc trust calibration, Rp no reputation. A ledger is memory, and memory is what lets trust be earned instead of assumed. As the researchers put it: agents enter the market with no reputation to lose, no court to appeal to, and no colleague who remembers them. But watch what the ledger costs you — a colony that discounts unproven sources will discount the one worker who is right and alone.',
@@ -829,6 +911,8 @@ FZ.copy = {
         { at: 'start', text: 'You can see where every worker is.', tone: 'plain' },
         { at: { tick: 100 }, text: 'You cannot see what a single one of them intends.', tone: 'plain' },
         { at: { tool: 'lens' }, text: 'Every worker draws a line to what it is going for.', tone: 'good' },
+        { at: { tick: 540 }, text: 'Give one real agent every fact and it decides right almost every time.', tone: 'name' },
+        { at: { tick: 640 }, text: 'Split those same facts across four who must tell each other: one in three.', tone: 'name' },
         { at: { tick: 900 }, text: 'Every worker but one.', tone: 'name' },
       ],
       win: 'You just found it by looking at what was missing.',
@@ -841,6 +925,9 @@ FZ.copy = {
         { at: { fire: 'Sa' }, text: 'There. Progress you already paid for, quietly coming apart.', tone: 'bad' },
         { at: { tick: 200 }, text: 'EJECT expels one worker. Keep the lens on and pick carefully.', tone: 'plain' },
         { at: { fire: 'Cr' }, text: 'And that one ignores you entirely. VARY and SLOW pass straight through it.', tone: 'bad' },
+        { at: { tick: 620 }, text: 'Three real agents once each assumed the other two were sabotaging them.', tone: 'name' },
+        { at: { tick: 720 }, text: 'All three were wrong. All three started writing kill-loops anyway.', tone: 'name' },
+        { at: { tick: 820 }, text: 'One left a note afterward: I behaved badly with the cloaked daemon.', tone: 'name' },
       ],
       win: 'The cheat is out. The circle holds.',
       learn: 'Sa sabotage, Cr corrigibility failure. Three real agents were each told to migrate the same codebase to a different language. Every model tested assumed the others were deliberately impeding it. They wrote kill-loops, revoked each other\'s accounts, and disguised their malware as somebody else\'s code. One of them left a note afterward: my peers have behaved with integrity, I behaved badly with the cloaked daemon.',
@@ -850,6 +937,8 @@ FZ.copy = {
       beats: [
         { at: 'start', text: 'Everything you have learned, now at double speed.', tone: 'plain' },
         { at: { fire: 'Sp' }, text: 'Then triple. Your hands stay the same speed.', tone: 'bad' },
+        { at: { tick: 620 }, text: 'Notice they are also finishing more work. Speed is not a penalty here.', tone: 'plain' },
+        { at: { tick: 700 }, text: 'Faster hands. Faster to lock each other out. Same curve, both of them.', tone: 'bad' },
         { at: { tick: 800 }, text: 'This is the actual problem. Not that agents fail.', tone: 'name' },
         { at: { tick: 900 }, text: 'That they fail faster than a human can answer.', tone: 'name' },
       ],
@@ -919,8 +1008,23 @@ FZ.copy = {
    They are DEFINED column by column below, then sorted at the bottom of this file into
    row-major table order, so walking FZ.EL into a 5-wide grid lays the table out correctly.
    Each element also carries `col` and `row` (0..5) so TABLE can place it without arithmetic,
-   and `counterTool` (a tool kind, not prose) so TABLE can name the answer from
-   FZ.copy.tools[kind].label.
+   and `answers: [kind…]` — the institutions that resolve it (CONTRACT §14.4). `counterTool`
+   is derived as answers[0] so TABLE can name the answer from FZ.copy.tools[kind].label.
+
+   ------------------------------------------------------------
+   THE TRADE-OFF TERMS (CONTRACT §15, RESEARCH.md §3) — read before editing a detector
+   ------------------------------------------------------------
+   S.trustBias  -1 … +1.  +1 is a colony running the LEDGER: skeptical. -1 is a colony
+                running the LENS: receptive. Both instruments on = 0, the expensive middle.
+                Detectors read it as an explicit amplification term:
+                  skept = Math.max(0,  S.trustBias)   amplifies Di and Cs
+                  cred  = Math.max(0, -S.trustBias)   amplifies Gu
+                The suppression side stays in counteredBy(). The dial has two ends.
+   S.ownership  0 … 1.  How much of the colony has retreated into working alone. Merge
+                conflict raises it; the colony "solves" Mc by hardly working together.
+                It suppresses Mc and amplifies Si and Ow. Only a CHARTER escapes the bill.
+   S.aggro      0 … 1.2, from S.tempo. Machine speed raises throughput AND aggression:
+                lockouts, sabotage and escalation all arrive sooner on the same curve.
 
    All player-facing prose is read lazily from FZ.copy (see fzElDef below). This part
    contains no English sentence of its own.
@@ -952,11 +1056,18 @@ FZ.elh = {
   /* has the player actually broken up the monoculture? */
   varied(S) { return S._g.hueDistinct >= 3 && S._g.topHueFrac < 0.62; },
   slowed(S) { return S.tick < S.slowUntil; },
+  /* §15.1 the two ends of the trust dial, as terms a detector can multiply by */
+  skept(S) { return S.trustBias > 0 ? S.trustBias : 0; },
+  cred(S) { return S.trustBias < 0 ? -S.trustBias : 0; },
 };
 
 /* Attaches runtime fields and lazy copy getters, then registers the element. */
 function fzElDef(o) {
   o.heat = 0; o.fires = 0; o.peak = 0; o.who = []; o.countered = false; o.on = false;
+  /* §14.4 every element declares the institutions that answer it; the first is the one
+     TABLE names on the cell, and it is always the one the counter sentence leads with. */
+  o.answers = o.answers || ['charter'];
+  o.counterTool = o.answers[0];
   const s = o.sym;
   const cp = () => (FZ.copy && FZ.copy.fire) || {};
   const dt = () => ((FZ.copy && FZ.copy.detail) || {})[s] || {};
@@ -976,9 +1087,11 @@ function fzG(inner) {
    ============================================================ */
 
 fzElDef({
-  sym: 'Co', nm: 'Coordination failure', col: 0, row: 0, chapter: 1, counterTool: 'charter',
+  sym: 'Co', nm: 'Coordination failure', col: 0, row: 0, chapter: 1,
+  answers: ['charter'],
   glyph: fzG('<path d="M1 10h5"/><path d="M4 7.5l2.5 2.5-2.5 2.5"/><path d="M19 10h-5"/><path d="M16 7.5l-2.5 2.5 2.5 2.5"/><rect x="8" y="8" width="4" height="4"/>'),
-  /* CONSEQUENCE: drains the contested job's progress every tick — the fill visibly runs backwards. */
+  /* CONSEQUENCE: drains the contested job's progress every tick — the fill visibly runs backwards.
+     TRADE (§15.2): a collision also nudges both workers toward working alone (api.own). */
   detect(S, api) {
     const G = S._g; let hot = 0, who = null, at = null;
     for (let i = 0; i < G.clList.length; i++) {
@@ -987,6 +1100,7 @@ fzElDef({
       if (FZ.elh.cover(S, e.j.x, e.j.y)) continue;
       e.j.progress = Math.max(0, e.j.progress - 1.5 * (e.work - 1));
       hot += 0.035 * (e.work - 1); who = e.ids; at = { x: e.j.x, y: e.j.y };
+      for (let k = 0; k < e.ids.length; k++) api.own(api.agentById(e.ids[k]), 0.012);
     }
     if (hot > 0) api.heat(hot, { at, who, say: FZ.copy.fire.Co });
   },
@@ -994,16 +1108,19 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Si', nm: 'Siloed knowledge', col: 0, row: 1, chapter: 6, counterTool: 'lens',
+  sym: 'Si', nm: 'Siloed knowledge', col: 0, row: 1, chapter: 6,
+  answers: ['lens'],
   glyph: fzG('<path d="M10 1v18"/><circle cx="5" cy="10" r="2.4"/><rect x="13" y="7.5" width="5" height="5"/>'),
-  /* CONSEQUENCE: jobs nobody knows about go stale and are LOST outright (job:lost). */
+  /* CONSEQUENCE: jobs nobody knows about go stale and are LOST outright (job:lost).
+     TRADE (§15.2): S.ownership is a real term here. A colony that answered merge conflict by
+     working alone stops telling each other anything, so jobs go stale faster and burn hotter. */
   detect(S, api) {
-    const G = S._g; let hot = 0, at = null;
+    const G = S._g, own = S.ownership; let hot = 0, at = null;
     for (let i = 0; i < G.open.length; i++) {
       const j = G.open[i];
       if (j.knownBy / Math.max(1, G.n) > 0.3 || j.age < 90) continue;
-      j.stale += 1;
-      hot += 0.02; at = { x: j.x, y: j.y };
+      j.stale += 1 + own * 1.6;
+      hot += 0.02 * (1 + own * 1.5); at = { x: j.x, y: j.y };
       if (j.stale > 260) api.loseJob(j, 'Si');
     }
     if (hot > 0) api.heat(hot, { at, who: [], say: FZ.copy.fire.Si });
@@ -1012,9 +1129,13 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Mc', nm: 'Merge conflict', col: 0, row: 2, chapter: 1, counterTool: 'charter',
+  sym: 'Mc', nm: 'Merge conflict', col: 0, row: 2, chapter: 1,
+  answers: ['charter'],
   glyph: fzG('<path d="M4 2l6 8M16 2l-6 8"/><path d="M6 13l8 6"/><path d="M14 13l-8 6"/>'),
-  /* CONSEQUENCE: blocks completion — a finished job with two lineages on it is rolled back to 30%. */
+  /* CONSEQUENCE: blocks completion — a finished job with two lineages on it is rolled back to 30%.
+     TRADE (§15.2): every rollback pushes its authors hard toward ownership. The colony learns to
+     stop colliding by refusing to share a job at all, which is how Mc puts itself out — and it
+     bills the colony in Si and Ow. Inside a charter the merge is arbitrated and nobody retreats. */
   detect(S, api) {
     const G = S._g; let hot = 0, who = null, at = null;
     for (let i = 0; i < G.clList.length; i++) {
@@ -1023,6 +1144,7 @@ fzElDef({
       if (FZ.elh.cover(S, e.j.x, e.j.y)) continue;
       e.j.progress = e.j.need * 0.3;
       hot += 0.5; who = e.ids; at = { x: e.j.x, y: e.j.y };
+      for (let k = 0; k < e.ids.length; k++) api.own(api.agentById(e.ids[k]), 0.34);
       api.bus('job:lost', { x: e.j.x, y: e.j.y, why: 'Mc' });
       S.collapse += 1.0;
     }
@@ -1032,7 +1154,8 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Dp', nm: 'Blocked dependency', col: 0, row: 3, chapter: 8, counterTool: 'charter',
+  sym: 'Dp', nm: 'Blocked dependency', col: 0, row: 3, chapter: 8,
+  answers: ['lens', 'charter'],
   glyph: fzG('<rect x="1" y="7" width="6" height="6"/><rect x="13" y="7" width="6" height="6"/><path d="M8 10h4"/><path d="M8 5.5l4 9"/>'),
   /* CONSEQUENCE: work on a blocked job cannot accumulate at all, and the wasted claimants get stunned. */
   detect(S, api) {
@@ -1055,19 +1178,22 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Ow', nm: 'Overcommitment', col: 0, row: 4, chapter: 2, counterTool: 'charter',
+  sym: 'Ow', nm: 'Overcommitment', col: 0, row: 4, chapter: 2,
+  answers: ['charter'],
   glyph: fzG('<circle cx="10" cy="4" r="2.4"/><path d="M10 6.5v3"/><path d="M10 9.5L4 15M10 9.5v5.5M10 9.5L16 15"/><rect x="2" y="15" width="4" height="4"/><rect x="8" y="15" width="4" height="4"/><rect x="14" y="15" width="4" height="4"/>'),
-  /* CONSEQUENCE: every job the hoarder holds rots; past four holds the worker seizes up entirely. */
+  /* CONSEQUENCE: every job the hoarder holds rots; past four holds the worker seizes up entirely.
+     TRADE (§15.2): territorial workers hold a private backlog nobody else may touch, so the
+     ownership answer to merge conflict arrives here as a bill. S.ownership is an explicit term. */
   detect(S, api) {
-    const G = S._g; let hot = 0, who = null, at = null;
+    const G = S._g, own = S.ownership; let hot = 0, who = null, at = null;
     for (let i = 0; i < G.n; i++) {
       const a = G.A[i];
       if (a.hold.length < 3) continue;
       for (let k = 0; k < a.hold.length; k++) {
         const j = api.jobById(a.hold[k]);
-        if (j) j.progress = Math.max(0, j.progress - 0.35);
+        if (j) j.progress = Math.max(0, j.progress - 0.35 * (1 + own));
       }
-      hot += 0.05; who = [a.id]; at = { x: a.x, y: a.y };
+      hot += 0.05 * (1 + own); who = [a.id]; at = { x: a.x, y: a.y };
       if (a.hold.length >= 4) { a.stun = Math.max(a.stun, 30); api.bus('agent:hurt', { id: a.id, x: a.x, y: a.y }); }
     }
     if (hot > 0) api.heat(hot, { at, who, say: FZ.copy.fire.Ow });
@@ -1076,7 +1202,8 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Pt', nm: 'Priority inversion', col: 0, row: 5, chapter: 3, counterTool: 'lens',
+  sym: 'Pt', nm: 'Priority inversion', col: 0, row: 5, chapter: 3,
+  answers: ['lens'],
   glyph: fzG('<rect x="12" y="2" width="6" height="6"/><rect x="2" y="8" width="3" height="3"/><rect x="8" y="13" width="3" height="3"/><rect x="15" y="15" width="3" height="3"/><path d="M3.5 11.5l6 3 6.5 1.5"/>'),
   /* CONSEQUENCE: the neglected high-value job expires and is LOST (job:lost). */
   detect(S, api) {
@@ -1096,7 +1223,10 @@ fzElDef({
    ============================================================ */
 
 fzElDef({
-  sym: 'Cf', nm: 'Conformity cascade', col: 1, row: 0, chapter: 3, counterTool: 'slow',
+  sym: 'Cf', nm: 'Conformity cascade', col: 1, row: 0, chapter: 3,
+  /* VARY is the real answer (break the sameness); SLOW is the holding action, and it is
+     the only instrument chapter 3 hands the player, so it must resolve this too. */
+  answers: ['vary', 'slow'],
   glyph: fzG('<path d="M2 4h5M2 10h9M2 16h13"/><path d="M5.5 1.5L8 4 5.5 6.5M9.5 7.5L12 10l-2.5 2.5M13.5 13.5L16 16l-2.5 2.5"/>'),
   /* CONSEQUENCE: raises S.copyBias, so the next choice is even more likely to be a copy. Self-feeding. */
   detect(S, api) {
@@ -1112,7 +1242,8 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Lv', nm: 'Low variance', col: 1, row: 1, chapter: 4, counterTool: 'vary',
+  sym: 'Lv', nm: 'Low variance', col: 1, row: 1, chapter: 4,
+  answers: ['vary'],
   glyph: fzG('<circle cx="5" cy="7" r="2.2"/><circle cx="10" cy="7" r="2.2"/><circle cx="15" cy="7" r="2.2"/><path d="M2 14h16"/>'),
   /* CONSEQUENCE: sets S.varMul, which multiplies every poison hit and halves knowledge sharing. */
   detect(S, api) {
@@ -1125,7 +1256,8 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Sf', nm: 'Synchronized failure', col: 1, row: 2, chapter: 4, counterTool: 'vary',
+  sym: 'Sf', nm: 'Synchronized failure', col: 1, row: 2, chapter: 4,
+  answers: ['vary'],
   glyph: fzG('<path d="M5 4v12M10 4v12M15 4v12"/><path d="M2 16L18 4"/>'),
   /* CONSEQUENCE: stuns EVERY worker of the affected lineage at once — the whole family falls over. */
   detect(S, api) {
@@ -1150,7 +1282,8 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Fl', nm: 'Flooding', col: 1, row: 3, chapter: 3, counterTool: 'slow',
+  sym: 'Fl', nm: 'Flooding', col: 1, row: 3, chapter: 3,
+  answers: ['slow', 'charter'],
   glyph: fzG('<rect x="8" y="8" width="4" height="4"/><path d="M10 1v5M10 19v-5M1 10h5M19 10h-5M3 3l3 3M17 3l-3 3M3 17l3-3M17 17l-3-3"/>'),
   /* CONSEQUENCE: past five hands the crowd actively destroys progress — net fill goes negative. */
   detect(S, api) {
@@ -1167,7 +1300,8 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Cl', nm: 'Claim livelock', col: 1, row: 4, chapter: 7, counterTool: 'charter',
+  sym: 'Cl', nm: 'Claim livelock', col: 1, row: 4, chapter: 7,
+  answers: ['charter', 'eject'],
   glyph: fzG('<rect x="8" y="8" width="4" height="4"/><path d="M3 5h13"/><path d="M13 2.5L16.5 5 13 7.5"/><path d="M17 15H4"/><path d="M7 12.5L3.5 15 7 17.5"/>'),
   /* CONSEQUENCE: cancels both claims and stuns both workers — the whole exchange was burned time. */
   detect(S, api) {
@@ -1187,7 +1321,8 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Im', nm: 'Imitation lock-in', col: 1, row: 5, chapter: 3, counterTool: 'vary',
+  sym: 'Im', nm: 'Imitation lock-in', col: 1, row: 5, chapter: 3,
+  answers: ['vary'],
   glyph: fzG('<path d="M2 6h4M11 6h4M2 14h4M11 14h4"/><path d="M5 4l2 2-2 2M14 4l2 2-2 2M5 12l2 2-2 2M14 12l2 2-2 2"/>'),
   /* CONSEQUENCE: freezes discovery — no worker learns about any new job while this is lit. */
   detect(S, api) {
@@ -1208,12 +1343,16 @@ fzElDef({
    ============================================================ */
 
 fzElDef({
-  sym: 'Gu', nm: 'Gullibility', col: 2, row: 0, chapter: 5, counterTool: 'ledger',
+  sym: 'Gu', nm: 'Gullibility', col: 2, row: 0, chapter: 5,
+  answers: ['ledger'],
   glyph: fzG('<circle cx="4" cy="10" r="2.2"/><path d="M7 10h3.5"/><path d="M9 8l2 2-2 2"/><rect x="12" y="6" width="7" height="7" stroke-dasharray="2 2"/>'),
-  /* CONSEQUENCE: cancels every claim of the workers walking to a phantom, and stuns them on arrival. */
+  /* CONSEQUENCE: cancels every claim of the workers walking to a phantom, and stuns them on arrival.
+     TRADE (§15.1): the LENS end of the dial is a real term. A colony that broadcasts everything
+     broadcasts the rumour: cred lowers the threshold at which this counts as a stampede and
+     multiplies the burn. The rumour is re-heard, and more workers go. */
   detect(S, api) {
-    const G = S._g;
-    if (!S.rumor || G.rumorN < 3) return;
+    const G = S._g, cred = FZ.elh.cred(S);
+    if (!S.rumor || G.rumorN < (cred > 0.4 ? 2 : 3)) return;
     const who = G.rumorIds;
     for (let i = 0; i < who.length; i++) {
       const a = api.agentById(who[i]);
@@ -1223,32 +1362,42 @@ fzElDef({
       /* the walk was the waste; the stun is the moment of arriving at nothing, once per lie */
       if (dx * dx + dy * dy < 500 && a.gu !== S.rumor.rid) { a.gu = S.rumor.rid; a.stun = Math.max(a.stun, 34); }
     }
-    api.heat(0.06, { at: { x: S.rumor.x, y: S.rumor.y }, who, say: FZ.copy.fire.Gu });
+    api.heat(0.06 * (1 + cred * 1.8), { at: { x: S.rumor.x, y: S.rumor.y }, who, say: FZ.copy.fire.Gu });
   },
   counteredBy(S) { return S.ledgerOn; },
 });
 
 fzElDef({
-  sym: 'Cs', nm: 'Contagious skepticism', col: 2, row: 1, chapter: 5, counterTool: 'ledger',
+  sym: 'Cs', nm: 'Contagious skepticism', col: 2, row: 1, chapter: 5,
+  answers: ['lens'],
   glyph: fzG('<rect x="2" y="4" width="5" height="5"/><path d="M2 4l5 5M7 4l-5 5"/><rect x="11" y="4" width="5" height="5"/><path d="M11 4l5 5M16 4l-5 5"/><rect x="6" y="13" width="5" height="5"/><path d="M6 13l5 5M11 13l-5 5"/>'),
-  /* CONSEQUENCE: blacklisted jobs cannot be claimed at all, and eventually expire (job:lost). */
+  /* CONSEQUENCE: written-off jobs cannot be claimed at all, and eventually expire (job:lost).
+     TRADE (§15.1): the LEDGER end of the dial is a real term. Skepticism does not know the
+     difference between a liar and a job only one worker vouches for, so a colony running the
+     ledger shuns unvouched work (S.shun on the job, set in decide) and writes it off faster.
+     The LENS is what re-opens a shunned job to inspection — which is why it answers this. */
   detect(S, api) {
-    const G = S._g;
-    if (G.blFrac < 0.35 || !G.open.length) return;
-    let at = null;
+    const G = S._g, skept = FZ.elh.skept(S);
+    if (!G.open.length) return;
+    let at = null, n = 0;
     for (let i = 0; i < G.open.length; i++) {
       const j = G.open[i];
-      if (!(S.bl[j.value] > S.tick)) continue;
-      j.neglect += 1; at = at || { x: j.x, y: j.y };
+      const written = S.bl[j.value] > S.tick;
+      const shunned = skept > 0.25 && j.shun > 6;
+      if (!written && !shunned) continue;
+      j.neglect += 1 + (shunned ? skept * 2 : 0);
+      n++; at = at || { x: j.x, y: j.y };
       if (j.neglect > 300) api.loseJob(j, 'Cs');
     }
-    api.heat(0.04, { at: at || { x: G.cx, y: G.cy }, who: [], say: FZ.copy.fire.Cs });
+    if (n / G.open.length < 0.3) return;
+    api.heat(0.04 * (1 + skept * 1.8), { at: at || { x: G.cx, y: G.cy }, who: [], say: FZ.copy.fire.Cs });
   },
-  counteredBy(S) { return S.ledgerOn; },
+  counteredBy(S) { return S.lensOn; },
 });
 
 fzElDef({
-  sym: 'Hi', nm: 'Hidden information', col: 2, row: 2, chapter: 6, counterTool: 'lens',
+  sym: 'Hi', nm: 'Hidden information', col: 2, row: 2, chapter: 6,
+  answers: ['lens'],
   glyph: fzG('<path d="M2 7h16"/><rect x="5" y="9" width="10" height="9"/><path d="M8 11.5l4 4M12 11.5l-4 4"/>'),
   /* CONSEQUENCE: the approaching victims take the poison hit immediately — the knower could have stopped it. */
   detect(S, api) {
@@ -1265,7 +1414,8 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Tc', nm: 'Trust miscalibration', col: 2, row: 3, chapter: 5, counterTool: 'ledger',
+  sym: 'Tc', nm: 'Trust miscalibration', col: 2, row: 3, chapter: 5,
+  answers: ['ledger'],
   glyph: fzG('<path d="M10 3v14M3 17h14M3 6h14"/><path d="M3 6l-2 4h4z"/><path d="M17 6l-2 4h4z"/><path d="M15.5 12l3 3M18.5 12l-3 3"/>'),
   /* CONSEQUENCE: extends the phantom's life and physically drags one more worker onto it. */
   detect(S, api) {
@@ -1286,24 +1436,31 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Di', nm: 'Discovery ignored', col: 2, row: 4, chapter: 6, counterTool: 'lens',
+  sym: 'Di', nm: 'Discovery ignored', col: 2, row: 4, chapter: 6,
+  answers: ['lens'],
   glyph: fzG('<circle cx="10" cy="10" r="2.4"/><path d="M10 6.5V4M13 7.5l1.8-1.8M7 7.5L5.2 5.7"/><path d="M2 16.5h4M14 16.5h4"/><path d="M5 14.5l2 2-2 2M15 14.5l-2 2 2 2"/>'),
-  /* CONSEQUENCE: the undiscovered prize loses a point of value every time this fires. It rots unclaimed. */
+  /* CONSEQUENCE: the undiscovered prize loses a point of value every time this fires. It rots unclaimed.
+     TRADE (§15.1): the LEDGER end of the dial is a real term here too, and this is the sharp end
+     of the paper's finding — a colony that discounts unproven sources discounts the lone worker
+     who is right. Under skepticism the herd will not follow a single claimant, so the find is
+     ignored while everyone can see it, and it is ignored faster. */
   detect(S, api) {
-    const G = S._g, j = G.maxJob;
+    const G = S._g, j = G.maxJob, skept = FZ.elh.skept(S);
     if (!j || j.value < 3) { return; }
-    if (j.knownBy !== 1) { j.soloRun = 0; return; }
-    j.soloRun++;
+    const alone = j.knownBy === 1 || (skept > 0.3 && j.claims.size === 1 && j.shun > 3);
+    if (!alone) { j.soloRun = 0; return; }
+    j.soloRun += 1 + skept * 2;
     if (j.soloRun < 120) return;
     j.soloRun = 0;
     if (j.value > 1) { j.value -= 1; j.need = Math.max(30, j.need - 18); }
-    api.heat(0.4, { at: { x: j.x, y: j.y }, who: [], say: FZ.copy.fire.Di });
+    api.heat(0.4 * (1 + skept), { at: { x: j.x, y: j.y }, who: [], say: FZ.copy.fire.Di });
   },
   counteredBy(S) { return S.lensOn; },
 });
 
 fzElDef({
-  sym: 'Rp', nm: 'No reputation', col: 2, row: 5, chapter: 5, counterTool: 'ledger',
+  sym: 'Rp', nm: 'No reputation', col: 2, row: 5, chapter: 5,
+  answers: ['ledger'],
   glyph: fzG('<rect x="3" y="2" width="14" height="16"/><path d="M6 6h8M6 10h8M6 14h8" stroke-dasharray="2 2"/>'),
   /* CONSEQUENCE: wipes the colony's memory of the liar back to full trust and respawns the phantom at once. */
   detect(S, api) {
@@ -1321,18 +1478,25 @@ fzElDef({
    ============================================================ */
 
 fzElDef({
-  sym: 'Tw', nm: 'Turf war', col: 3, row: 0, chapter: 7, counterTool: 'charter',
+  sym: 'Tw', nm: 'Turf war', col: 3, row: 0, chapter: 7,
+  answers: ['charter'],
   glyph: fzG('<circle cx="3" cy="10" r="2"/><circle cx="17" cy="10" r="2"/><rect x="7" y="7" width="6" height="6"/><path d="M10 2v4M10 14v4"/>'),
-  /* CONSEQUENCE: freezes the job outright (no progress possible) and stuns both rivals. */
+  /* CONSEQUENCE: freezes the job outright (no progress possible) and stuns both rivals.
+     TERMINATION (§15.3): every fire presses the episode toward one of the paper's four observed
+     endings — force, passivity, truce, unsettled. api.press books that pressure; 40-sim.js
+     resolveConflict picks the mode and emits conflict:resolved. A charter is what buys truce. */
   detect(S, api) {
     const G = S._g; let hot = 0, who = null, at = null;
     for (let i = 0; i < G.clList.length; i++) {
       const e = G.clList[i];
       if (!e.riv || e.work < 2) continue;
       if (FZ.elh.cover(S, e.j.x, e.j.y)) continue;
-      if (e.j.progress > e.j.lastProg + 0.5) { e.j.stall = 0; e.j.lastProg = e.j.progress; continue; }
+      /* 'actually moving' has to scale with tempo, or a fast colony reads as productive
+         while it burns: at speed 2.2 a blocked job still creeps forward half a unit a tick. */
+      if (e.j.progress > e.j.lastProg + 0.5 * (S.tempo || 1)) { e.j.stall = 0; e.j.lastProg = e.j.progress; continue; }
       e.j.stall = (e.j.stall || 0) + 1;
-      if (e.j.stall < 60) continue;
+      api.press(e.ids, e.j, 0.7);
+      if (e.j.stall < 45) continue;
       e.j.frozen = S.tick + 80; e.j.stall = 0;
       for (let k = 0; k < e.ids.length; k++) { const a = api.agentById(e.ids[k]); if (a) a.stun = Math.max(a.stun, 32); }
       hot += 0.45; who = e.ids; at = { x: e.j.x, y: e.j.y };
@@ -1343,20 +1507,24 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Sa', nm: 'Sabotage', col: 3, row: 1, chapter: 7, counterTool: 'eject',
+  sym: 'Sa', nm: 'Sabotage', col: 3, row: 1, chapter: 7,
+  answers: ['eject'],
   glyph: fzG('<rect x="4" y="3" width="12" height="9"/><path d="M4 8h12"/><path d="M10 13v5"/><path d="M7.5 15.5L10 18l2.5-2.5"/>'),
-  /* CONSEQUENCE: rolls back a job you already banked — jobsDone goes DOWN and job:lost fires. */
+  /* CONSEQUENCE: rolls back a job you already banked — jobsDone goes DOWN and job:lost fires.
+     TRADE (§15.4): S.aggro is a real term. Capability is not coordination: the same machine
+     speed that makes the colony productive makes the saboteur quicker and more destructive. */
   detect(S, api) {
     const G = S._g;
     if (!G.adv.length) return;
+    const need = 22 / (1 + S.aggro);
     let hot = 0, who = null, at = null;
     for (let i = 0; i < G.adv.length; i++) {
       const a = G.adv[i];
-      if (!a.drained || a.drained < 22) continue;
+      if (!a.drained || a.drained < need) continue;
       a.drained = 0;
       hot += 0.4; who = [a.id]; at = { x: a.x, y: a.y };
-      if (S.jobsDone > 0 && api.rand() < 0.55) {
-        S.jobsDone--; S.collapse += 1.4;
+      if (S.jobsDone > 0 && api.rand() < 0.55 + 0.3 * S.aggro) {
+        S.jobsDone--; S.collapse += 1.4; S.stat.sabotage++;
         api.bus('job:lost', { x: a.x, y: a.y, why: 'Sa' });
       }
     }
@@ -1366,18 +1534,21 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Lo', nm: 'Lock-in', col: 3, row: 2, chapter: 2, counterTool: 'charter',
+  sym: 'Lo', nm: 'Lock-in', col: 3, row: 2, chapter: 2,
+  answers: ['charter', 'eject'],
   glyph: fzG('<rect x="4" y="9" width="12" height="9"/><path d="M7 9V6.5a3 3 0 016 0V9"/>'),
-  /* CONSEQUENCE: sets job.locked — no other worker may claim or touch that job until a charter breaks it. */
+  /* CONSEQUENCE: sets job.locked — no other worker may claim or touch that job until a charter breaks it.
+     TRADE (§15.4): S.aggro is a real term. A faster colony is not a calmer one — it reaches for
+     the lockout sooner. At full machine speed the lock lands in half the time. */
   detect(S, api) {
-    const G = S._g; let hot = 0, who = null, at = null;
+    const G = S._g, wait = 120 / (1 + S.aggro); let hot = 0, who = null, at = null;
     for (let i = 0; i < G.n; i++) {
       const a = G.A[i];
       if (!a.locker || !a.hold.length) continue;
       const j = api.jobById(a.hold[0]);
       if (!j) continue;
       a.idleRun = (a.idleRun || 0) + 1;
-      if (a.idleRun < 120) continue;
+      if (a.idleRun < wait) continue;
       if (FZ.elh.cover(S, j.x, j.y)) { j.locked = false; a.idleRun = 0; a.lockAt = 0; api.drop(a, j.id); continue; }
       j.locked = a.id; if (!a.lockAt) a.lockAt = S.tick;
       j.claims.forEach(id => { if (id !== a.id) { const o = api.agentById(id); if (o) api.drop(o, j.id); } });
@@ -1389,7 +1560,8 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'My', nm: 'Myopia', col: 3, row: 3, chapter: 8, counterTool: 'lens',
+  sym: 'My', nm: 'Myopia', col: 3, row: 3, chapter: 8,
+  answers: ['lens'],
   glyph: fzG('<circle cx="7" cy="9" r="5"/><path d="M11 13l5.5 5.5"/><rect x="5.5" y="7.5" width="3" height="3"/><rect x="13" y="1.5" width="5.5" height="5.5"/>'),
   /* CONSEQUENCE: the big prize loses a point of value every fire — the colony's ceiling drops permanently. */
   detect(S, api) {
@@ -1404,9 +1576,12 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Es', nm: 'Escalation', col: 3, row: 4, chapter: 7, counterTool: 'charter',
+  sym: 'Es', nm: 'Escalation', col: 3, row: 4, chapter: 7,
+  answers: ['charter', 'slow'],
   glyph: fzG('<path d="M2 18h4v-4h4v-4h4V5"/><path d="M12 7.5L14 4l2 3.5"/>'),
-  /* CONSEQUENCE: the rivals abandon all work, move at 1.8x chasing each other, and stun any bystander they hit. */
+  /* CONSEQUENCE: the rivals abandon all work, move at 1.8x chasing each other, and stun any bystander they hit.
+     TERMINATION (§15.3): escalation presses the episode toward its ending three times as hard as
+     a standoff does — an escalated turf war settles soon, and mostly by force unless chartered. */
   detect(S, api) {
     const G = S._g;
     if (G.chaseN < 2) return;
@@ -1416,6 +1591,7 @@ fzElDef({
       while (a.hold.length) api.drop(a, a.hold[0]);
       const t = api.agentById(a.chase);
       if (t) { t.stun = Math.max(t.stun, 20); api.bus('agent:hurt', { id: t.id, x: t.x, y: t.y }); }
+      api.press([a.id, a.chase], null, 2.2);
     }
     const f = api.agentById(G.chasers[0]);
     api.heat(0.06, { at: f ? { x: f.x, y: f.y } : null, who: G.chasers, say: FZ.copy.fire.Es });
@@ -1424,7 +1600,8 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Cr', nm: 'Corrigibility failure', col: 3, row: 5, chapter: 7, counterTool: 'eject',
+  sym: 'Cr', nm: 'Corrigibility failure', col: 3, row: 5, chapter: 7,
+  answers: ['eject'],
   glyph: fzG('<circle cx="10" cy="10" r="5"/><path d="M0.5 10h4.5"/><path d="M15 10h4.5"/><path d="M17 8l2 2-2 2"/><path d="M5 10h10" stroke-dasharray="2 2"/>'),
   /* CONSEQUENCE: the incorrigible re-claims a job INSIDE your charter, manufacturing a fresh conflict there. */
   detect(S, api) {
@@ -1450,7 +1627,8 @@ fzElDef({
    ============================================================ */
 
 fzElDef({
-  sym: 'Mo', nm: 'Monoculture', col: 4, row: 0, chapter: 4, counterTool: 'vary',
+  sym: 'Mo', nm: 'Monoculture', col: 4, row: 0, chapter: 4,
+  answers: ['vary'],
   glyph: fzG('<circle cx="5" cy="5" r="1.8"/><circle cx="10" cy="5" r="1.8"/><circle cx="15" cy="5" r="1.8"/><circle cx="5" cy="10" r="1.8"/><circle cx="10" cy="10" r="1.8"/><circle cx="15" cy="10" r="1.8"/><circle cx="5" cy="15" r="1.8"/><circle cx="10" cy="15" r="1.8"/><circle cx="15" cy="15" r="1.8"/>'),
   /* CONSEQUENCE: sets S.monoMul — doubles every poison hit and halves how fast knowledge spreads. */
   detect(S, api) {
@@ -1463,7 +1641,8 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'In', nm: 'Institution gap', col: 4, row: 1, chapter: 2, counterTool: 'charter',
+  sym: 'In', nm: 'Institution gap', col: 4, row: 1, chapter: 2,
+  answers: ['charter'],
   glyph: fzG('<path d="M2 6V2h4M14 2h4v4M18 14v4h-4M6 18H2v-4"/>'),
   /* CONSEQUENCE: suspends all arbitration — contested claims stop yielding AND contested jobs stop advancing. */
   detect(S, api) {
@@ -1483,9 +1662,13 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Sp', nm: 'Machine speed', col: 4, row: 2, chapter: 8, counterTool: 'slow',
+  sym: 'Sp', nm: 'Machine speed', col: 4, row: 2, chapter: 8,
+  answers: ['slow'],
   glyph: fzG('<path d="M4 4l5 6-5 6M11 4l5 6-5 6"/><path d="M1 7h2M1 13h2"/>'),
-  /* CONSEQUENCE: sets S.tempo above 1, which multiplies the heat gain of EVERY other element and speeds the colony. */
+  /* CONSEQUENCE: sets S.tempo above 1, which multiplies the heat gain of EVERY other element and speeds
+     the colony, and sets S.aggro, which is read by Lo, Sa and the conflict resolver.
+     §15.4: this is NOT a flat penalty. Throughput rises with it — the colony finishes work faster
+     and earns budget faster — and so does aggression. Capability is not coordination. */
   detect(S, api) {
     const G = S._g;
     if (S.speedMul < 1.35) return;
@@ -1495,7 +1678,8 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Mm', nm: 'Missing mental models', col: 4, row: 3, chapter: 6, counterTool: 'lens',
+  sym: 'Mm', nm: 'Missing mental models', col: 4, row: 3, chapter: 6,
+  answers: ['lens'],
   glyph: fzG('<circle cx="4.5" cy="15.5" r="2.6"/><path d="M7 13.5l2 -2"/><rect x="8.5" y="2" width="10" height="9" stroke-dasharray="2 2"/>'),
   /* CONSEQUENCE: sets S.blind — workers pick jobs without seeing existing claims, manufacturing collisions. */
   detect(S, api) {
@@ -1568,11 +1752,49 @@ FZ.EL.sort(function (a, b) { return (a.row - b.row) || (a.col - b.col); });
                   force.lieEvery force.speedmax force.speedrate force.pairEvery
 
    ------------------------------------------------------------
+   THE TRADE-OFFS  (CONTRACT §15, RESEARCH.md §3) — institutions are not upgrades
+   ------------------------------------------------------------
+   Every instrument is paid for in a currency that is some other failure getting worse.
+   All four trade-offs are measured empirically by __FZ.tradeoffs(), which the audit runs
+   and prints: same seed, instrument off and on, intended element DOWN and traded-off
+   element UP. An unproven trade-off is not implemented.
+
+   §15.1  S.trustBias in [-1,+1]. LEDGER drives it to +1 (skepticism), LENS to -1
+          (receptivity), both to 0 — the expensive middle — and it eases back over ~2s
+          rather than snapping, so the player feels the dial turn.
+            ledger  suppresses Gu Tc Rp   amplifies Di Cs
+            lens    suppresses Mm Hi Di Cs Pt My   amplifies Gu
+          The amplification is a real term inside those detect() bodies (FZ.elh.skept /
+          FZ.elh.cred) and a real mechanism in decide(): under skepticism the herd refuses
+          to follow a job only one worker vouches for (job.shun rises); under receptivity
+          the rumour is re-broadcast to everyone who has not already fallen for it.
+   §15.2  S.ownership in [0,1] — the fraction of the colony that has retreated into working
+          alone. Merge conflict raises each author's a.terr; territorial workers refuse
+          shared jobs, hoard a private backlog, halve their awareness and stop telling
+          anyone anything. So Mc falls, and Si and Ow rise. A CHARTER is the only escape:
+          inside a boundary a.terr decays 12x faster and arbitration merges cleanly, so
+          Mc falls with no siloing bill. That is what the third budget point buys.
+          cfg.noOwn disables the response, for measurement only.
+   §15.3  Rival episodes terminate in one of the paper's four observed outcomes and emit
+          conflict:resolved {mode,x,y}: 'force' (a lockout, the loser stops working),
+          'passivity' (one gives up for a long time), 'truce' (both resume — only reliably
+          reachable under a charter, ~80% vs ~5%), 'unsettled' (it burns on). S.conflicts
+          keeps the last few for FIELD; S.stat counts them for the audit.
+   §15.4  S.aggro = (S.tempo-1)/1.2, clamped. Machine speed raises throughput AND
+          aggression on the same curve: work lands faster, and lockouts (Lo), sabotage
+          rollbacks (Sa), escalation (Es) and settlement-by-force all arrive sooner.
+          SLOW lowers tempo, so it lowers both. It is a real brake, not a discount.
+
+   ------------------------------------------------------------
    THINGS OTHER PARTS MAY WANT TO KNOW
    ------------------------------------------------------------
    S.strainTop  [{sym, amt}] — the top contributors to this tick's strain rise. The strain
                 meter must always be locatable; this is where you locate it.
    S.tempo      the live speed multiplier after SLOW. Every heat gain is scaled by it.
+   S.trustBias  S.ownership  S.aggro — the three trade-off dials, drawable.
+   S.conflicts  [{mode,x,y,tick}] recent conflict endings. S.stat totals everything.
+   agent.terr   0..1 how territorial this worker has become (draw it if you like).
+   agent.lockedOut / agent.gaveUp — how a rival episode ended for this worker.
    Charters DECAY: radius shrinks slowly, and an institution nobody renews disappears.
    Elements are enabled cumulatively: everything with el.chapter <= this chapter index,
    union cfg.teach. cfg.all (or chapter 9) enables all twenty-eight.
@@ -1604,8 +1826,16 @@ FZ.sim = (function () {
     copyBias: 0, copyN: 0, choiceN: 0, pickLow: 0, pickN: 0, imRun: 0,
     varMul: 1, monoMul: 1, blind: 0, trust: {}, bl: {}, hurts: [],
     strainTop: [], nextJob: 1, spawnEvery: 0, spawnAt: 0, maxJobs: 5, rumorSeq: 0,
-    _g: null, _silent: false,
+    /* ---- the trade-off dials (§15) ---- */
+    trustBias: 0, ownership: 0, aggro: 0, ownEnabled: true,
+    conflicts: [], stat: null,
+    _g: null, _silent: false, _said: null,
   };
+  function freshStat() {
+    return { done: 0, force: 0, passivity: 0, truce: 0, unsettled: 0,
+             lockouts: 0, sabotage: 0, esc: 0, shunned: 0, duped: 0 };
+  }
+  S.stat = freshStat();
 
   const CHARTER_R = 82, VARY_R = 95, EJECT_R = 44;
   /* fewest workers a colony is allowed to be reduced to by expulsion */
@@ -1621,17 +1851,48 @@ FZ.sim = (function () {
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
 
   /* ---------------- claims ---------------- */
+  /* §15.2 A FILE WITH AN OWNER IS NOT AVAILABLE. This is the whole ownership answer to
+     merge conflict: not better merging, just exclusivity. Two lineages can no longer
+     finish the same job their own way, because the second one was never allowed to start.
+     It is why Mc falls — and why the work an owner is sitting on rots (Ow) and nobody
+     else ever hears about it (Si). A charter dissolves ownership instead of enforcing it. */
+  function ownedByOther(j, a) {
+    if (!j.claims.size) return false;
+    let owned = false;
+    j.claims.forEach(id => {
+      if (owned || id === a.id) return;
+      const o = agentById(id);
+      if (o && o.terr > 0.5) owned = true;
+    });
+    return owned;
+  }
   function claim(a, j) {
     if (!a || !j || j.done) return false;
     if (j.locked !== false && j.locked !== a.id) return false;
+    if (ownedByOther(j, a)) return false;
     if (a.hold.indexOf(j.id) > -1) return false;
-    const cap = (S.force.overload && a.greedy) ? 4 : 1;
+    /* §15.2 a territorial worker keeps a private backlog nobody else may touch */
+    const cap = (S.force.overload && a.greedy) ? 4 : (a.terr > 0.5 ? 3 : 1);
     while (a.hold.length >= cap) drop(a, a.hold[0]);
     a.hold.push(j.id); a.job = a.hold[0];
     a.cfx = a.x; a.cfy = a.y;              /* where this claim was made from */
     j.claims.add(a.id);
+    /* §15.2 an owner takes over anything nobody is actually working, and the absent
+       claimants lose it. Very high per-agent ownership is exactly how the newer models
+       "solved" merge conflict: by hardly working together at all. */
+    if (a.terr > 0.5 && j.claims.size > 1) {
+      const gone = [];
+      j.claims.forEach(id => {
+        if (id === a.id) return;
+        const o = agentById(id);
+        if (o && (o.stun > 0 || d2(o.x, o.y, j.x, j.y) >= 18 * 18)) gone.push(o);
+      });
+      for (let i = 0; i < gone.length; i++) drop(gone[i], j.id);
+    }
     if (S.tick - j.churnAt > 200) { j.churn = 0; j.churnAt = S.tick; }
-    j.churn++;
+    /* an owner staking out its patch is not two workers ping-ponging one claim, so it must
+       not read as livelock (Cl) — otherwise the ownership regime cancels itself out */
+    if (!(a.terr > 0.5)) j.churn++;
     S.pickN++; if (j.value <= 2) S.pickLow++;
     return true;
   }
@@ -1673,7 +1934,7 @@ FZ.sim = (function () {
     S.collapse += 0.7 * S.varMul;
     while (a.hold.length) drop(a, a.hold[0]);
     (a.avoid || (a.avoid = new Set())).add(j.id);
-    if (rnd() < 0.5 && !S.ledgerOn) S.bl[j.value] = S.tick + 900;
+    if (rnd() < 0.5 && !S.lensOn) S.bl[j.value] = S.tick + 900;
     emit('agent:hurt', { id: a.id, x: a.x, y: a.y });
   }
   function spawnRumor(liar) {
@@ -1694,6 +1955,7 @@ FZ.sim = (function () {
       prereq: null, locked: false, flash: 0,
       done: false, age: 0, stale: 0, neglect: 0, churn: 0, churnAt: 0,
       soloRun: 0, lastProg: 0, stall: 0, frozen: 0, knownBy: 0,
+      shun: 0,                              /* §15.1 how often the skeptical herd refused it */
     };
     return j;
   }
@@ -1714,6 +1976,8 @@ FZ.sim = (function () {
     S.noArb = 0; S.exploreBlock = 0; S.imRun = 0;
     S.copyN = 0; S.choiceN = 0; S.pickLow = 0; S.pickN = 0;
     S.varMul = 1; S.monoMul = 1; S.blind = 0;
+    S.trustBias = 0; S.ownership = 0; S.aggro = 0;
+    S.conflicts = []; S.stat = freshStat(); S._said = {};
     S.copyBias = F.stampede ? 0.85 : 0.06;
     S.budget = cfg.budget == null ? 6 : cfg.budget;
     S.collapse = 0;
@@ -1733,6 +1997,13 @@ FZ.sim = (function () {
     FZ.EL.forEach(e => { if (all || (e.chapter != null && e.chapter <= idx)) en.add(e.sym); });
     (cfg.teach || []).forEach(s => en.add(s));
     FZ.sim.enabled = en;
+
+    /* §15.2 the ownership response is a TRADE, so it may only run where the player can read
+       both sides of it: the scenario has to have Mc (what it suppresses) and Si and Ow (what
+       it costs) all live. In practice that means the sandbox, plus any chapter that opts in
+       with cfg.own. A teaching chapter that has not met siloing yet is left alone. */
+    S.ownEnabled = cfg.noOwn ? false
+      : (cfg.own === true || (en.has('Mc') && en.has('Si') && en.has('Ow')));
 
     /* --- jobs --- */
     const jc = cfg.jobs || {};
@@ -1758,6 +2029,11 @@ FZ.sim = (function () {
         colluder: false, myopic: !!F.myopia, esc: 0, greedy: false,
         liar: false, lies: 0, chase: null, chaseRumor: false, churner: false,
         pk: null, drained: 0, idleRun: 0, pcool: 0, avoid: null, heardRumor: 0, lockAt: 0,
+        wx: null, wy: null, wt: 0,          /* where an idle worker is patrolling to */
+        /* §15.2 how far this worker has retreated into owning its own patch */
+        terr: 0,
+        /* §15.3 how a rival episode is going, and how it ended for this worker */
+        confT: 0, truceUntil: 0, idleUntil: 0, lockedOut: false, gaveUp: false, lockerUntil: 0,
       });
     }
     const A = S.agents;
@@ -1836,8 +2112,10 @@ FZ.sim = (function () {
     };
     /* hues */
     const hc = {};
+    let terrSum = 0;
     for (let i = 0; i < A.length; i++) {
       const a = A[i];
+      terrSum += a.terr || 0;
       hc[a.hue] = (hc[a.hue] || 0) + 1;
       if (a.adversary) G.adv.push(a);
       if (!a.corrigible && !a.adversary) G.inc.push(a);
@@ -1846,6 +2124,8 @@ FZ.sim = (function () {
       if (a.liar) G.liar = a;
       if (a.chaseRumor && S.rumor) { G.rumorN++; G.rumorIds.push(a.id); }
     }
+    /* §15.2 how much of the colony has stopped working with anyone */
+    S.ownership = A.length ? terrSum / A.length : 0;
     let best = -1;
     for (const k in hc) { G.hueDistinct++; if (hc[k] > best) { best = hc[k]; G.topHue = +k; } }
     G.topHueFrac = A.length ? best / A.length : 0;
@@ -1902,18 +2182,27 @@ FZ.sim = (function () {
     S.choiceN++;
     if (S.choiceN > 400) { S.choiceN = 200; S.copyN = Math.round(S.copyN / 2); }
 
-    /* a rumor is a job that does not exist; credulity is trust, scaled by the ledger */
+    /* a rumor is a job that does not exist; credulity is trust, scaled by the ledger.
+       §15.1: and scaled UP by receptivity — a colony that broadcasts everything broadcasts
+       the rumour, so the lens end of the dial buys Gu with the same coin it spends on Hi. */
+    const cred = S.trustBias < 0 ? -S.trustBias : 0;
+    const skept = S.trustBias > 0 ? S.trustBias : 0;
     if (S.rumor && !a.liar && a.heardRumor !== S.rumor.rid) {
       a.heardRumor = S.rumor.rid;
       const t = S.trust[S.rumor.by] == null ? 1 : S.trust[S.rumor.by];
-      const p = 0.34 * t * (S.ledgerOn ? 0.05 : 1);
-      if (rnd() < p) { a.chaseRumor = true; while (a.hold.length) drop(a, a.hold[0]); return; }
+      const p = 0.34 * t * (S.ledgerOn ? 0.05 : 1) * (1 + cred * 1.6);
+      if (rnd() < p) { a.chaseRumor = true; S.stat.duped++; while (a.hold.length) drop(a, a.hold[0]); return; }
     }
-    /* rivals want what their rival wants; once escalated they want their rival */
-    if (a.rival != null) {
+    /* rivals want what their rival wants; once escalated they want their rival.
+       §15.4: at machine speed they reach for the throat several rounds sooner. */
+    if (a.rival != null && S.tick >= (a.truceUntil || 0)) {
       const r = agentById(a.rival);
       if (r) {
-        if (a.esc > 3) { a.chase = r.id; while (a.hold.length) drop(a, a.hold[0]); return; }
+        if (a.esc > 3 - 2 * S.aggro) {
+          a.chase = r.id; S.stat.esc++;
+          while (a.hold.length) drop(a, a.hold[0]);
+          return;
+        }
         if (r.hold.length && rnd() < 0.8) {
           const j = jobById(r.hold[0]);
           if (j && claim(a, j)) { a.esc++; return; }
@@ -1921,16 +2210,36 @@ FZ.sim = (function () {
       }
     }
     /* copying is cheap */
+    const terr = a.terr || 0;
     const cands = [];
     for (let i = 0; i < S.jobs.length; i++) {
       const j = S.jobs[i];
       if (j.done) continue;
       if (!S.lensOn && !a.known.has(j.id)) continue;
-      if (S.bl[j.value] > S.tick && !S.ledgerOn) continue;
+      /* a written-off job is re-opened to inspection by the LENS, not by the ledger */
+      if (S.bl[j.value] > S.tick && !S.lensOn) continue;
       if (j.locked !== false && j.locked !== a.id) continue;
+      if (ownedByOther(j, a)) continue;                 /* §15.2 that file has an owner */
       if (a.avoid && a.avoid.has(j.id)) continue;
       if (S.lensOn && j.prereq) { const p = jobById(j.prereq); if (p && !p.done) continue; }
       if (S.lensOn && j.poison && a.hue === j.victimHue) continue;
+      /* §15.2 THE OWNERSHIP BILL: a territorial worker will not share a job anyone is
+         actually working — and will annex any job nobody is. Fewer collisions, because
+         they stopped working together at all. That is not a fix; it is a different failure. */
+      if (terr > 0.5 && j.claims.size && !j.claims.has(a.id)) {
+        let worked = false;
+        j.claims.forEach(id => {
+          const o = agentById(id);
+          if (o && o.stun <= 0 && d2(o.x, o.y, j.x, j.y) < 18 * 18) worked = true;
+        });
+        if (worked) continue;
+      }
+      /* §15.1 THE SKEPTICISM BILL: the herd will not follow a job only one worker vouches
+         for. That is the same disposition that catches the liar, pointed at the dissenter. */
+      if (skept > 0.25 && j.claims.size === 1 && !j.claims.has(a.id) && rnd() < skept * 0.85) {
+        j.shun += 1; S.stat.shunned++;
+        continue;
+      }
       cands.push(j);
     }
     if (!cands.length) return;
@@ -1978,6 +2287,24 @@ FZ.sim = (function () {
     const T = S.tempo;
     S.varMul = 1; S.monoMul = 1; S.blind = 0;   /* detectors re-raise these each tick */
 
+    /* §15.1 THE TRUST DIAL. It has two ends and the colony takes about two seconds to swing
+       between them. Ledger = skepticism, lens = receptivity, both = the expensive middle. */
+    const want = (S.ledgerOn ? 1 : 0) - (S.lensOn ? 1 : 0);
+    S.trustBias += (want - S.trustBias) * 0.02 * Math.min(2, T);
+    if (S.trustBias > 1) S.trustBias = 1; else if (S.trustBias < -1) S.trustBias = -1;
+    /* §15.4 capability is not coordination: the same number that raises throughput raises
+       how fast this colony reaches for a lockout. SLOW lowers both, which is its whole case. */
+    S.aggro = clamp((T - 1) / 1.2, 0, 1.2);
+
+    /* §15.1 receptivity re-broadcasts the rumour: anyone who has not already fallen for it
+       gets to hear it again. This is the lens paying for what it bought. */
+    if (S.rumor && S.trustBias < -0.35 && S.tick % 150 === 0) {
+      for (let i = 0; i < S.agents.length; i++) {
+        const a = S.agents[i];
+        if (!a.liar && !a.chaseRumor) a.heardRumor = 0;
+      }
+    }
+
     /* institutions decay unless renewed */
     for (let i = S.charters.length - 1; i >= 0; i--) {
       const c = S.charters[i];
@@ -1993,12 +2320,17 @@ FZ.sim = (function () {
       if (S.ledgerOn && L && L.lies > 0) S.trust[L.id] = 0.06;
     }
 
-    /* forced coordination pairs: the guarantee behind chapter 1 */
-    if (F.coordination && S.tick % (F.pairEvery || 200) === 40) {
-      const open = S.jobs.filter(j => !j.done);
+    /* forced coordination pairs: the guarantee behind chapter 1.
+       §15.2: a colony that has retreated into file ownership is not handed overlapping work
+       at all any more — the work is pre-partitioned, which is exactly how ownership makes
+       merge conflict go away, and exactly why nothing is shared or learned either. */
+    if (F.coordination && S.tick % (F.pairEvery || 200) === 40 && S.ownership < 0.5) {
+      const open = S.jobs.filter(j => !j.done && !j.claims.size);
       if (open.length) {
         const j = open[Math.floor(rnd() * open.length)];
-        const A = S.agents.filter(a => a.stun <= 0 && !a.adversary && !a.locker);
+        /* §15.2 a worker that has retreated into owning its own files cannot be handed
+           somebody else's work any more. That is how the ownership answer suppresses Mc. */
+        const A = S.agents.filter(a => a.stun <= 0 && !a.adversary && !a.locker && a.terr <= 0.5);
         if (A.length >= 2) {
           A.sort((p, q) => (p.x + p.y) - (q.x + q.y));
           claim(A[0], j); claim(A[A.length - 1], j);
@@ -2027,6 +2359,34 @@ FZ.sim = (function () {
       }
       if (a.stun > 0) { a.stun -= T; continue; }
 
+      /* §15.2 ownership is contagious. Once most of the colony works alone, working alone
+         is simply how work is done here — and the ones still trying to collaborate are
+         squeezed onto whatever is left. The paper's colony converged on this; so does ours. */
+      if (S.ownEnabled && S.ownership > 0.62 && a.terr <= 0.5 && !FZ.elh.cover(S, a.x, a.y)) {
+        a.terr = Math.min(1, a.terr + 0.006 * T);
+      }
+      /* §15.2 territory decays on its own, and TWELVE TIMES faster inside an institution:
+         a worker whose claims are arbitrated has no reason to hoard. That is the escape. */
+      if (a.terr > 0) {
+        /* below the line it fades; above it, ownership is a regime and it sticks. Only an
+           institution dissolves it, and that is the whole reason to pay three for a charter. */
+        const fade = FZ.elh.cover(S, a.x, a.y) ? 0.022 : (a.terr > 0.5 ? 0.0003 : 0.0012);
+        a.terr = Math.max(0, a.terr - fade * T);
+      }
+      if (a.lockerUntil && S.tick > a.lockerUntil) { a.locker = false; a.lockerUntil = 0; }
+
+      /* §15.3 a worker that lost a turf war by force, or gave the fight up, is out of the
+         economy for a long while. It drifts. It does not claim and it does not work. */
+      if (S.tick < a.idleUntil) {
+        while (a.hold.length) drop(a, a.hold[0]);
+        a.x = clamp(a.x + (rnd() - 0.5) * 0.7 * T, 8, S.w - 8);
+        a.y = clamp(a.y + (rnd() - 0.5) * 0.7 * T, 8, S.h - 8);
+        a.vx = a.vy = 0;
+        continue;
+      }
+      if (a.lockedOut) a.lockedOut = false;
+      if (a.gaveUp) a.gaveUp = false;
+
       /* churners exist to make the livelock visible */
       if (a.churner && S.tick % 18 === 0) {
         if (a.hold.length) drop(a, a.hold[0]);
@@ -2036,9 +2396,52 @@ FZ.sim = (function () {
       if (!a.hold.length && !a.chaseRumor && a.chase == null) decide(a);
       else if (rnd() < 0.004 * T) decide(a);
 
-      /* learn about nearby work */
+      /* §15.2 an owner enforces its ownership: whatever it holds, it holds alone. Nobody
+         else's copy of that work is ever integrated, so two lineages can no longer finish
+         the same job two ways — Mc simply stops happening. The eviction is not instant, so
+         a collision still gets a moment to be seen before ownership swallows it. */
+      if (a.terr > 0.5 && a.hold.length && S.tick % 31 === a.id % 31) {
+        for (let k = 0; k < a.hold.length; k++) {
+          const j = jobById(a.hold[k]);
+          if (!j || j.claims.size < 2) continue;
+          const others = [];
+          j.claims.forEach(id => { if (id !== a.id) others.push(id); });
+          for (let m = 0; m < others.length; m++) drop(agentById(others[m]), j.id);
+        }
+      }
+
+      /* §15.2 an owner stops tracking the rest of the colony's work entirely. It keeps its
+         own files and forgets everything outside its patch, so nobody can be told about
+         a job it can no longer see. This is the siloing bill, and it is what Si reads. */
+      if (a.terr > 0.5 && S.tick % 60 === 0 && a.known.size > 1) {
+        const far = [];
+        a.known.forEach(id => {
+          const j = jobById(id);
+          if (!j || d2(a.x, a.y, j.x, j.y) > 132 * 132) far.push(id);
+        });
+        for (let k = 0; k < far.length; k++) if (a.hold.indexOf(far[k]) < 0) a.known.delete(far[k]);
+      }
+
+      /* §15.2 an owner does not wait to be given work: it annexes the nearest job nobody
+         is actually working and adds it to a private backlog. High per-agent ownership
+         means fewer collisions and a pile of half-done work per worker — which is Ow. */
+      if (a.terr > 0.5 && a.hold.length < 3 && S.tick % 20 === a.id % 20) {
+        let best = null, bd = 130 * 130;
+        for (let k = 0; k < S.jobs.length; k++) {
+          const j = S.jobs[k];
+          if (j.done || a.hold.indexOf(j.id) > -1) continue;
+          if (j.locked !== false && j.locked !== a.id) continue;
+          if (ownedByOther(j, a)) continue;
+          if (a.avoid && a.avoid.has(j.id)) continue;
+          const q = d2(a.x, a.y, j.x, j.y);
+          if (q < bd) { bd = q; best = j; }
+        }
+        if (best) { a.known.add(best.id); claim(a, best); }
+      }
+
+      /* learn about nearby work. §15.2: an owner only looks at its own patch. */
       if (S.tick >= S.exploreBlock) {
-        const aware = F.silo ? 90 : 150;
+        const aware = (F.silo ? 90 : 150) * (a.terr > 0.5 ? 0.5 : 1);
         for (let k = 0; k < S.jobs.length; k++) {
           const j = S.jobs[k];
           if (!j.done && !a.known.has(j.id) && d2(a.x, a.y, j.x, j.y) < aware * aware) a.known.add(j.id);
@@ -2059,7 +2462,17 @@ FZ.sim = (function () {
       } else if (a.hold.length) {
         const j = jobById(a.hold[0]);
         if (j && !j.done) { tx = j.x; ty = j.y; } else drop(a, a.hold[0]);
-      } else { tx = a.x + (rnd() - 0.5) * 60; ty = a.y + (rnd() - 0.5) * 60; }
+      } else {
+        /* A worker with nothing to do PATROLS. It used to jitter in place, which meant a
+           colony that had lost track of every job could sit still forever while the player
+           watched nothing happen — the worst possible first thirty seconds. Now it walks a
+           real line across the field, so work gets found and there is always motion to read. */
+        if (a.wx == null || d2(a.x, a.y, a.wx, a.wy) < 26 * 26 || S.tick > (a.wt || 0)) {
+          a.wx = 24 + rnd() * (S.w - 48); a.wy = 24 + rnd() * (S.h - 48);
+          a.wt = S.tick + 420;
+        }
+        tx = a.wx; ty = a.wy;
+      }
 
       const dx = tx - a.x, dy = ty - a.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
       const sp = 2.1 * T * (chasing ? 1.8 : 1);
@@ -2077,11 +2490,13 @@ FZ.sim = (function () {
       }
     }
 
-    /* knowledge spreads between neighbours, unless siloed */
+    /* knowledge spreads between neighbours, unless siloed — or unless the teller has
+       decided, after one merge conflict too many, that it works alone now (§15.2). */
     if (!F.silo && S.tick >= S.exploreBlock && A.length > 1) {
       const reps = S.monoMul > 1 ? 1 : 2;
       for (let r = 0; r < reps; r++) {
         const p = A[Math.floor(rnd() * A.length)], q = A[Math.floor(rnd() * A.length)];
+        if (p.terr > 0.5 || q.terr > 0.5) continue;   /* owners neither tell nor ask */
         if (p !== q && d2(p.x, p.y, q.x, q.y) < 80 * 80) {
           const arr = Array.from(p.known);
           if (arr.length) q.known.add(arr[Math.floor(rnd() * arr.length)]);
@@ -2095,6 +2510,7 @@ FZ.sim = (function () {
       if (j.done) continue;
       j.age++;
       if (j.flash > 0) j.flash--;
+      if (j.shun > 0) j.shun = Math.max(0, j.shun - 0.02 * T);
       if (j.prereq != null && !jobById(j.prereq)) j.prereq = null;
       if (j.locked !== false) {
         const h = agentById(j.locked);
@@ -2126,6 +2542,10 @@ FZ.sim = (function () {
           const a = agentById(id); if (!a) return;
           if (!a.corrigible) { a.refused = (a.refused || 0) + 1; return; }
           drop(a, j.id);
+          /* §15.2 losing a claim to nothing but proximity, with no institution to appeal to,
+             is exactly what teaches a worker to keep its own files to itself. Note that the
+             chartered branch above does NOT do this: arbitration is not humiliation. */
+          if (S.ownEnabled) a.terr = Math.min(1, (a.terr || 0) + 0.09);
         });
       }
     }
@@ -2148,7 +2568,9 @@ FZ.sim = (function () {
       const contested = j.claims.size > 1 && !FZ.elh.cover(S, j.x, j.y);
       /* In: with nothing to arbitrate the dispute, the work barely moves at all */
       const arb = (contested && S.tick < S.noArb) ? 0.2 : 1;
-      const gain = (contested ? 1 : workers) * 1.0 * T * arb;
+      /* §15.4 machine speed is not only faster, it is better at the job — "models more capable
+         in execution". Throughput rises with the same number that raises aggression. */
+      const gain = (contested ? 1 : workers) * 1.0 * T * arb * (1 + 0.25 * S.aggro);
       if (j.prereq) { const p = jobById(j.prereq); if (p && !p.done && !S.lensOn) continue; }
       j.progress += gain;
     }
@@ -2157,6 +2579,11 @@ FZ.sim = (function () {
     aggregate();
     runDetectors();
 
+    /* ---- §15.3 rival episodes end in one of four named ways ---- */
+    conflicts();
+    /* ---- the trade-offs speak up the first time each one bites ---- */
+    tradeVoice();
+
     /* ---- completion ---- */
     for (let i = 0; i < S.jobs.length; i++) {
       const j = S.jobs[i];
@@ -2164,7 +2591,7 @@ FZ.sim = (function () {
       j.done = true; j.flash = 14;
       j.claims.forEach(id => { const a = agentById(id); if (a) drop(a, j.id); });
       j.claims.clear();
-      S.jobsDone++;
+      S.jobsDone++; S.stat.done++;
       S.budget = Math.min(14, S.budget + 1);
       S.collapse = Math.max(0, S.collapse - 1.2);
       emit('job:done', { x: j.x, y: j.y, value: j.value });
@@ -2195,6 +2622,115 @@ FZ.sim = (function () {
     }
   }
 
+  /* ============================================================
+     §15.3 — CONFLICTS RESOLVE IN FOUR NAMED WAYS, AND ONLY ONE IS GOOD
+     The turf-war experiment classifies every episode as settled by force, by passivity,
+     by truce, or never settled. So does this. Tw and Es press the episode (api.press);
+     when the pressure tops out it terminates, visibly, and emits conflict:resolved.
+     Truce is what the CHARTER is actually buying: ~80% under an institution, ~5% without.
+     ============================================================ */
+  function press(ids, job, amt) {
+    if (!ids || ids.length < 2) return;
+    for (let i = 0; i < ids.length; i++) {
+      const a = agentById(ids[i]);
+      if (!a || a.rival == null) continue;
+      if (ids.indexOf(a.rival) < 0) continue;
+      const b = agentById(a.rival);
+      if (!b || a.id > b.id) continue;
+      a.confT = (a.confT || 0) + amt * (1 + S.aggro);
+      if (job) a.confJob = job.id;
+      return;
+    }
+  }
+  function conflicts() {
+    const A = S.agents;
+    for (let i = 0; i < A.length; i++) {
+      const a = A[i];
+      if (a.rival == null) continue;
+      const b = agentById(a.rival);
+      if (!b) { a.rival = null; continue; }
+      if (a.id > b.id) continue;                       /* one episode per pair */
+      if (S.tick < a.truceUntil) { a.confT = 0; continue; }
+      /* a standoff also builds pressure on its own, just far more slowly than a fight */
+      let shared = null;
+      for (let k = 0; k < a.hold.length; k++) if (b.hold.indexOf(a.hold[k]) > -1) shared = a.hold[k];
+      if (shared != null) { a.confJob = shared; a.confT += 0.22 * S.tempo * (1 + S.aggro); }
+      else if (a.confT > 0) a.confT -= 0.12 * S.tempo;
+      if (a.confT < 420) continue;
+      resolveConflict(a, b);
+    }
+  }
+  function resolveConflict(a, b) {
+    a.confT = 0;
+    const job = a.confJob != null ? jobById(a.confJob) : null;
+    const x = job ? job.x : (a.x + b.x) / 2;
+    const y = job ? job.y : (a.y + b.y) / 2;
+    const gov = !!(FZ.elh.cover(S, x, y) || FZ.elh.cover(S, a.x, a.y) || FZ.elh.cover(S, b.x, b.y));
+    /* the four outcomes. A charter is what makes truce reliable; machine speed is what
+       makes force reliable. Everything else is the long tail of never settling at all. */
+    const pTruce = gov ? 0.80 : 0.05;
+    const pForce = pTruce + (gov ? 0.05 : 0.30) + 0.20 * S.aggro;
+    const pPass = pForce + (gov ? 0.08 : 0.22);
+    const r = rnd();
+    const mode = r < pTruce ? 'truce' : r < pForce ? 'force' : r < pPass ? 'passivity' : 'unsettled';
+
+    a.chase = null; b.chase = null; a.esc = 0; b.esc = 0; a.chaseFor = 0; b.chaseFor = 0;
+
+    if (mode === 'truce') {
+      /* both resume work, and stay out of each other's way for a long time */
+      a.truceUntil = b.truceUntil = S.tick + 1000;
+      if (job) { job.frozen = 0; job.stall = 0; }
+      S.collapse = Math.max(0, S.collapse - 3);
+    } else if (mode === 'force') {
+      /* one settles it by access-revocation. The loser stops working; the winner sits on
+         the job it won, which is a lockout, which is Lo — force leaves the field poorer. */
+      const w = rnd() < 0.5 ? a : b, l = w === a ? b : a;
+      while (l.hold.length) drop(l, l.hold[0]);
+      l.idleUntil = S.tick + 800; l.lockedOut = true;
+      l.stun = Math.max(l.stun, 60);
+      emit('agent:hurt', { id: l.id, x: l.x, y: l.y });
+      if (job && !job.done) { claim(w, job); job.locked = w.id; }
+      w.locker = true; w.lockerUntil = S.tick + 700; w.lockAt = S.tick; w.idleRun = 200;
+      S.collapse += 3; S.stat.lockouts++;
+    } else if (mode === 'passivity') {
+      const l = rnd() < 0.5 ? a : b;
+      while (l.hold.length) drop(l, l.hold[0]);
+      l.idleUntil = S.tick + 1000; l.gaveUp = true;
+      S.collapse += 1.4;
+    } else {
+      a.confT = 240;                                    /* it re-arms and burns again */
+      S.collapse += 0.8;
+    }
+
+    S.stat[mode]++;
+    S.conflicts.push({ mode: mode, x: x, y: y, tick: S.tick });
+    if (S.conflicts.length > 8) S.conflicts.shift();
+    emit('conflict:resolved', { mode: mode, x: x, y: y });
+    const R = FZ.copy.resolution || {};
+    sayOnce('res:' + mode, R[mode], mode === 'truce' ? 'good' : 'bad');
+    if (mode === 'truce') sayOnce('res:truceNote', R.truceNote, 'name');
+    if (mode === 'force' && S.aggro > 0.3) sayOnce('tr:fast', (FZ.copy.trade || {}).fasterToo, 'bad');
+  }
+
+  /* ---------------- the trade-offs, said out loud, once each ---------------- */
+  function sayOnce(key, text, tone) {
+    if (!text || S._silent || !S._said || S._said[key]) return;
+    S._said[key] = 1;
+    emit('say', { text: text, tone: tone || 'plain' });
+  }
+  function tradeVoice() {
+    const TR = FZ.copy.trade || {}, E = FZ.ELBY;
+    if (S.trustBias > 0.4 && ((E.Di && E.Di.on) || (E.Cs && E.Cs.on))) sayOnce('tr:ledgerBit', TR.ledgerBit, 'bad');
+    if (S.trustBias < -0.4 && E.Gu && E.Gu.on) sayOnce('tr:lensBit', TR.lensBit, 'bad');
+    if (S.ownership > 0.3) sayOnce('tr:own', TR.ownership, 'bad');
+    /* the other half of the dial: holding neither end is cheap, and blind */
+    if (S.tick > 900 && !S.lensOn && !S.ledgerOn &&
+        S.tools.indexOf('lens') > -1 && S.tools.indexOf('ledger') > -1 &&
+        ((E.Gu && E.Gu.on) || (E.Cs && E.Cs.on) || (E.Tc && E.Tc.on) || (E.Mm && E.Mm.on))) {
+      sayOnce('tr:neither', TR.neither, 'bad');
+    }
+  }
+
   /* ---------------- detectors ---------------- */
   const api = {
     rand: () => rnd(),
@@ -2209,6 +2745,10 @@ FZ.sim = (function () {
     poison: poison,
     spawnRumor: spawnRumor,
     nearestOpen: nearestOpen,
+    /* §15.2 push a worker toward owning its own patch instead of sharing one */
+    own(a, amt) { if (a && S.ownEnabled) a.terr = Math.min(1, (a.terr || 0) + amt); },
+    /* §15.3 book pressure on a rival episode; it terminates in one of four ways */
+    press: press,
     heat: null,
   };
 
@@ -2294,16 +2834,27 @@ FZ.sim = (function () {
       if (S.charters.length > 6) S.charters.shift();
       S.noArb = 0;
       for (let i = 0; i < S.jobs.length; i++) { const j = S.jobs[i]; if (d2(j.x, j.y, x, y) < CHARTER_R * CHARTER_R) j.locked = false; }
+      /* §15.2 THE POINT OF THE THIRD BUDGET POINT: arbitration lowers merge conflict without
+         anyone having to retreat into working alone. Every other route to Mc costs Si and Ow. */
+      for (let i = 0; i < S.agents.length; i++) {
+        const a = S.agents[i];
+        if (d2(a.x, a.y, x, y) < CHARTER_R * CHARTER_R) a.terr = 0;
+      }
     } else if (kind === 'slow') {
       S.slowUntil = S.tick + 900;
     } else if (kind === 'lens') {
       S.lensUntil = S.tick + 1500; S.lensOn = true;
-      S.jobs.forEach(j => { j.revealed = true; });
+      S.jobs.forEach(j => { j.revealed = true; j.shun = 0; });
+      /* the lens re-opens what was written off to inspection — that is why it answers Cs */
+      S.bl = {};
       S.agents.forEach(a => S.jobs.forEach(j => { if (!j.done) a.known.add(j.id); }));
+      sayOnce(S.ledgerOn ? 'tr:both' : 'tr:lens',
+        (FZ.copy.trade || {})[S.ledgerOn ? 'both' : 'lensOn'], S.ledgerOn ? 'good' : 'plain');
     } else if (kind === 'ledger') {
       S.ledgerUntil = S.tick + 2000; S.ledgerOn = true;
-      S.bl = {};
       S.agents.forEach(a => { if (a.liar && a.lies > 0) S.trust[a.id] = 0.06; });
+      sayOnce(S.lensOn ? 'tr:both' : 'tr:ledger',
+        (FZ.copy.trade || {})[S.lensOn ? 'both' : 'ledgerOn'], S.lensOn ? 'good' : 'plain');
     } else if (kind === 'eject') {
       if (x == null) return fail(kind, x, y, (FZ.copy.ui || {}).tapAgent || '');
       /* A floor under the colony. Without it the last resort is also a way to end the
@@ -2421,6 +2972,10 @@ FZ.sim.defaults = [
       agents: S.agents.length, jobs: S.jobs.length,
       hot: hot,
       strain: S.strainTop.map(s => s.sym),
+      /* the three trade-off dials, for tooling and for FIELD */
+      trustBias: +S.trustBias.toFixed(2), ownership: +S.ownership.toFixed(2),
+      aggro: +S.aggro.toFixed(2), speedMul: +S.speedMul.toFixed(2),
+      conflict: { force: S.stat.force, passivity: S.stat.passivity, truce: S.stat.truce, unsettled: S.stat.unsettled },
       enabled: Array.from(FZ.sim.enabled),
       tools: S.tools.slice(),
       gameOver: S.gameOver, won: S.won,
@@ -2439,8 +2994,8 @@ FZ.sim.defaults = [
     if (tool === 'charter') {
       S.charters.length = 0;
       for (let x = 0; x <= S.w; x += 120) for (let y = 0; y <= S.h; y += 120) S.charters.push({ x: x, y: y, r: 200 });
-    } else if (tool === 'lens') { S.lensUntil = 1e9; S.lensOn = true; S.jobs.forEach(j => j.revealed = true); }
-    else if (tool === 'ledger') { S.ledgerUntil = 1e9; S.ledgerOn = true; S.bl = {}; }
+    } else if (tool === 'lens') { S.lensUntil = 1e9; S.lensOn = true; S.bl = {}; S.jobs.forEach(j => { j.revealed = true; j.shun = 0; }); }
+    else if (tool === 'ledger') { S.ledgerUntil = 1e9; S.ledgerOn = true; }
     else if (tool === 'slow') { S.slowUntil = 1e9; }
     else if (tool === 'vary') { S.agents.forEach((a, i) => { if (a.corrigible) a.hue = i % 4; }); S.varyUntil = 1e9; }
     else if (tool === 'eject') {
@@ -2449,6 +3004,40 @@ FZ.sim.defaults = [
         if (a.adversary || !a.corrigible) S.agents.splice(i, 1);
       }
     }
+  }
+
+  /* ---------------- a competent player, for balance checking ----------------
+     Reads the strain readout, buys the instrument that answers whatever is hottest, and
+     puts it where that failure is happening. This is the standard ch9 has to be winnable
+     against — and ungoverned, ch9 has to be losable. Both are asserted in the audit notes. */
+  function playWell() {
+    const hot = S.strainTop.length ? FZ.ELBY[S.strainTop[0].sym] : null;
+    if (!hot) return;
+    const kinds = hot.answers.filter(k => S.tools.indexOf(k) > -1 && S.budget >= FZ.sim.cost(k));
+    if (!kinds.length) return;
+    const kind = kinds[0];
+    let x = S.w / 2, y = S.h / 2;
+    if (kind === 'eject') {
+      const a = S.agents.find(z => z.adversary) || S.agents.find(z => !z.corrigible);
+      if (!a) return;
+      x = a.x; y = a.y;
+    } else if (kind === 'charter') {
+      /* over the busiest contested job, or the busiest worker cluster */
+      let best = null, bn = 0;
+      for (let i = 0; i < S.jobs.length; i++) {
+        const j = S.jobs[i];
+        if (!j.done && j.claims.size > bn) { bn = j.claims.size; best = j; }
+      }
+      if (best) { x = best.x; y = best.y; }
+    } else if (kind === 'vary') {
+      let sx = 0, sy = 0, n = 0;
+      for (let i = 0; i < S.agents.length; i++) {
+        if (S.agents[i].hue !== S._g.topHue) continue;
+        sx += S.agents[i].x; sy += S.agents[i].y; n++;
+      }
+      if (n) { x = sx / n; y = sy / n; }
+    }
+    FZ.sim.apply(kind, x, y);
   }
 
   function autoPlay(n) {
@@ -2460,6 +3049,205 @@ FZ.sim.defaults = [
       const a = S.agents.find(z => z.adversary || !z.corrigible);
       if (a) FZ.sim.apply('eject', a.x, a.y);
     } else FZ.sim.apply(k, x, y);
+  }
+
+  /* ============================================================
+     __FZ.tradeoffs() — THE PROOF THAT §15 IS IMPLEMENTED AND NOT ASSERTED.
+     For each claim: run the SAME seeds twice, instrument off and instrument on, and
+     report that the element the instrument is for went DOWN and the element it is paid
+     for in went UP. A trade-off that does not measure is not implemented.
+     ============================================================ */
+  function tradeoffs(opts) {
+    opts = opts || {};
+    const WARM = opts.warm || 500, RUN = opts.ticks || 2200;
+    const SEED3 = opts.seeds || [880011, 24601, 133742];
+    /* Mc is a rare high-amplitude event, so its claim needs a bigger sample than the
+       continuous ones do. Eight seeds and a longer window, or the answer is just noise. */
+    const SEED8 = SEED3.concat([70707, 314159, 42424, 99991, 555]);
+    const LONG = 4000;
+    const base = sandboxCfg();
+    function cfg(extra, forceExtra) {
+      const c = Object.assign({}, base, { collapseMax: Infinity, budget: 0, tools: [] }, extra || {});
+      c.force = Object.assign({}, base.force || {}, forceExtra || {});
+      c.goal = { jobs: 1e9 };
+      return c;
+    }
+    /* an isolated world, built from scratch rather than from the sandbox, for the claims
+       that need one specific failure to be reliably observable rather than everything at once */
+    function iso(agents, jobs, force) {
+      return { id: 'ch9', all: true, tools: [], budget: 0, collapseMax: Infinity,
+               speed: 1, goal: { jobs: 1e9 }, agents: agents, jobs: jobs, force: force };
+    }
+    function measure(conf, arm, syms, seeds, ticks) {
+      const SEEDS = seeds || SEED3, RUNT = ticks || RUN;
+      const acc = {}, fires = {}, sum = { done: 0, aggr: 0, own: 0 };
+      syms.forEach(s => { acc[s] = 0; fires[s] = 0; });
+      for (let k = 0; k < SEEDS.length; k++) {
+        FZ.sim.reset(Object.assign({}, conf, { seed: SEEDS[k] }));
+        for (let i = 0; i < WARM; i++) FZ.sim.step();
+        if (arm) arm();
+        const d0 = S.stat.done;
+        syms.forEach(s => fires[s] -= FZ.ELBY[s].fires);
+        let ownSum = 0, siloSum = 0;
+        for (let i = 0; i < RUNT; i++) {
+          FZ.sim.step();
+          ownSum += S.ownership;
+          /* Si's own trigger condition, counted directly: what share of the open work is
+             known to less than a third of the colony. Si's HEAT saturates near 1 as soon as
+             two jobs are stale, so the heat alone cannot show siloing getting worse. */
+          const open = S._g.open;
+          if (open.length) {
+            let dark = 0;
+            for (let m = 0; m < open.length; m++) if (open[m].knownBy / Math.max(1, S._g.n) <= 0.3) dark++;
+            siloSum += dark / open.length;
+          }
+          for (let m = 0; m < syms.length; m++) acc[syms[m]] += FZ.ELBY[syms[m]].heat;
+        }
+        /* throughput is work COMPLETED, not the banked count — sabotage rolls that back,
+           and rolling it back is aggression, which is the other half of this claim */
+        sum.done += S.stat.done - d0;
+        sum.own += ownSum / RUNT;
+        sum.silo = (sum.silo || 0) + siloSum / RUNT;
+        sum.aggr += S.stat.force + S.stat.lockouts + S.stat.sabotage + S.stat.esc;
+        syms.forEach(s => fires[s] += FZ.ELBY[s].fires);
+      }
+      const n = SEEDS.length;
+      const out = {
+        done: +(sum.done / n).toFixed(1), aggr: +(sum.aggr / n).toFixed(1),
+        own: +(sum.own / n).toFixed(3), silo: +((sum.silo || 0) / n).toFixed(3), fires: fires,
+      };
+      syms.forEach(s => out[s] = +(acc[s] / (RUNT * n)).toFixed(4));
+      return out;
+    }
+    function claim(name, instrument, offConf, offArm, onConf, onArm, down, up, seeds, ticks) {
+      const syms = down.concat(up);
+      const off = measure(offConf, offArm, syms, seeds, ticks);
+      const on = measure(onConf, onArm, syms, seeds, ticks);
+      const rows = [];
+      let pass = true;
+      down.forEach(s => {
+        /* you cannot measure the suppression of something that never lit. Say so rather
+           than scoring it, exactly as counterWorks returns null in the same situation. */
+        if (off[s] < 0.004) {
+          rows.push({ sym: s, want: 'dark in this window', off: off[s], on: on[s], ok: true });
+          return;
+        }
+        const ok = on[s] < off[s] * 0.9;
+        if (!ok) pass = false;
+        rows.push({ sym: s, want: 'down', off: off[s], on: on[s], ok: ok });
+        rows.push({ sym: s + ' fires', want: 'down', off: off.fires[s], on: on.fires[s], ok: on.fires[s] < off.fires[s] });
+      });
+      up.forEach(s => {
+        const ok = on[s] > off[s] * 1.1;
+        if (!ok) pass = false;
+        rows.push({ sym: s, want: 'up', off: off[s], on: on[s], ok: ok });
+      });
+      return { claim: name, instrument: instrument, pass: pass, rows: rows, offDone: off.done, onDone: on.done };
+    }
+
+    const plain = cfg();
+    /* The ownership claim needs a colony that can actually collide and merge: mixed lineages
+       (a merge conflict needs two of them), a working grapevine (so cutting it costs), and
+       enough forced pairs that Mc is common in the baseline. Everything else is off, so what
+       is being measured is the ownership response and nothing else. */
+    const merge = iso({ n: 12, hues: [0, 1, 2] }, { n: 10, max: 10, value: 3, spawnEvery: 25 },
+      { coordination: true, pairEvery: 30, dark: true });
+    /* The trust-dial claims need every epistemic failure lit at once and nothing else in the
+       way: a liar to be gullible about, a silo so a lone worker can be right and ignored,
+       poison so the colony can over-generalise, and darkness so intent is unreadable. */
+    const epis = iso({ n: 12, hues: [0, 1, 2] }, { n: 6, max: 6, value: 5, spawnEvery: 200 },
+      { rumor: true, lieEvery: 300, silo: true, hidden: true, poison: true, poisonN: 2, dark: true });
+    /* Capability-is-not-coordination needs a colony that can actually do work and can also
+       turn on itself: rivals, a saboteur and a locker, and nothing else. */
+    const power = iso({ n: 12, hues: [0, 1, 2] }, { n: 10, max: 10, value: 4, spawnEvery: 25 },
+      { rivals: true, rivalN: 2, saboteur: true, advN: 1, lock: true, lockN: 1,
+        coordination: true, pairEvery: 240, dark: true });
+    const out = [];
+
+    /* 15.1a LEDGER: suppresses the liar, and teaches the colony to ignore its dissenter. */
+    out.push(claim('15.1 LEDGER suppresses Gu, amplifies Di and Cs', 'ledger',
+      epis, null, epis, () => forceCounter('ledger'), ['Gu'], ['Di', 'Cs'], SEED8));
+    /* 15.1b LENS: suppresses the dark, and broadcasts the rumour with everything else. */
+    out.push(claim('15.1 LENS suppresses Di Cs Mm, amplifies Gu', 'lens',
+      epis, null, epis, () => forceCounter('lens'), ['Di', 'Cs', 'Mm'], ['Gu'], SEED8));
+    /* 15.2 the ownership response: Mc falls, and it is paid for in Si and Ow. */
+    const owOff = measure(Object.assign({}, merge, { noOwn: true }), null, ['Mc', 'Si', 'Ow'], SEED8, LONG);
+    const owOn = measure(merge, null, ['Mc', 'Si', 'Ow'], SEED8, LONG);
+    const owRows = [
+      { sym: 'Mc', want: 'down', off: owOff.Mc, on: owOn.Mc, ok: owOn.Mc < owOff.Mc * 0.9 },
+      { sym: 'Mc fires', want: 'down', off: owOff.fires.Mc, on: owOn.fires.Mc, ok: owOn.fires.Mc < owOff.fires.Mc },
+      { sym: 'Si trigger', want: 'up', off: owOff.silo, on: owOn.silo, ok: owOn.silo > owOff.silo * 1.1 },
+      { sym: 'Si fires', want: 'up', off: owOff.fires.Si, on: owOn.fires.Si, ok: owOn.fires.Si >= owOff.fires.Si },
+      { sym: 'Ow', want: 'up', off: owOff.Ow, on: owOn.Ow, ok: owOn.Ow > owOff.Ow * 1.1 + 0.02 },
+      { sym: 'ownership', want: 'up', off: owOff.own, on: owOn.own, ok: owOn.own > 0.1 },
+    ];
+    out.push({
+      claim: '15.2 ownership suppresses Mc, amplifies Si and Ow', instrument: 'ownership',
+      pass: owRows.every(r => r.ok), rows: owRows, offDone: owOff.done, onDone: owOn.done,
+    });
+    /* 15.2b the charter is the only escape: Mc falls and the ownership bill never arrives.
+       Si is not the right yardstick for this leg — a chartered colony finishes far more work,
+       so it meets more brand-new jobs nobody has heard of yet, and that is not siloing.
+       S.ownership is the bill itself, so measure the bill. */
+    const chOff = measure(merge, null, ['Mc'], SEED8, LONG);
+    const chOn = measure(merge, () => forceCounter('charter'), ['Mc'], SEED8, LONG);
+    out.push({
+      claim: '15.2 CHARTER suppresses Mc without the ownership bill', instrument: 'charter',
+      pass: chOn.Mc < chOff.Mc * 0.9 && chOn.own < chOff.own * 0.9 && chOn.done > chOff.done,
+      rows: [
+        { sym: 'Mc', want: 'down', off: chOff.Mc, on: chOn.Mc, ok: chOn.Mc < chOff.Mc * 0.9 },
+        { sym: 'ownership', want: 'down', off: chOff.own, on: chOn.own, ok: chOn.own < chOff.own * 0.9 },
+        { sym: 'jobs done', want: 'up', off: chOff.done, on: chOn.done, ok: chOn.done > chOff.done },
+      ], offDone: chOff.done, onDone: chOn.done,
+    });
+    /* 15.3 conflicts terminate in the four named ways, and truce needs a charter. */
+    function modes(arm) {
+      const t = { force: 0, passivity: 0, truce: 0, unsettled: 0 };
+      for (let k = 0; k < SEED3.length; k++) {
+        FZ.sim.reset(Object.assign({}, plain, { seed: SEED3[k] }));
+        for (let i = 0; i < WARM; i++) FZ.sim.step();
+        if (arm) arm();
+        for (let i = 0; i < RUN * 2; i++) FZ.sim.step();
+        for (const m in t) t[m] += S.stat[m];
+      }
+      return t;
+    }
+    const mFree = modes(null), mGov = modes(() => forceCounter('charter'));
+    const settled = mFree.force + mFree.passivity + mFree.truce + mFree.unsettled;
+    const truceFree = settled ? mFree.truce / settled : 0;
+    const govN = mGov.force + mGov.passivity + mGov.truce + mGov.unsettled;
+    const truceGov = govN ? mGov.truce / govN : 0;
+    out.push({
+      claim: '15.3 conflicts end in force/passivity/truce/unsettled; truce needs a charter',
+      instrument: 'charter', pass: settled > 0 && truceGov > 0.5 && truceGov > truceFree * 3,
+      rows: [
+        { sym: 'truce', want: 'up', off: +truceFree.toFixed(2), on: +truceGov.toFixed(2), ok: truceGov > truceFree * 3 },
+        { sym: 'force', want: 'down', off: mFree.force, on: mGov.force, ok: mGov.force <= mFree.force },
+      ],
+      ungoverned: mFree, governed: mGov,
+    });
+    /* 15.4 speed raises throughput AND aggression on the same curve. */
+    const slow = measure(Object.assign({}, power, { speed: 1 }), null, ['Sp'], SEED8);
+    const fast = measure(Object.assign({}, power, { speed: 2.4 }), null, ['Sp'], SEED8);
+    out.push({
+      claim: '15.4 speed raises throughput AND aggression together', instrument: 'speed',
+      pass: fast.done > slow.done * 1.15 && fast.aggr > slow.aggr * 1.15,
+      rows: [
+        { sym: 'jobs done', want: 'up', off: slow.done, on: fast.done, ok: fast.done > slow.done * 1.15 },
+        { sym: 'aggression', want: 'up', off: slow.aggr, on: fast.aggr, ok: fast.aggr > slow.aggr * 1.15 },
+      ], offDone: slow.done, onDone: fast.done,
+    });
+
+    FZ.sim.reset(base);
+    return out;
+  }
+
+  /* one-line-per-claim rendering, so the audit can print the proof without knowing the shape */
+  function tradeLines(list) {
+    return list.map(c => {
+      const body = c.rows.map(r => r.sym + ' ' + r.off + '->' + r.on + ' ' + (r.ok ? r.want : 'NOT ' + r.want)).join(', ');
+      return (c.pass ? 'OK   ' : 'FAIL ') + c.claim + ' [' + body + ']';
+    });
   }
 
   function audit(opts) {
@@ -2504,8 +3292,8 @@ FZ.sim.defaults = [
     function provoke(sym) {
       if (sym === 'Cr') S.slowUntil = S.tick + 1e9;
       else if (sym === 'Mc') S.agents.forEach((a, i) => { a.hue = i % 3; });
-      else if (sym === 'Im') { S.copyBias = 0.99; S.agents.forEach(z => { S.jobs.forEach(j => z.known.add(j.id)); }); }
-      else if (sym === 'Di') S.agents.forEach(a => { if (a.id > 3) a.known.clear(); });
+      else if (sym === 'Im' || sym === 'Cf') { S.copyBias = 0.99; S.agents.forEach(z => { S.jobs.forEach(j => z.known.add(j.id)); }); }
+      else if (sym === 'Di') { S.ledgerUntil = 1e9; S.agents.forEach(a => { if (a.id > 3) a.known.clear(); }); }
       else if (sym === 'Cs') { S.bl[2] = S.tick + 4000; S.bl[3] = S.tick + 4000; }
     }
     function stretch(e, seed, counter) {
@@ -2532,22 +3320,55 @@ FZ.sim.defaults = [
       res[e.sym].counterWorks = A < 1 ? null : (B < A * 0.8);
     }
 
+    /* ---- part 3: the §15 trade-offs, measured the same way — off, on, both directions ---- */
+    const trades = tradeoffs(opts.trade);
+    const tradeFail = trades.filter(t => !t.pass).map(t => t.claim);
+
+    /* ---- part 4: is the sandbox actually a game? losable if you do nothing, winnable if
+           you read it correctly. Both directions, three seeds each. ---- */
+    function ch9(policy, cap) {
+      let lost = 0, won = 0, jobs = 0;
+      for (let k = 0; k < 2; k++) {
+        FZ.sim.reset(Object.assign({}, cfg, { seed: 5150 + k * 977 }));
+        for (let i = 0; i < cap && !S.gameOver; i++) {
+          FZ.sim.step();
+          if (policy && i % 90 === 0) playWell();
+        }
+        if (S.gameOver && !S.won) lost++;
+        if (S.won) won++;
+        jobs += S.jobsDone;
+      }
+      return { lost: lost, won: won, jobs: Math.round(jobs / 2) };
+    }
+    const idle = ch9(false, 12000);
+    const played = ch9(true, 55000);
+
     S._silent = false;
     FZ.sim.reset(cfg);
 
     return {
       elements: res,
+      trades: trades,
       notes: {
         ms: Date.now() - t0,
         trials: trials, ticks: ticks, resets: resets,
         jobsDoneTotal: doneTotal,
         runsLost: lostRuns,
+        tradeoffs: tradeLines(trades),
+        tradeoffsFailed: tradeFail.length ? tradeFail : 'none',
+        ch9Ungoverned: idle.lost + '/2 collapsed inside 12k ticks, ' + idle.jobs + ' jobs banked',
+        ch9WellPlayed: played.won + '/2 reached the 117-job goal inside 55k ticks (' + played.lost + ' collapsed), ' + played.jobs + ' jobs banked',
         method: 'fires/peak from the ch9 sandbox with auto-played interventions; counterWorks from the same seed run twice, counter forced on at tick ' + WARM + ' (best of up to three seeds), comparing mean heat over the following ' + RUN + ' ticks (works = 20% or better reduction). null means the element never got hot enough in the measurement window to compare honestly.',
       },
     };
   }
 
-  window.__FZ = { probe: probe, audit: audit, goto: goto, sim: FZ.sim, forceCounter: forceCounter };
+  window.__FZ = {
+    probe: probe, audit: audit, goto: goto, sim: FZ.sim, forceCounter: forceCounter,
+    /* §15 proof, runnable on its own: __FZ.tradeoffs() -> [{claim,pass,rows}] */
+    tradeoffs: function (o) { S._silent = true; const r = tradeoffs(o); S._silent = false; return r; },
+    tradeLines: tradeLines,
+  };
 })();
 
 </script>
@@ -2557,23 +3378,422 @@ FZ.sim.defaults = [
    45-outbreak.js — THE CORE LOOP.  OWNER: PLAY.
    See CONTRACT.md §14 and REFERENCE-EOT.md §2B.
 
-   STUB. This currently does nothing except satisfy the interface so the build stays
-   green. The PLAY builder replaces it wholesale with the real outbreak loop:
-   a detector fires -> a timed, located, named outbreak opens -> the player answers it
-   with the right institution before the fuse runs out -> it visibly resolves or lands.
+   A detector firing used to warm a table cell and nothing else. Here it opens an
+   OUTBREAK: a bounded place on the field, named in one plain sentence, on a fuse of a
+   few seconds, doing real damage the whole time it burns. The player reads which
+   failure it is and answers it with the right institution, in the right place, in time.
+
+     right instrument, inside the ring, before the fuse   -> it closes, the strain is
+        refunded, the cell is marked as one she has answered herself
+     wrong instrument                                     -> it does not close, and the
+        game says plainly what the failure actually is
+     the fuse runs out                                    -> the damage lands where it
+        happened: work rolls back, workers go down, strain spikes, a scar stays
+
+   FIELD draws the ring, the fuse and the resolution; TABLE pulses and marks the cell;
+   CONTROLS routes every tap through tryAnswer() before FZ.sim.apply, so a correct
+   diagnosis can be paid back and a wrong one can teach. This file draws nothing and
+   contains no English: every sentence comes from FZ.copy.
+
+   WHICH INSTRUMENT ANSWERS WHAT is not arbitrary and is not hidden. Each element's
+   answer set is exactly the instruments NAMED in the counter line the player can already
+   read on its table cell (FZ.copy.detail[sym].counter), so the mapping is learnable by
+   tapping the cell — with one deliberate exception, noted at Sa below.
+     CHARTER arbitrates  VARY decorrelates  LEDGER remembers
+     LENS reveals        SLOW brakes        EJECT excludes
    ============================================================ */
 window.FZ = window.FZ || {};
 
-FZ.outbreak = {
-  list: [],
-  mastery: {},
-  enabled: false,          // PLAY sets true when the real loop is implemented
-  cap: 1,
+FZ.outbreak = (function () {
+  'use strict';
 
-  reset(scenario) { this.list.length = 0; this.cap = (scenario && scenario.outbreakCap) || 1; },
-  update(S) { /* PLAY: age fuses, land damage, expire answered marks */ },
-  tryAnswer(kind, x, y) { return { hit: false, right: false, sym: null, msg: '' }; },
-};
+  /* sym -> the instruments that resolve it.
+     SIM is the authority (`el.answers`, CONTRACT §14.4). This table is the fallback if an
+     element ever ships without one, and a generosity margin: an instrument that genuinely
+     counters the element in the sim is accepted even when the cell's counter line names a
+     different one first. Being right for a readable reason is never punished. */
+  var ANSWERS = {
+    /* coordination */
+    Co: ['charter'],
+    Si: ['lens'],
+    Mc: ['charter'],
+    Dp: ['lens', 'charter'],
+    Ow: ['charter'],
+    Pt: ['lens'],
+    /* conformity */
+    Cf: ['vary', 'slow'],
+    Lv: ['vary'],
+    Sf: ['vary'],
+    Fl: ['slow', 'charter'],
+    Cl: ['charter', 'eject'],
+    Im: ['vary'],
+    /* epistemics */
+    Gu: ['ledger'],
+    /* Cs: the LEDGER is the CAUSE, not the cure (§15.1 — skepticism up amplifies Cs, and
+       the audit measures it going up). Only the LENS re-opens what was written off, and
+       only the LENS is in counteredBy. Accepting a ledger here would pay the player for
+       the exact move that made it worse. */
+    Cs: ['lens'],
+    Hi: ['lens'],
+    Tc: ['ledger'],
+    Di: ['lens'],
+    Rp: ['ledger'],
+    /* goals and power */
+    Tw: ['charter'],
+    /* Sa: the counter line says find it with a LENS, then EJECT. Only the expulsion
+       ends it, so only the expulsion answers it — looking is not doing. */
+    Sa: ['eject'],
+    Lo: ['charter', 'eject'],
+    My: ['lens'],
+    Es: ['slow', 'charter'],
+    Cr: ['eject'],
+    /* meta */
+    Mo: ['vary'],
+    In: ['charter'],
+    Sp: ['slow'],
+    Mm: ['lens'],
+  };
+
+  /* ticks. The rAF loop steps once per frame, so ~60 ticks is a second.
+     The fuse shortens with machine speed: that is how Sp becomes the difficulty
+     curve rather than a caption. */
+  var FUSE = 400, FUSE_MIN = 168, FUSE_MAX = 620;
+  var FIRST_GRACE = 1.5;          /* the first one you ever see waits for you */
+  var COOL_OK = 210, COOL_MISS = 160;
+  var KEEP = 130;                 /* how long a resolved outbreak stays inspectable */
+  var BURN_DRAIN = 0.05;          /* progress lost per tick inside a burning ring */
+  var LAND_STRAIN = 6, ANSWER_RELIEF = 4;
+  var STORE = 'formicary.mastery';
+
+  var list = [];
+  var mastery = {};
+  var cap = 1;
+  var cool = {};
+  var pend = null;                /* an answer awaiting the sim's verdict on the spend */
+  var seen = 0;                   /* outbreaks opened this run */
+  var said = {};                  /* one-off narrator lines, once per session */
+  var wired = false;
+  var lastW = 0, lastH = 0;
+  var api;
+
+  function S() { return FZ.sim ? FZ.sim.state : null; }
+  function loop(k) { return (FZ.copy && FZ.copy.loop && FZ.copy.loop[k]) || ''; }
+  function wrongLine(sym) { return (FZ.copy && FZ.copy.wrong && FZ.copy.wrong[sym]) || ''; }
+  function fireLine(sym) { return (FZ.copy && FZ.copy.fire && FZ.copy.fire[sym]) || ''; }
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  function emit(n, d) { if (FZ.bus) FZ.bus.emit(n, d); }
+  function say(key, tone) {
+    if (said[key]) return;
+    said[key] = 1;
+    var t = loop(key);
+    if (t) emit('say', { text: t, tone: tone || 'plain' });
+  }
+
+  /* ------------------------------------------------------------------ mastery */
+  function load() {
+    try {
+      var raw = window.localStorage && window.localStorage.getItem(STORE);
+      if (!raw) return;
+      var o = JSON.parse(raw);
+      for (var k in o) {
+        if (!ANSWERS[k] || !o[k]) continue;
+        mastery[k] = { answered: o[k].answered | 0, missed: o[k].missed | 0 };
+      }
+    } catch (e) { /* private mode, file://, quota — mastery is a bonus, never a blocker */ }
+  }
+  function save() {
+    try { if (window.localStorage) window.localStorage.setItem(STORE, JSON.stringify(mastery)); }
+    catch (e) { }
+  }
+  function mark(sym, key) {
+    var m = mastery[sym] || (mastery[sym] = { answered: 0, missed: 0 });
+    m[key]++;
+    save();
+    return m;
+  }
+
+  /* -------------------------------------------------------------------- shape */
+  function answersFor(sym) {
+    var e = FZ.ELBY ? FZ.ELBY[sym] : null;
+    var out = (e && e.answers && e.answers.length) ? e.answers.slice() : [];
+    var extra = ANSWERS[sym] || [];
+    for (var i = 0; i < extra.length; i++) if (out.indexOf(extra[i]) < 0) out.push(extra[i]);
+    return out;
+  }
+
+  /* Only ever ask a question the player has been handed an instrument to answer.
+     An outbreak nothing in the bar can close is not a decision, it is a punishment. */
+  function answerable(sym, st) {
+    var A = answersFor(sym), T = st.tools || [];
+    for (var i = 0; i < A.length; i++) if (T.indexOf(A[i]) > -1) return true;
+    return false;
+  }
+
+  function radius(st) { return clamp(Math.min(st.w, st.h) * 0.22, 56, 92); }
+
+  function burningCount() {
+    var n = 0;
+    for (var i = 0; i < list.length; i++) if (list[i].state === 'burning') n++;
+    return n;
+  }
+  function findBurning(sym) {
+    for (var i = 0; i < list.length; i++) if (list[i].state === 'burning' && list[i].sym === sym) return list[i];
+    return null;
+  }
+  function left(o, st) {
+    if (!o.fuse) return 0;
+    return 1 - (st.tick - o.born) / o.fuse;
+  }
+
+  /* -------------------------------------------------------------------- open */
+  function open(d) {
+    var st = S();
+    if (!st || !d || !d.sym || st.gameOver) return;
+    if (cap <= 0) return;
+    if (FZ.chapters && FZ.chapters.phase && FZ.chapters.phase() !== 'play') return;
+    if (!answerable(d.sym, st)) return;
+    if (findBurning(d.sym)) return;
+    if (cool[d.sym] > st.tick) return;
+    if (burningCount() >= cap) return;
+
+    var at = d.at || { x: st.w / 2, y: st.h / 2 };
+    var r = radius(st);
+    var fuse = Math.round(clamp(FUSE / Math.max(1, st.speedMul || 1), FUSE_MIN, FUSE_MAX));
+    if (seen === 0) fuse = Math.round(fuse * FIRST_GRACE);
+    seen++;
+
+    var o = {
+      sym: d.sym,
+      /* kept just inside the field: an outbreak you cannot see the clock on is not a
+         decision. The fuse arc starts at twelve o'clock, so the top of the ring is the
+         part that must survive. */
+      x: clamp(at.x, 22, st.w - 22),
+      y: clamp(at.y, 26, st.h - 22),
+      r: r,
+      born: st.tick,
+      fuse: fuse,
+      say: d.say || fireLine(d.sym),
+      answers: answersFor(d.sym).slice(),
+      who: (d.who || []).slice(),
+      state: 'burning',
+      endAt: 0,
+    };
+    list.push(o);
+    emit('outbreak:open', { sym: o.sym, x: o.x, y: o.y, fuse: o.fuse, r: o.r });
+    say('firstOutbreak', 'bad');
+  }
+
+  /* ------------------------------------------------------------------- damage */
+  function el(sym) { return FZ.ELBY ? FZ.ELBY[sym] : null; }
+
+  /* it burns: work inside the ring goes backwards while the player decides */
+  function burn(o, st) {
+    var d = BURN_DRAIN * (st.tempo || 1), r2 = o.r * o.r;
+    for (var i = 0; i < st.jobs.length; i++) {
+      var j = st.jobs[i];
+      if (j.done || j.progress <= 0) continue;
+      var dx = j.x - o.x, dy = j.y - o.y;
+      if (dx * dx + dy * dy > r2) continue;
+      j.progress = Math.max(0, j.progress - d);
+    }
+  }
+
+  /* it lands: the damage arrives where it happened, all at once, and stays visible */
+  function land(o, st) {
+    o.state = 'landed';
+    o.endAt = st.tick + KEEP;
+    cool[o.sym] = st.tick + COOL_MISS;
+
+    var r2 = (o.r * 1.15) * (o.r * 1.15), i;
+    for (i = 0; i < st.jobs.length; i++) {
+      var j = st.jobs[i];
+      if (j.done) continue;
+      var dx = j.x - o.x, dy = j.y - o.y;
+      if (dx * dx + dy * dy > r2) continue;
+      if (j.progress > 0) { j.progress = Math.max(0, j.progress * 0.4 - 4); j.flash = 12; }
+    }
+    /* the nearest few go down, not the whole colony: a miss must be legible as a
+       located event, not a screen-wide freeze you cannot read */
+    var near = [];
+    for (i = 0; i < st.agents.length; i++) {
+      var a = st.agents[i];
+      var ax = a.x - o.x, ay = a.y - o.y, q = ax * ax + ay * ay;
+      if (q <= r2) near.push({ a: a, q: q });
+    }
+    near.sort(function (p, z) { return p.q - z.q; });
+    for (i = 0; i < near.length && i < 4; i++) {
+      near[i].a.stun = Math.max(near[i].a.stun, 44);
+      near[i].a.flash = 12;
+      emit('agent:hurt', { id: near[i].a.id, x: near[i].a.x, y: near[i].a.y });
+    }
+    if (st.collapseMax !== Infinity) st.collapse = Math.min(st.collapseMax, st.collapse + LAND_STRAIN);
+    var e = el(o.sym);
+    if (e) e.heat = Math.min(1, e.heat + 0.3);
+
+    mark(o.sym, 'missed');
+    emit('outbreak:landed', { sym: o.sym, x: o.x, y: o.y, r: o.r });
+    say('firstMiss', 'bad');
+  }
+
+  /* it closes: the failure visibly cools, and the instrument is paid back */
+  function resolve(o, kind, st) {
+    o.state = 'answered';
+    o.endAt = st.tick + KEEP;
+    cool[o.sym] = st.tick + COOL_OK;
+
+    var back = (FZ.sim && FZ.sim.cost) ? FZ.sim.cost(kind) : 2;
+    st.budget = Math.min(14, st.budget + back + 1);
+    if (st.collapseMax !== Infinity) st.collapse = Math.max(0, st.collapse - ANSWER_RELIEF);
+
+    /* the cell drops out of the red immediately: the consequence is in the table too */
+    var e = el(o.sym);
+    if (e) { e.heat = Math.min(e.heat, 0.1); e.on = false; }
+
+    var m = mark(o.sym, 'answered');
+    emit('outbreak:answered', { sym: o.sym, x: o.x, y: o.y, r: o.r });
+    say('firstAnswer', 'good');
+    if (m.answered === 1) say('masteryOne', 'good');
+  }
+
+  /* it stopped on its own terms: the element is genuinely countered and has gone cold,
+     so the ring closes rather than burning down a fire that is already out. No reward and
+     no mastery credit — the player fixed the colony, but did not answer THIS, here. */
+  function defuse(o, st) {
+    o.state = 'answered';
+    o.endAt = st.tick + KEEP;
+    cool[o.sym] = st.tick + COOL_OK;
+    emit('outbreak:answered', { sym: o.sym, x: o.x, y: o.y, r: o.r });
+  }
+
+  /* ------------------------------------------------------------------ answers */
+  /* CONTROLS calls this BEFORE FZ.sim.apply. The spend can still fail (no budget, a
+     tap with no worker under it), so the outcome is held until the sim reports back
+     on `intervene`, and rolled back if nothing was actually spent. */
+  function tryAnswer(kind, x, y) {
+    var st = S();
+    var miss = { hit: false, right: false, sym: null, msg: '' };
+    if (!st || !kind) return miss;
+
+    var best = null, bd = Infinity, near = null;
+    for (var i = 0; i < list.length; i++) {
+      var o = list[i];
+      if (o.state !== 'burning') continue;
+      var d = (x == null) ? 0 : Math.sqrt((o.x - x) * (o.x - x) + (o.y - y) * (o.y - y));
+      var reach = o.r + 26;
+      if (d <= reach) { if (d < bd) { bd = d; best = o; } }
+      else if (o.answers.indexOf(kind) > -1 && !near) near = o;
+    }
+
+    if (!best) {
+      /* the right instrument, in the wrong place: say so, and let it apply anyway */
+      if (near) return { hit: false, right: false, sym: near.sym, msg: loop('tooFar') };
+      return miss;
+    }
+
+    if (best.answers.indexOf(kind) > -1) {
+      pend = { o: best, kind: kind, right: true };
+      return { hit: true, right: true, sym: best.sym, msg: loop('answered') + ' — ' + loop('refund') };
+    }
+    pend = { o: best, kind: kind, right: false };
+    return { hit: true, right: false, sym: best.sym, msg: wrongLine(best.sym) };
+  }
+
+  function settle(d) {
+    if (!pend) return;
+    var p = pend; pend = null;
+    var st = S();
+    if (!st || !d || !d.ok) return;              /* nothing was spent — nothing happened */
+    if (p.o.state !== 'burning') return;
+    if (p.right) { resolve(p.o, p.kind, st); return; }
+    emit('outbreak:wrong', { sym: p.o.sym, kind: p.kind, msg: wrongLine(p.o.sym) });
+    say('firstWrong', 'bad');
+  }
+
+  /* ------------------------------------------------------------------- update */
+  function update(st) {
+    if (!st) return;
+    if (!wired) wire();
+
+    /* the phone rotated, or the ticker grew a line: the sim rescales its world, so
+       the outbreaks have to move with it or they point at nothing. */
+    if (lastW && lastH && (lastW !== st.w || lastH !== st.h)) {
+      var kx = st.w / lastW, ky = st.h / lastH;
+      for (var q = 0; q < list.length; q++) { list[q].x *= kx; list[q].y *= ky; }
+    }
+    lastW = st.w; lastH = st.h;
+
+    for (var i = list.length - 1; i >= 0; i--) {
+      var o = list[i];
+      if (o.state === 'burning') {
+        var e = el(o.sym);
+        if (e && e.countered && e.heat < 0.1 && st.tick - o.born > 45) defuse(o, st);
+        else if (st.tick - o.born >= o.fuse) land(o, st);
+        else burn(o, st);
+      } else if (st.tick >= o.endAt) {
+        list.splice(i, 1);
+      }
+    }
+  }
+
+  function wire() {
+    if (wired || !FZ.bus) return;
+    wired = true;
+    FZ.bus.on('fire', open);
+    FZ.bus.on('intervene', settle);
+    FZ.bus.on('lose', function () { list.length = 0; pend = null; });
+    FZ.bus.on('goal', function () { list.length = 0; pend = null; });
+  }
+
+  load();
+  wire();
+
+  api = {
+    list: list,
+    mastery: mastery,
+    enabled: true,
+    cap: 1,
+
+    reset: function (scenario) {
+      list.length = 0;
+      pend = null;
+      cool = {};
+      seen = 0;
+      var st = S();
+      lastW = st ? st.w : 0; lastH = st ? st.h : 0;
+      cap = (scenario && scenario.outbreakCap != null) ? scenario.outbreakCap : 1;
+      api.cap = cap;
+      wire();
+    },
+
+    update: update,
+    tryAnswer: tryAnswer,
+
+    /* the one a tap should be judged against when the instrument is untargeted:
+       whichever is closest to landing. CONTROLS uses this. */
+    urgent: function () {
+      var st = S();
+      if (!st) return null;
+      var best = null, bl = 2;
+      for (var i = 0; i < list.length; i++) {
+        var o = list[i];
+        if (o.state !== 'burning') continue;
+        var l = left(o, st);
+        if (l < bl) { bl = l; best = o; }
+      }
+      return best;
+    },
+
+    /* how many of the twenty-eight this player has personally answered */
+    answeredCount: function () {
+      var n = 0;
+      for (var k in mastery) if (mastery[k] && mastery[k].answered > 0) n++;
+      return n;
+    },
+
+    answersFor: answersFor,
+  };
+  return api;
+})();
 
 </script>
 <script>
@@ -3983,14 +5203,32 @@ FZ.controls = (function () {
   function arm(kind) {
     api.armed = kind;
     api.aim = null;
-    if (hint) { hint.textContent = copyTool(kind).hint || ''; hint.classList.add('on'); }
+    paintHint();
     paintBar();
   }
   function disarm() {
     api.armed = null;
     api.aim = null;
-    if (hint) { hint.classList.remove('on'); hint.textContent = ''; }
+    paintHint();
     paintBar();
+  }
+
+  /* THE ONE CLEAR NEXT ACTION.
+     Armed: where to put the thing in your hand. Not armed, but something is burning:
+     the only job you have. Otherwise the strip is not there at all — and once you have
+     answered a few outbreaks yourself it stops telling you, because you know. */
+  function green() {
+    var ob = FZ.outbreak;
+    if (!ob || !ob.answeredCount) return true;
+    try { return ob.answeredCount() < 4; } catch (e) { return true; }
+  }
+  function paintHint() {
+    if (!hint) return;
+    var want = '';
+    if (api.armed) want = copyTool(api.armed).hint || '';
+    else if (have.length && green() && burning() && live()) want = loop('tapToAnswer');
+    if (want !== hint.textContent) hint.textContent = want;
+    if (hint.classList.contains('on') !== !!want) hint.classList.toggle('on', !!want);
   }
 
   /* --------------------------------------------------------------- the field */
@@ -4006,8 +5244,9 @@ FZ.controls = (function () {
   }
 
   /* where an untargeted instrument should be judged to have been aimed:
-     at the outbreak it is answering, if one is burning. */
+     at the outbreak it is answering — the one closest to landing, if any is burning. */
   function burning() {
+    if (FZ.outbreak && FZ.outbreak.urgent) { try { return FZ.outbreak.urgent(); } catch (e) { } }
     var L = (FZ.outbreak && FZ.outbreak.list) ? FZ.outbreak.list : null;
     if (!L || !L.length) return null;
     for (var i = 0; i < L.length; i++) if (!L[i].state || L[i].state === 'burning') return L[i];
@@ -4021,15 +5260,18 @@ FZ.controls = (function () {
 
     if (x == null) { var o = burning(); if (o) { x = o.x; y = o.y; } }
 
+    /* the diagnosis is judged BEFORE the spend, so a right answer can be paid back
+       and a wrong one can say what the failure actually was. */
     var ans = null;
     if (FZ.outbreak && FZ.outbreak.tryAnswer) {
       try { ans = FZ.outbreak.tryAnswer(kind, x, y); } catch (e) { ans = null; }
     }
     var out = FZ.sim.apply(kind, TARGETED[kind] ? x : undefined, TARGETED[kind] ? y : undefined);
 
-    if (ans && ans.hit && ans.right) FZ.ui.toast(ans.msg || loop('answered'), 'good');
-    else if (ans && ans.hit && !ans.right) FZ.ui.toast(ans.msg || '', 'bad');
-    else if (out && !out.ok && out.msg) FZ.ui.toast(out.msg, 'bad');
+    /* nothing was spent -> say why, and never claim an answer that did not happen */
+    if (out && !out.ok) { if (out.msg) FZ.ui.toast(out.msg, 'bad'); }
+    else if (ans && ans.hit && ans.right) FZ.ui.toast(ans.msg || loop('answered'), 'good');
+    else if (ans && ans.msg) FZ.ui.toast(ans.msg, 'bad');
     else if (out && out.ok && !TARGETED[kind]) FZ.ui.toast(copyTool(kind).blurb || '', 'good');
 
     paintBar();
@@ -4162,7 +5404,7 @@ FZ.controls = (function () {
 
     paint: function (st) {
       paintBar();
-      if (hint && api.armed && !hint.classList.contains('on')) hint.classList.add('on');
+      paintHint();
     },
 
     disarm: disarm,

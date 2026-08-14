@@ -116,14 +116,32 @@ FZ.controls = (function () {
   function arm(kind) {
     api.armed = kind;
     api.aim = null;
-    if (hint) { hint.textContent = copyTool(kind).hint || ''; hint.classList.add('on'); }
+    paintHint();
     paintBar();
   }
   function disarm() {
     api.armed = null;
     api.aim = null;
-    if (hint) { hint.classList.remove('on'); hint.textContent = ''; }
+    paintHint();
     paintBar();
+  }
+
+  /* THE ONE CLEAR NEXT ACTION.
+     Armed: where to put the thing in your hand. Not armed, but something is burning:
+     the only job you have. Otherwise the strip is not there at all — and once you have
+     answered a few outbreaks yourself it stops telling you, because you know. */
+  function green() {
+    var ob = FZ.outbreak;
+    if (!ob || !ob.answeredCount) return true;
+    try { return ob.answeredCount() < 4; } catch (e) { return true; }
+  }
+  function paintHint() {
+    if (!hint) return;
+    var want = '';
+    if (api.armed) want = copyTool(api.armed).hint || '';
+    else if (have.length && green() && burning() && live()) want = loop('tapToAnswer');
+    if (want !== hint.textContent) hint.textContent = want;
+    if (hint.classList.contains('on') !== !!want) hint.classList.toggle('on', !!want);
   }
 
   /* --------------------------------------------------------------- the field */
@@ -139,8 +157,9 @@ FZ.controls = (function () {
   }
 
   /* where an untargeted instrument should be judged to have been aimed:
-     at the outbreak it is answering, if one is burning. */
+     at the outbreak it is answering — the one closest to landing, if any is burning. */
   function burning() {
+    if (FZ.outbreak && FZ.outbreak.urgent) { try { return FZ.outbreak.urgent(); } catch (e) { } }
     var L = (FZ.outbreak && FZ.outbreak.list) ? FZ.outbreak.list : null;
     if (!L || !L.length) return null;
     for (var i = 0; i < L.length; i++) if (!L[i].state || L[i].state === 'burning') return L[i];
@@ -154,15 +173,18 @@ FZ.controls = (function () {
 
     if (x == null) { var o = burning(); if (o) { x = o.x; y = o.y; } }
 
+    /* the diagnosis is judged BEFORE the spend, so a right answer can be paid back
+       and a wrong one can say what the failure actually was. */
     var ans = null;
     if (FZ.outbreak && FZ.outbreak.tryAnswer) {
       try { ans = FZ.outbreak.tryAnswer(kind, x, y); } catch (e) { ans = null; }
     }
     var out = FZ.sim.apply(kind, TARGETED[kind] ? x : undefined, TARGETED[kind] ? y : undefined);
 
-    if (ans && ans.hit && ans.right) FZ.ui.toast(ans.msg || loop('answered'), 'good');
-    else if (ans && ans.hit && !ans.right) FZ.ui.toast(ans.msg || '', 'bad');
-    else if (out && !out.ok && out.msg) FZ.ui.toast(out.msg, 'bad');
+    /* nothing was spent -> say why, and never claim an answer that did not happen */
+    if (out && !out.ok) { if (out.msg) FZ.ui.toast(out.msg, 'bad'); }
+    else if (ans && ans.hit && ans.right) FZ.ui.toast(ans.msg || loop('answered'), 'good');
+    else if (ans && ans.msg) FZ.ui.toast(ans.msg, 'bad');
     else if (out && out.ok && !TARGETED[kind]) FZ.ui.toast(copyTool(kind).blurb || '', 'good');
 
     paintBar();
@@ -295,7 +317,7 @@ FZ.controls = (function () {
 
     paint: function (st) {
       paintBar();
-      if (hint && api.armed && !hint.classList.contains('on')) hint.classList.add('on');
+      paintHint();
     },
 
     disarm: disarm,

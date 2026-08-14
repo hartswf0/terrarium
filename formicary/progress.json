@@ -1,6 +1,6 @@
 {
-  "round": 1,
-  "updated": "2026-08-14 18:00 UTC",
+  "round": 2,
+  "updated": "2026-08-14 19:47 UTC",
   "note": "Client verdict on the baseline: NOT VERY PLAYABLE. Structural, so the fix is structural. Two changes followed. (1) A tenth law, L10 THE CORE LOOP: a detector firing now opens a timed OUTBREAK, drawn where it happened and named in plain words, which the player must answer with the right institution before the fuse runs out. No piece can be marked won while L10 scores below 8. (2) The client supplied the real source paper, which the egress proxy had blocked. Its four sections ARE the table's four families, the 117 target turns out to be a direct citation, and it hands us the decision the game was missing: institutions TRADE OFF rather than upgrade. LEDGER catches the liar and teaches the colony to ignore the lone dissenter; LENS reveals everything including the rumour. Sub-agent concurrency is capped at 2 on this box, so the seven pieces are consolidated into five.",
   "pieces": [
     {
@@ -29,6 +29,31 @@
           },
           "shots": [
             "v1-ch0.png"
+          ]
+        },
+        {
+          "n": 1,
+          "verdict": "close",
+          "score": 76,
+          "laws": {
+            "L1": 8,
+            "L2": 8,
+            "L3": 8,
+            "L4": 8,
+            "L5": 8,
+            "L6": 7,
+            "L7": 6,
+            "L8": 8,
+            "L9": 8,
+            "L10": 7
+          },
+          "built": "The outbreak loop is real and measured. A scripted competent player took 47 actions in 90 seconds \u2014 one decision every 1.9s \u2014 and survived at strain 7.5; hands-off, the same chapter hits strain 100 in 21.8s. Fuse is ~6.7s, floored at 2.8s, and scales with machine speed. A wrong instrument gives the plain diagnosis AND auto-opens the element card with its counter chip lit. A miss draws a scar at the exact spot, stuns the nearest workers and spikes strain. Mastery persists in localStorage.",
+          "gap": "Two failures. (1) Name plates collide: the ring's own label reads Sa while the ticker sentence belongs to In, and three plates stack with one half-occluded \u2014 so the player cannot tell which failure they are being asked to answer. (2) An exploit: ejecting an HONEST worker inside a burning Sa ring returns ANSWERED and refunds, while strain actually goes UP. A bot banked 11 correct Sa answers and gutted the colony from 16 workers to 4.",
+          "shots": [
+            "r1P-01first.png",
+            "r1P-02first2.png",
+            "r1P-03ch1a.png",
+            "r1P-04ch1b.png"
           ]
         }
       ]
@@ -114,6 +139,31 @@
             "L10": 2
           },
           "shots": []
+        },
+        {
+          "n": 1,
+          "verdict": "close",
+          "score": 71,
+          "laws": {
+            "L1": 7,
+            "L2": 8,
+            "L3": 6,
+            "L4": 6,
+            "L5": 8,
+            "L6": 9,
+            "L7": 7,
+            "L8": 6,
+            "L9": 7,
+            "L10": 7
+          },
+          "built": "All six section-15 trade-offs implemented and proven empirically in the audit \u2014 same seed, instrument off vs on, showing the intended element fall and the traded-off element rise. AUDIT: PASS with 28 live detectors. L6 scored 9, the highest single law of the round.",
+          "gap": "The strain economy cannot punish. Passive drain is a flat -3 strain per second, so a landed outbreak's damage evaporates in about two seconds, and budget sits pinned at its cap. Worse: the ch9 balance numbers were measured with the core loop switched off entirely, so they do not describe the game anyone actually plays.",
+          "shots": [
+            "r1W-01first.png",
+            "r1W-02gate.png",
+            "r1W-03ch1.png",
+            "r1W-04ch1b.png"
+          ]
         }
       ]
     },
@@ -143,6 +193,31 @@
           },
           "shots": [
             "v1-gate.png"
+          ]
+        },
+        {
+          "n": 1,
+          "verdict": "close",
+          "score": 78,
+          "laws": {
+            "L1": 8,
+            "L2": 9,
+            "L3": 8,
+            "L4": 7,
+            "L5": 7,
+            "L6": 8,
+            "L7": 6,
+            "L8": 8,
+            "L9": 9,
+            "L10": 8
+          },
+          "built": "Best score of the round. Layout now adapts to what a chapter contains. Constraints verified independently against the built file: zero border-radius, zero pictographic codepoints, palette exact, IBM Plex Mono embedded.",
+          "gap": "The taxonomy names are illegible. Element names render at 7.2px and are ellipsis-truncated in six of 28 cells at 390px \u2014 COORDINATION..., SYNCHRONIZED..., MISSING MENTAL... The vocabulary the whole piece exists to teach is below the 11px floor and, for six entries, literally cut off on the target device.",
+          "shots": [
+            "r1S-ab-after5.png",
+            "r1S-ab-gate5.png",
+            "r1S-abrun1.png",
+            "r1S-abrun2.png"
           ]
         }
       ]
