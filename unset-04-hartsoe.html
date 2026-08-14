@@ -22176,6 +22176,13 @@ resetDrive(); requestAnimationFrame(frame);
     '  court = rooms wrapped around a rectangular court; stack = tapering tiers',
     '  (tower, castle, keep); hull = a lofted body (ship, pod, creature); bar = an',
     '  ordinary house of rooms. Never flatten a ring or a tower into a bar.',
+    'IF THE REQUEST IS A SHAPE NONE OF THOSE HOLD — a letter, a monogram, a plan',
+    'figure, a creature, a plus, a spiral, a comb — return a "mask" instead: an',
+    'array of equal-length strings of "#" (built) and "." (open), up to 24x24,',
+    'read top row = north. The compiler turns each "#" into a room-sized bay and',
+    'derives walls, doors, roof and foundations from it. Example, a plus house:',
+    '{"name":"PLUS HOUSE","mask":["..##..","..##..","######","######","..##..","..##.."],"cell":12}',
+    'Use the mask whenever it expresses the request better than a named topology.',
     'All numbers are finite feet.',
   ].join('\n');
   const IR_USES = ['living', 'kitchen', 'dining', 'bed', 'bath', 'study', 'hall'];
@@ -22184,6 +22191,13 @@ resetDrive(); requestAnimationFrame(frame);
     const out = JSON.parse(JSON.stringify(base));
     if (typeof r.name === 'string' && r.name.trim()) out.name = r.name.trim().slice(0, 22).toUpperCase();
     if (IR_GEN[r.topology]) out.morphology.topology = r.topology;
+    // the model's own plan figure — this is how an answer that is not one of
+    // the named topologies actually survives instead of being discarded
+    if (maskIsSane(r.mask)) { out.morphology.topology = 'figure'; out.morphology.massing.mask = r.mask; }
+    else if (typeof r.glyph === 'string' && GLYPHS[r.glyph.toUpperCase()]) {
+      out.morphology.topology = 'figure'; out.morphology.massing.mask = GLYPHS[r.glyph.toUpperCase()];
+    }
+    if (Number.isFinite(r.cell)) out.morphology.massing.cell = Math.min(20, Math.max(7, r.cell));
     const lim = { width: [12, 120], depth: [10, 90], wallZ: [7, 14], rise: [0.6, 12], innerR: [8, 60],
       outerR: [14, 90], segments: [8, 24], tiers: [2, 5], taper: [0.05, 0.6], stations: [3, 8], cells: [2, 8] };
     if (r.massing && typeof r.massing === 'object') Object.keys(lim).forEach((k) => {
@@ -22233,6 +22247,61 @@ resetDrive(); requestAnimationFrame(frame);
     return inside;
   };
 
+  // ── PLAN FIGURES · any shape a grid can hold ───────────────────────────────
+  // The five topology buckets were the whole disconnect. "A W shaped house"
+  // matched none of them and silently became a bar, and mergeIR only accepted
+  // the model's answer if it named one of those same five words — so the API
+  // was called and its answer discarded. A FIGURE is a plan mask: cells that
+  // are filled become bays, and because neighbouring cells share exact edges
+  // the existing partition, doorway, roof-field and certificate machinery all
+  // work unchanged. Letters are just one thing a mask can hold.
+  const GLYPHS = {
+    A: ['.###.', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'],
+    B: ['####.', '#...#', '#...#', '####.', '#...#', '#...#', '####.'],
+    C: ['.###.', '#...#', '#....', '#....', '#....', '#...#', '.###.'],
+    D: ['####.', '#...#', '#...#', '#...#', '#...#', '#...#', '####.'],
+    E: ['#####', '#....', '#....', '####.', '#....', '#....', '#####'],
+    F: ['#####', '#....', '#....', '####.', '#....', '#....', '#....'],
+    G: ['.###.', '#...#', '#....', '#.###', '#...#', '#...#', '.###.'],
+    H: ['#...#', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'],
+    I: ['#####', '..#..', '..#..', '..#..', '..#..', '..#..', '#####'],
+    J: ['..###', '...#.', '...#.', '...#.', '...#.', '#..#.', '.##..'],
+    K: ['#...#', '#..#.', '#.#..', '##...', '#.#..', '#..#.', '#...#'],
+    L: ['#....', '#....', '#....', '#....', '#....', '#....', '#####'],
+    M: ['#...#', '##.##', '#.#.#', '#.#.#', '#...#', '#...#', '#...#'],
+    N: ['#...#', '##..#', '#.#.#', '#.#.#', '#..##', '#...#', '#...#'],
+    O: ['.###.', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'],
+    P: ['####.', '#...#', '#...#', '####.', '#....', '#....', '#....'],
+    Q: ['.###.', '#...#', '#...#', '#...#', '#.#.#', '#..#.', '.##.#'],
+    R: ['####.', '#...#', '#...#', '####.', '#.#..', '#..#.', '#...#'],
+    S: ['.####', '#....', '#....', '.###.', '....#', '....#', '####.'],
+    T: ['#####', '..#..', '..#..', '..#..', '..#..', '..#..', '..#..'],
+    U: ['#...#', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'],
+    V: ['#...#', '#...#', '#...#', '#...#', '#...#', '.#.#.', '..#..'],
+    W: ['#...#', '#...#', '#...#', '#.#.#', '#.#.#', '##.##', '#...#'],
+    X: ['#...#', '#...#', '.#.#.', '..#..', '.#.#.', '#...#', '#...#'],
+    Y: ['#...#', '#...#', '.#.#.', '..#..', '..#..', '..#..', '..#..'],
+    Z: ['#####', '....#', '...#.', '..#..', '.#...', '#....', '#####'],
+  };
+  // A letter drawn with diagonals is not walkable: two cells that touch only
+  // at a corner share no wall and no doorway can be cut. Fill one orthogonal
+  // neighbour at every such joint — it thickens the stroke slightly and makes
+  // the figure a building you can actually cross.
+  function connect4(rows) {
+    const C = Math.max.apply(null, rows.map((r) => r.length));
+    const g = rows.map((r) => { const a = r.split(''); while (a.length < C) a.push('.'); return a; });
+    const R = g.length, on = (r, c) => r >= 0 && r < R && c >= 0 && c < C && g[r][c] === '#';
+    for (let r = 0; r < R - 1; r++) for (let c = 0; c < C - 1; c++) {
+      if (on(r, c) && on(r + 1, c + 1) && !on(r, c + 1) && !on(r + 1, c)) g[r + 1][c] = '#';
+      else if (on(r, c + 1) && on(r + 1, c) && !on(r, c) && !on(r + 1, c + 1)) g[r + 1][c + 1] = '#';
+    }
+    return g.map((r) => r.join(''));
+  }
+  function maskIsSane(mask) {
+    if (!Array.isArray(mask) || mask.length < 2 || mask.length > 24) return false;
+    if (!mask.every((r) => typeof r === 'string' && r.length >= 2 && r.length <= 24 && /^[.#]+$/.test(r))) return false;
+    return mask.join('').split('#').length - 1 >= 3;
+  }
   // ── GENERATORS ── each returns {bays, voids, roofField, roofLow, grade} ────
   // A bay is {id, quad:[4 plan points], use, level}. roofField(x,y) -> z.
   const IR_GEN = {
@@ -22313,6 +22382,20 @@ resetDrive(); requestAnimationFrame(frame);
       const field = (x, y) => top + Math.max(0, 1 - Math.hypot(x, y) / Math.max(0.001, rTop)) * m.rise * 2.2;
       return { bays, voids: [], roofField: field, roofLow: 'eave', grade: 0, stacked: true, tierH: hT };
     },
+    // any plan mask at all — letters, words, monograms, arbitrary figures
+    figure(m) {
+      const mask = connect4(m.mask || GLYPHS.H), cell = Math.max(7, Math.min(20, m.cell || 11));
+      const rows = mask.length, cols = mask[0].length, bays = [];
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        if (mask[r][c] !== '#') continue;
+        const x0 = (c - cols / 2) * cell, y0 = ((rows - 1 - r) - rows / 2) * cell;
+        bays.push({ id: 'c' + r + '_' + c, level: 0,
+          quad: [[x0, y0], [x0 + cell, y0], [x0 + cell, y0 + cell], [x0, y0 + cell]] });
+      }
+      const zE = m.wallZ, halfD = rows * cell / 2;
+      const field = (x, y) => zE + Math.max(0, 1 - Math.abs(y) / Math.max(0.001, halfD)) * m.rise;
+      return { bays, voids: [], roofField: field, roofLow: 'eave', grade: 0, mask };
+    },
     // lofted stations along an axis — the hull, the starship, the creature
     hull(m) {
       const st = Math.max(3, Math.min(8, m.stations | 0)), L = m.width, bays = [];
@@ -22334,8 +22417,44 @@ resetDrive(); requestAnimationFrame(frame);
     const t = String(text || '').toLowerCase();
     const has = (re) => new RegExp(re, 'i').test(t);
     const numAfter = (re, dflt) => { const m = t.match(new RegExp('(\\d+)\\s*(?:' + re + ')')); return m ? parseInt(m[1], 10) : dflt; };
-    let topology = 'bar', analogy = 'house';
-    if (has('donut|doughnut|ring|annul|torus|circular house|round house|orbital')) { topology = 'loop'; analogy = 'donut'; }
+    let topology = 'bar', analogy = 'house', mask = null;
+    // ALPHABET ARCHITECTURE — "a W shaped house", "an A-shaped house",
+    // "a house shaped like the letter E". Any glyph, and any word up to four
+    // letters, joined along a spine corridor so you can walk the whole word.
+    // named plan figures come first, so "a plus shaped house" is a cross and
+    // not the word P-L-U-S spelled out in rooms
+    const FIGURES = {
+      plus: ['..##..', '..##..', '######', '######', '..##..', '..##..'],
+      cross: ['..##..', '..##..', '######', '######', '..##..', '..##..'],
+      pinwheel: ['###...', '..#...', '..####', '####..', '...#..', '...###'],
+      comb: ['######', '#.#.#.', '#.#.#.', '#.#.#.', '#.#.#.', '#.....'],
+      spiral: ['######', '#.....', '#.####', '#.#..#', '#.####', '#.....'],
+    };
+    const figName = Object.keys(FIGURES).find((k) => new RegExp('\\b' + k + '\\b', 'i').test(t));
+    const letters = figName ? null : (() => {
+      let mm = t.match(/\b(?:letter|glyph)\s+([a-z]{1,4})\b/i)
+        || t.match(/shaped like(?: the)?(?: letter)?\s+([a-z]{1,4})\b/i)
+        || t.match(/in the shape of(?: the)?(?: letter)?\s+([a-z]{1,4})\b/i)
+        || t.match(/\b([a-z]{1,4})[\s-]*shaped\b/i)
+        || (/\balphabet\b/i.test(t) ? t.match(/\b([a-z]{1,4})\b\s*$/i) : null);
+      if (!mm) return null;
+      const w = mm[1].toUpperCase().split('').filter((ch) => GLYPHS[ch]);
+      return w.length ? w : null;
+    })();
+    if (figName) { topology = 'figure'; analogy = figName; mask = FIGURES[figName]; }
+    else if (letters) {
+      topology = 'figure'; analogy = 'letter ' + letters.join('');
+      const H = GLYPHS[letters[0]].length;
+      mask = [];
+      for (let r = 0; r < H; r++)
+        mask.push(letters.map((ch) => GLYPHS[ch][r]).join('.'));   // one empty column between glyphs
+      if (letters.length > 1) {                                     // a corridor so the word is one house
+        const bottom = mask[H - 1].split('');
+        for (let i = 0; i < bottom.length; i++) bottom[i] = '#';
+        mask[H - 1] = bottom.join('');
+      }
+    }
+    else if (has('donut|doughnut|ring|annul|torus|circular house|round house|orbital')) { topology = 'loop'; analogy = 'donut'; }
     else if (has('courtyard|court house|atrium|cloister|quad')) { topology = 'court'; analogy = 'courtyard'; }
     else if (has('tower|castle|keep|turret|cone|silo|lighthouse|ziggurat|stack')) { topology = 'stack'; analogy = 'tower'; }
     else if (has('starship|spaceship|ship|hull|pod|capsule|creature|whale|blimp|zeppelin')) { topology = 'hull'; analogy = 'hull'; }
@@ -22364,7 +22483,8 @@ resetDrive(); requestAnimationFrame(frame);
       intent: { analogy, irreducible_invariants: topology === 'loop' ? ['one closed inhabited annulus', 'one protected central void']
         : topology === 'court' ? ['one enclosing ring', 'one protected court'] : topology === 'stack' ? ['stacked tiers', 'tapering silhouette']
         : topology === 'hull' ? ['one lofted hull'] : ['one bar of rooms'] },
-      morphology: { topology, massing: m, protected_voids: (topology === 'loop' || topology === 'court') ? ['court'] : [] },
+      morphology: { topology, massing: Object.assign(m, mask ? { mask, cell: Math.round(11 * S) } : {}),
+        protected_voids: (topology === 'loop' || topology === 'court') ? ['court'] : [] },
       spaces: uses, systems: { water_path: water, fireplace: !has('no fire') && uses.includes('living') },
       deck: !has('no deck'),
     };
@@ -22560,7 +22680,7 @@ resetDrive(); requestAnimationFrame(frame);
       const fb = G.bays.find((b) => ['living', 'dining', 'study', 'hall'].includes(b.use));
       if (fb) { const c = centroid(fb.quad); A.flue(g, c[0], c[1], gradeAt(c[0], c[1]), zf(c) + 2.6, 3.2); }
     }
-    return { topology: topo, bays: G.bays.length, exterior: exterior.length, partitions: interior.length,
+    return { reached: seen.size, topology: topo, bays: G.bays.length, exterior: exterior.length, partitions: interior.length,
       doors: doored.size, openings: openingCount, voids: G.voids, levels: levels.length,
       entry: { at: ec, bay: entryBay.id }, roofField: G.roofField, grade: G.grade, gradeAt, massing: m };
   }
@@ -22620,6 +22740,8 @@ resetDrive(); requestAnimationFrame(frame);
     put('EgressCert', info.openings > 0 && info.entry, 'entry at bay ' + (info.entry && info.entry.bay));
     put('EnvelopeCert', info.exterior > 0 && info.bays > 0, info.exterior + ' exterior runs over ' + info.bays + ' bays');
     put('WaterCert', !!(ir.systems && ir.systems.water_path), 'low edge drains to ' + (ir.systems && ir.systems.water_path));
+    put('WalkCert', info.reached === info.bays, info.reached + ' of ' + info.bays
+      + ' bays reachable from the entry on foot');
     const inv = (ir.intent && ir.intent.irreducible_invariants) || [];
     const keptVoid = !inv.some((s) => /void|court/i.test(s)) || (info.voids || []).length > 0;
     put('NoveltyCert', keptVoid, inv.join(' · ') + ' — voids kept: ' + (info.voids || []).length);
@@ -22682,6 +22804,32 @@ resetDrive(); requestAnimationFrame(frame);
     scene.add(grp);
     return grp;
   }
+  // Printed after every build. If it says LOCAL ONLY, no request was sent and
+  // nothing was spent. If it says MODEL, the endpoint, the bytes, the latency
+  // and the token usage are all there to check.
+  function houseReceipt(t) {
+    try {
+      const line = [
+        'route      ' + t.route,
+        'prompt     "' + String(t.prompt).slice(0, 70) + '"',
+        'local read ' + t.localTopology + '   ->   built as ' + t.finalTopology,
+        'api called ' + (t.apiCalled ? 'YES' : 'no'),
+        t.apiCalled ? 'endpoint   ' + t.endpoint : null,
+        t.apiCalled ? 'model      ' + t.provider + ' / ' + t.model : null,
+        t.sent ? 'sent       ' + t.sent.systemChars + ' c system + ' + t.sent.userChars + ' c prompt' : null,
+        t.apiCalled ? 'reply      ' + t.replyChars + ' c in ' + t.latencyMs + ' ms' : null,
+        t.usage ? 'tokens     ' + JSON.stringify(t.usage) : (t.apiCalled ? 'tokens     not reported by provider' : null),
+        t.acceptedFromModel.length ? 'accepted   ' + t.acceptedFromModel.join(', ') : null,
+        t.note ? 'note       ' + t.note : null,
+        t.error ? 'ERROR      ' + t.error : null,
+        t.built ? 'built      ' + t.built.bays + ' bays, ' + t.built.parts + ' parts, attempt '
+          + t.built.attempts : ('refused    ' + t.failed),
+        'total      ' + t.totalMs + ' ms',
+      ].filter(Boolean).join('\n  ');
+      console.info('%c[HOUSE RECEIPT]\n  ' + line, 'color:#19e6c8');
+      console.info('full trace on window.__houseTrace — .sent.system, .sent.user and .reply are the exact bytes');
+    } catch (_) {}
+  }
   async function generateHouse(promptText) {
     let mod;
     try { mod = await depotModule(); } catch (e) { try { notify('DEPOT UNREACHABLE — ' + e.message.slice(0, 40)); } catch (_) {} return null; }
@@ -22690,17 +22838,53 @@ resetDrive(); requestAnimationFrame(frame);
     let cfg = null; try { cfg = getAIConfig(); } catch (_) {}
     let usable = false; try { usable = aiLocalAvailable(cfg); } catch (_) {}
     houseStage(0, ir.morphology.topology.toUpperCase());
+    // ── THE RECEIPT ────────────────────────────────────────────────────────
+    // You cannot tell whether a build consulted a model or invented an answer,
+    // so every run now leaves evidence: the route taken, the exact endpoint,
+    // the exact bytes sent and returned, the latency, the token usage the
+    // provider reported, and precisely which fields of the reply survived
+    // validation. It is printed to the console and left on window.__houseTrace.
+    const T0 = (window.performance || Date).now();
+    const trace = { prompt: promptText, localTopology: ir.morphology.topology,
+      route: usable ? 'MODEL + LOCAL' : 'LOCAL ONLY (no model configured)',
+      provider: cfg && cfg.provider, model: cfg && cfg.model,
+      endpoint: (cfg && cfg.endpoint) || (typeof aiWorkerUrl === 'function' ? aiWorkerUrl(cfg) : '') || '(provider default)',
+      apiCalled: false, sent: null, reply: null, replyChars: 0, latencyMs: null,
+      usage: null, acceptedFromModel: [], rejectedFromModel: [] };
+    window.__houseTrace = trace;
     if (usable) {
       houseStage(1, (cfg && cfg.model) || 'model');
+      const userMsg = 'Request: ' + promptText
+        + '\n\nThe local translation, which you may refine:\n' + JSON.stringify({
+          topology: ir.morphology.topology, massing: ir.morphology.massing, spaces: ir.spaces });
+      trace.sent = { system: IR_CONTRACT, user: userMsg,
+        systemChars: IR_CONTRACT.length, userChars: userMsg.length };
+      const tCall = (window.performance || Date).now();
       try {
-        const raw = await callConfiguredLLM('Request: ' + promptText
-          + '\n\nThe local translation, which you may refine:\n' + JSON.stringify({
-            topology: ir.morphology.topology, massing: ir.morphology.massing, spaces: ir.spaces }),
-          IR_CONTRACT, cfg, null, 1200);
-        const txt = String(raw || ''), a = txt.indexOf('{'), b = txt.lastIndexOf('}');
-        if (a > -1 && b > a) ir = mergeIR(ir, JSON.parse(txt.slice(a, b + 1).replace(/,\s*([}\]])/g, '$1')));
-      } catch (_) { /* the local translation stands on its own */ }
+        const raw = await callConfiguredLLM(userMsg, IR_CONTRACT, cfg, null, 1200);
+        trace.apiCalled = true;
+        trace.latencyMs = Math.round((window.performance || Date).now() - tCall);
+        trace.reply = String(raw || '');
+        trace.replyChars = trace.reply.length;
+        try { trace.usage = (window.__ai && window.__ai.last && window.__ai.last.usage) || null; } catch (_) {}
+        const txt = trace.reply, a = txt.indexOf('{'), b = txt.lastIndexOf('}');
+        if (a > -1 && b > a) {
+          const parsed = JSON.parse(txt.slice(a, b + 1).replace(/,\s*([}\]])/g, '$1'));
+          trace.parsed = parsed;
+          const was = JSON.stringify({ t: ir.morphology.topology, m: ir.morphology.massing, s: ir.spaces });
+          ir = mergeIR(ir, parsed);
+          const now = JSON.stringify({ t: ir.morphology.topology, m: ir.morphology.massing, s: ir.spaces });
+          Object.keys(parsed).forEach((k) => {
+            (was !== now ? trace.acceptedFromModel : trace.rejectedFromModel).push(k); });
+          if (was === now) trace.note = 'the reply parsed but changed nothing — every field failed validation';
+        } else { trace.note = 'no JSON object in the reply'; }
+      } catch (e) {
+        trace.apiCalled = true; trace.error = String((e && e.message) || e);
+        trace.latencyMs = Math.round((window.performance || Date).now() - tCall);
+      }
     }
+    trace.finalTopology = ir.morphology.topology;
+    trace.finalMassing = JSON.parse(JSON.stringify(ir.morphology.massing));
     // ── THE SITE · sample the ground this house will actually stand on ─────
     const L = curLand;
     let site = null, seat = null, preview = null;
@@ -22745,7 +22929,11 @@ resetDrive(); requestAnimationFrame(frame);
         houseStage(5, Object.keys(c.cert).length + '/' + Object.keys(c.cert).length + ' CERTIFICATES');
         const b2 = installDepotGroup(g, ir.name || 'HOUSE', seat);
         if (preview) setTimeout(() => { try { scene.remove(preview); } catch (_) {} }, 4200);
-        houseStageEnd(info.topology.toUpperCase() + ' · ' + info.bays + ' BAYS · ' + c.meshes + ' PARTS', true);
+        trace.built = { topology: info.topology, bays: info.bays, parts: c.meshes, attempts: attempt + 1 };
+        trace.totalMs = Math.round((window.performance || Date).now() - T0);
+        houseReceipt(trace);
+        houseStageEnd(info.topology.toUpperCase() + ' · ' + info.bays + ' BAYS · ' + c.meshes
+          + ' PARTS · ' + (trace.apiCalled ? 'MODEL ' + (trace.latencyMs || 0) + 'MS' : 'LOCAL'), true);
         if (b2) { try { notify(ir.name + ' — ' + info.topology.toUpperCase() + ' · ' + info.bays
           + ' BAYS · ' + c.meshes + ' PARTS · ALL ' + Object.keys(c.cert).length
           + ' CERTIFICATES' + (attempt ? ' (repaired ×' + attempt + ')' : '')); } catch (_) {} }
@@ -22755,6 +22943,8 @@ resetDrive(); requestAnimationFrame(frame);
       ir = repairIR(ir, why);
     }
     if (preview) { try { scene.remove(preview); } catch (_) {} }
+    trace.totalMs = Math.round((window.performance || Date).now() - T0);
+    trace.failed = why; houseReceipt(trace);
     houseStageEnd(String(why).slice(0, 46), false);
     try { notify('COULD NOT CERTIFY — ' + String(why).slice(0, 52)); } catch (_) {}
     console.warn('[house certificate]', c && c.cert);
