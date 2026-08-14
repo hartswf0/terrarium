@@ -22801,8 +22801,19 @@ resetDrive(); requestAnimationFrame(frame);
       else if (b.use === 'living') A.sofa(g, c[0], c[1], z0 + FLOOR, 6);
       else if (b.use === 'dining') A.dine(g, c[0], c[1], z0 + FLOOR);
     });
+    // THE WALL HEAD FOLLOWS THE ROOF IT CARRIES. A flat head leaves a gap
+    // everywhere the roof field rises above the storey — the roof then floats,
+    // touching nothing, and the whole plan fails its contact check. This is the
+    // kit's own wall-head-meets-roof rule, applied per wall run.
+    const topLevel = levels[levels.length - 1];
+    const headAt = (b, p1, p2) => {
+      const z0 = (b.level || 0) * tierH;
+      if (G.stacked && (b.level || 0) !== topLevel) return z0 + m.wallZ;
+      const mid = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+      return Math.max(z0 + FLOOR + 7, zf(mid) - 0.45);
+    };
     exterior.forEach((e) => {
-      const b = e.bays[0], z0 = (b.level || 0) * tierH, zHead = z0 + m.wallZ;
+      const b = e.bays[0], z0 = (b.level || 0) * tierH, zHead = headAt(b, e.a, e.b);
       const L = ELEN(e.a, e.b), ops = [];
       if (e === entryEdge && !entryDone) { ops.push([L / 2 - 1.8, L / 2 + 1.8, 0, 7.2, 'd']); entryDone = true; openingCount++; }
       else if (L >= 6.5) {
@@ -22814,7 +22825,7 @@ resetDrive(); requestAnimationFrame(frame);
     interior.forEach((e) => {
       const b = e.bays[0], z0 = (b.level || 0) * tierH, L = ELEN(e.a, e.b);
       const ops = doored.has(e) ? [[Math.max(0.4, L / 2 - 1.7), Math.min(L - 0.4, L / 2 + 1.7), 0, 7]] : [];
-      edgeWall(e.a, e.b, z0 + FLOOR, z0 + m.wallZ, ops, M.siding);
+      edgeWall(e.a, e.b, z0 + FLOOR, headAt(b, e.a, e.b), ops, M.siding);
     });
     // ROOF · one height field, so adjacent sectors share their seam endpoints
     const topBays = G.stacked ? G.bays.filter((b) => (b.level || 0) === levels[levels.length - 1]) : G.bays;
@@ -22822,7 +22833,6 @@ resetDrive(); requestAnimationFrame(frame);
     const roofQuad = (q) => A.slab(g, [q[0][0], q[0][1], zf(q[0])], [q[1][0], q[1][1], zf(q[1])],
       [q[2][0], q[2][1], zf(q[2])], [q[3][0], q[3][1], zf(q[3])], 0.55, M.roof, 3);
     topBays.forEach((b) => roofQuad(b.quad));      // corners are shared, so seams are exact
-    const topLevel = levels[levels.length - 1];
     exterior.forEach((e) => {                      // the overhang is a strip, not a scaled sector
       if (G.stacked && (e.bays[0].level || 0) !== topLevel) return;
       const c = centroid(e.bays[0].quad);
