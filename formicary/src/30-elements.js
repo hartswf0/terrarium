@@ -136,7 +136,7 @@ fzElDef({
       if (!p) continue;
       if (FZ.elh.cover(S, j.x, j.y) || S.lensOn) continue;
       j.progress = Math.max(0, j.progress - 0.8);
-      hot += 0.04; who = e.ids; at = { x: j.x, y: j.y };
+      hot += 0.09; who = e.ids; at = { x: j.x, y: j.y };
     }
     if (hot > 0) {
       api.heat(hot, { at, who, say: FZ.copy.fire.Dp });
