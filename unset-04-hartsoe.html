@@ -22084,18 +22084,20 @@ resetDrive(); requestAnimationFrame(frame);
     return depotPromise;
   }
   // ── INSTALL any house group built in FEET: naturalize, collide, register ──
-  function installDepotGroup(inner, name) {
+  function installDepotGroup(inner, name, seat) {
     const L = curLand;
     if (!L || !(window.HARTSOE_GROUND && window.HARTSOE_GROUND.on) || !henryGroup) {
       try { notify('LAND FIRST — fetch a place, then set a house on it'); } catch (_) {} return null;
     }
     const S = L.scale || 1.84, FT = 0.3048 / S;
-    const at = { x: P.pos.x, z: P.pos.z };
-    const base = gYw(at.x, at.z);
+    const at = (seat && seat.at) || { x: P.pos.x, z: P.pos.z };
+    const base = (seat && Number.isFinite(seat.base)) ? seat.base : gYw(at.x, at.z);
     const bb0 = new THREE.Box3().setFromObject(inner), c0 = bb0.getCenter(new THREE.Vector3());
     const root = new THREE.Group();
     const scaler = new THREE.Group(); scaler.scale.setScalar(FT); scaler.add(inner);
-    inner.position.set(-c0.x, -bb0.min.y, -c0.z);
+    // a site-compiled house already has its feet cut to the ground: seat its
+    // DATUM. Dropping its bounding box on one sample is what made it hover.
+    inner.position.set(-c0.x, seat && seat.datum ? 0 : -bb0.min.y, -c0.z);
     root.add(scaler); root.position.set(at.x, base, at.z);
     root.updateMatrixWorld(true);
     const pieces = [], snaps = [];
@@ -22370,8 +22372,13 @@ resetDrive(); requestAnimationFrame(frame);
   }
 
   // ── THE COMPILER · IR -> geometry, every coordinate derived here ──────────
-  function compileHouseIR(ir, kit, g) {
-    const A = kit.api, M = A.M, THREE_ = A.THREE_NS || null;
+  function compileHouseIR(ir, kit, g, site) {
+    // THE SITE LAW: the superstructure is one rigid datum; only foundations,
+    // piers and the skirt reach down to meet the ground. Seating a whole house
+    // from a single terrain sample is what left the ring hovering over the
+    // downhill side of the hill — certified against flat ground it never had.
+    const gradeAt = (site && typeof site.gradeAt === 'function') ? site.gradeAt : () => 0;
+    const A = kit.api, M = A.M;
     const oops = (s) => { throw new Error(s); };
     if (!ir || !ir.morphology) oops('the IR has no morphology');
     const topo = ir.morphology.topology, m = ir.morphology.massing || {};
@@ -22512,7 +22519,11 @@ resetDrive(); requestAnimationFrame(frame);
     const piers = new Set();
     exterior.forEach((e) => { if ((e.bays[0].level || 0) !== 0) return;
       [e.a, e.b].forEach((p) => { const k = K2(p); if (piers.has(k)) return; piers.add(k);
-        A.pier(g, p[0], p[1], G.grade - 1.6, FLOOR, 1.15); }); });
+        A.pier(g, p[0], p[1], gradeAt(p[0], p[1]) - 1.4, FLOOR, 1.15); }); });
+    // and a stem wall closes the underfloor, so the house SITS on the slope
+    exterior.forEach((e) => { if ((e.bays[0].level || 0) !== 0) return;
+      const zg = Math.min(gradeAt(e.a[0], e.a[1]), gradeAt(e.b[0], e.b[1]));
+      if (FLOOR - zg > 0.12) wallSeg(e.a, e.b, zg - 0.35, FLOOR, M.concrete || M.masonry || M.siding); });
     // WATER · the low edge of the roof, its gutter, its fall, its destination
     const dest = (ir.systems && ir.systems.water_path) || 'grade';
     if (G.roofLow === 'inner' && G.voids.length) {
@@ -22522,11 +22533,11 @@ resetDrive(); requestAnimationFrame(frame);
         wallSeg(p, q, zf(p) - 0.85, zf(p) - 0.28, M.steel || M.fascia || M.siding);   // inner gutter
       }
       const c0 = poly[0];
-      A.pier(g, c0[0] * 0.62, c0[1] * 0.62, G.grade, zf(c0) - 0.8, 0.5);              // downpipe
-      A.mbox && g.add(A.mbox(-3.1, 3.1, -3.1, 3.1, G.grade - 0.5, G.grade + 0.85, M.masonry || M.concrete, 2));  // rain-garden kerb, ankle high
+      A.pier(g, c0[0] * 0.62, c0[1] * 0.62, gradeAt(c0[0] * 0.62, c0[1] * 0.62), zf(c0) - 0.8, 0.5);              // downpipe
+      A.mbox && g.add(A.mbox(-3.1, 3.1, -3.1, 3.1, gradeAt(0, 0) - 0.5, gradeAt(0, 0) + 0.85, M.masonry || M.concrete, 2));  // rain-garden kerb, ankle high
     } else {
       const low = topBays.map((b) => b.quad.map((p) => [p, zf(p)])).flat().sort((a, b2) => a[1] - b2[1])[0];
-      if (low) A.pier(g, low[0][0], low[0][1], G.grade, low[1] - 0.6, 0.5);
+      if (low) A.pier(g, low[0][0], low[0][1], gradeAt(low[0][0], low[0][1]), low[1] - 0.6, 0.5);
     }
     // ARRIVAL · a deck at the door and a derived stair when the floor is up
     const ec = [(entryEdge.a[0] + entryEdge.b[0]) / 2, (entryEdge.a[1] + entryEdge.b[1]) / 2];
@@ -22536,9 +22547,10 @@ resetDrive(); requestAnimationFrame(frame);
       const perp = [-outward[1] * 4.5, outward[0] * 4.5];
       plate([[d0[0] + perp[0], d0[1] + perp[1]], [d1[0] + perp[0], d1[1] + perp[1]],
              [d1[0] - perp[0], d1[1] - perp[1]], [d0[0] - perp[0], d0[1] - perp[1]]], FLOOR, 0.4, M.timber || M.siding);
-      A.pier(g, d1[0], d1[1], G.grade - 1.2, FLOOR - 0.4, 0.9);
+      A.pier(g, d1[0], d1[1], gradeAt(d1[0], d1[1]) - 1.2, FLOOR - 0.4, 0.9);
     }
-    if (FLOOR > 0.6) A.stairs(g, { x: ec[0], y: ec[1], zTop: FLOOR, zBot: G.grade, grade: G.grade, heading: 'S', width: 3.6 });
+    { const zg = gradeAt(ec[0], ec[1]);   // the entry stair is derived from the ground it actually lands on
+      if (FLOOR - zg > 0.62) A.stairs(g, { x: ec[0], y: ec[1], zTop: FLOOR, zBot: zg, grade: zg, heading: 'S', width: 3.6 }); }
     if (G.stacked && levels.length > 1) {
       const b0 = G.bays.find((b) => (b.level || 0) === 0), c = centroid(b0.quad);
       for (let i = 1; i < levels.length; i++)
@@ -22547,11 +22559,11 @@ resetDrive(); requestAnimationFrame(frame);
     // FIRE · common company only, enforced structurally
     if (ir.systems && ir.systems.fireplace) {
       const fb = G.bays.find((b) => ['living', 'dining', 'study', 'hall'].includes(b.use));
-      if (fb) { const c = centroid(fb.quad); A.flue(g, c[0], c[1], G.grade, zf(c) + 2.6, 3.2); }
+      if (fb) { const c = centroid(fb.quad); A.flue(g, c[0], c[1], gradeAt(c[0], c[1]), zf(c) + 2.6, 3.2); }
     }
     return { topology: topo, bays: G.bays.length, exterior: exterior.length, partitions: interior.length,
       doors: doored.size, openings: openingCount, voids: G.voids, levels: levels.length,
-      entry: { at: ec, bay: entryBay.id }, roofField: G.roofField, grade: G.grade, massing: m };
+      entry: { at: ec, bay: entryBay.id }, roofField: G.roofField, grade: G.grade, gradeAt, massing: m };
   }
 
   // ── CERTIFICATES · measured from the built geometry, fail-closed ──────────
@@ -22590,7 +22602,12 @@ resetDrive(); requestAnimationFrame(frame);
     // STRUCTURE · contact flood from grade, the same test House Depot runs
     const TOL = 2 / 12;
     const grown = boxes.map((b) => b.clone().expandByScalar(TOL));
-    const onGrade = new Set(); grown.forEach((b, i) => { if (b.min.y <= info.grade + 0.5) onGrade.add(i); });
+    const gAt = info.gradeAt || (() => 0);
+    // seeded from the terrain UNDER each piece, not from one flat plane —
+    // otherwise a house floating over a slope still certifies as grounded
+    const onGrade = new Set(); grown.forEach((b, i) => {
+      const cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2;
+      if (b.min.y <= gAt(cx, -cz) + 0.6) onGrade.add(i); });
     let changed = true;
     while (changed) { changed = false;
       for (let i = 0; i < grown.length; i++) { if (onGrade.has(i)) continue;
@@ -22628,37 +22645,104 @@ resetDrive(); requestAnimationFrame(frame);
         if (a > -1 && b > a) ir = mergeIR(ir, JSON.parse(txt.slice(a, b + 1).replace(/,\s*([}\]])/g, '$1')));
       } catch (_) { /* the local translation stands on its own */ }
     }
-    kit.setCUR(ir.name || 'GENERATED');
-    const g0 = new THREE.Group();
-    let info;
-    try { info = compileHouseIR(ir, kit, g0); }
-    catch (e) { try { notify('IR REJECTED — ' + String(e.message).slice(0, 52)); } catch (_) {} return null; }
-    const c = certifyHouse(ir, g0, info);
-    window.__lastHouse = { ir, info, cert: c };
-    if (!c.pass) {
-      try { notify('CERTIFICATE FAILED — ' + c.fail[0].slice(0, 54)); } catch (_) {}
-      console.warn('[house certificate]', c.cert);
-      return null;                                  // fail-closed: no half-house reaches the land
+    // ── THE SITE · sample the ground this house will actually stand on ─────
+    const L = curLand;
+    let site = null, seat = null;
+    if (L && window.HARTSOE_GROUND && window.HARTSOE_GROUND.on) {
+      const S = L.scale || 1.84, FT = 0.3048 / S;
+      const at = { x: P.pos.x, z: P.pos.z };
+      const mm = ir.morphology.massing;
+      const Rft = Math.max(mm.width || 34, mm.depth || 26, 2 * (mm.outerR || 20)) / 2 + 8;
+      let base = -Infinity;
+      for (let i = -4; i <= 4; i++) for (let j = -4; j <= 4; j++) {
+        const y = gYw(at.x + (i / 4) * Rft * FT, at.z + (j / 4) * Rft * FT);
+        if (Number.isFinite(y) && y > base) base = y;          // the datum clears the high side
+      }
+      if (!Number.isFinite(base)) base = gYw(at.x, at.z);
+      site = { gradeAt: (xFt, yFt) => {
+        const y = gYw(at.x + xFt * FT, at.z - yFt * FT);       // W maps house y to -world z
+        return Number.isFinite(y) ? Math.min(0, (y - base) / FT) : 0;
+      } };
+      seat = { at, base, datum: true };
     }
-    const b2 = installDepotGroup(g0, ir.name || 'HOUSE');
-    if (b2) { try { notify(ir.name + ' — ' + info.bays + ' BAYS, ' + c.meshes
-      + ' PARTS, EVERY CERTIFICATE PASSED'); } catch (_) {} }
-    return b2;
+    // ── COMPILE · CERTIFY · REPAIR · repeat, so a request converges ─────────
+    let info = null, c = null, why = '';
+    for (let attempt = 0; attempt < 4; attempt++) {
+      kit.setCUR(ir.name || 'GENERATED');
+      const g = new THREE.Group();
+      try { info = compileHouseIR(ir, kit, g, site); }
+      catch (e) { why = e.message; ir = repairIR(ir, why); continue; }
+      c = certifyHouse(ir, g, info);
+      window.__lastHouse = { ir, info, cert: c, attempt };
+      if (c.pass) {
+        const b2 = installDepotGroup(g, ir.name || 'HOUSE', seat);
+        if (b2) { try { notify(ir.name + ' — ' + info.topology.toUpperCase() + ' · ' + info.bays
+          + ' BAYS · ' + c.meshes + ' PARTS · ALL ' + Object.keys(c.cert).length
+          + ' CERTIFICATES' + (attempt ? ' (repaired ×' + attempt + ')' : '')); } catch (_) {} }
+        return b2;
+      }
+      why = c.fail[0];
+      ir = repairIR(ir, why);
+    }
+    try { notify('COULD NOT CERTIFY — ' + String(why).slice(0, 52)); } catch (_) {}
+    console.warn('[house certificate]', c && c.cert);
+    return null;
+  }
+  // Bounded, deterministic repairs. Each reads the failing certificate and
+  // changes the SOURCE massing — never the geometry, and never the check.
+  function repairIR(ir, why) {
+    const out = JSON.parse(JSON.stringify(ir)), m = out.morphology.massing, w = String(why || '');
+    if (/long enough for a front door|no exterior edge/i.test(w)) {
+      m.width = Math.min(120, m.width * 1.3); m.depth = Math.min(90, m.depth * 1.3);
+      m.outerR = Math.min(90, m.outerR * 1.25); m.segments = Math.max(8, Math.round(m.segments * 0.75));
+    } else if (/TopologyCert/i.test(w)) {
+      m.innerR = Math.min(60, m.innerR * 1.3); m.outerR = Math.max(m.outerR, m.innerR + 12);
+      m.rise = Math.max(0.8, m.rise * 0.8);
+    } else if (/StructureCert/i.test(w)) {
+      m.wallZ = Math.max(7, Math.min(14, m.wallZ));            // stem wall + piers already reach;
+      out.deck = false;                                        // the deck is the usual orphan
+    } else if (/DwellingCert/i.test(w)) {
+      out.spaces = ['living', 'kitchen', 'bed', 'bath'];
+    } else if (/EnvelopeCert|EgressCert/i.test(w)) {
+      m.cells = Math.max(2, Math.min(8, (m.cells | 0) + 1));
+    } else {
+      m.width = Math.min(120, m.width * 1.15); m.depth = Math.min(90, m.depth * 1.15);
+    }
+    return out;
   }
   window.__irFromUtterance = irFromUtterance;
   window.__compileHouseIR = compileHouseIR;
   window.__certifyHouse = certifyHouse;
   window.generateHouse = generateHouse;
   window.__depotModule = depotModule;
-  window.__compileHousePlan = compileHousePlan;
   // ── WHAT GETS BUILT ON REAL LAND ─────────────────────────────────────────
   // Two changes to the game's own generator, both aimed at the same thing:
   // stop producing props. (1) A prompt that names a BUILDING is routed to the
   // house pipeline — real grammar, real feet, checked by the critic. (2) Any
   // other prompt, while a land pack is mounted, is briefed as ARCHITECTURE
   // with the nine as worked examples and the game's own metres-per-unit.
-  const BUILDING_WORDS = /\b(house|home|cabin|cottage|dwelling|shelter|hut|shed|barn|studio|workshop|garage|bunkhouse|lodge|pavilion|hall|chapel|shack|bothy|annexe|annex|guest|residence|villa|farmhouse|outbuilding|porch|loft|bungalow)\b/i;
-  window.__isBuildingPrompt = (t) => BUILDING_WORDS.test(String(t || ''));
+  // Anything a person could stand inside belongs to the house compiler. The old
+  // list held only ordinary house words, so "a donut house", "a cone castle"
+  // and "a starship dwelling" fell through to the arena generator and came back
+  // as slabs and cones — the toys, not architecture.
+  const BUILDING_WORDS = new RegExp('\\b(' + [
+    'house|home|cabin|cottage|dwelling|shelter|hut|shed|barn|studio|workshop|garage|bunkhouse',
+    'lodge|pavilion|hall|chapel|shack|bothy|annexe|annex|guest|residence|villa|farmhouse',
+    'outbuilding|porch|loft|bungalow|building|structure|architecture|房|dorm|quarters',
+    'tower|castle|keep|fort|fortress|citadel|palace|temple|shrine|monastery|cloister|abbey',
+    'courtyard|court|atrium|manor|mansion|estate|hotel|inn|hostel|library|museum|school',
+    'clinic|station|depot|silo|lighthouse|windmill|observatory|greenhouse|conservatory',
+    'bathhouse|sauna|teahouse|pagoda|yurt|tipi|igloo|dome|rotunda|amphitheatre|amphitheater',
+    'donut|doughnut|ring|annulus|torus|orbital|roundhouse|drum',
+    'starship|spaceship|ship|hull|pod|capsule|ark|hangar|terminal|bunker|vault|granary|mill',
+    'nest|hive|burrow|treehouse|houseboat|refuge|hermitage|retreat|outpost|basecamp|compound',
+  ].join('|') + ')\\b', 'i');
+  // …except when the prompt is plainly about the rig, which is the other domain
+  const VEHICLE_WORDS = /\b(rig|car|truck|kart|bike|wheel|wheels|chassis|engine|ramp|jump|track|loop|spoiler|suspension|axle|drone|boat|plane|rocket)\b/i;
+  window.__isBuildingPrompt = (t) => {
+    const x = String(t || '');
+    return BUILDING_WORDS.test(x) && !(VEHICLE_WORDS.test(x) && !/house|home|cabin|dwelling|tower|castle/i.test(x));
+  };
   window.__archSystemPrompt = function (sceneSummary) {
     const S = (curLand && curLand.scale) || 1.84;             // metres per world unit
     const ft = (1 / (S * 3.280839895)).toFixed(3);            // units per foot
