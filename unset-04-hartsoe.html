@@ -22163,27 +22163,39 @@ resetDrive(); requestAnimationFrame(frame);
   // asked to REFINE the local translation of the request into massing — and
   // every field it returns is bounds-checked before it can reach the compiler.
   const IR_CONTRACT = [
-    'You refine a house TRANSLATION. Reply with ONE JSON object, no prose, no code.',
-    'You never write geometry. A deterministic compiler derives every coordinate.',
-    'Return only these fields, all optional — omit anything you would not change:',
-    '{ "name":"SHORT NAME", "topology":"bar|loop|court|stack|hull",',
-    '  "massing":{"width":34,"depth":26,"wallZ":9,"rise":4.6,"roof":"gable|shed|flat",',
-    '             "innerR":15,"outerR":29,"segments":12,"tiers":2,"taper":0.34,"stations":5,"cells":5},',
-    '  "spaces":["living","kitchen","bed","bed","bath","study","dining"],',
+    'You are an architect. Design THIS building from scratch. Reply with ONE JSON object,',
+    'no prose, no markdown, no code. You do not pick from a catalogue — you draw the plan.',
+    '',
+    'THE PLAN IS A LIST OF CELLS. Each cell is one room-sized quad in FEET, given as 4',
+    'corners [x,y] going round. x runs east, y runs north, and the building is centred on',
+    '[0,0]. Cells may be any size, any angle, and may meet along part of an edge — where',
+    'two cells share a span the compiler builds a partition with a doorway; everywhere',
+    'else it builds exterior wall with windows. It then derives the roof from one height',
+    'field, cuts foundations to the real ground, and refuses the design if any room is',
+    'unreachable, anything floats, or a protected void gets roofed over.',
+    '',
+    '{ "name":"SHORT NAME",',
+    '  "cells":[ {"id":"living","use":"living","level":0,"poly":[[-18,-12],[0,-12],[0,2],[-18,2]]}, … ],',
+    '  "roof":"gable|shed|flat", "rise":5, "wallZ":9,',
     '  "water":"cistern|rain-garden|grade", "fireplace":true }',
-    'topology is the SHAPE OF THE WHOLE HOUSE and must keep the request’s image:',
-    '  loop = a closed inhabited ring around an open court (donut, orbital, annulus);',
-    '  court = rooms wrapped around a rectangular court; stack = tapering tiers',
-    '  (tower, castle, keep); hull = a lofted body (ship, pod, creature); bar = an',
-    '  ordinary house of rooms. Never flatten a ring or a tower into a bar.',
-    'IF THE REQUEST IS A SHAPE NONE OF THOSE HOLD — a letter, a monogram, a plan',
-    'figure, a creature, a plus, a spiral, a comb — return a "mask" instead: an',
-    'array of equal-length strings of "#" (built) and "." (open), up to 24x24,',
-    'read top row = north. The compiler turns each "#" into a room-sized bay and',
-    'derives walls, doors, roof and foundations from it. Example, a plus house:',
-    '{"name":"PLUS HOUSE","mask":["..##..","..##..","######","######","..##..","..##.."],"cell":12}',
-    'Use the mask whenever it expresses the request better than a named topology.',
-    'All numbers are finite feet.',
+    '',
+    'uses: living kitchen dining bed bath study hall. level 0 is the ground floor; a cell',
+    'on level 1 sits above and gets a stair. Between 4 and 60 cells. Every number finite.',
+    '',
+    'THE BAR — these are worked examples of QUALITY, not a menu. Match their care, then',
+    'design whatever was actually asked for:',
+    ' · a ring house: twelve trapezoid cells swept round a circle, leaving the middle open,',
+    '   so the plan is a continuous loop and the court can never be built on;',
+    ' · a tower: a ring of cells per level, each level a little smaller than the one below;',
+    ' · a hull: a row of cells whose width swells at the middle and tapers at both ends;',
+    ' · a letter or figure: cells laid on a grid so the plan reads as the shape from above,',
+    '   with no two rooms touching only at a corner, because that cannot be walked through.',
+    '',
+    'Rules that make it a house rather than a sculpture: rooms of at least 60 sq ft (baths',
+    '30); every room sharing at least 4 ft of wall with another so a door can be cut; a',
+    'living space, a kitchen and a bath at minimum; and a fireplace only in a common room.',
+    'If the request is fanciful — a creature, a machine, a word, an impossible thing — build',
+    'its FORM honestly in cells and keep it inhabitable. Never substitute an ordinary house.',
   ].join('\n');
   const IR_USES = ['living', 'kitchen', 'dining', 'bed', 'bath', 'study', 'hall'];
   function mergeIR(base, r) {
@@ -22193,7 +22205,10 @@ resetDrive(); requestAnimationFrame(frame);
     if (IR_GEN[r.topology]) out.morphology.topology = r.topology;
     // the model's own plan figure — this is how an answer that is not one of
     // the named topologies actually survives instead of being discarded
-    if (maskIsSane(r.mask)) { out.morphology.topology = 'figure'; out.morphology.massing.mask = r.mask; }
+    if (Array.isArray(r.cells) && r.cells.length >= 2) {   // designed geometry wins over any name
+      out.morphology.topology = 'cells'; out.morphology.massing.cells = r.cells;
+    }
+    else if (maskIsSane(r.mask)) { out.morphology.topology = 'figure'; out.morphology.massing.mask = r.mask; }
     else if (typeof r.glyph === 'string' && GLYPHS[r.glyph.toUpperCase()]) {
       out.morphology.topology = 'figure'; out.morphology.massing.mask = GLYPHS[r.glyph.toUpperCase()];
     }
@@ -22205,6 +22220,14 @@ resetDrive(); requestAnimationFrame(frame);
       if (Number.isFinite(v)) out.morphology.massing[k] = Math.min(lim[k][1], Math.max(lim[k][0], v));
     });
     if (r.massing && ['gable', 'shed', 'flat'].includes(r.massing.roof)) out.morphology.massing.roof = r.massing.roof;
+    if (['gable', 'shed', 'flat'].includes(r.roof)) out.morphology.massing.roof = r.roof;
+    if (Number.isFinite(r.rise)) out.morphology.massing.rise = Math.min(12, Math.max(0.6, r.rise));
+    if (Number.isFinite(r.wallZ)) out.morphology.massing.wallZ = Math.min(14, Math.max(7, r.wallZ));
+    // uses declared on the cells themselves are the real programme
+    if (Array.isArray(r.cells)) {
+      const u = r.cells.map((c) => c && c.use).filter((x) => IR_USES.includes(x));
+      if (u.length) out.spaces = [...new Set(u)];
+    }
     if (Array.isArray(r.spaces)) { const u = r.spaces.filter((x) => IR_USES.includes(x)); if (u.length) out.spaces = u.slice(0, 12); }
     if (['cistern', 'rain-garden', 'grade'].includes(r.water)) out.systems.water_path = r.water;
     if (typeof r.fireplace === 'boolean') out.systems.fireplace = r.fireplace;
@@ -22382,6 +22405,112 @@ resetDrive(); requestAnimationFrame(frame);
       const field = (x, y) => top + Math.max(0, 1 - Math.hypot(x, y) / Math.max(0.001, rTop)) * m.rise * 2.2;
       return { bays, voids: [], roofField: field, roofLow: 'eave', grade: 0, stacked: true, tierH: hT };
     },
+    // NO SHAPE OPINION AT ALL — the plan arrives as cells and is built as given.
+    // This is the one the model designs into: quads in feet, any size, any
+    // angle, any arrangement. The named generators below are now exemplars of
+    // quality, not a menu of what may be asked for.
+    cells(m) {
+      const src = Array.isArray(m.cells) ? m.cells : [];
+      const bays = [];
+      src.slice(0, 160).forEach((c, i) => {
+        const poly = Array.isArray(c) ? c : (c && c.poly);
+        if (!Array.isArray(poly) || poly.length < 3 || poly.length > 4) return;
+        const q = poly.map((pt) => [Number(pt && pt[0]), Number(pt && pt[1])]);
+        if (!q.every((pt) => Number.isFinite(pt[0]) && Number.isFinite(pt[1])
+          && Math.abs(pt[0]) < 400 && Math.abs(pt[1]) < 400)) return;
+        if (q.length === 3) q.push(q[2].slice());
+        const snap = q.map((pt) => [Math.round(pt[0] * 4) / 4, Math.round(pt[1] * 4) / 4]);
+        if (Math.abs(signedArea(snap)) < 30) return;          // a room, not a sliver
+        bays.push({ id: String((c && c.id) || 'cell' + i), use: c && c.use,
+          level: Math.max(0, Math.min(4, (c && c.level) | 0)), quad: snap });
+      });
+      if (!bays.length) throw new Error('no usable cells — each needs 3 or 4 finite [x,y] corners and 30+ sq ft');
+      // ── KNIT ── A designed plan whose rooms only touch at corners, or stand a
+      // few feet apart, is not a house — no doorway can be cut and most of it
+      // is unreachable. Rather than refuse the design, join it: components that
+      // do not share a wall are linked by a corridor, which is what an architect
+      // would draw anyway. Cells are treated as their bounding rectangles here,
+      // which is what a room plan almost always is.
+      const bb = (b) => { const xs = b.quad.map((q) => q[0]), ys = b.quad.map((q) => q[1]);
+        return { x0: Math.min.apply(null, xs), x1: Math.max.apply(null, xs),
+                 y0: Math.min.apply(null, ys), y1: Math.max.apply(null, ys) }; };
+      const MINSHARE = 3.4;
+      // This has to be the SAME question the compiler asks, or knit will
+      // believe a plan is joined that the census will later find in pieces.
+      // The census joins two cells when their edges are collinear and overlap;
+      // overlapping plans are joined too, being one continuous space.
+      const edgesOf = (b) => { const out = [];
+        for (let i = 0; i < b.quad.length; i++) {
+          const a1 = b.quad[i], a2 = b.quad[(i + 1) % b.quad.length];
+          const L = Math.hypot(a2[0] - a1[0], a2[1] - a1[1]); if (L < 0.06) continue;
+          let dx = (a2[0] - a1[0]) / L, dy = (a2[1] - a1[1]) / L;
+          if (dx < -1e-9 || (Math.abs(dx) <= 1e-9 && dy < 0)) { dx = -dx; dy = -dy; }
+          const nx = -dy, ny = dx, off = a1[0] * nx + a1[1] * ny;
+          const t1 = a1[0] * dx + a1[1] * dy, t2 = a2[0] * dx + a2[1] * dy;
+          out.push({ k: Math.round(dx * 512) / 512 + ',' + Math.round(dy * 512) / 512
+            + ',' + Math.round(off * 16) / 16, t0: Math.min(t1, t2), t1: Math.max(t1, t2) });
+        }
+        return out; };
+      const abut = (p, q) => {
+        if ((p.level || 0) !== (q.level || 0)) return false;
+        const A = bb(p), B = bb(q);
+        if (Math.min(A.x1, B.x1) - Math.max(A.x0, B.x0) > 0.4
+          && Math.min(A.y1, B.y1) - Math.max(A.y0, B.y0) > 0.4) return true;   // overlapping
+        const ea = edgesOf(p), eb = edgesOf(q);
+        for (const x of ea) for (const y of eb)
+          if (x.k === y.k && Math.min(x.t1, y.t1) - Math.max(x.t0, y.t0) >= MINSHARE) return true;
+        return false;
+      };
+      // Guessing corridors did not converge — each new link failed to join and
+      // the loop kept adding more. Moving is exact: translate a stranded wing
+      // until its wall meets the house. The design's shape survives; only its
+      // position changes, which is what a drawing does when a plan is resolved.
+      const bbxOf = (list) => list.reduce((A, bth) => { const B = bb(bth);
+        return A ? { x0: Math.min(A.x0, B.x0), x1: Math.max(A.x1, B.x1),
+                     y0: Math.min(A.y0, B.y0), y1: Math.max(A.y1, B.y1) } : B; }, null);
+      const shift = (list, dx, dy) => list.forEach((bth) => {
+        bth.quad = bth.quad.map((pt) => [pt[0] + dx, pt[1] + dy]); });
+      for (let pass = 0; pass < bays.length + 2; pass++) {   // every stranded wing, not the first eight
+        const comp = bays.map(() => -1);
+        let n = 0;
+        for (let i = 0; i < bays.length; i++) {
+          if (comp[i] >= 0) continue;
+          const stack = [i]; comp[i] = n;
+          while (stack.length) { const k = stack.pop();
+            for (let j = 0; j < bays.length; j++)
+              if (comp[j] < 0 && abut(bays[k], bays[j])) { comp[j] = n; stack.push(j); } }
+          n++;
+        }
+        if (n <= 1) break;
+        const size = new Array(n).fill(0); comp.forEach((c) => size[c]++);
+        const main = size.indexOf(Math.max.apply(null, size));
+        let pick = -1;
+        for (let c = 0; c < n; c++) if (c !== main) { pick = c; break; }
+        if (pick < 0) break;
+        const mainCells = bays.filter((_, i) => comp[i] === main);
+        const moveCells = bays.filter((_, i) => comp[i] === pick);
+        const A = bbxOf(mainCells), B = bbxOf(moveCells);
+        const SHARE = 4.2;
+        let dy = 0;
+        const oy = Math.min(A.y1, B.y1) - Math.max(A.y0, B.y0);
+        if (oy < SHARE) {                                   // slide it into line first
+          dy = (B.y0 + B.y1) / 2 < (A.y0 + A.y1) / 2
+            ? (A.y0 + SHARE) - B.y1 : (A.y1 - SHARE) - B.y0;
+        }
+        const dx = (B.x0 + B.x1) / 2 >= (A.x0 + A.x1) / 2 ? A.x1 - B.x0 : A.x0 - B.x1;
+        shift(moveCells, dx, dy);
+      }      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+      bays.forEach((b) => b.quad.forEach((pt) => { x0 = Math.min(x0, pt[0]); x1 = Math.max(x1, pt[0]);
+        y0 = Math.min(y0, pt[1]); y1 = Math.max(y1, pt[1]); }));
+      const zE = m.wallZ, halfD = Math.max(1, (y1 - y0) / 2), cy = (y0 + y1) / 2;
+      const kind = m.roof || 'gable';
+      const field = kind === 'flat' ? () => zE + 0.8
+        : kind === 'shed' ? (x, y) => zE + ((y - y0) / Math.max(0.001, y1 - y0)) * m.rise
+        : (x, y) => zE + m.rise - Math.abs(y - cy) / halfD * m.rise;
+      const lv = bays.map((b) => b.level || 0);
+      return { bays, voids: [], roofField: field, roofLow: 'eave', grade: 0,
+        stacked: Math.max.apply(null, lv) > 0, tierH: m.wallZ };
+    },
     // any plan mask at all — letters, words, monograms, arbitrary figures
     figure(m) {
       const mask = connect4(m.mask || GLYPHS.H), cell = Math.max(7, Math.min(20, m.cell || 11));
@@ -22426,9 +22555,7 @@ resetDrive(); requestAnimationFrame(frame);
     const FIGURES = {
       plus: ['..##..', '..##..', '######', '######', '..##..', '..##..'],
       cross: ['..##..', '..##..', '######', '######', '..##..', '..##..'],
-      pinwheel: ['###...', '..#...', '..####', '####..', '...#..', '...###'],
       comb: ['######', '#.#.#.', '#.#.#.', '#.#.#.', '#.#.#.', '#.....'],
-      spiral: ['######', '#.....', '#.####', '#.#..#', '#.####', '#.....'],
     };
     const figName = Object.keys(FIGURES).find((k) => new RegExp('\\b' + k + '\\b', 'i').test(t));
     const letters = figName ? null : (() => {
@@ -22438,6 +22565,10 @@ resetDrive(); requestAnimationFrame(frame);
         || t.match(/\b([a-z]{1,4})[\s-]*shaped\b/i)
         || (/\balphabet\b/i.test(t) ? t.match(/\b([a-z]{1,4})\b\s*$/i) : null);
       if (!mm) return null;
+      // "shaped like a seahorse" must not read the article as the letter A
+      const STOP = ['a', 'an', 'the', 'my', 'our', 'his', 'her', 'its', 'this', 'that',
+        'one', 'two', 'to', 'of', 'in', 'on', 'at', 'is', 'it', 'me', 'you'];
+      if (STOP.indexOf(mm[1].toLowerCase()) > -1) return null;
       const w = mm[1].toUpperCase().split('').filter((ch) => GLYPHS[ch]);
       return w.length ? w : null;
     })();
@@ -22533,26 +22664,62 @@ resetDrive(); requestAnimationFrame(frame);
       [quad[0][0], quad[0][1], z], [quad[1][0], quad[1][1], z],
       [quad[2][0], quad[2][1], z], [quad[3][0], quad[3][1], z], th, mat, 3);
 
-    // ── edge census: an edge in two bays is a partition, in one is envelope ─
-    const edges = new Map();
+    // ── EDGE CENSUS BY COLLINEAR OVERLAP ───────────────────────────────────
+    // Exact endpoint matching only works when neighbours sit on a shared grid.
+    // Arbitrary cells meet in T-junctions and partial overlaps, so edges are
+    // grouped by the LINE they lie on and compared as intervals: a span two
+    // cells both cover is a partition, the remainder is envelope. This is what
+    // lets the model hand over any arrangement of rooms it likes.
+    const edgeRecs = [];
     G.bays.forEach((b) => {
-      for (let i = 0; i < b.quad.length; i++) {
-        const a = b.quad[i], c = b.quad[(i + 1) % b.quad.length];
-        if (ELEN(a, c) < 0.06) continue;
-        const k = (b.level || 0) + '#' + EK(a, c);
-        const rec = edges.get(k) || { a, b: c, bays: [] };
-        rec.bays.push(b); edges.set(k, rec);
+      const q = b.quad;
+      for (let i = 0; i < q.length; i++) {
+        const a = q[i], c = q[(i + 1) % q.length];
+        const L = ELEN(a, c); if (L < 0.06) continue;
+        let dx = (c[0] - a[0]) / L, dy = (c[1] - a[1]) / L;
+        if (dx < -1e-9 || (Math.abs(dx) <= 1e-9 && dy < 0)) { dx = -dx; dy = -dy; }
+        const nx = -dy, ny = dx, off = a[0] * nx + a[1] * ny;
+        const t0 = a[0] * dx + a[1] * dy, t1 = c[0] * dx + c[1] * dy;
+        edgeRecs.push({ key: (b.level || 0) + '#' + Math.round(dx * 512) / 512 + ','
+            + Math.round(dy * 512) / 512 + ',' + Math.round(off * 16) / 16,
+          bay: b, dx, dy, nx, ny, off, t0: Math.min(t0, t1), t1: Math.max(t0, t1) });
       }
     });
+    const byLine = new Map();
+    edgeRecs.forEach((e) => { const gg = byLine.get(e.key) || []; gg.push(e); byLine.set(e.key, gg); });
     const exterior = [], interior = [];
-    edges.forEach((r) => (r.bays.length === 1 ? exterior : interior).push(r));
+    byLine.forEach((group) => {
+      const cuts = [];
+      group.forEach((e) => { cuts.push(e.t0, e.t1); });
+      cuts.sort((x, y) => x - y);
+      const uniq = cuts.filter((v, i) => i === 0 || v - cuts[i - 1] > 0.05);
+      const e0 = group[0];
+      const P = (t) => [e0.nx * e0.off + e0.dx * t, e0.ny * e0.off + e0.dy * t];
+      let run = null;
+      const flush = () => { if (!run) return;
+        (run.bays.length === 1 ? exterior : interior).push({ a: P(run.s), b: P(run.e), bays: run.bays });
+        run = null; };
+      for (let i = 0; i + 1 < uniq.length; i++) {
+        const s0 = uniq[i], s1 = uniq[i + 1];
+        if (s1 - s0 < 0.12) continue;
+        const mid = (s0 + s1) / 2;
+        const cov = [];
+        group.forEach((g2) => { if (g2.t0 <= mid && g2.t1 >= mid && cov.indexOf(g2.bay) < 0) cov.push(g2.bay); });
+        if (!cov.length) { flush(); continue; }
+        const sig = cov.map((b) => b.id).sort().join('|');
+        if (run && run.sig === sig && Math.abs(run.e - s0) < 0.06) run.e = s1;
+        else { flush(); run = { s: s0, e: s1, sig, bays: cov }; }
+      }
+      flush();
+    });
     if (!exterior.length) oops('the massing has no exterior edge — nothing to enclose');
 
     // ── program: assign uses around the bays, entry on the longest outer run ─
     const uses = (ir.spaces && ir.spaces.length ? ir.spaces : ['living', 'kitchen', 'bed', 'bath']).slice();
     const ground = G.bays.filter((b) => (b.level || 0) === 0);
-    ground.forEach((b, i) => { b.use = uses[i % uses.length]; });
-    G.bays.filter((b) => (b.level || 0) > 0).forEach((b, i) => { b.use = i % 3 === 0 ? 'bed' : i % 3 === 1 ? 'study' : 'hall'; });
+    ground.forEach((b, i) => { if (!b.use) b.use = uses[i % uses.length]; });   // keep designed uses
+    G.bays.filter((b) => (b.level || 0) > 0).forEach((b, i) => {
+      if (!b.use) b.use = i % 3 === 0 ? 'bed' : i % 3 === 1 ? 'study' : 'hall'; });
     // the entry: the exterior edge furthest south (smallest y), long enough for a door
     let entryEdge = null, best = Infinity;
     exterior.forEach((e) => {
@@ -22568,11 +22735,44 @@ resetDrive(); requestAnimationFrame(frame);
     const adj = new Map(); G.bays.forEach((b) => adj.set(b.id, []));
     interior.forEach((e) => { if (e.bays.length === 2 && ELEN(e.a, e.b) >= 3.2) {
       adj.get(e.bays[0].id).push({ to: e.bays[1].id, e }); adj.get(e.bays[1].id).push({ to: e.bays[0].id, e }); } });
+    // Two rooms whose PLANS OVERLAP are one continuous space. There is no wall
+    // between them to cut a door in, but they are certainly connected — and a
+    // designed plan is full of them, as is any corridor knitted in to join one.
+    const bbx = (b) => { const xs = b.quad.map((q) => q[0]), ys = b.quad.map((q) => q[1]);
+      return [Math.min.apply(null, xs), Math.max.apply(null, xs),
+              Math.min.apply(null, ys), Math.max.apply(null, ys)]; };
+    for (let i = 0; i < G.bays.length; i++) for (let j = i + 1; j < G.bays.length; j++) {
+      const pb = G.bays[i], qb = G.bays[j];
+      if ((pb.level || 0) !== (qb.level || 0)) continue;
+      const A = bbx(pb), B = bbx(qb);
+      if (Math.min(A[1], B[1]) - Math.max(A[0], B[0]) > 0.4
+        && Math.min(A[3], B[3]) - Math.max(A[2], B[2]) > 0.4) {
+        adj.get(pb.id).push({ to: qb.id, e: null }); adj.get(qb.id).push({ to: pb.id, e: null });
+      }
+    }
+    // a stair is circulation too — without this a tower reads as unreachable
+    // upper floors even though the flights that serve them are built
+    const levelsPre = [...new Set(G.bays.map((b) => b.level || 0))].sort((p, q) => p - q);
+    const stairLink = [];
+    if (levelsPre.length > 1) {
+      const nearestCore = (arr) => arr.reduce((best, b) => {
+        const c = centroid(b.quad), d = Math.hypot(c[0], c[1]);
+        return (!best || d < best.d) ? { b, d } : best; }, null);
+      for (let i = 1; i < levelsPre.length; i++) {
+        const lo = nearestCore(G.bays.filter((b) => (b.level || 0) === levelsPre[i - 1]));
+        const hi = nearestCore(G.bays.filter((b) => (b.level || 0) === levelsPre[i]));
+        if (!lo || !hi) continue;
+        adj.get(lo.b.id).push({ to: hi.b.id, e: null });
+        adj.get(hi.b.id).push({ to: lo.b.id, e: null });
+        stairLink.push({ from: lo.b, to: hi.b, zLo: levelsPre[i - 1], zHi: levelsPre[i] });
+      }
+    }
     const doored = new Set(), seen = new Set([entryBay.id]);
     let queue = [entryBay.id];
     while (queue.length) {
       const cur = queue.shift();
-      (adj.get(cur) || []).forEach((lnk) => { if (!seen.has(lnk.to)) { seen.add(lnk.to); doored.add(lnk.e); queue.push(lnk.to); } });
+      (adj.get(cur) || []).forEach((lnk) => { if (!seen.has(lnk.to)) {
+        seen.add(lnk.to); if (lnk.e) doored.add(lnk.e); queue.push(lnk.to); } });
     }
     // a spanning tree makes every room reachable, but a ring is supposed to
     // COME BACK — close the last opening so the route is continuous
@@ -22670,11 +22870,12 @@ resetDrive(); requestAnimationFrame(frame);
     }
     { const zg = gradeAt(ec[0], ec[1]);   // the entry stair is derived from the ground it actually lands on
       if (FLOOR - zg > 0.62) A.stairs(g, { x: ec[0], y: ec[1], zTop: FLOOR, zBot: zg, grade: zg, heading: 'S', width: 3.6 }); }
-    if (G.stacked && levels.length > 1) {
-      const b0 = G.bays.find((b) => (b.level || 0) === 0), c = centroid(b0.quad);
-      for (let i = 1; i < levels.length; i++)
-        A.stairs(g, { x: c[0] * 0.6, y: c[1] * 0.6, zTop: levels[i] * tierH + FLOOR, zBot: levels[i - 1] * tierH + FLOOR, grade: levels[i - 1] * tierH + FLOOR, heading: 'N', width: 3.4 });
-    }
+    stairLink.forEach((lk) => {
+      const c = centroid(lk.to.quad), cl = centroid(lk.from.quad);
+      A.stairs(g, { x: (c[0] + cl[0]) / 2, y: (c[1] + cl[1]) / 2,
+        zTop: lk.zHi * tierH + FLOOR, zBot: lk.zLo * tierH + FLOOR,
+        grade: lk.zLo * tierH + FLOOR, heading: 'N', width: 3.4 });
+    });
     // FIRE · common company only, enforced structurally
     if (ir.systems && ir.systems.fireplace) {
       const fb = G.bays.find((b) => ['living', 'dining', 'study', 'hall'].includes(b.use));
@@ -22861,7 +23062,7 @@ resetDrive(); requestAnimationFrame(frame);
         systemChars: IR_CONTRACT.length, userChars: userMsg.length };
       const tCall = (window.performance || Date).now();
       try {
-        const raw = await callConfiguredLLM(userMsg, IR_CONTRACT, cfg, null, 1200);
+        const raw = await callConfiguredLLM(userMsg, IR_CONTRACT, cfg, null, 6000);
         trace.apiCalled = true;
         trace.latencyMs = Math.round((window.performance || Date).now() - tCall);
         trace.reply = String(raw || '');
@@ -22877,9 +23078,13 @@ resetDrive(); requestAnimationFrame(frame);
           Object.keys(parsed).forEach((k) => {
             (was !== now ? trace.acceptedFromModel : trace.rejectedFromModel).push(k); });
           if (was === now) trace.note = 'the reply parsed but changed nothing — every field failed validation';
-        } else { trace.note = 'no JSON object in the reply'; }
+        } else {
+          trace.note = /[[{]/.test(txt) ? 'the reply was cut off before the JSON closed — raise maxTokens'
+            : 'no JSON object in the reply';
+        }
       } catch (e) {
         trace.apiCalled = true; trace.error = String((e && e.message) || e);
+        if (/JSON/i.test(trace.error)) trace.note = 'the reply was cut off mid-JSON — raise maxTokens';
         trace.latencyMs = Math.round((window.performance || Date).now() - tCall);
       }
     }
