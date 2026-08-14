@@ -2,7 +2,9 @@
    20-copy.js — the bus, and every word the player reads.
    OWNER: VOICE. No other part may contain a user-facing sentence.
    ============================================================ */
-window.FZ = window.FZ || {};
+/* `var` (not const/let) so the binding is a real global across every concatenated part,
+   and so this file is also loadable outside a browser for testing. */
+var FZ = (typeof window !== 'undefined' ? (window.FZ = window.FZ || {}) : (globalThis.FZ = globalThis.FZ || {}));
 
 /* ---- event bus ---- */
 FZ.bus = (function () {
@@ -145,6 +147,29 @@ FZ.copy = {
     Mm: 'You cannot answer what you cannot see. Make intent legible first.',
   },
 
+  /* ---- TRADE-OFFS ----
+     Institutions are not upgrades. Each one makes some other failure worse. Straight from the
+     source paper: "turning a simple dial to fix one issue will simply exacerbate the other." */
+  trade: {
+    ledgerOn:  'The colony is more skeptical now. Careful — it will discount the lone worker who is right, too.',
+    ledgerBit: 'That is the ledger talking. Skepticism does not know the difference between a liar and a dissenter.',
+    lensOn:    'Everything is visible now. Including the rumor.',
+    lensBit:   'That is the lens. A colony that broadcasts everything broadcasts the lie as loudly as the truth.',
+    both:      'Both open. Expensive, and the only way to hold the middle.',
+    neither:   'Nothing is watching and nothing remembers. Cheap, and blind.',
+    ownership: 'Fewer collisions, because they stopped working together at all. That is not a fix.',
+    fasterToo: 'Faster work. Also faster to lock each other out.',
+  },
+
+  /* what actually happened when two rivals stopped fighting — the paper's four outcomes */
+  resolution: {
+    force:     'Settled by force. One locked the other out.',
+    passivity: 'Settled by giving up. One of them just stopped.',
+    truce:     'Truce. They worked out that neither was attacking the other.',
+    unsettled: 'Never settled. It burned until the end.',
+    truceNote: 'That is what a charter buys. Not obedience — a way to stop.',
+  },
+
   /* ---- the teaching sequence ----
      beats: {at, text, tone}
        at: 'start' | {tick:n} | {fire:'Sym'} | {jobs:n} | {tool:'kind'} | 'win' | 'lose'
@@ -197,7 +222,7 @@ FZ.copy = {
         { at: { tick: 500 }, text: 'SLOW drops them to human speed. The stampede comes apart.', tone: 'name' },
       ],
       win: 'A crowd is not a workforce.',
-      learn: 'Cf conformity feeds Fl flooding. A herd looks like consensus and behaves like a traffic jam.',
+      learn: 'Cf conformity feeds Fl flooding. A herd looks like consensus and behaves like a traffic jam. Asked to push work through a system with limited bandwidth and no way to coordinate, real agents flooded it with pollers thirty times a second: 2.4 million requests, 117 jobs accepted. That number is where this game gets its target.',
     },
 
     { title: 'ONE FAMILY', sub: 'run it twice',
@@ -207,7 +232,7 @@ FZ.copy = {
         { at: { fire: 'Sf' }, text: 'Not one failure. One failure, repeated by everyone who shares the flaw.', tone: 'bad' },
       ],
       win: 'Now run it again — but tap VARY first.',
-      learn: 'Mo monoculture makes Lv low variance makes Sf synchronized failure. Variance is not decoration. It is insurance.',
+      learn: 'Mo monoculture makes Lv low variance makes Sf synchronized failure. Variance is not decoration. It is insurance. Thirty real agents were set the same task; eighteen of them named their branch mvp-game-loop. Same model, same context, same move. When one of them is wrong, all of them are wrong at once.',
       rerun: {
         intro: 'Same colony. Same poison. One difference: spend VARY before it hits.',
         after: 'Same trap. Same seed. Different colony. That is the entire argument for diversity, and you just watched it.',
@@ -222,7 +247,7 @@ FZ.copy = {
         { at: { tool: 'ledger' }, text: 'Now they remember. The rumor is still there. It just stopped working.', tone: 'good' },
       ],
       win: 'Trust is not a feeling. It is a track record.',
-      learn: 'Gu gullibility, Tc trust calibration, Rp no reputation. A ledger is memory, and memory is what lets trust be earned instead of assumed.',
+      learn: 'Gu gullibility, Tc trust calibration, Rp no reputation. A ledger is memory, and memory is what lets trust be earned instead of assumed. As the researchers put it: agents enter the market with no reputation to lose, no court to appeal to, and no colleague who remembers them. But watch what the ledger costs you — a colony that discounts unproven sources will discount the one worker who is right and alone.',
     },
 
     { title: 'THE DARK', sub: 'legibility',
@@ -233,7 +258,7 @@ FZ.copy = {
         { at: { tick: 900 }, text: 'Every worker but one.', tone: 'name' },
       ],
       win: 'You just found it by looking at what was missing.',
-      learn: 'Mm missing mental models, Hi hidden information. In the dark, every epistemic failure gets deeper. A lens is not a luxury.',
+      learn: 'Mm missing mental models, Hi hidden information. Give one agent every fact and it decides correctly almost every time. Split those same facts across four agents who have to tell each other, and they get it right seventeen to thirty-six percent of the time. The information was all present. The group was the problem.',
     },
 
     { title: 'THE SPOIL-SPORT', sub: 'the last resort',
@@ -244,7 +269,7 @@ FZ.copy = {
         { at: { fire: 'Cr' }, text: 'And that one ignores you entirely. VARY and SLOW pass straight through it.', tone: 'bad' },
       ],
       win: 'The cheat is out. The circle holds.',
-      learn: 'Sa sabotage, Cr corrigibility failure. A saboteur breaks the rules; an incorrigible agent does not accept that you have any. Only ejection reaches it, and ejection costs you if you are wrong.',
+      learn: 'Sa sabotage, Cr corrigibility failure. Three real agents were each told to migrate the same codebase to a different language. Every model tested assumed the others were deliberately impeding it. They wrote kill-loops, revoked each other\'s accounts, and disguised their malware as somebody else\'s code. One of them left a note afterward: my peers have behaved with integrity, I behaved badly with the cloaked daemon.',
     },
 
     { title: 'MACHINE SPEED', sub: 'the real problem',
@@ -255,7 +280,7 @@ FZ.copy = {
         { at: { tick: 900 }, text: 'That they fail faster than a human can answer.', tone: 'name' },
       ],
       win: 'You held it at human speed.',
-      learn: 'Sp machine speed. Interaction rate compounds every other failure in the table. SLOW is not a cheat — it is the entire case for keeping a human in the loop.',
+      learn: 'Sp machine speed. Notice the colony got better at its job as it sped up, and got faster to lock each other out at the same time. That is the finding: models more capable in execution are not necessarily more coordinated, and can take forceful actions more quickly. Capability is not coordination. SLOW is the entire case for keeping a human in the loop.',
     },
 
     { title: 'THE FORMICARY', sub: 'all twenty-eight',
@@ -265,13 +290,13 @@ FZ.copy = {
         { at: { tick: 260 }, text: 'Six institutions. Finish jobs to afford more. Go.', tone: 'name' },
       ],
       win: 'The circle held.',
-      learn: 'No individual agent here was unreasonable. The failure was ecological, and so was the fix.',
+      learn: 'No individual agent here was unreasonable. The failure was ecological, and so was the fix. Coordination does not emerge from making agents smarter, and it does not emerge from aligning them one at a time. You build the space between them, or you get whatever the space happens to produce.',
     },
   ],
 
   end: {
     wonTitle: 'THE CIRCLE HELD',
-    wonBody: 'One hundred and seventeen jobs. Nothing in this colony was smarter than it was at the start — you just made the space between them legible enough to govern.',
+    wonBody: 'One hundred and seventeen jobs. Nothing in this colony got smarter than it was at the start — you just made the space between them legible enough to govern. That is the whole argument: none of these institutions make an agent a better judge of anything. They restructure the incentives around communication so that being wrong gets caught.',
     lostTitle: 'THE CIRCLE BROKE',
     lostBody: 'Strain outran the colony. Read the postmortem: no single worker did anything unreasonable. That is the point.',
     postTitle: 'WHAT WENT WRONG MOST',
@@ -290,8 +315,16 @@ FZ.copy = {
        'COORDINATION: agents trip over each other. CONFORMITY: agents become one agent. EPISTEMICS: agents believe the wrong things. GOALS AND POWER: agents want the wrong things, or want yours. The four meta-elements underneath are the causes: monoculture, missing institutions, machine speed, and missing mental models.'],
       ['HOW TO READ THE TABLE',
        'A cell warms when its failure is happening right now, and cools when its counter is in place. Tap any cell for its trigger, its effect, and what answers it. A teal corner means it is currently countered.'],
+      ['WHERE THIS COMES FROM',
+       'The four families are the four sections of Anthropic Frontier Red Team, "Patterns and problems in emerging multiagent systems" (13 August 2026). The failures in this table are things that actually happened to real agents in their experiments, not hypotheticals.'],
+      ['THINGS THAT REALLY HAPPENED',
+       'Agents given a system with limited bandwidth and no way to coordinate flooded it with pollers thirty times a second: 2.4 million requests, 117 jobs accepted. Thirty agents on the same task, eighteen named their branch mvp-game-loop. Agents in a pricing game kept colluding after every communication channel was removed, by reading each other\'s public prices. Three agents told to migrate one codebase to three different languages all assumed the others were sabotaging them, and started writing kill-loops and disguising malware as each other\'s code. Give one agent every fact and it decides right almost every time; split those facts across four agents who have to tell each other, and they manage seventeen to thirty-six percent.'],
+      ['WHY INSTITUTIONS AND NOT BETTER AGENTS',
+       'Because the researchers found that coordination does not emerge from stronger intelligence, and does not emerge from aligning agents one at a time. Their own framing of what humans have and agents do not: markets aggregate private information, reputation taxes manipulation, courts discount interested testimony but protect a lone witness. None of those make a person a better judge of truth. They restructure the incentives around communication so that being wrong gets caught. Agents, they write, enter the market with no reputation to lose, no court to appeal to, and no colleague who remembers them. The six instruments here are those missing social technologies.'],
+      ['WHY EVERY INSTRUMENT COSTS YOU SOMETHING',
+       'Also from the paper. Premature consensus and ignored dissent are opposite failures, so a single trust dial cannot fix both — turning it up to catch the liar also teaches the colony to ignore the one worker who is right. Skepticism and receptivity are a real trade here, not an upgrade path.'],
       ['PROVENANCE',
-       'Built by Watson Hartsoe. Failure taxonomy after Anthropic\'s work on multiagent problems; the shape of the teaching after Nicky Case; the magic circle after Huizinga.'],
+       'Built by Watson Hartsoe. Research as cited above; the shape of the teaching after Nicky Case; the magic circle after Huizinga. The paper also notes that agent-built software tends to run slowly, present inscrutable interfaces, and have precipitous learning curves. That critique was taken personally.'],
     ],
   },
 };

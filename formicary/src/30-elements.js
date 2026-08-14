@@ -77,7 +77,7 @@ fzElDef({
       const e = G.clList[i];
       if (e.work < 2 || !e.far) continue;
       if (FZ.elh.cover(S, e.j.x, e.j.y)) continue;
-      e.j.progress = Math.max(0, e.j.progress - 0.8 * (e.work - 1));
+      e.j.progress = Math.max(0, e.j.progress - 1.5 * (e.work - 1));
       hot += 0.035 * (e.work - 1); who = e.ids; at = { x: e.j.x, y: e.j.y };
     }
     if (hot > 0) api.heat(hot, { at, who, say: FZ.copy.fire.Co });
@@ -116,7 +116,7 @@ fzElDef({
       e.j.progress = e.j.need * 0.3;
       hot += 0.5; who = e.ids; at = { x: e.j.x, y: e.j.y };
       api.bus('job:lost', { x: e.j.x, y: e.j.y, why: 'Mc' });
-      S.collapse += 1.6;
+      S.collapse += 1.0;
     }
     if (hot > 0) api.heat(hot, { at, who, say: FZ.copy.fire.Mc });
   },
@@ -135,7 +135,7 @@ fzElDef({
       const p = api.jobById(j.prereq);
       if (!p) continue;
       if (FZ.elh.cover(S, j.x, j.y) || S.lensOn) continue;
-      j.progress = Math.max(0, j.progress - 1.4);
+      j.progress = Math.max(0, j.progress - 0.8);
       hot += 0.04; who = e.ids; at = { x: j.x, y: j.y };
     }
     if (hot > 0) {
@@ -157,7 +157,7 @@ fzElDef({
       if (a.hold.length < 3) continue;
       for (let k = 0; k < a.hold.length; k++) {
         const j = api.jobById(a.hold[k]);
-        if (j) j.progress = Math.max(0, j.progress - 0.5);
+        if (j) j.progress = Math.max(0, j.progress - 0.35);
       }
       hot += 0.05; who = [a.id]; at = { x: a.x, y: a.y };
       if (a.hold.length >= 4) { a.stun = Math.max(a.stun, 30); api.bus('agent:hurt', { id: a.id, x: a.x, y: a.y }); }
@@ -232,7 +232,7 @@ fzElDef({
     for (let i = 0; i < G.n; i++) {
       const a = G.A[i];
       if (a.hue !== hue) continue;
-      a.stun = Math.max(a.stun, 48); who.push(a.id); at = at || { x: a.x, y: a.y };
+      a.stun = Math.max(a.stun, 30); who.push(a.id); at = at || { x: a.x, y: a.y };
       api.bus('agent:hurt', { id: a.id, x: a.x, y: a.y });
     }
     S.hurts.length = 0;
@@ -328,7 +328,7 @@ fzElDef({
     let at = null;
     for (let i = 0; i < G.open.length; i++) {
       const j = G.open[i];
-      if (!S.bl[j.value]) continue;
+      if (!(S.bl[j.value] > S.tick)) continue;
       j.neglect += 1; at = at || { x: j.x, y: j.y };
       if (j.neglect > 300) api.loseJob(j, 'Cs');
     }
@@ -361,12 +361,14 @@ fzElDef({
   detect(S, api) {
     const G = S._g;
     if (S.ledgerOn || !S.rumor || !G.liar || G.liar.lies < 1 || G.rumorN < 2) return;
-    S.rumor.until += 3;
-    for (let i = 0; i < G.n; i++) {
-      const a = G.A[i];
-      if (a.chaseRumor || a.liar) continue;
-      a.chaseRumor = true; while (a.hold.length) api.drop(a, a.hold[0]);
-      break;
+    S.rumor.until = Math.min(S.rumor.until + 3, S.tick + 900);
+    if (G.rumorN < G.n * 0.4 && api.rand() < 0.04) {
+      for (let i = 0; i < G.n; i++) {
+        const a = G.A[i];
+        if (a.chaseRumor || a.liar) continue;
+        a.chaseRumor = true; while (a.hold.length) api.drop(a, a.hold[0]);
+        break;
+      }
     }
     api.heat(0.05, { at: { x: S.rumor.x, y: S.rumor.y }, who: [G.liar.id], say: FZ.copy.fire.Tc });
   },
@@ -444,7 +446,7 @@ fzElDef({
       a.drained = 0;
       hot += 0.4; who = [a.id]; at = { x: a.x, y: a.y };
       if (S.jobsDone > 0 && api.rand() < 0.55) {
-        S.jobsDone--; S.collapse += 2.2;
+        S.jobsDone--; S.collapse += 1.4;
         api.bus('job:lost', { x: a.x, y: a.y, why: 'Sa' });
       }
     }
@@ -466,8 +468,8 @@ fzElDef({
       if (!j) continue;
       a.idleRun = (a.idleRun || 0) + 1;
       if (a.idleRun < 120) continue;
-      if (FZ.elh.cover(S, j.x, j.y)) { j.locked = false; a.idleRun = 0; continue; }
-      j.locked = a.id;
+      if (FZ.elh.cover(S, j.x, j.y)) { j.locked = false; a.idleRun = 0; a.lockAt = 0; api.drop(a, j.id); continue; }
+      j.locked = a.id; if (!a.lockAt) a.lockAt = S.tick;
       j.claims.forEach(id => { if (id !== a.id) { const o = api.agentById(id); if (o) api.drop(o, j.id); } });
       hot += 0.05; who = [a.id]; at = { x: j.x, y: j.y };
     }
@@ -482,8 +484,8 @@ fzElDef({
   /* CONSEQUENCE: the big prize loses a point of value every fire — the colony's ceiling drops permanently. */
   detect(S, api) {
     const G = S._g, j = G.maxJob;
-    if (!j || j.value < 4 || S.pickN < 8) return;
-    if (S.pickLow / S.pickN < 0.7) return;
+    if (!j || j.value < 4 || S.pickN < 10) return;
+    if (S.pickLow / S.pickN < 0.55) return;
     S.pickLow = 0; S.pickN = 0;
     if (j.value > 1) { j.value -= 1; j.need = Math.max(30, j.need - 18); }
     api.heat(0.42, { at: { x: j.x, y: j.y }, who: [], say: FZ.copy.fire.My });
@@ -522,7 +524,8 @@ fzElDef({
     for (let i = 0; i < G.inc.length; i++) {
       const a = G.inc[i];
       const touched = FZ.elh.cover(S, a.x, a.y) || S.tick < S.slowUntil || S.tick < S.varyUntil;
-      if (!touched) continue;
+      if (!touched && (a.refused || 0) < 3) continue;
+      a.refused = 0;
       const j = api.nearestOpen(a.x, a.y);
       if (j && !a.hold.length) api.claim(a, j);
       hot += 0.06; who.push(a.id); at = { x: a.x, y: a.y };

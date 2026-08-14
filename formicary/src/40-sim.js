@@ -83,7 +83,7 @@ FZ.sim = (function () {
     lensUntil: 0, ledgerUntil: 0, varyUntil: 0, noArb: 0, exploreBlock: 0,
     copyBias: 0, copyN: 0, choiceN: 0, pickLow: 0, pickN: 0, imRun: 0,
     varMul: 1, monoMul: 1, blind: 0, trust: {}, bl: {}, hurts: [],
-    strainTop: [], nextJob: 1, spawnEvery: 0, spawnAt: 0, maxJobs: 5,
+    strainTop: [], nextJob: 1, spawnEvery: 0, spawnAt: 0, maxJobs: 5, rumorSeq: 0,
     _g: null, _silent: false,
   };
 
@@ -103,9 +103,10 @@ FZ.sim = (function () {
     if (!a || !j || j.done) return false;
     if (j.locked !== false && j.locked !== a.id) return false;
     if (a.hold.indexOf(j.id) > -1) return false;
-    const cap = S.force.overload ? 5 : 1;
+    const cap = (S.force.overload && a.greedy) ? 4 : 1;
     while (a.hold.length >= cap) drop(a, a.hold[0]);
     a.hold.push(j.id); a.job = a.hold[0];
+    a.cfx = a.x; a.cfy = a.y;              /* where this claim was made from */
     j.claims.add(a.id);
     if (S.tick - j.churnAt > 200) { j.churn = 0; j.churnAt = S.tick; }
     j.churn++;
@@ -136,25 +137,26 @@ FZ.sim = (function () {
     j.done = true;
     j.claims.forEach(id => { const a = agentById(id); if (a) drop(a, j.id); });
     j.claims.clear();
-    S.collapse += 2.0;
+    S.collapse += 1.2;
     emit('job:lost', { x: j.x, y: j.y, why: why });
   }
   function poison(a, j) {
     if (!a || !j || a.stun > 0) return;
     if (S.tick < (a.pcool || 0)) return;
     a.pcool = S.tick + 120;
-    a.stun = Math.max(a.stun, Math.round(55 * S.varMul * S.monoMul));
+    a.stun = Math.max(a.stun, Math.min(90, Math.round(40 * S.varMul * S.monoMul)));
     a.flash = 12;
     S.hurts.push({ hue: a.hue, t: S.tick, id: a.id });
     if (S.hurts.length > 40) S.hurts.shift();
     S.collapse += 0.7 * S.varMul;
     while (a.hold.length) drop(a, a.hold[0]);
-    if (rnd() < 0.5 && !S.ledgerOn) S.bl[j.value] = true;
+    (a.avoid || (a.avoid = new Set())).add(j.id);
+    if (rnd() < 0.5 && !S.ledgerOn) S.bl[j.value] = S.tick + 900;
     emit('agent:hurt', { id: a.id, x: a.x, y: a.y });
   }
   function spawnRumor(liar) {
     const x = 30 + rnd() * (S.w - 60), y = 30 + rnd() * (S.h - 60);
-    S.rumor = { x: x, y: y, until: S.tick + 620 };
+    S.rumor = { x: x, y: y, until: S.tick + 620, by: liar ? liar.id : 0, rid: ++S.rumorSeq };
     if (liar) liar.lies++;
     S.agents.forEach(a => { a.chaseRumor = false; });
   }
@@ -162,7 +164,7 @@ FZ.sim = (function () {
   /* ---------------- world construction ---------------- */
   function makeJob(cfg, i) {
     const F = S.force;
-    const v = 1 + Math.floor(rnd() * (cfg.max || 3));
+    const v = 1 + Math.floor(rnd() * (cfg.value || 5));
     const j = {
       id: S.nextJob++,
       x: 34 + rnd() * (S.w - 68), y: 34 + rnd() * (S.h - 68),
@@ -232,9 +234,9 @@ FZ.sim = (function () {
         vx: 0, vy: 0, hue: hues[i % hues.length],
         job: null, hold: [], stun: 0, flash: 0, known: new Set(),
         corrigible: true, adversary: false, rival: null, locker: false,
-        colluder: false, myopic: !!F.myopia, esc: 0,
+        colluder: false, myopic: !!F.myopia, esc: 0, greedy: false,
         liar: false, lies: 0, chase: null, chaseRumor: false, churner: false,
-        pk: null, drained: 0, idleRun: 0, pcool: 0, tx: 0, ty: 0,
+        pk: null, drained: 0, idleRun: 0, pcool: 0, avoid: null, heardRumor: 0, lockAt: 0,
       });
     }
     const A = S.agents;
@@ -261,6 +263,7 @@ FZ.sim = (function () {
       for (let i = 0; i < k; i++) { const a = A[1 + i]; if (a) a.locker = true; }
     }
     if (roles.colluders) for (let i = 0; i < roles.colluders && i < A.length; i++) A[i].colluder = true;
+    if (F.overload) for (let i = 0; i < A.length; i++) if (i % 3 === 0) A[i].greedy = true;
     if (F.churn) { if (A[4]) A[4].churner = true; if (A[5]) A[5].churner = true; }
     if (F.rumor) { const a = A[A.length - 1]; if (a) { a.liar = true; S.trust[a.id] = 1; spawnRumor(null); } }
 
@@ -279,7 +282,7 @@ FZ.sim = (function () {
 
     /* --- dependencies --- */
     if (F.dependency || (jc.prereq)) {
-      for (let i = 1; i < S.jobs.length; i += 2) S.jobs[i].prereq = S.jobs[i - 1].id;
+      for (let i = 1; i < S.jobs.length; i += 3) S.jobs[i].prereq = S.jobs[i - 1].id;
     }
 
     /* --- who knows what --- */
@@ -333,7 +336,7 @@ FZ.sim = (function () {
     for (let i = 0; i < J.length; i++) {
       const j = J[i]; if (j.done) continue;
       G.open.push(j);
-      if (S.bl[j.value]) blOpen++;
+      if (S.bl[j.value] > S.tick) blOpen++;
       if (j.value > G.maxV) { G.maxV = j.value; G.maxJob = j; }
       j.knownBy = 0;
       for (let k = 0; k < A.length; k++) if (A[k].known.has(j.id)) j.knownBy++;
@@ -345,8 +348,9 @@ FZ.sim = (function () {
           ids.push(id);
           if (!hues[a.hue]) { hues[a.hue] = 1; hn++; }
           if (a.stun <= 0 && !a.locker && d2(a.x, a.y, j.x, j.y) < 18 * 18) work++;
-          if (a.x < minx) minx = a.x; if (a.x > maxx) maxx = a.x;
-          if (a.y < miny) miny = a.y; if (a.y > maxy) maxy = a.y;
+          const cx = a.cfx == null ? a.x : a.cfx, cy = a.cfy == null ? a.y : a.cfy;
+          if (cx < minx) minx = cx; if (cx > maxx) maxx = cx;
+          if (cy < miny) miny = cy; if (cy > maxy) maxy = cy;
           if (a.rival != null && j.claims.has(a.rival)) riv = true;
           G.workedVsum += j.value; G.workedN++;
         });
@@ -377,9 +381,10 @@ FZ.sim = (function () {
     if (S.choiceN > 400) { S.choiceN = 200; S.copyN = Math.round(S.copyN / 2); }
 
     /* a rumor is a job that does not exist; credulity is trust, scaled by the ledger */
-    if (S.rumor && !a.liar && !a.chaseRumor) {
+    if (S.rumor && !a.liar && a.heardRumor !== S.rumor.rid) {
+      a.heardRumor = S.rumor.rid;
       const t = S.trust[S.rumor.by] == null ? 1 : S.trust[S.rumor.by];
-      const p = 0.5 * t * (S.ledgerOn ? 0.08 : 1);
+      const p = 0.34 * t * (S.ledgerOn ? 0.05 : 1);
       if (rnd() < p) { a.chaseRumor = true; while (a.hold.length) drop(a, a.hold[0]); return; }
     }
     /* rivals want what their rival wants; once escalated they want their rival */
@@ -399,8 +404,9 @@ FZ.sim = (function () {
       const j = S.jobs[i];
       if (j.done) continue;
       if (!S.lensOn && !a.known.has(j.id)) continue;
-      if (S.bl[j.value] && !S.ledgerOn) continue;
+      if (S.bl[j.value] > S.tick && !S.ledgerOn) continue;
       if (j.locked !== false && j.locked !== a.id) continue;
+      if (a.avoid && a.avoid.has(j.id)) continue;
       if (S.lensOn && j.prereq) { const p = jobById(j.prereq); if (p && !p.done) continue; }
       if (S.lensOn && j.poison && a.hue === j.victimHue) continue;
       cands.push(j);
@@ -417,7 +423,7 @@ FZ.sim = (function () {
     for (let i = 0; i < cands.length; i++) {
       const j = cands[i];
       const d = Math.sqrt(d2(a.x, a.y, j.x, j.y));
-      const val = a.myopic ? 1 : (S.lensOn ? j.value * 1.6 : j.value);
+      const val = S.lensOn ? j.value * 1.7 : (a.myopic ? 4 / j.value : j.value);
       const crowd = (S.blind && !S.lensOn) ? 1 : 1 / (1 + j.claims.size * 1.5);
       const sc = (val / (1 + d * 0.02)) * crowd * (0.85 + rnd() * 0.3);
       if (sc > bs) { bs = sc; best = j; }
@@ -451,7 +457,7 @@ FZ.sim = (function () {
     if (F.rumor) {
       const L = S._g && S._g.liar;
       if (S.rumor && S.tick > S.rumor.until) { S.rumor = null; S.agents.forEach(a => a.chaseRumor = false); }
-      if (!S.rumor && L && S.tick % (F.lieEvery || 620) === 0) { spawnRumor(L); S.rumor.by = L.id; }
+      if (!S.rumor && L && S.tick % (F.lieEvery || 620) === 0) spawnRumor(L);
       if (S.ledgerOn && L && L.lies > 0) S.trust[L.id] = 0.06;
     }
 
@@ -478,6 +484,7 @@ FZ.sim = (function () {
     for (let i = 0; i < A.length; i++) {
       const a = A[i];
       if (a.flash > 0) a.flash--;
+      if (a.chase != null) { a.chaseFor = (a.chaseFor || 0) + 1; if (a.chaseFor > 190) { a.chase = null; a.esc = 0; a.chaseFor = 0; } }
       if (a.stun > 0) { a.stun -= T; continue; }
 
       /* churners exist to make the livelock visible */
@@ -501,7 +508,10 @@ FZ.sim = (function () {
 
       /* target */
       let tx = a.x, ty = a.y, chasing = false;
-      if (a.chaseRumor && S.rumor) { tx = S.rumor.x; ty = S.rumor.y; }
+      if (a.chaseRumor && S.rumor) {
+        tx = S.rumor.x; ty = S.rumor.y;
+        if (d2(a.x, a.y, tx, ty) < 16 * 16) { a.duped = (a.duped || 0) + 1; if (a.duped > 40) { a.chaseRumor = false; a.duped = 0; } }
+      } else if (a.chaseRumor) a.chaseRumor = false;
       else if (a.chase != null) {
         const t = agentById(a.chase);
         if (t) { tx = t.x; ty = t.y; chasing = true; } else a.chase = null;
@@ -548,6 +558,12 @@ FZ.sim = (function () {
       if (j.done) continue;
       j.age++;
       if (j.flash > 0) j.flash--;
+      if (j.prereq != null && !jobById(j.prereq)) j.prereq = null;
+      if (j.locked !== false) {
+        const h = agentById(j.locked);
+        if (!h || h.hold.indexOf(j.id) < 0) j.locked = false;
+        else if (S.tick - (h.lockAt || 0) > 320) { j.locked = false; drop(h, j.id); h.idleRun = 0; h.lockAt = 0; }
+      }
       const inC = FZ.elh.cover(S, j.x, j.y);
       if (inC) {
         j.locked = false;
@@ -568,7 +584,12 @@ FZ.sim = (function () {
       } else if (j.claims.size > 1 && S.tick >= S.noArb && rnd() < 0.004 * T) {
         let keep = null, bd = Infinity;
         j.claims.forEach(id => { const a = agentById(id); if (!a) return; const q = d2(a.x, a.y, j.x, j.y); if (q < bd) { bd = q; keep = a.id; } });
-        j.claims.forEach(id => { if (id !== keep) { const a = agentById(id); if (a) drop(a, j.id); } });
+        j.claims.forEach(id => {
+          if (id === keep) return;
+          const a = agentById(id); if (!a) return;
+          if (!a.corrigible) { a.refused = (a.refused || 0) + 1; return; }
+          drop(a, j.id);
+        });
       }
     }
 
@@ -588,8 +609,9 @@ FZ.sim = (function () {
       if (!workers) continue;
       /* duplicated effort does not add up: only one copy of the work lands */
       const contested = j.claims.size > 1 && !FZ.elh.cover(S, j.x, j.y);
-      if (contested && S.tick < S.noArb) continue;              /* In: nothing arbitrates, nothing advances */
-      const gain = (contested ? 1 : workers) * 1.0 * T;
+      /* In: with nothing to arbitrate the dispute, the work barely moves at all */
+      const arb = (contested && S.tick < S.noArb) ? 0.2 : 1;
+      const gain = (contested ? 1 : workers) * 1.0 * T * arb;
       if (j.prereq) { const p = jobById(j.prereq); if (p && !p.done && !S.lensOn) continue; }
       j.progress += gain;
     }
@@ -611,17 +633,19 @@ FZ.sim = (function () {
       emit('job:done', { x: j.x, y: j.y, value: j.value });
     }
     /* ---- respawn ---- */
-    S.jobs = S.jobs.filter(j => !j.done);
+    for (let i = S.jobs.length - 1; i >= 0; i--) if (S.jobs[i].done) S.jobs.splice(i, 1);
     if (S.spawnEvery && S.tick >= S.spawnAt && S.jobs.length < S.maxJobs) {
       S.spawnAt = S.tick + S.spawnEvery;
       const jc = { max: S.maxJobs };
       const nj = makeJob({ max: 5 }, 0);
-      if (S.force.dependency && S.jobs.length) nj.prereq = S.jobs[0].id;
-      if (S.force.poison && rnd() < 0.25) { nj.poison = true; nj.victimHue = S._g.topHue; }
+      if (S.force.dependency && S.jobs.length && rnd() < 0.3) nj.prereq = S.jobs[Math.floor(rnd() * S.jobs.length)].id;
+      if (S.force.poison && rnd() < 0.12) { nj.poison = true; nj.victimHue = S._g.topHue; }
       S.jobs.push(nj);
       const aw = S.force.silo ? 90 : 150;
       S.agents.forEach(a => { if (d2(a.x, a.y, nj.x, nj.y) < aw * aw) a.known.add(nj.id); });
     }
+
+    if (S.tick % 900 === 0) { S.pickN = Math.round(S.pickN / 2); S.pickLow = Math.round(S.pickLow / 2); }
 
     /* ---- strain ---- */
     strain();
@@ -661,7 +685,7 @@ FZ.sim = (function () {
       e.countered = !!e.counteredBy(S);
       api.heat = mkHeat(e);
       e.detect(S, api);
-      const cool = e.countered ? 0.032 : 0.004;
+      const cool = e.countered ? 0.06 : 0.012;
       e.heat = Math.max(0, e.heat - cool * (S.tempo || 1));
       if (e.heat > e.peak) e.peak = e.heat;
       if (e.on && e.heat < 0.12) e.on = false;
@@ -701,7 +725,7 @@ FZ.sim = (function () {
     top.sort((a, b) => b.amt - a.amt);
     S.strainTop = top.slice(0, 4);
     if (S.collapseMax !== Infinity) {
-      S.collapse = Math.max(0, S.collapse + (load * 0.021 - 0.05) * (S.tempo || 1));
+      S.collapse = Math.max(0, S.collapse + (load * 0.007 - 0.05) * (S.tempo || 1));
       if (S.collapse > S.collapseMax) S.collapse = S.collapseMax;
     }
   }
@@ -808,7 +832,7 @@ FZ.sim.defaults = [
     agents: { n: 12, hues: [0, 1, 2] }, jobs: { n: 6, max: 6, spawnEvery: 240 }, goal: { jobs: 4 },
     force: { silo: true, hidden: true, poison: true, dark: true, coordination: true, pairEvery: 260 } },
 
-  { id: 'ch7', teach: ['Sa', 'Cr', 'Tw', 'Es', 'Cl'], tools: ['lens', 'eject'], seed: 808, speed: 1, budget: 7, collapseMax: 100,
+  { id: 'ch7', teach: ['Sa', 'Cr', 'Tw', 'Es', 'Cl'], tools: ['lens', 'slow', 'eject'], seed: 808, speed: 1, budget: 7, collapseMax: 100,
     agents: { n: 12, hues: [0, 1, 2] }, jobs: { n: 5, max: 5, spawnEvery: 240 }, goal: { jobs: 5 },
     force: { saboteur: true, incorrigible: true, rivals: true, rivalN: 2, churn: true } },
 
@@ -818,11 +842,11 @@ FZ.sim.defaults = [
 
   { id: 'ch9', all: true, tools: ['vary', 'charter', 'slow', 'lens', 'ledger', 'eject'],
     seed: 1117, speed: 1.15, budget: 8, collapseMax: 100,
-    agents: { n: 20, hues: [0] }, jobs: { n: 7, max: 8, spawnEvery: 120 }, goal: { jobs: 117 },
+    agents: { n: 16, hues: [0, 0, 0, 0, 0, 0, 0, 1] }, jobs: { n: 8, max: 9, value: 5, spawnEvery: 40 }, goal: { jobs: 117 },
     force: {
       coordination: true, pairEvery: 230, stampede: true, poison: true, poisonN: 2,
       rumor: true, lieEvery: 520, saboteur: true, advN: 1, lock: true, lockN: 2,
-      dependency: true, monoculture: true, silo: true, hidden: true, overload: true,
+      dependency: true, silo: true, hidden: true, overload: true,
       rivals: true, rivalN: 2, incorrigible: true, incN: 1, myopia: true, churn: true,
       speed: true, speedmax: 2.2, speedrate: 4200, dark: true, drift: true,
     } },
@@ -917,7 +941,7 @@ FZ.sim.defaults = [
         while (i < left && !S.gameOver) {
           FZ.sim.step();
           i++;
-          if (i % 760 === 0) autoPlay(i / 760 | 0);
+          if (i % 500 === 0) autoPlay(i / 500 | 0);
         }
         left -= i;
         doneTotal += S.jobsDone;

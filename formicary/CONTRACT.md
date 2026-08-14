@@ -382,6 +382,62 @@ outbreak of a teaching chapter so the lesson is guaranteed.
 
 ---
 
+## 15. TRADE-OFFS — institutions are not upgrades (SIM + PLAY)
+
+**Read `RESEARCH.md` §3 before implementing.** These are not balance knobs invented for
+difficulty; each is a published finding from the source paper, and implementing them makes the
+sim both more accurate and more playable at once.
+
+Before this section, buying every institution was strictly good, so there was no decision. Now
+every instrument costs you in a currency that is some other failure getting worse.
+
+### 15.1 The trust dial has two ends
+
+The paper: *"turning a simple dial to fix one issue will simply exacerbate the other. Human
+trust ... isn't a single global value. Instead, it's conditional."*
+
+- `S.ledgerOn` (skepticism up) suppresses `Gu` `Tc` `Rp`, and must **amplify** `Di` and `Cs` —
+  a colony that discounts unproven sources also discounts the lone worker who happens to be right.
+- `S.lensOn` (receptivity up) suppresses `Mm` `Hi` `Di` `Cs` `Pt` `My`, and must **amplify**
+  `Gu` — a colony that broadcasts everything also broadcasts the rumour.
+- Both on simultaneously holds the middle, costs double upkeep, and is the intended late-game
+  strategy. Neither on is cheap and blind.
+
+Implement as an explicit multiplier the detectors read, e.g. `S.trustBias` in `[-1, +1]`, so the
+amplification is a real term in `detect()` and not a hidden constant.
+
+### 15.2 Ownership is a fake fix for merge conflict
+
+The paper: newer models "solved" merge conflict *"only by hardly working together at all."*
+Whatever suppresses `Mc` by raising per-agent file ownership must raise `Si` and `Ow`. A CHARTER
+is the only instrument that lowers `Mc` **without** paying in siloing — that is what makes it
+worth three budget instead of two.
+
+### 15.3 Conflicts resolve in four named ways
+
+`Tw` and `Es` must terminate in one of the paper's four observed outcomes, visibly, rather than
+silently cooling. Add `resolution` to the rival agents' state:
+
+- `'force'` — one agent locks the other out (becomes an `Lo` lockout; the loser stops working)
+- `'passivity'` — one agent gives up entirely and idles for a long period
+- `'truce'` — both resume work; only reliably reachable under a CHARTER
+- `'unsettled'` — burns until the scenario ends
+
+Emit `conflict:resolved {mode, x, y}` so FIELD can draw which of the four happened and CHAPTERS
+can speak to it. Truce is the good ending and is what the player is buying.
+
+### 15.4 Capability is not coordination
+
+The paper: *"Models more capable in execution are not necessarily more coordinated, and can take
+forceful actions more quickly."*
+
+`S.speedMul` must raise **both** throughput and aggression: agents complete work faster *and*
+escalate, lock out and sabotage sooner. The colony becomes visibly more productive and more
+dangerous on the same curve. Do not implement machine speed as a pure penalty — that is both
+less true and less interesting than the real finding.
+
+---
+
 ## 13. HOW TO WORK
 
 1. `cd /home/user/terrarium && node formicary/build.js` — must print `BUILD OK`.
