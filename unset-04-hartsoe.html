@@ -12066,8 +12066,7 @@ async function runAIAgent() {
     // a prompt that names a building becomes a BUILDING, not an arena piece
     try {
         if (window.__routeBuildingPrompt && window.__routeBuildingPrompt(promptText)) {
-            clearInterval(aiProgressInterval);
-            try { progressBar.style.width = '0%'; setCarLoadingProgress(playerCar, 0, false); } catch(_){}
+            clearInterval(aiProgressInterval);   // the house pipeline drives the HUD with real stages
             return;
         }
     } catch(_){}
@@ -22626,6 +22625,63 @@ resetDrive(); requestAnimationFrame(frame);
     put('NoveltyCert', keptVoid, inv.join(' · ') + ' — voids kept: ' + (info.voids || []).length);
     return { pass: fail.length === 0, cert, fail, meshes: meshes.length };
   }
+  // ── WHAT THE BUILD IS ACTUALLY DOING ─────────────────────────────────────
+  // The old HUD said SYNTHESIZING / REAR-LIGHT COMPUTE over a bar driven by
+  // `progress += (95 - progress) * 0.04` on a 100 ms timer. It measured
+  // nothing — it was a curve crawling toward 95% whether the house was
+  // compiling, already certified, or dead. You could not tell a working build
+  // from a failed one. These stages ARE the pipeline, and each reports only
+  // when it has really finished.
+  const HOUSE_STAGES = ['READING THE REQUEST', 'ASKING THE MODEL', 'READING THE GROUND',
+    'COMPILING', 'CERTIFYING', 'SEATING ON THE LAND'];
+  function houseStage(i, detail) {
+    try {
+      const hud = document.getElementById('ai-hud'); if (hud) hud.classList.remove('gone');
+      const ttl = hud && hud.firstElementChild; if (ttl) ttl.textContent = 'BUILDING';
+      const st = document.getElementById('ai-hud-status');
+      if (st) st.textContent = (HOUSE_STAGES[i] || '') + (detail ? ' · ' + detail : '');
+      const bar = document.getElementById('ai-progress-bar');
+      const f = (i + 1) / HOUSE_STAGES.length;
+      if (bar) bar.style.width = Math.round(f * 100) + '%';
+      try { setCarLoadingProgress(playerCar, f, true); } catch (_) {}
+    } catch (_) {}
+  }
+  function houseStageEnd(msg, ok) {
+    try {
+      const st = document.getElementById('ai-hud-status'); if (st) st.textContent = msg || '';
+      const hud = document.getElementById('ai-hud'); const ttl = hud && hud.firstElementChild;
+      if (ttl) ttl.textContent = ok ? 'STANDING' : 'REFUSED';
+      const bar = document.getElementById('ai-progress-bar'); if (bar) bar.style.width = ok ? '100%' : '0%';
+      setTimeout(() => {
+        if (hud) hud.classList.add('gone');
+        if (bar) bar.style.width = '0%';
+        try { setCarLoadingProgress(playerCar, 0, false); } catch (_) {}
+      }, ok ? 1400 : 2600);
+    } catch (_) {}
+  }
+  // ── WHERE IT WILL LAND · drawn on the ground BEFORE anything is built ─────
+  // You could not see the site until a house was already standing on it.
+  function sitePreview(at, base, Rft, FT) {
+    const grp = new THREE.Group(); grp.name = 'SITE PREVIEW';
+    const R = Math.max(0.4, Rft * FT);
+    // survey pegs, not pillars — they mark ground, so they must read as ground
+    const stake = new THREE.MeshBasicMaterial({ color: 0x19e6c8, transparent: true, opacity: 0.95 });
+    const geo = new THREE.BoxGeometry(0.05, 0.24, 0.05);
+    for (let i = 0; i < 40; i++) {                       // the footprint, following the real ground
+      const a = i / 40 * Math.PI * 2, x = at.x + Math.cos(a) * R, z = at.z + Math.sin(a) * R;
+      const y = gYw(x, z);
+      const m = new THREE.Mesh(geo, stake);
+      m.position.set(x, (Number.isFinite(y) ? y : base) + 0.12, z);
+      grp.add(m);
+    }
+    const disc = new THREE.Mesh(new THREE.RingGeometry(R * 0.975, R, 44),
+      new THREE.MeshBasicMaterial({ color: 0xffc83d, transparent: true, opacity: 0.55,
+        side: THREE.DoubleSide }));
+    disc.rotation.x = -Math.PI / 2;                      // the DATUM the house will sit on
+    disc.position.set(at.x, base + 0.06, at.z); grp.add(disc);
+    scene.add(grp);
+    return grp;
+  }
   async function generateHouse(promptText) {
     let mod;
     try { mod = await depotModule(); } catch (e) { try { notify('DEPOT UNREACHABLE — ' + e.message.slice(0, 40)); } catch (_) {} return null; }
@@ -22633,9 +22689,9 @@ resetDrive(); requestAnimationFrame(frame);
     let ir = irFromUtterance(promptText);          // works with no model at all
     let cfg = null; try { cfg = getAIConfig(); } catch (_) {}
     let usable = false; try { usable = aiLocalAvailable(cfg); } catch (_) {}
-    try { notify((usable ? 'DRAFTING — ' : 'BUILDING LOCALLY — ') + ir.morphology.topology.toUpperCase()
-      + ' · ' + String(promptText).slice(0, 30).toUpperCase()); } catch (_) {}
+    houseStage(0, ir.morphology.topology.toUpperCase());
     if (usable) {
+      houseStage(1, (cfg && cfg.model) || 'model');
       try {
         const raw = await callConfiguredLLM('Request: ' + promptText
           + '\n\nThe local translation, which you may refine:\n' + JSON.stringify({
@@ -22647,7 +22703,7 @@ resetDrive(); requestAnimationFrame(frame);
     }
     // ── THE SITE · sample the ground this house will actually stand on ─────
     const L = curLand;
-    let site = null, seat = null;
+    let site = null, seat = null, preview = null;
     if (L && window.HARTSOE_GROUND && window.HARTSOE_GROUND.on) {
       const S = L.scale || 1.84, FT = 0.3048 / S;
       const at = { x: P.pos.x, z: P.pos.z };
@@ -22664,18 +22720,32 @@ resetDrive(); requestAnimationFrame(frame);
         return Number.isFinite(y) ? Math.min(0, (y - base) / FT) : 0;
       } };
       seat = { at, base, datum: true };
+      let relief = 0;                                          // how hard is this site, in feet
+      for (let i = -4; i <= 4; i++) for (let j = -4; j <= 4; j++) {
+        const y = gYw(at.x + (i / 4) * Rft * FT, at.z + (j / 4) * Rft * FT);
+        if (Number.isFinite(y)) relief = Math.max(relief, (base - y) / FT);
+      }
+      preview = sitePreview(at, base, Rft, FT);
+      houseStage(2, Math.round(Rft * 2) + ' FT ACROSS · ' + Math.round(relief) + ' FT OF FALL');
+    } else {
+      houseStage(2, 'NO LAND — FLAT DATUM');
     }
     // ── COMPILE · CERTIFY · REPAIR · repeat, so a request converges ─────────
     let info = null, c = null, why = '';
     for (let attempt = 0; attempt < 4; attempt++) {
       kit.setCUR(ir.name || 'GENERATED');
       const g = new THREE.Group();
+      houseStage(3, attempt ? 'ATTEMPT ' + (attempt + 1) : ir.morphology.topology.toUpperCase());
       try { info = compileHouseIR(ir, kit, g, site); }
       catch (e) { why = e.message; ir = repairIR(ir, why); continue; }
+      houseStage(4, info.bays + ' BAYS · ' + g.children.length + ' PARTS');
       c = certifyHouse(ir, g, info);
       window.__lastHouse = { ir, info, cert: c, attempt };
       if (c.pass) {
+        houseStage(5, Object.keys(c.cert).length + '/' + Object.keys(c.cert).length + ' CERTIFICATES');
         const b2 = installDepotGroup(g, ir.name || 'HOUSE', seat);
+        if (preview) setTimeout(() => { try { scene.remove(preview); } catch (_) {} }, 4200);
+        houseStageEnd(info.topology.toUpperCase() + ' · ' + info.bays + ' BAYS · ' + c.meshes + ' PARTS', true);
         if (b2) { try { notify(ir.name + ' — ' + info.topology.toUpperCase() + ' · ' + info.bays
           + ' BAYS · ' + c.meshes + ' PARTS · ALL ' + Object.keys(c.cert).length
           + ' CERTIFICATES' + (attempt ? ' (repaired ×' + attempt + ')' : '')); } catch (_) {} }
@@ -22684,6 +22754,8 @@ resetDrive(); requestAnimationFrame(frame);
       why = c.fail[0];
       ir = repairIR(ir, why);
     }
+    if (preview) { try { scene.remove(preview); } catch (_) {} }
+    houseStageEnd(String(why).slice(0, 46), false);
     try { notify('COULD NOT CERTIFY — ' + String(why).slice(0, 52)); } catch (_) {}
     console.warn('[house certificate]', c && c.cert);
     return null;
