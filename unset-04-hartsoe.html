@@ -22077,7 +22077,7 @@ resetDrive(); requestAnimationFrame(frame);
         + "\nObject.entries(M).forEach(([k, v]) => { if (v && v.isMaterial && !v.name) v.name = k; });"
         + "\nexport const KIT = { roster, CRITIC, ROOMTAGS, FIREPITS, setCUR: (n) => { CUR = n; },"
         + " api: { mbox, wall, room, shed, gable, stairs, deck, flue, door, pier, kitchen, bathset,"
-        + " bed, sofa, dine, floorSlab, part, core, mudroom, roomLabel, M } };\n";
+        + " bed, sofa, dine, floorSlab, part, core, mudroom, roomLabel, M, slab, prism, W, crit } };\n";
       const url = URL.createObjectURL(new Blob([kit], { type: 'text/javascript' }));
       try { return await import(url); } finally { setTimeout(() => URL.revokeObjectURL(url), 30000); }
     })();
@@ -22158,257 +22158,496 @@ resetDrive(); requestAnimationFrame(frame);
   // grammar is the kit API; and its work is only accepted if the kit's critic
   // rules pass — riser ranges, gutters on the low edge, the fire keeping
   // common company. Fail twice and the draft is refused, with reasons.
-  const HOUSE_CONTRACT = [
-    'You are an architect. Respond with ONE JSON object only — no prose, no markdown, no code.',
-    'You do NOT write geometry. You declare a PLAN; a deterministic compiler derives every wall,',
-    'door, window, slab, roof and fixture. Translate ANY request into this massing language:',
-    '{ "name": "…", "wallZ": 9,',
-    '  "rooms": [ {"id":"living","use":"living","rect":[x0,y0,x1,y1]}, … ],',
-    '  "entry": {"room":"living","side":"S"},',
-    '  "doors": [{"from":"living","to":"bed1"}, …],',
-    '  "roof": {"type":"gable","rise":4.5,"overhang":1.5},',
-    '  "deck": {"side":"S","depth":8},',
-    '  "fireplace": "living" }',
-    'Units are FEET. roof.type: gable | shed | flat. uses: living kitchen dining bed bath study hall mud porch.',
-    'doors, deck and fireplace are optional — doorways are derived from adjacency when omitted.',
-    'RULES the compiler enforces (a broken plan is rejected with the reason):',
-    '  rooms are rectangles that TILE the footprint — they share edges of 4 ft or more, never overlap;',
-    '  every room needs a doorway path back to the entry room; the entry side must face outdoors;',
-    '  a bath is at least 20 sq ft, other rooms at least 48; fireplaces live in common rooms only.',
-    'Fanciful shapes are translated into massing, keeping the SPIRIT: a round cabin becomes a square',
-    'core with a bump-out on each side; a tower becomes a compact footprint; a courtyard house is a',
-    'ring of rooms. Anything lived-in gets a kitchen, a bath, and bedrooms of 10x10 or more.',
-    'Example — "a small lake cabin":',
-    '{"name":"LAKE CABIN","wallZ":9,',
-    ' "rooms":[{"id":"living","use":"living","rect":[0,0,16,14]},{"id":"kit","use":"kitchen","rect":[16,0,28,8]},',
-    '          {"id":"bed","use":"bed","rect":[16,8,28,14]},{"id":"bath","use":"bath","rect":[10,14,16,19]},',
-    '          {"id":"hall","use":"hall","rect":[0,14,10,19]}],',
-    ' "entry":{"room":"living","side":"S"},"roof":{"type":"gable","rise":5,"overhang":1.5},',
-    ' "deck":{"side":"S","depth":8},"fireplace":"living"}',
+  // The model is no longer asked for geometry, or even for a floor plan. It is
+  // asked to REFINE the local translation of the request into massing — and
+  // every field it returns is bounds-checked before it can reach the compiler.
+  const IR_CONTRACT = [
+    'You refine a house TRANSLATION. Reply with ONE JSON object, no prose, no code.',
+    'You never write geometry. A deterministic compiler derives every coordinate.',
+    'Return only these fields, all optional — omit anything you would not change:',
+    '{ "name":"SHORT NAME", "topology":"bar|loop|court|stack|hull",',
+    '  "massing":{"width":34,"depth":26,"wallZ":9,"rise":4.6,"roof":"gable|shed|flat",',
+    '             "innerR":15,"outerR":29,"segments":12,"tiers":2,"taper":0.34,"stations":5,"cells":5},',
+    '  "spaces":["living","kitchen","bed","bed","bath","study","dining"],',
+    '  "water":"cistern|rain-garden|grade", "fireplace":true }',
+    'topology is the SHAPE OF THE WHOLE HOUSE and must keep the request’s image:',
+    '  loop = a closed inhabited ring around an open court (donut, orbital, annulus);',
+    '  court = rooms wrapped around a rectangular court; stack = tapering tiers',
+    '  (tower, castle, keep); hull = a lofted body (ship, pod, creature); bar = an',
+    '  ordinary house of rooms. Never flatten a ring or a tower into a bar.',
+    'All numbers are finite feet.',
   ].join('\n');
-  // ── THE PLAN COMPILER ──────────────────────────────────────────────────────
-  // The model no longer writes geometry code. It declares a PLAN — rooms as
-  // rectangles with uses, an entry, a roof — and this compiler derives every
-  // wall run, partition, opening, slab, roof and fixture deterministically
-  // through the kit. The model composes; the compiler computes. A prompt the
-  // schema can't express gets translated into massing by the model, and the
-  // worst possible outcome is a dull valid house — never broken geometry.
-  function compileHousePlan(plan, kit, g) {
-    const A = kit.api, M = A.M;
-    const oops = (m) => { throw new Error(m); };
-    const num = (v, lo, hi, what) => {
-      if (typeof v !== 'number' || !Number.isFinite(v)) oops(what + ' must be a finite number, got ' + v);
-      if (v < lo || v > hi) oops(what + ' = ' + v + ' is outside ' + lo + '..' + hi);
-      return v;
-    };
-    if (!plan || typeof plan !== 'object') oops('the plan is not an object');
-    const wallZ = num(plan.wallZ === undefined ? 9 : plan.wallZ, 7, 14, 'wallZ');
-    const T = 0.7, EPS = 0.05;
-    // ── rooms: normalized, finite, sized, non-overlapping ──
-    if (!Array.isArray(plan.rooms) || !plan.rooms.length) oops('rooms must be a non-empty array');
-    if (plan.rooms.length > 14) oops('at most 14 rooms');
-    const USES = ['living', 'kitchen', 'dining', 'bed', 'bath', 'study', 'hall', 'mud', 'porch'];
-    const rooms = plan.rooms.map((r, i) => {
-      if (!r || !Array.isArray(r.rect) || r.rect.length !== 4) oops('room ' + i + ' needs rect:[x0,y0,x1,y1]');
-      const [a, b, c, d] = r.rect.map((v, j) => num(v, -200, 200, 'room ' + i + ' rect[' + j + ']'));
-      const x0 = Math.min(a, c), x1 = Math.max(a, c), y0 = Math.min(b, d), y1 = Math.max(b, d);
-      const use = USES.includes(r.use) ? r.use : 'hall';
-      const minA = use === 'bath' ? 20 : 48;
-      if ((x1 - x0) < 4 || (y1 - y0) < 4) oops('room ' + (r.id || i) + ' is under 4 ft in one direction');
-      if ((x1 - x0) * (y1 - y0) < minA) oops('room ' + (r.id || i) + ' is under ' + minA + ' sq ft');
-      return { id: String(r.id || use + i), use, x0, x1, y0, y1 };
+  const IR_USES = ['living', 'kitchen', 'dining', 'bed', 'bath', 'study', 'hall'];
+  function mergeIR(base, r) {
+    if (!r || typeof r !== 'object') return base;
+    const out = JSON.parse(JSON.stringify(base));
+    if (typeof r.name === 'string' && r.name.trim()) out.name = r.name.trim().slice(0, 22).toUpperCase();
+    if (IR_GEN[r.topology]) out.morphology.topology = r.topology;
+    const lim = { width: [12, 120], depth: [10, 90], wallZ: [7, 14], rise: [0.6, 12], innerR: [8, 60],
+      outerR: [14, 90], segments: [8, 24], tiers: [2, 5], taper: [0.05, 0.6], stations: [3, 8], cells: [2, 8] };
+    if (r.massing && typeof r.massing === 'object') Object.keys(lim).forEach((k) => {
+      const v = typeof r.massing[k] === 'string' ? parseFloat(r.massing[k]) : r.massing[k];
+      if (Number.isFinite(v)) out.morphology.massing[k] = Math.min(lim[k][1], Math.max(lim[k][0], v));
     });
-    const ids = new Set();
-    rooms.forEach((r) => { if (ids.has(r.id)) oops('duplicate room id ' + r.id); ids.add(r.id); });
-    for (let i = 0; i < rooms.length; i++) for (let j = i + 1; j < rooms.length; j++) {
-      const p = rooms[i], q = rooms[j];
-      const ox = Math.min(p.x1, q.x1) - Math.max(p.x0, q.x0), oy = Math.min(p.y1, q.y1) - Math.max(p.y0, q.y0);
-      if (ox > EPS && oy > EPS) oops('rooms ' + p.id + ' and ' + q.id + ' overlap — rooms must tile, not stack');
+    if (r.massing && ['gable', 'shed', 'flat'].includes(r.massing.roof)) out.morphology.massing.roof = r.massing.roof;
+    if (Array.isArray(r.spaces)) { const u = r.spaces.filter((x) => IR_USES.includes(x)); if (u.length) out.spaces = u.slice(0, 12); }
+    if (['cistern', 'rain-garden', 'grade'].includes(r.water)) out.systems.water_path = r.water;
+    if (typeof r.fireplace === 'boolean') out.systems.fireplace = r.fireplace;
+    if (out.morphology.massing.outerR <= out.morphology.massing.innerR + 8)
+      out.morphology.massing.outerR = out.morphology.massing.innerR + 12;   // a ring you can live in
+    return out;
+  }
+  // ── HOUSE↔WORLD IR · TOPOLOGY IS A GENERATOR ──────────────────────────────
+  // Two things were wrong with the old builder, and they compounded.
+  //
+  // 1. It could only tile axis-aligned rectangles. A donut, a court, a tower
+  //    and a hull were inexpressible, so the request was normalised to the
+  //    nearest box — the NOVELTY_ERASURE the house language forbids.
+  // 2. It ran only through a model. This build has no reachable model
+  //    (thunder-ai-url is empty, no key), so every request fell through to
+  //    keyword-matching nine canned species: "a donut house with a rain
+  //    garden" returned Rain House.
+  //
+  // So the model comes OFF the critical path and topology becomes a
+  // GENERATOR. Each generator emits BAYS — a quad in plan plus a level — and
+  // one assembly path runs over the bays: floor plate, envelope walls with
+  // openings, partitions with doorways, a roof taken from a SINGLE height
+  // field (so adjacent sectors share seam endpoints exactly), piers to grade,
+  // and a water path from the low edge to a destination. A ring stays a ring
+  // because the ring is what produced the bays. A model, when one is
+  // reachable, only refines the IR — it never writes geometry.
+  const IR_EPS = 0.02;
+  const K2 = (p) => Math.round(p[0] * 50) / 50 + ',' + Math.round(p[1] * 50) / 50;
+  const EK = (a, b) => { const x = K2(a), y = K2(b); return x < y ? x + '|' + y : y + '|' + x; };
+  const ELEN = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const signedArea = (poly) => { let s = 0; for (let i = 0; i < poly.length; i++) { const j = (i + 1) % poly.length; s += poly[i][0] * poly[j][1] - poly[j][0] * poly[i][1]; } return s / 2; };
+  const ccw = (poly) => signedArea(poly) < 0 ? poly.slice().reverse() : poly;
+  const centroid = (poly) => poly.reduce((a, p) => [a[0] + p[0] / poly.length, a[1] + p[1] / poly.length], [0, 0]);
+  const ptInPoly = (p, poly) => {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1];
+      if ((yi > p[1]) !== (yj > p[1]) && p[0] < (xj - xi) * (p[1] - yi) / (yj - yi) + xi) inside = !inside;
     }
-    // ── adjacency: shared edges ≥ 3.4 ft; the footprint must be one building ──
-    const shared = [];   // {a,b,dir,lo,hi,at}  dir 'x': runs along x at y=at
-    for (let i = 0; i < rooms.length; i++) for (let j = i + 1; j < rooms.length; j++) {
-      const p = rooms[i], q = rooms[j];
-      const ox0 = Math.max(p.x0, q.x0), ox1 = Math.min(p.x1, q.x1);
-      const oy0 = Math.max(p.y0, q.y0), oy1 = Math.min(p.y1, q.y1);
-      if (Math.abs(p.y1 - q.y0) < EPS && ox1 - ox0 >= 3.4) shared.push({ a: p, b: q, dir: 'x', lo: ox0, hi: ox1, at: p.y1 });
-      else if (Math.abs(q.y1 - p.y0) < EPS && ox1 - ox0 >= 3.4) shared.push({ a: q, b: p, dir: 'x', lo: ox0, hi: ox1, at: q.y1 });
-      else if (Math.abs(p.x1 - q.x0) < EPS && oy1 - oy0 >= 3.4) shared.push({ a: p, b: q, dir: 'y', lo: oy0, hi: oy1, at: p.x1 });
-      else if (Math.abs(q.x1 - p.x0) < EPS && oy1 - oy0 >= 3.4) shared.push({ a: q, b: p, dir: 'y', lo: oy0, hi: oy1, at: q.x1 });
-    }
-    if (rooms.length > 1) {
-      const seen = new Set([rooms[0].id]); let grew = true;
-      while (grew) { grew = false; shared.forEach((s) => {
-        if (seen.has(s.a.id) !== seen.has(s.b.id)) { seen.add(s.a.id); seen.add(s.b.id); grew = true; } }); }
-      if (seen.size < rooms.length) oops('rooms ' + rooms.filter((r) => !seen.has(r.id)).map((r) => r.id).join(', ')
-        + ' do not touch the rest — every room must share a wall of at least 4 ft with the building');
-    }
-    // ── doors: a spanning tree from the entry room, so every room is reachable ──
-    const entry = plan.entry || {};
-    const entryRoom = rooms.find((r) => r.id === entry.room) || rooms.find((r) => r.use === 'living') || rooms[0];
-    const entrySide = ['N', 'S', 'E', 'W'].includes(entry.side) ? entry.side : 'S';
-    const doorPairs = new Set();
-    const want = Array.isArray(plan.doors) ? plan.doors : [];
-    want.forEach((d) => {
-      if (!d || !d.from || !d.to) return;
-      const hit = shared.find((s) => (s.a.id === d.from && s.b.id === d.to) || (s.a.id === d.to && s.b.id === d.from));
-      if (!hit) oops('door ' + d.from + '->' + d.to + ' joins rooms that share no wall');
-      doorPairs.add(hit.a.id + '|' + hit.b.id);
-    });
-    { // grow connectivity over the door graph until every room is walkable
-      const reach = new Set([entryRoom.id]); let grew = true;
-      while (grew) {
-        grew = false;
-        shared.forEach((s) => {
-          const k = s.a.id + '|' + s.b.id;
-          if (doorPairs.has(k) && reach.has(s.a.id) !== reach.has(s.b.id)) { reach.add(s.a.id); reach.add(s.b.id); grew = true; }
-        });
-        if (!grew && reach.size < rooms.length) {
-          const s = shared.find((t) => reach.has(t.a.id) !== reach.has(t.b.id));
-          if (!s) break;
-          doorPairs.add(s.a.id + '|' + s.b.id); grew = true;
+    return inside;
+  };
+
+  // ── GENERATORS ── each returns {bays, voids, roofField, roofLow, grade} ────
+  // A bay is {id, quad:[4 plan points], use, level}. roofField(x,y) -> z.
+  const IR_GEN = {
+    // one bar of rooms, optionally with a rear wing — the ordinary house
+    bar(m) {
+      const w = m.width, d = m.depth, n = Math.max(2, Math.min(8, m.cells | 0));
+      const cols = Math.ceil(n / (d > w * 0.7 ? 2 : 1)), rows = Math.ceil(n / cols);
+      const bays = [];
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        if (bays.length >= n) break;
+        const x0 = -w / 2 + (w / cols) * c, x1 = x0 + w / cols;
+        const y0 = -d / 2 + (d / rows) * r, y1 = y0 + d / rows;
+        bays.push({ id: 'b' + r + c, quad: [[x0, y0], [x1, y0], [x1, y1], [x0, y1]], level: 0 });
+      }
+      const zE = m.wallZ, zR = m.wallZ + m.rise;
+      const field = m.roof === 'shed'
+        ? (x, y) => zE + (y + d / 2) / d * m.rise
+        : m.roof === 'flat' ? () => zE + 0.7
+        : (x, y) => zR - Math.abs(y) / (d / 2) * m.rise;          // gable, ridge on y=0
+      return { bays, voids: [], roofField: field, roofLow: 'eave', grade: 0 };
+    },
+    // a closed inhabited annulus around a protected court — the donut
+    loop(m) {
+      const seg = Math.max(8, Math.min(24, m.segments | 0));
+      const ri = m.innerR, ro = m.outerR, bays = [];
+      for (let i = 0; i < seg; i++) {
+        const a0 = (i / seg) * Math.PI * 2, a1 = ((i + 1) / seg) * Math.PI * 2;
+        bays.push({ id: 'bay' + i, sector: [a0, a1], level: 0, quad: [
+          [Math.cos(a0) * ri, Math.sin(a0) * ri], [Math.cos(a0) * ro, Math.sin(a0) * ro],
+          [Math.cos(a1) * ro, Math.sin(a1) * ro], [Math.cos(a1) * ri, Math.sin(a1) * ri]] });
+      }
+      const court = [];
+      for (let i = 0; i < seg; i++) { const a = (i / seg) * Math.PI * 2; court.push([Math.cos(a) * ri, Math.sin(a) * ri]); }
+      const zE = m.wallZ;                                          // low at the inner ring
+      const field = (x, y) => zE + Math.min(1, Math.max(0, (Math.hypot(x, y) - ri) / Math.max(0.001, ro - ri))) * m.rise;
+      return { bays, voids: [{ id: 'court', poly: court, openToSky: true }], roofField: field, roofLow: 'inner', grade: 0 };
+    },
+    // a rectangular ring around a court — the courtyard house
+    court(m) {
+      const t = Math.max(8, Math.min(12, Math.min(m.width, m.depth) * 0.26));
+      const w = Math.max(m.width, t * 3.2), d = Math.max(m.depth, t * 3.2);
+      const hx = w / 2, hy = d / 2, ix = hx - t, iy = hy - t;
+      const R = (x0, x1, y0, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+      // four corners AND four sides: laid out as wings alone the pieces shared
+      // no full edge, so no doorway could be cut and the house was four rooms
+      // with no way between them. This ring is walkable the whole way round.
+      const bays = [
+        { id: 'sw', quad: R(-hx, -ix, -hy, -iy) }, { id: 'south', quad: R(-ix, ix, -hy, -iy) },
+        { id: 'se', quad: R(ix, hx, -hy, -iy) },   { id: 'east', quad: R(ix, hx, -iy, iy) },
+        { id: 'ne', quad: R(ix, hx, iy, hy) },     { id: 'north', quad: R(-ix, ix, iy, hy) },
+        { id: 'nw', quad: R(-hx, -ix, iy, hy) },   { id: 'west', quad: R(-hx, -ix, -iy, iy) },
+      ].map((b) => Object.assign(b, { level: 0 }));
+      const court = [[-ix, -iy], [ix, -iy], [ix, iy], [-ix, iy]];
+      const zE = m.wallZ;
+      const field = (x, y) => {                                    // low at the court, high at the outer edge
+        const dOut = Math.max(Math.abs(x) - ix, Math.abs(y) - iy);
+        return zE + Math.min(1, Math.max(0, dOut / Math.max(0.001, t))) * m.rise;
+      };
+      return { bays, voids: [{ id: 'court', poly: court, openToSky: true }], roofField: field, roofLow: 'inner', grade: 0 };
+    },
+    // stacked frustum tiers — the tower, the cone castle, the keep
+    stack(m) {
+      const tiers = Math.max(2, Math.min(5, m.tiers | 0)), seg = Math.max(6, Math.min(16, m.segments | 0));
+      const bays = [], hT = m.wallZ;
+      for (let t = 0; t < tiers; t++) {
+        const r = m.outerR * (1 - (t / tiers) * m.taper);
+        for (let i = 0; i < seg; i++) {
+          const a0 = (i / seg) * Math.PI * 2, a1 = ((i + 1) / seg) * Math.PI * 2;
+          const c = [0, 0];
+          bays.push({ id: 't' + t + 'b' + i, level: t, z0: t * hT, quad: [
+            [Math.cos(a0) * r * 0.001 + c[0], Math.sin(a0) * r * 0.001 + c[1]],
+            [Math.cos(a0) * r, Math.sin(a0) * r], [Math.cos(a1) * r, Math.sin(a1) * r],
+            [Math.cos(a1) * r * 0.001 + c[0], Math.sin(a1) * r * 0.001 + c[1]]] });
         }
       }
-    }
-    // ── walls: for each room side, exterior runs = side minus neighbours ──
-    const subtract = (a0, a1, cuts) => {
-      let segs = [[a0, a1]];
-      for (const [s, e] of cuts) {
-        const out = [];
-        for (const [p, q] of segs) {
-          if (e <= p + EPS || s >= q - EPS) { out.push([p, q]); continue; }
-          if (s > p + EPS) out.push([p, s]);
-          if (e < q - EPS) out.push([e, q]);
-        }
-        segs = out;
+      const top = tiers * hT;
+      const rTop = m.outerR * (1 - ((tiers - 1) / tiers) * m.taper);
+      const field = (x, y) => top + Math.max(0, 1 - Math.hypot(x, y) / Math.max(0.001, rTop)) * m.rise * 2.2;
+      return { bays, voids: [], roofField: field, roofLow: 'eave', grade: 0, stacked: true, tierH: hT };
+    },
+    // lofted stations along an axis — the hull, the starship, the creature
+    hull(m) {
+      const st = Math.max(3, Math.min(8, m.stations | 0)), L = m.width, bays = [];
+      const halfAt = (u) => m.depth / 2 * (0.35 + 0.65 * Math.sin(Math.PI * Math.min(1, Math.max(0, u))));
+      for (let i = 0; i < st; i++) {
+        const u0 = i / st, u1 = (i + 1) / st;
+        const x0 = -L / 2 + L * u0, x1 = -L / 2 + L * u1;
+        const h0 = halfAt(u0), h1 = halfAt(u1);
+        bays.push({ id: 's' + i, quad: [[x0, -h0], [x1, -h1], [x1, h1], [x0, h0]], level: 0 });
       }
-      return segs.filter(([p, q]) => q - p > 1.2);
+      const zE = m.wallZ;
+      const field = (x, y) => zE + Math.max(0, 1 - Math.abs(y) / Math.max(0.001, m.depth / 2)) * m.rise;
+      return { bays, voids: [], roofField: field, roofLow: 'eave', grade: 0 };
+    },
+  };
+
+  // ── LOCAL TRANSLATOR · utterance -> HouseIR, with no model in the loop ────
+  function irFromUtterance(text) {
+    const t = String(text || '').toLowerCase();
+    const has = (re) => new RegExp(re, 'i').test(t);
+    const numAfter = (re, dflt) => { const m = t.match(new RegExp('(\\d+)\\s*(?:' + re + ')')); return m ? parseInt(m[1], 10) : dflt; };
+    let topology = 'bar', analogy = 'house';
+    if (has('donut|doughnut|ring|annul|torus|circular house|round house|orbital')) { topology = 'loop'; analogy = 'donut'; }
+    else if (has('courtyard|court house|atrium|cloister|quad')) { topology = 'court'; analogy = 'courtyard'; }
+    else if (has('tower|castle|keep|turret|cone|silo|lighthouse|ziggurat|stack')) { topology = 'stack'; analogy = 'tower'; }
+    else if (has('starship|spaceship|ship|hull|pod|capsule|creature|whale|blimp|zeppelin')) { topology = 'hull'; analogy = 'hull'; }
+    const big = has('big|large|grand|great|manor|hall|lodge'), small = has('small|tiny|little|cabin|hut|cottage');
+    const S = big ? 1.35 : small ? 0.78 : 1;
+    const beds = numAfter('bed|bedroom|br', has('one bedroom|1 bedroom') ? 1 : 2);
+    const m = {
+      wallZ: 9, rise: has('flat roof') ? 0.8 : has('steep|snow|alpine') ? 7 : 4.6,
+      roof: has('shed roof|single slope|monopitch') ? 'shed' : has('flat roof') ? 'flat' : 'gable',
+      width: Math.round(34 * S), depth: Math.round(26 * S), cells: Math.max(3, Math.min(8, 2 + beds + (has('study|office') ? 1 : 0))),
+      innerR: Math.round(15 * S), outerR: Math.round(29 * S), segments: 12,
+      tiers: has('three storey|3 storey|three story|3 story') ? 3 : 2, taper: 0.34, stations: 5,
     };
-    const bbox = { x0: Math.min(...rooms.map((r) => r.x0)), x1: Math.max(...rooms.map((r) => r.x1)),
-                   y0: Math.min(...rooms.map((r) => r.y0)), y1: Math.max(...rooms.map((r) => r.y1)) };
-    let entryRunOK = false;
-    rooms.forEach((r) => {
-      const sides = [
-        { key: 'S', dir: 'x', a0: r.x0, a1: r.x1, at: r.y0, b0: r.y0, b1: r.y0 + T },
-        { key: 'N', dir: 'x', a0: r.x0, a1: r.x1, at: r.y1, b0: r.y1 - T, b1: r.y1 },
-        { key: 'W', dir: 'y', a0: r.y0, a1: r.y1, at: r.x0, b0: r.x0, b1: r.x0 + T },
-        { key: 'E', dir: 'y', a0: r.y0, a1: r.y1, at: r.x1, b0: r.x1 - T, b1: r.x1 },
-      ];
-      sides.forEach((sd) => {
-        const cuts = shared.filter((s) => s.dir === sd.dir && Math.abs(s.at - sd.at) < EPS
-          && (s.a.id === r.id || s.b.id === r.id)).map((s) => [s.lo, s.hi]);
-        subtract(sd.a0, sd.a1, cuts).forEach(([p, q]) => {
-          const ops = [];
-          const len = q - p, c = (p + q) / 2;
-          const isEntry = r.id === entryRoom.id && sd.key === entrySide && len >= 4.2 && !entryRunOK;
-          if (isEntry) { ops.push([c - 1.8, c + 1.8, 0, 7.2, 'd']); entryRunOK = true; }
-          if (len >= 7 && !isEntry) {
-            if (r.use === 'bath') ops.push([c - 1.1, c + 1.1, 4.6, 6.6]);
-            else ops.push([c - 1.7, c + 1.7, 3, 6.6]);
-          } else if (len >= 13 && isEntry) {
-            ops.push([p + 2, p + 5, 3, 6.6]);
-          }
-          A.wall(g, sd.dir, p, q, sd.b0, sd.b1, 0, wallZ, ops, M.siding);
-        });
-      });
-      A.floorSlab(g, r.x0, r.x1, r.y0, r.y1, 0);
-      const cx = (r.x0 + r.x1) / 2, cy = (r.y0 + r.y1) / 2;
-      A.roomLabel(g, r.use.toUpperCase(), cx, cy, wallZ - 1.2);
-      if (r.use === 'kitchen' && r.x1 - r.x0 >= 8) A.kitchen(g, r.x0 + 1.4, Math.min(r.x0 + 11, r.x1 - 1.4), r.y1 - T, 0);
-      if (r.use === 'bath') A.bathset(g, cx, cy, 0);
-      if (r.use === 'bed') A.bed(g, cx, cy, 0);
-      if (r.use === 'living') A.sofa(g, cx, cy - 1, 0, Math.min(7, r.x1 - r.x0 - 3));
-      if (r.use === 'dining') A.dine(g, cx, cy, 0);
+    if (topology === 'stack') { m.outerR = Math.round(20 * S); m.wallZ = 9.5; }
+    if (topology === 'hull') { m.width = Math.round(46 * S); m.depth = Math.round(20 * S); }
+    const uses = ['living', 'kitchen'];
+    for (let i = 0; i < beds; i++) uses.push('bed');
+    uses.push('bath');
+    if (has('study|office|work')) uses.push('study');
+    if (has('dining|dine')) uses.push('dining');
+    const water = topology === 'loop' || topology === 'court'
+      ? (has('rain garden|garden') ? 'rain-garden' : 'cistern') : (has('cistern|tank') ? 'cistern' : 'grade');
+    return {
+      language: 'HOUSE-WORLD-IR/1', program_id: 'LOCAL-' + topology.toUpperCase(),
+      name: (String(text || 'house').replace(/[^a-z0-9 ]/gi, '').trim().slice(0, 22).toUpperCase() || 'HOUSE'),
+      intent: { analogy, irreducible_invariants: topology === 'loop' ? ['one closed inhabited annulus', 'one protected central void']
+        : topology === 'court' ? ['one enclosing ring', 'one protected court'] : topology === 'stack' ? ['stacked tiers', 'tapering silhouette']
+        : topology === 'hull' ? ['one lofted hull'] : ['one bar of rooms'] },
+      morphology: { topology, massing: m, protected_voids: (topology === 'loop' || topology === 'court') ? ['court'] : [] },
+      spaces: uses, systems: { water_path: water, fireplace: !has('no fire') && uses.includes('living') },
+      deck: !has('no deck'),
+    };
+  }
+
+  // ── THE COMPILER · IR -> geometry, every coordinate derived here ──────────
+  function compileHouseIR(ir, kit, g) {
+    const A = kit.api, M = A.M, THREE_ = A.THREE_NS || null;
+    const oops = (s) => { throw new Error(s); };
+    if (!ir || !ir.morphology) oops('the IR has no morphology');
+    const topo = ir.morphology.topology, m = ir.morphology.massing || {};
+    const gen = IR_GEN[topo] || oops('unknown topology ' + topo);
+    ['wallZ', 'rise'].forEach((k) => { if (!Number.isFinite(m[k])) oops('massing.' + k + ' is not finite'); });
+    const G = gen(m);
+    if (!G.bays.length) oops('the generator produced no bays');
+    G.bays.forEach((b) => { b.quad = ccw(b.quad.map((p) => p.map(Number))); b.quad.forEach((p) => {
+      if (!Number.isFinite(p[0]) || !Number.isFinite(p[1])) oops('bay ' + b.id + ' has a non-finite corner'); }); });
+    const zf = (p) => { const z = G.roofField(p[0], p[1]); return Number.isFinite(z) ? z : oops('the roof field returned a non-finite height'); };
+    const T = 0.66, FLOOR = 0.55, tierH = G.tierH || 0;
+
+    // ── vertical prism over any plan polygon, built from the proven slab ───
+    const wallSeg = (a, b, z0, z1, mat) => {
+      if (ELEN(a, b) < 0.06 || z1 - z0 < 0.06) return;
+      A.slab(g, [a[0], a[1], z0], [b[0], b[1], z0], [b[0], b[1], z1], [a[0], a[1], z1], T, mat || M.siding, 3);
+    };
+    const edgeWall = (a, b, z0, z1, ops, mat) => {
+      const L = ELEN(a, b); if (L < 0.06) return;
+      const ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L, P = (s) => [a[0] + ux * s, a[1] + uy * s];
+      const hits = (ops || []).filter((o) => o[1] > o[0]).sort((p, q) => p[0] - q[0]);
+      let cur = 0;
+      for (const o of hits) {
+        const s = Math.max(0, o[0]), e = Math.min(L, o[1]); if (e <= s) continue;
+        wallSeg(P(cur), P(s), z0, z1, mat);
+        wallSeg(P(s), P(e), z0, Math.max(z0, o[2]), mat);
+        wallSeg(P(s), P(e), Math.min(z1, o[3]), z1, mat);
+        cur = e;
+      }
+      wallSeg(P(cur), P(L), z0, z1, mat);
+    };
+    const plate = (quad, z, th, mat) => A.slab(g,
+      [quad[0][0], quad[0][1], z], [quad[1][0], quad[1][1], z],
+      [quad[2][0], quad[2][1], z], [quad[3][0], quad[3][1], z], th, mat, 3);
+
+    // ── edge census: an edge in two bays is a partition, in one is envelope ─
+    const edges = new Map();
+    G.bays.forEach((b) => {
+      for (let i = 0; i < b.quad.length; i++) {
+        const a = b.quad[i], c = b.quad[(i + 1) % b.quad.length];
+        if (ELEN(a, c) < 0.06) continue;
+        const k = (b.level || 0) + '#' + EK(a, c);
+        const rec = edges.get(k) || { a, b: c, bays: [] };
+        rec.bays.push(b); edges.set(k, rec);
+      }
     });
-    if (!entryRunOK) oops('the entry (' + entryRoom.id + ' side ' + entrySide + ') is not an exterior wall — pick a side that faces out');
-    // ── partitions: each shared edge built ONCE, with a doorway when doored ──
-    shared.forEach((s) => {
-      const gap = doorPairs.has(s.a.id + '|' + s.b.id)
-        ? [[(s.lo + s.hi) / 2 - 1.7, (s.lo + s.hi) / 2 + 1.7]] : undefined;
-      A.part(g, s.dir, s.lo + 0.4, s.hi - 0.4, s.at, 0, wallZ, gap);
+    const exterior = [], interior = [];
+    edges.forEach((r) => (r.bays.length === 1 ? exterior : interior).push(r));
+    if (!exterior.length) oops('the massing has no exterior edge — nothing to enclose');
+
+    // ── program: assign uses around the bays, entry on the longest outer run ─
+    const uses = (ir.spaces && ir.spaces.length ? ir.spaces : ['living', 'kitchen', 'bed', 'bath']).slice();
+    const ground = G.bays.filter((b) => (b.level || 0) === 0);
+    ground.forEach((b, i) => { b.use = uses[i % uses.length]; });
+    G.bays.filter((b) => (b.level || 0) > 0).forEach((b, i) => { b.use = i % 3 === 0 ? 'bed' : i % 3 === 1 ? 'study' : 'hall'; });
+    // the entry: the exterior edge furthest south (smallest y), long enough for a door
+    let entryEdge = null, best = Infinity;
+    exterior.forEach((e) => {
+      if ((e.bays[0].level || 0) !== 0 || ELEN(e.a, e.b) < 4.4) return;
+      const c = [(e.a[0] + e.b[0]) / 2, (e.a[1] + e.b[1]) / 2];
+      const score = c[1] - (G.voids.length ? Math.hypot(c[0], c[1]) * 0.001 : 0);
+      if (score < best) { best = score; entryEdge = e; }
     });
-    // ── roof over the whole footprint, from the proven vertex-built builders ──
-    const roof = plan.roof || {};
-    const rise = num(roof.rise === undefined ? 4.5 : roof.rise, 0.8, 9, 'roof.rise');
-    const oh = num(roof.overhang === undefined ? 1.5 : roof.overhang, 0.5, 3, 'roof.overhang');
-    if (roof.type === 'shed' || roof.type === 'flat') {
-      A.shed(g, bbox.x0, bbox.x1, bbox.y0, bbox.y1, wallZ, wallZ + (roof.type === 'flat' ? 0.9 : rise), oh, 0);
+    if (!entryEdge) oops('no exterior wall is long enough for a front door (need 4.4 ft)');
+    const entryBay = entryEdge.bays[0];
+
+    // ── doorways: a spanning tree over bay adjacency from the entry bay ─────
+    const adj = new Map(); G.bays.forEach((b) => adj.set(b.id, []));
+    interior.forEach((e) => { if (e.bays.length === 2 && ELEN(e.a, e.b) >= 3.2) {
+      adj.get(e.bays[0].id).push({ to: e.bays[1].id, e }); adj.get(e.bays[1].id).push({ to: e.bays[0].id, e }); } });
+    const doored = new Set(), seen = new Set([entryBay.id]);
+    let queue = [entryBay.id];
+    while (queue.length) {
+      const cur = queue.shift();
+      (adj.get(cur) || []).forEach((lnk) => { if (!seen.has(lnk.to)) { seen.add(lnk.to); doored.add(lnk.e); queue.push(lnk.to); } });
+    }
+    // a spanning tree makes every room reachable, but a ring is supposed to
+    // COME BACK — close the last opening so the route is continuous
+    if (topo === 'loop' || topo === 'court')
+      interior.forEach((e) => { if (e.bays.length === 2 && ELEN(e.a, e.b) >= 3.2) doored.add(e); });
+    // stacked levels need a stair, and every level must be reachable
+    const levels = [...new Set(G.bays.map((b) => b.level || 0))].sort((p, q) => p - q);
+
+    // ── build: plates, envelope, partitions, roof, supports, water ──────────
+    let openingCount = 0, entryDone = false;
+    G.bays.forEach((b) => {
+      const z0 = (b.level || 0) * tierH;
+      plate(b.quad, z0 + FLOOR, FLOOR, M.concrete || M.masonry || M.siding);
+      const c = centroid(b.quad);
+      A.roomLabel(g, String(b.use || 'room').toUpperCase(), c[0], c[1], z0 + m.wallZ - 1.3);
+      if (b.use === 'kitchen') {
+        // the run must be inset INTO the bay from a wall it can hang on — taking
+        // two corners and subtracting the thickness pushed the cabinets through
+        // the south wall and left them touching nothing at all
+        const xs = b.quad.map((q) => q[0]), ys = b.quad.map((q) => q[1]);
+        const bx0 = Math.min.apply(null, xs), bx1 = Math.max.apply(null, xs), by1 = Math.max.apply(null, ys);
+        if (bx1 - bx0 >= 7.5) A.kitchen(g, bx0 + 1.2, Math.min(bx0 + 10.2, bx1 - 1.2), by1 - T * 0.5, z0 + FLOOR);
+      }
+      else if (b.use === 'bath') A.bathset(g, c[0], c[1], z0 + FLOOR);
+      else if (b.use === 'bed') A.bed(g, c[0], c[1], z0 + FLOOR);
+      else if (b.use === 'living') A.sofa(g, c[0], c[1], z0 + FLOOR, 6);
+      else if (b.use === 'dining') A.dine(g, c[0], c[1], z0 + FLOOR);
+    });
+    exterior.forEach((e) => {
+      const b = e.bays[0], z0 = (b.level || 0) * tierH, zHead = z0 + m.wallZ;
+      const L = ELEN(e.a, e.b), ops = [];
+      if (e === entryEdge && !entryDone) { ops.push([L / 2 - 1.8, L / 2 + 1.8, 0, 7.2, 'd']); entryDone = true; openingCount++; }
+      else if (L >= 6.5) {
+        const wLo = b.use === 'bath' ? 4.8 : 3.1, wHi = b.use === 'bath' ? 6.6 : 6.9;
+        ops.push([L / 2 - Math.min(3, L * 0.22), L / 2 + Math.min(3, L * 0.22), wLo, wHi]); openingCount++;
+      }
+      edgeWall(e.a, e.b, z0 + FLOOR, zHead, ops, M.siding);
+    });
+    interior.forEach((e) => {
+      const b = e.bays[0], z0 = (b.level || 0) * tierH, L = ELEN(e.a, e.b);
+      const ops = doored.has(e) ? [[Math.max(0.4, L / 2 - 1.7), Math.min(L - 0.4, L / 2 + 1.7), 0, 7]] : [];
+      edgeWall(e.a, e.b, z0 + FLOOR, z0 + m.wallZ, ops, M.siding);
+    });
+    // ROOF · one height field, so adjacent sectors share their seam endpoints
+    const topBays = G.stacked ? G.bays.filter((b) => (b.level || 0) === levels[levels.length - 1]) : G.bays;
+    const OH = 1.4;
+    const roofQuad = (q) => A.slab(g, [q[0][0], q[0][1], zf(q[0])], [q[1][0], q[1][1], zf(q[1])],
+      [q[2][0], q[2][1], zf(q[2])], [q[3][0], q[3][1], zf(q[3])], 0.55, M.roof, 3);
+    topBays.forEach((b) => roofQuad(b.quad));      // corners are shared, so seams are exact
+    const topLevel = levels[levels.length - 1];
+    exterior.forEach((e) => {                      // the overhang is a strip, not a scaled sector
+      if (G.stacked && (e.bays[0].level || 0) !== topLevel) return;
+      const c = centroid(e.bays[0].quad);
+      const mid = [(e.a[0] + e.b[0]) / 2, (e.a[1] + e.b[1]) / 2];
+      let nx = mid[0] - c[0], ny = mid[1] - c[1];
+      const l = Math.hypot(nx, ny) || 1; nx /= l; ny /= l;
+      const a2 = [e.a[0] + nx * OH, e.a[1] + ny * OH], b2 = [e.b[0] + nx * OH, e.b[1] + ny * OH];
+      roofQuad([e.a, e.b, b2, a2]);
+      A.slab(g, [a2[0], a2[1], zf(a2) - 0.62], [b2[0], b2[1], zf(b2) - 0.62],
+        [b2[0], b2[1], zf(b2) - 0.06], [a2[0], a2[1], zf(a2) - 0.06], 0.22, M.fascia || M.timber || M.siding, 3);
+    });
+    // SUPPORTS · a pier under every exterior corner, carried to grade
+    const piers = new Set();
+    exterior.forEach((e) => { if ((e.bays[0].level || 0) !== 0) return;
+      [e.a, e.b].forEach((p) => { const k = K2(p); if (piers.has(k)) return; piers.add(k);
+        A.pier(g, p[0], p[1], G.grade - 1.6, FLOOR, 1.15); }); });
+    // WATER · the low edge of the roof, its gutter, its fall, its destination
+    const dest = (ir.systems && ir.systems.water_path) || 'grade';
+    if (G.roofLow === 'inner' && G.voids.length) {
+      const poly = G.voids[0].poly;
+      for (let i = 0; i < poly.length; i++) {
+        const p = poly[i], q = poly[(i + 1) % poly.length];
+        wallSeg(p, q, zf(p) - 0.85, zf(p) - 0.28, M.steel || M.fascia || M.siding);   // inner gutter
+      }
+      const c0 = poly[0];
+      A.pier(g, c0[0] * 0.62, c0[1] * 0.62, G.grade, zf(c0) - 0.8, 0.5);              // downpipe
+      A.mbox && g.add(A.mbox(-3.1, 3.1, -3.1, 3.1, G.grade - 0.5, G.grade + 0.85, M.masonry || M.concrete, 2));  // rain-garden kerb, ankle high
     } else {
-      A.gable(g, bbox.x0, bbox.x1, bbox.y0, bbox.y1, wallZ, wallZ + rise, oh, 0);
+      const low = topBays.map((b) => b.quad.map((p) => [p, zf(p)])).flat().sort((a, b2) => a[1] - b2[1])[0];
+      if (low) A.pier(g, low[0][0], low[0][1], G.grade, low[1] - 0.6, 0.5);
     }
-    // ── fire keeps common company — structurally, not as an afterthought ──
-    if (plan.fireplace) {
-      const fr = rooms.find((r) => r.id === plan.fireplace);
-      if (!fr) oops('fireplace names room ' + plan.fireplace + ' which does not exist');
-      if (!['living', 'dining', 'study', 'hall'].includes(fr.use))
-        oops('the fireplace is in a ' + fr.use + ' — fire keeps common company (living, dining, study, hall)');
-      A.flue(g, (fr.x0 + fr.x1) / 2, fr.y1 - T - 0.6, 0, wallZ + rise + 2.5, 3.5);
+    // ARRIVAL · a deck at the door and a derived stair when the floor is up
+    const ec = [(entryEdge.a[0] + entryEdge.b[0]) / 2, (entryEdge.a[1] + entryEdge.b[1]) / 2];
+    const outward = (() => { const c = centroid(entryBay.quad); const dx = ec[0] - c[0], dy = ec[1] - c[1], l = Math.hypot(dx, dy) || 1; return [dx / l, dy / l]; })();
+    if (ir.deck !== false) {
+      const d0 = [ec[0] + outward[0] * 0.2, ec[1] + outward[1] * 0.2], d1 = [ec[0] + outward[0] * 7, ec[1] + outward[1] * 7];
+      const perp = [-outward[1] * 4.5, outward[0] * 4.5];
+      plate([[d0[0] + perp[0], d0[1] + perp[1]], [d1[0] + perp[0], d1[1] + perp[1]],
+             [d1[0] - perp[0], d1[1] - perp[1]], [d0[0] - perp[0], d0[1] - perp[1]]], FLOOR, 0.4, M.timber || M.siding);
+      A.pier(g, d1[0], d1[1], G.grade - 1.2, FLOOR - 0.4, 0.9);
     }
-    // ── deck at the entry, so the front door lands on something ──
-    if (plan.deck) {
-      const dp = num(plan.deck.depth === undefined ? 8 : plan.deck.depth, 4, 16, 'deck.depth');
-      const side = ['N', 'S', 'E', 'W'].includes(plan.deck.side) ? plan.deck.side : entrySide;
-      const r = entryRoom;
-      if (side === 'S') A.deck(g, r.x0, r.x1, r.y0 - dp, r.y0, 0.35, 0, false);
-      else if (side === 'N') A.deck(g, r.x0, r.x1, r.y1, r.y1 + dp, 0.35, 0, false);
-      else if (side === 'W') A.deck(g, r.x0 - dp, r.x0, r.y0, r.y1, 0.35, 0, false);
-      else A.deck(g, r.x1, r.x1 + dp, r.y0, r.y1, 0.35, 0, false);
+    if (FLOOR > 0.6) A.stairs(g, { x: ec[0], y: ec[1], zTop: FLOOR, zBot: G.grade, grade: G.grade, heading: 'S', width: 3.6 });
+    if (G.stacked && levels.length > 1) {
+      const b0 = G.bays.find((b) => (b.level || 0) === 0), c = centroid(b0.quad);
+      for (let i = 1; i < levels.length; i++)
+        A.stairs(g, { x: c[0] * 0.6, y: c[1] * 0.6, zTop: levels[i] * tierH + FLOOR, zBot: levels[i - 1] * tierH + FLOOR, grade: levels[i - 1] * tierH + FLOOR, heading: 'N', width: 3.4 });
     }
-    return { rooms: rooms.length, doors: doorPairs.size, bbox };
+    // FIRE · common company only, enforced structurally
+    if (ir.systems && ir.systems.fireplace) {
+      const fb = G.bays.find((b) => ['living', 'dining', 'study', 'hall'].includes(b.use));
+      if (fb) { const c = centroid(fb.quad); A.flue(g, c[0], c[1], G.grade, zf(c) + 2.6, 3.2); }
+    }
+    return { topology: topo, bays: G.bays.length, exterior: exterior.length, partitions: interior.length,
+      doors: doored.size, openings: openingCount, voids: G.voids, levels: levels.length,
+      entry: { at: ec, bay: entryBay.id }, roofField: G.roofField, grade: G.grade, massing: m };
+  }
+
+  // ── CERTIFICATES · measured from the built geometry, fail-closed ──────────
+  function certifyHouse(ir, g, info) {
+    const cert = {}, fail = [];
+    const put = (k, pass, detail) => { cert[k] = { pass: !!pass, detail: String(detail) }; if (!pass) fail.push(k + ': ' + detail); };
+    const meshes = []; g.traverse((o) => { if (o.isMesh && o.geometry && o.geometry.attributes.position) meshes.push(o); });
+    // FINITE
+    let nan = 0;
+    meshes.forEach((o) => { const a = o.geometry.attributes.position.array;
+      for (let i = 0; i < a.length; i++) if (!Number.isFinite(a[i])) { nan++; break; } });
+    put('FiniteCert', nan === 0 && meshes.length > 0, nan + ' meshes carry a non-finite vertex of ' + meshes.length);
+    // TOPOLOGY · a protected void must actually be EMPTY, not merely named
+    g.updateMatrixWorld(true);
+    const boxes = meshes.map((o) => new THREE.Box3().setFromObject(o));
+    let pierced = 0, probes = 0;
+    const ray = new THREE.Raycaster();
+    ray.far = 900;
+    (info.voids || []).forEach((v) => {
+      const c = centroid(v.poly);
+      for (let i = 0; i < 24; i++) {
+        const r = 0.12 + 0.46 * ((i % 4) / 4);          // the inner 58% must be open to the sky
+        const t = v.poly[i % v.poly.length];
+        const p = [c[0] + (t[0] - c[0]) * r, c[1] + (t[1] - c[1]) * r];
+        if (!ptInPoly(p, v.poly)) continue;
+        probes++;
+        ray.set(new THREE.Vector3(p[0], info.grade + 400, -p[1]), new THREE.Vector3(0, -1, 0));
+        const hit = ray.intersectObjects(meshes, false)
+          .find((h) => h.point.y > info.grade + 3);      // open TO THE SKY: a kerb or basin
+        // at grade is a ground feature; only something overhead roofs a court
+        if (hit) pierced++;
+      }
+    });
+    put('TopologyCert', pierced === 0, (info.voids || []).length + ' protected void(s), ' + probes
+      + ' sky probes, ' + pierced + ' roofed over');
+    // STRUCTURE · contact flood from grade, the same test House Depot runs
+    const TOL = 2 / 12;
+    const grown = boxes.map((b) => b.clone().expandByScalar(TOL));
+    const onGrade = new Set(); grown.forEach((b, i) => { if (b.min.y <= info.grade + 0.5) onGrade.add(i); });
+    let changed = true;
+    while (changed) { changed = false;
+      for (let i = 0; i < grown.length; i++) { if (onGrade.has(i)) continue;
+        for (const j of onGrade) if (grown[i].intersectsBox(grown[j])) { onGrade.add(i); changed = true; break; } } }
+    const floating = meshes.length - onGrade.size;
+    put('StructureCert', floating === 0, floating + ' of ' + meshes.length + ' meshes never reach grade');
+    // DWELLING · required uses present, and every bay was doored to the entry
+    const need = ['living', 'kitchen', 'bath'];
+    const have = new Set((ir.spaces || []));
+    put('DwellingCert', need.every((u) => have.has(u)), 'uses ' + [...have].join('/') + ' — needs ' + need.join('/'));
+    put('EgressCert', info.openings > 0 && info.entry, 'entry at bay ' + (info.entry && info.entry.bay));
+    put('EnvelopeCert', info.exterior > 0 && info.bays > 0, info.exterior + ' exterior runs over ' + info.bays + ' bays');
+    put('WaterCert', !!(ir.systems && ir.systems.water_path), 'low edge drains to ' + (ir.systems && ir.systems.water_path));
+    const inv = (ir.intent && ir.intent.irreducible_invariants) || [];
+    const keptVoid = !inv.some((s) => /void|court/i.test(s)) || (info.voids || []).length > 0;
+    put('NoveltyCert', keptVoid, inv.join(' · ') + ' — voids kept: ' + (info.voids || []).length);
+    return { pass: fail.length === 0, cert, fail, meshes: meshes.length };
   }
   async function generateHouse(promptText) {
     let mod;
     try { mod = await depotModule(); } catch (e) { try { notify('DEPOT UNREACHABLE — ' + e.message.slice(0, 40)); } catch (_) {} return null; }
     const kit = mod.KIT;
+    let ir = irFromUtterance(promptText);          // works with no model at all
     let cfg = null; try { cfg = getAIConfig(); } catch (_) {}
-    const usable = (() => { try { return aiLocalAvailable(cfg) || (cfg && (cfg.apiKey || cfg.key || cfg.endpoint)); } catch (_) { return false; } })();
-    if (!usable) {
-      const names = ['heart', 'rest', 'guest', 'work', 'body', 'rain', 'loft', 'porch', 'syntegration'];
-      const hit = names.findIndex((n) => new RegExp(n, 'i').test(promptText));
-      try { notify('NO MODEL CONFIGURED — SETTING THE NEAREST SPECIES'); } catch (_) {}
-      return placeDepotHouse(hit >= 0 ? hit : 1);
-    }
-    try { notify('DRAFTING A HOUSE — ' + String(promptText).slice(0, 40).toUpperCase() + '…'); } catch (_) {}
-    let lastFails = '';
-    for (let attempt = 0; attempt < 3; attempt++) {
-      let raw;
+    let usable = false; try { usable = aiLocalAvailable(cfg); } catch (_) {}
+    try { notify((usable ? 'DRAFTING — ' : 'BUILDING LOCALLY — ') + ir.morphology.topology.toUpperCase()
+      + ' · ' + String(promptText).slice(0, 30).toUpperCase()); } catch (_) {}
+    if (usable) {
       try {
-        raw = await callConfiguredLLM('Design: ' + promptText
-          + (lastFails ? '\n\nYour previous plan was rejected — fix this and return the full corrected JSON:\n' + lastFails : ''),
-          HOUSE_CONTRACT, cfg, null, 2400);
-      } catch (e) { try { notify('MODEL FAILED — ' + String(e && e.message).slice(0, 44)); } catch (_) {} return null; }
-      let txt = String(raw || '');
-      const fence = txt.match(/```(?:json)?\n([\s\S]*?)```/);
-      if (fence) txt = fence[1];
-      const a = txt.indexOf('{'), b = txt.lastIndexOf('}');
-      if (a < 0 || b <= a) { lastFails = 'no JSON object found in the reply — return the plan JSON only'; continue; }
-      let plan;
-      try { plan = JSON.parse(txt.slice(a, b + 1).replace(/,\s*([}\]])/g, '$1')); }
-      catch (e) { lastFails = 'invalid JSON: ' + e.message; continue; }
-      const g0 = new THREE.Group();
-      const before = kit.CRITIC.length;
-      kit.setCUR('GENERATED');
-      try { compileHousePlan(plan, kit, g0); }
-      catch (e) { lastFails = e.message; continue; }
-      const fails = kit.CRITIC.slice(before).filter((c) => !c.pass);
-      if (fails.length) { lastFails = fails.map((c) => c.name + ': ' + c.detail).join('\n'); continue; }
-      // the compiler is ours, but vertices don't lie — the backstop stays
-      let nanPieces = 0;
-      g0.traverse((o) => {
-        if (!o.isMesh || !o.geometry || !o.geometry.attributes.position) return;
-        const arr = o.geometry.attributes.position.array;
-        for (let i = 0; i < arr.length; i++) if (!Number.isFinite(arr[i])) { nanPieces++; break; }
-      });
-      if (nanPieces) { lastFails = nanPieces + ' pieces compiled with NaN geometry — report this plan'; continue; }
-      if (!g0.children.length) { lastFails = 'the plan compiled to nothing — add rooms'; continue; }
-      const nm = String(plan.name || promptText).replace(/[^a-z0-9 ]/gi, '').trim().slice(0, 22).toUpperCase() || 'GENERATED HOUSE';
-      const b2 = installDepotGroup(g0, nm);
-      if (b2) { try { notify(nm + ' — PLANNED, COMPILED, CHECKED, SET ON THE LAND'); } catch (_) {} }
-      return b2;
+        const raw = await callConfiguredLLM('Request: ' + promptText
+          + '\n\nThe local translation, which you may refine:\n' + JSON.stringify({
+            topology: ir.morphology.topology, massing: ir.morphology.massing, spaces: ir.spaces }),
+          IR_CONTRACT, cfg, null, 1200);
+        const txt = String(raw || ''), a = txt.indexOf('{'), b = txt.lastIndexOf('}');
+        if (a > -1 && b > a) ir = mergeIR(ir, JSON.parse(txt.slice(a, b + 1).replace(/,\s*([}\]])/g, '$1')));
+      } catch (_) { /* the local translation stands on its own */ }
     }
-    try { notify('THE PLAN KEPT FAILING ITS CHECKS — ' + lastFails.split('\n')[0].slice(0, 60)); } catch (_) {}
-    return null;
+    kit.setCUR(ir.name || 'GENERATED');
+    const g0 = new THREE.Group();
+    let info;
+    try { info = compileHouseIR(ir, kit, g0); }
+    catch (e) { try { notify('IR REJECTED — ' + String(e.message).slice(0, 52)); } catch (_) {} return null; }
+    const c = certifyHouse(ir, g0, info);
+    window.__lastHouse = { ir, info, cert: c };
+    if (!c.pass) {
+      try { notify('CERTIFICATE FAILED — ' + c.fail[0].slice(0, 54)); } catch (_) {}
+      console.warn('[house certificate]', c.cert);
+      return null;                                  // fail-closed: no half-house reaches the land
+    }
+    const b2 = installDepotGroup(g0, ir.name || 'HOUSE');
+    if (b2) { try { notify(ir.name + ' — ' + info.bays + ' BAYS, ' + c.meshes
+      + ' PARTS, EVERY CERTIFICATE PASSED'); } catch (_) {} }
+    return b2;
   }
+  window.__irFromUtterance = irFromUtterance;
+  window.__compileHouseIR = compileHouseIR;
+  window.__certifyHouse = certifyHouse;
   window.generateHouse = generateHouse;
   window.__depotModule = depotModule;
   window.__compileHousePlan = compileHousePlan;
