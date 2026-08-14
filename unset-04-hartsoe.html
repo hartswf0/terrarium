@@ -1647,6 +1647,8 @@ body.watcher-role #crosshair{display:none!important}
     <div class="std-line" data-std-surface="consolidated">
         <button id="unified-context-btn" class="std-context std-agent" type="button" style="cursor:pointer;" title="Click to cycle CHAT / AGENT / SAY">AGENT</button>
         <input type="text" id="ai-prompt-input" placeholder="summon a structure — a dragon gate, a watchtower…" autocomplete="off" spellcheck="false"/>
+        <button id="ai-img-btn" class="std-icon std-media" type="button" aria-label="add reference image" title="add a reference image"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.2"/><circle cx="9" cy="9" r="1.5"/><path d="m5.5 17 4.2-4.3 3.1 3 2.2-2.1 3.5 3.4"/></svg></button>
+        <input type="file" id="ai-img-file" accept="image/*" style="display:none">
         <button id="btn-submit-ai" class="std-send" type="button" aria-label="send"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 20 4l-5.4 16-3.2-6.1L4 11.5Z"/><path d="m11.4 13.9 4.9-5.2"/></svg></button>
         <button id="unified-mic" class="std-icon std-mic" type="button" aria-label="voice input">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -15250,7 +15252,7 @@ Reply with ONLY a JSON array of 2–8 NEW parts, each: {"kind":"one of: ${KINDS}
         if(clr) clr.addEventListener('click',()=>{ if(activeTab==='WORLD') worldImage=null; else helloImage=null; syncImgRow(); refreshAI(); });
         // the same slot the rig builder reads — a house can now be designed from
         // a photograph, a sketch or a plan, exactly as a vehicle can
-        window.__refImage = () => (activeTab === 'WORLD' ? worldImage : helloImage) || null;
+        window.__refImage = () => window.__houseRef || (activeTab === 'WORLD' ? worldImage : helloImage) || null;
         // Shared ingest for drag-drop / paste (same slots the LLM reads).
         window.__ingestRefImage = function(file){
             if(!file || !/^image\//.test(file.type)) return false;
@@ -23058,6 +23060,11 @@ resetDrive(); requestAnimationFrame(frame);
     try { mod = await depotModule(); } catch (e) { try { notify('DEPOT UNREACHABLE — ' + e.message.slice(0, 40)); } catch (_) {} return null; }
     const kit = mod.KIT;
     let ir = irFromUtterance(promptText);          // works with no model at all
+    // The local translation is the FLOOR. If the model's own design cannot be
+    // certified, we fall back to this rather than building nothing — which is
+    // what "the named shapes are the quality bar" actually has to mean.
+    const irLocal = JSON.parse(JSON.stringify(ir));
+    let usingModelPlan = false;
     let cfg = null; try { cfg = getAIConfig(); } catch (_) {}
     let usable = false; try { usable = aiLocalAvailable(cfg); } catch (_) {}
     houseStage(0, ir.morphology.topology.toUpperCase());
@@ -23100,6 +23107,7 @@ resetDrive(); requestAnimationFrame(frame);
         if (a > -1 && b > a) {
           const parsed = JSON.parse(txt.slice(a, b + 1).replace(/,\s*([}\]])/g, '$1'));
           trace.parsed = parsed;
+          if (Array.isArray(parsed.cells) && parsed.cells.length >= 2) usingModelPlan = true;
           const was = JSON.stringify({ t: ir.morphology.topology, m: ir.morphology.massing, s: ir.spaces });
           ir = mergeIR(ir, parsed);
           const now = JSON.stringify({ t: ir.morphology.topology, m: ir.morphology.massing, s: ir.spaces });
@@ -23160,13 +23168,18 @@ resetDrive(); requestAnimationFrame(frame);
       window.__lastHouse = { ir, info, cert: c, attempt };
       if (c.pass) {
         houseStage(5, Object.keys(c.cert).length + '/' + Object.keys(c.cert).length + ' CERTIFICATES');
+        // The pad is drawn from the footprint that was actually compiled — but
+        // it MUST be measured before installing, because installing reparents
+        // every child out of g and leaves an empty box behind.
+        if (seat) {
+          const bx = new THREE.Box3().setFromObject(g);
+          const rr = Math.max(bx.max.x - bx.min.x, bx.max.z - bx.min.z) / 2 + 2;
+          if (preview) { try { scene.remove(preview); } catch (_) {} }
+          preview = sitePreview(seat.at, seat.base, Number.isFinite(rr) && rr > 1 ? rr : 24, seat.FT);
+        }
         const b2 = installDepotGroup(g, ir.name || 'HOUSE', seat);
-        if (preview) setTimeout(() => { try { scene.remove(preview); } catch (_) {} }, 4200);
-        // the pad is drawn from the footprint that was actually compiled, not
-        // from a radius guessed before the plan existed — they never matched
-        if (seat) { const bx = new THREE.Box3().setFromObject(g);
-          preview = sitePreview(seat.at, seat.base,
-            Math.max(bx.max.x - bx.min.x, bx.max.z - bx.min.z) / 2 + 2, seat.FT); }
+        const pv = preview; preview = null;      // clear THIS pad, not the last one
+        if (pv) setTimeout(() => { try { scene.remove(pv); } catch (_) {} }, 4200);
         trace.built = { topology: info.topology, bays: info.bays, parts: c.meshes, attempts: attempt + 1 };
         trace.totalMs = Math.round((window.performance || Date).now() - T0);
         houseReceipt(trace);
@@ -23178,7 +23191,13 @@ resetDrive(); requestAnimationFrame(frame);
         return b2;
       }
       why = c.fail[0];
-      ir = repairIR(ir, why);
+      if (usingModelPlan) {
+        // the design came back uncertifiable — keep the request, drop the plan
+        usingModelPlan = false;
+        trace.modelPlanRejected = why;
+        ir = JSON.parse(JSON.stringify(irLocal));
+        houseStage(3, 'MODEL PLAN REFUSED — FALLING BACK TO THE LOCAL BUILD');
+      } else ir = repairIR(ir, why);
     }
     if (preview) { try { scene.remove(preview); } catch (_) {} }
     trace.totalMs = Math.round((window.performance || Date).now() - T0);
@@ -23192,6 +23211,21 @@ resetDrive(); requestAnimationFrame(frame);
   // changes the SOURCE massing — never the geometry, and never the check.
   function repairIR(ir, why) {
     const out = JSON.parse(JSON.stringify(ir)), m = out.morphology.massing, w = String(why || '');
+    // nudging numbers cannot repair a fixed set of cells — there is nothing in
+    // the massing for them to move. Grow the rooms instead, then give up on it.
+    if (out.morphology.topology === 'cells') {
+      if (/WalkCert|StructureCert/i.test(w) && Array.isArray(m.cells)) {
+        m.cells = m.cells.map((c) => {
+          const poly = Array.isArray(c) ? c : c && c.poly;
+          if (!Array.isArray(poly)) return c;
+          const cx = poly.reduce((a, q) => a + q[0] / poly.length, 0);
+          const cy = poly.reduce((a, q) => a + q[1] / poly.length, 0);
+          const grown = poly.map((q) => [cx + (q[0] - cx) * 1.18, cy + (q[1] - cy) * 1.18]);
+          return Array.isArray(c) ? grown : Object.assign({}, c, { poly: grown });
+        });
+      }
+      return out;
+    }
     if (/long enough for a front door|no exterior edge/i.test(w)) {
       m.width = Math.min(120, m.width * 1.3); m.depth = Math.min(90, m.depth * 1.3);
       m.outerR = Math.min(90, m.outerR * 1.25); m.segments = Math.max(8, Math.round(m.segments * 0.75));
@@ -23210,6 +23244,44 @@ resetDrive(); requestAnimationFrame(frame);
     }
     return out;
   }
+  // ── A REFERENCE IMAGE ON THE BUILDER BAR ─────────────────────────────────
+  // HELLO and WORLD have had one all along; the bar you actually build from
+  // did not. Same behaviour: pick a picture, it rides along with the request,
+  // click again to take it off.
+  (function wireHouseImage() {
+    const btn = document.getElementById('ai-img-btn'), file = document.getElementById('ai-img-file');
+    if (!btn || !file) return;
+    const paint = () => {
+      const on = !!window.__houseRef;
+      btn.style.borderColor = on ? '#19e6c8' : '';
+      btn.style.color = on ? '#19e6c8' : '';
+      btn.title = on ? 'reference image attached — click to remove' : 'add a reference image';
+    };
+    btn.addEventListener('click', () => {
+      if (window.__houseRef) { window.__houseRef = null; paint();
+        try { notify('REFERENCE IMAGE REMOVED'); } catch (_) {} return; }
+      file.click();
+    });
+    file.addEventListener('change', () => {
+      const f = file.files && file.files[0]; file.value = '';
+      if (!f) return;
+      if (f.size > 8 * 1024 * 1024) { try { notify('IMAGE TOO BIG — KEEP IT UNDER 8MB'); } catch (_) {} return; }
+      const r = new FileReader();
+      r.onload = () => { window.__houseRef = String(r.result); paint();
+        try { notify('REFERENCE IMAGE ATTACHED — DESCRIBE THE HOUSE AND SEND'); } catch (_) {} };
+      r.readAsDataURL(f);
+    });
+    window.addEventListener('paste', (e) => {
+      const it = e.clipboardData && [...e.clipboardData.items].find((x) => /^image\//.test(x.type));
+      if (!it) return;
+      const f = it.getAsFile(); if (!f) return;
+      const r = new FileReader();
+      r.onload = () => { window.__houseRef = String(r.result); paint();
+        try { notify('REFERENCE IMAGE PASTED'); } catch (_) {} };
+      r.readAsDataURL(f);
+    });
+    paint();
+  })();
   window.__irFromUtterance = irFromUtterance;
   window.__compileHouseIR = compileHouseIR;
   window.__certifyHouse = certifyHouse;
