@@ -53,7 +53,7 @@ FZ.table = (function () {
       '#etable{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;align-items:start}',
       '#etable .tcol{display:flex;flex-direction:column;gap:3px;padding-top:4px}',
       '#metaRow{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin-top:6px;padding-top:4px;border-top:2px solid ' + g('.28') + '}',
-      '#etable .cell,#metaRow .cell{position:relative;display:block;width:100%;min-height:42px;',
+      '#etable .cell,#metaRow .cell{position:relative;display:block;width:100%;min-height:var(--ch,42px);',
       'padding:4px 4px 6px;margin:0;text-align:left;overflow:hidden;cursor:pointer;',
       'background:' + g('.05') + ';border:1px solid ' + g('.13') + ';border-left:3px solid ' + g('.13') + ';',
       'color:' + g('.9') + ';font-family:inherit;-webkit-tap-highlight-color:transparent;',
@@ -64,15 +64,16 @@ FZ.table = (function () {
       '.cgl svg{width:15px;height:15px;display:block}',
       '#etable .cell .csy,#metaRow .cell .csy{font-size:13px;font-weight:700;letter-spacing:.02em;line-height:1;color:inherit}',
       '#etable .cell .cnm,#metaRow .cell .cnm{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;',
-      'margin-top:2px;font-size:clamp(7px,2.05vw,9px);line-height:1.16;letter-spacing:0;color:' + g('.55') + ';text-transform:uppercase}',
+      'margin-top:2px;font-size:var(--nf,8px);line-height:1.14;letter-spacing:0;color:' + g('.55') + ';text-transform:uppercase}',
+      '#tableWrap.hn .cnm{display:none}',
       '#etable .cell .fx,#metaRow .cell .fx{position:absolute;right:3px;top:3px;font-size:8px;line-height:1;color:' + g('.4') + ';font-weight:700}',
       '#etable .cell .hb,#metaRow .cell .hb{position:absolute;left:0;right:0;bottom:0;height:3px;background:' + g('.08') + '}',
       '#etable .cell .hb i,#metaRow .cell .hb i{display:block;height:100%;width:0%;background:' + g('.35') + ';transition:width .18s linear}',
       '#etable .cell .ctm,#metaRow .cell .ctm{position:absolute;right:0;top:0;width:12px;height:12px;background:' + TEAL + ';',
       'clip-path:polygon(100% 0,100% 100%,0 0);display:none}',
       '.cell.ct .ctm{display:block}',
-      '.cell.warm{border-left-color:' + AMBER + '}.cell.warm::before{opacity:.1}',
-      '.cell.warm .csy,.cell.warm .cgl{color:' + (dark ? AMBER : RED) + '}',
+      '.cell.warm{border-left-color:' + AMBER + '}.cell.warm::before{opacity:' + (dark ? '.1' : '.22') + '}',
+      dark ? '.cell.warm .csy,.cell.warm .cgl{color:' + AMBER + '}' : '',
       '.cell.warm .hb i{background:' + AMBER + '}',
       '.cell.hot{border-color:' + RED + ';border-left-color:' + RED + '}',
       '.cell.hot::before{background:' + RED + ';opacity:.16}',
@@ -292,6 +293,8 @@ FZ.table = (function () {
   }
 
   /* ------------------------------------------------------------ detail card */
+  /* The card hugs the bottom of the table region and grows upward only as far as
+     its content needs — it can never reach the field. */
   function place() {
     if (!detail) return;
     var vh = window.innerHeight;
@@ -299,12 +302,24 @@ FZ.table = (function () {
     var sb = stage ? stage.getBoundingClientRect().bottom : 0;
     var wb = wrap ? wrap.getBoundingClientRect() : null;
     var bottom = wb ? Math.max(4, vh - wb.bottom) : 4;
-    var want = wb ? wb.top : vh - bottom - 240;
-    var top = Math.min(want, vh - bottom - 236);
-    if (top < sb + 6) top = sb + 6;                 /* never cover the field */
-    if (top > vh - bottom - 120) top = Math.max(sb + 6, vh - bottom - 120);
-    detail.style.top = Math.round(top) + 'px';
+    detail.style.top = 'auto';
     detail.style.bottom = Math.round(bottom) + 'px';
+    detail.style.maxHeight = Math.round(Math.max(150, (vh - bottom) - (sb + 6))) + 'px';
+  }
+
+  /* 28 cells have to fit the room they were given, without a scrollbar if possible. */
+  function fit() {
+    if (!built || !wrap || !tbl) return;
+    var h = wrap.clientHeight;
+    if (!h) return;
+    var rows = 1;
+    for (var i = 0; i < tbl.children.length; i++) rows = Math.max(rows, tbl.children[i].children.length);
+    var slack = 26 + (rows - 1) * 3;
+    var per = Math.floor((h - slack) / (rows + 1));
+    per = Math.max(31, Math.min(48, per));
+    wrap.style.setProperty('--ch', per + 'px');
+    wrap.style.setProperty('--nf', (per >= 42 ? 8 : per >= 37 ? 7.4 : 7) + 'px');
+    wrap.classList.toggle('hn', per < 34);
   }
 
   function open(sym) {

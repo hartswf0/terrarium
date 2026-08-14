@@ -189,8 +189,8 @@ FZ.render = (function () {
   function charter(cx, cy, r, a, live) {
     ctx.save();
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.clip();
-    A(0.13 * a); ctx.fillStyle = pattern(); ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
-    A(0.05 * a); ctx.fillStyle = C.teal; ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    A(0.2 * a); ctx.fillStyle = pattern(); ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    A(0.07 * a); ctx.fillStyle = C.teal; ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
     ctx.restore();
     A(0.5 * a); ctx.strokeStyle = C.teal; ctx.lineWidth = 2;
     ctx.setLineDash(live ? [7, 5] : [4, 4]);
