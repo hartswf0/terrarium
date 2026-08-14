@@ -15248,6 +15248,9 @@ Reply with ONLY a JSON array of 2–8 NEW parts, each: {"kind":"one of: ${KINDS}
             r.readAsDataURL(f);
         });
         if(clr) clr.addEventListener('click',()=>{ if(activeTab==='WORLD') worldImage=null; else helloImage=null; syncImgRow(); refreshAI(); });
+        // the same slot the rig builder reads — a house can now be designed from
+        // a photograph, a sketch or a plan, exactly as a vehicle can
+        window.__refImage = () => (activeTab === 'WORLD' ? worldImage : helloImage) || null;
         // Shared ingest for drag-drop / paste (same slots the LLM reads).
         window.__ingestRefImage = function(file){
             if(!file || !/^image\//.test(file.type)) return false;
@@ -22521,8 +22524,10 @@ resetDrive(); requestAnimationFrame(frame);
         bays.push({ id: 'c' + r + '_' + c, level: 0,
           quad: [[x0, y0], [x0 + cell, y0], [x0 + cell, y0 + cell], [x0, y0 + cell]] });
       }
-      const zE = m.wallZ, halfD = rows * cell / 2;
-      const field = (x, y) => zE + Math.max(0, 1 - Math.abs(y) / Math.max(0.001, halfD)) * m.rise;
+      // A steep ridge over a letter reads as a row of separate gabled bars and
+      // buries the plan. The shape IS the building here, so the roof stays low.
+      const zE = m.wallZ, halfD = rows * cell / 2, fRise = Math.min(m.rise, 2.4);
+      const field = (x, y) => zE + Math.max(0, 1 - Math.abs(y) / Math.max(0.001, halfD)) * fRise;
       return { bays, voids: [], roofField: field, roofLow: 'eave', grade: 0, mask };
     },
     // lofted stations along an axis — the hull, the starship, the creature
@@ -22788,18 +22793,25 @@ resetDrive(); requestAnimationFrame(frame);
       plate(b.quad, z0 + FLOOR, FLOOR, M.concrete || M.masonry || M.siding);
       const c = centroid(b.quad);
       A.roomLabel(g, String(b.use || 'room').toUpperCase(), c[0], c[1], z0 + m.wallZ - 1.3);
+      // a room is only as furnishable as it is big — a full-size bed dropped
+      // into a five foot cell pokes straight out through the walls
+      const fxs = b.quad.map((q) => q[0]), fys = b.quad.map((q) => q[1]);
+      const bw = Math.max.apply(null, fxs) - Math.min.apply(null, fxs);
+      const bd = Math.max.apply(null, fys) - Math.min.apply(null, fys);
+      const fits = (w, d) => bw >= w + 1.6 && bd >= d + 1.6;
       if (b.use === 'kitchen') {
         // the run must be inset INTO the bay from a wall it can hang on — taking
         // two corners and subtracting the thickness pushed the cabinets through
         // the south wall and left them touching nothing at all
         const xs = b.quad.map((q) => q[0]), ys = b.quad.map((q) => q[1]);
         const bx0 = Math.min.apply(null, xs), bx1 = Math.max.apply(null, xs), by1 = Math.max.apply(null, ys);
-        if (bx1 - bx0 >= 7.5) A.kitchen(g, bx0 + 1.2, Math.min(bx0 + 10.2, bx1 - 1.2), by1 - T * 0.5, z0 + FLOOR);
+        if (bx1 - bx0 >= 7.5 && bd >= 7) A.kitchen(g, bx0 + 1.2, Math.min(bx0 + 10.2, bx1 - 1.2), by1 - T * 0.5, z0 + FLOOR);
       }
-      else if (b.use === 'bath') A.bathset(g, c[0], c[1], z0 + FLOOR);
-      else if (b.use === 'bed') A.bed(g, c[0], c[1], z0 + FLOOR);
-      else if (b.use === 'living') A.sofa(g, c[0], c[1], z0 + FLOOR, 6);
-      else if (b.use === 'dining') A.dine(g, c[0], c[1], z0 + FLOOR);
+      else if (b.use === 'bath' && fits(5.5, 5.5)) A.bathset(g, c[0], c[1], z0 + FLOOR);
+      else if (b.use === 'bed' && fits(5, 6.6))
+        A.bed(g, c[0], c[1], z0 + FLOOR, Math.min(6.2, bw - 2.2), Math.min(6.8, bd - 2.2));
+      else if (b.use === 'living' && fits(5.5, 4)) A.sofa(g, c[0], c[1], z0 + FLOOR, Math.min(7, bw - 2.4));
+      else if (b.use === 'dining' && fits(8, 8)) A.dine(g, c[0], c[1], z0 + FLOOR);
     });
     // THE WALL HEAD FOLLOWS THE ROOF IT CARRIES. A flat head leaves a gap
     // everywhere the roof field rises above the storey — the roof then floats,
@@ -23065,14 +23077,20 @@ resetDrive(); requestAnimationFrame(frame);
     window.__houseTrace = trace;
     if (usable) {
       houseStage(1, (cfg && cfg.model) || 'model');
-      const userMsg = 'Request: ' + promptText
+      let refImg = null; try { refImg = window.__refImage && window.__refImage(); } catch (_) {}
+      trace.referenceImage = !!refImg;
+      const userMsg = (refImg ? 'A REFERENCE IMAGE IS ATTACHED. Read its massing — the silhouette, how many\n'
+        + 'volumes it has, how they meet, the roof shape, where it opens — and lay the plan\n'
+        + 'out in cells so the built house RESEMBLES it from the same angle. Keep it a\n'
+        + 'house: rooms of real size, a way in, and every room reachable.\n\n' : '')
+        + 'Request: ' + promptText
         + '\n\nThe local translation, which you may refine:\n' + JSON.stringify({
           topology: ir.morphology.topology, massing: ir.morphology.massing, spaces: ir.spaces });
       trace.sent = { system: IR_CONTRACT, user: userMsg,
         systemChars: IR_CONTRACT.length, userChars: userMsg.length };
       const tCall = (window.performance || Date).now();
       try {
-        const raw = await callConfiguredLLM(userMsg, IR_CONTRACT, cfg, null, 6000);
+        const raw = await callConfiguredLLM(userMsg, IR_CONTRACT, cfg, refImg, 6000);
         trace.apiCalled = true;
         trace.latencyMs = Math.round((window.performance || Date).now() - tCall);
         trace.reply = String(raw || '');
@@ -23124,8 +23142,8 @@ resetDrive(); requestAnimationFrame(frame);
         const y = gYw(at.x + (i / 4) * Rft * FT, at.z + (j / 4) * Rft * FT);
         if (Number.isFinite(y)) relief = Math.max(relief, (base - y) / FT);
       }
-      preview = sitePreview(at, base, Rft, FT);
-      houseStage(2, Math.round(Rft * 2) + ' FT ACROSS · ' + Math.round(relief) + ' FT OF FALL');
+      seat.relief = relief; seat.FT = FT;
+      houseStage(2, Math.round(relief) + ' FT OF FALL ACROSS THE SITE');
     } else {
       houseStage(2, 'NO LAND — FLAT DATUM');
     }
@@ -23144,6 +23162,11 @@ resetDrive(); requestAnimationFrame(frame);
         houseStage(5, Object.keys(c.cert).length + '/' + Object.keys(c.cert).length + ' CERTIFICATES');
         const b2 = installDepotGroup(g, ir.name || 'HOUSE', seat);
         if (preview) setTimeout(() => { try { scene.remove(preview); } catch (_) {} }, 4200);
+        // the pad is drawn from the footprint that was actually compiled, not
+        // from a radius guessed before the plan existed — they never matched
+        if (seat) { const bx = new THREE.Box3().setFromObject(g);
+          preview = sitePreview(seat.at, seat.base,
+            Math.max(bx.max.x - bx.min.x, bx.max.z - bx.min.z) / 2 + 2, seat.FT); }
         trace.built = { topology: info.topology, bays: info.bays, parts: c.meshes, attempts: attempt + 1 };
         trace.totalMs = Math.round((window.performance || Date).now() - T0);
         houseReceipt(trace);
