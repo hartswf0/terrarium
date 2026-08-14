@@ -17,7 +17,7 @@ FZ.table = (function () {
   var AMBER = '#ffd23f', RED = '#ff2e2e', TEAL = '#19e6c8';
 
   var api = null;
-  var built = false, pending = true;
+  var built = false;
   var wrap = null, tbl = null, metaRow = null, detail = null;
   var cells = new Map();          // sym -> {el, node, sy, nm, hb, fx, state, heat, ct, live, known}
   var known = new Set();          // cumulative: once taught, always readable
@@ -69,7 +69,7 @@ FZ.table = (function () {
       'margin-top:1px;font-size:var(--nf,8px);line-height:1.1;letter-spacing:0;color:' + g('.55') + ';text-transform:uppercase}',
       '#tableWrap.hn .fzc .cnm{display:none}',
       '#tableWrap.l1 .fzc .cnm{-webkit-line-clamp:1}',
-      'W .fzc .fx{position:absolute;right:3px;top:3px;font-size:8px;line-height:1;color:' + g('.4') + ';font-weight:700}',
+      'W .fzc .fx{position:absolute;right:14px;top:3px;font-size:8px;line-height:1;color:' + g('.4') + ';font-weight:700}',
       'W .fzc .hb{position:absolute;left:0;right:0;bottom:0;height:3px;background:' + g('.08') + '}',
       'W .fzc .hb i{display:block;height:100%;width:0%;background:' + g('.35') + ';transition:width .18s linear}',
       'W .fzc .ctm{position:absolute;right:0;top:0;width:12px;height:12px;background:' + TEAL + ';',
@@ -81,6 +81,13 @@ FZ.table = (function () {
       'W .fzc.hot{border-color:' + RED + '}',
       'W .fzc.hot::before{background:' + RED + ';opacity:' + (dark ? '.18' : '.14') + '}',
       'W .fzc.hot .csy,W .fzc.hot .cgl{color:' + RED + '}W .fzc.hot .hb i{background:' + RED + '}',
+      /* an outbreak of this element is burning on the field right now */
+      '@keyframes fzburn{0%{border-color:' + RED + '}50%{border-color:' + g('.15') + '}100%{border-color:' + RED + '}}',
+      'W .fzc.brn{border-color:' + RED + ';animation:fzburn .8s linear infinite}',
+      'W .fzc.brn::before{background:' + RED + ';opacity:' + (dark ? '.26' : '.2') + '}',
+      'W .fzc.brn .csy,W .fzc.brn .cgl{color:' + RED + '}',
+      /* one the player has personally diagnosed and answered */
+      'W .fzc.mast{border-top:3px solid ' + TEAL + '}',
       'W .fzc.dorm{opacity:.6}',
       'W .fzc.lk{border-style:dashed;background:none}',
       'W .fzc.lk .csy,W .fzc.lk .cnm,W .fzc.lk .fx,W .fzc.lk .hb{visibility:hidden}',
@@ -109,6 +116,8 @@ FZ.table = (function () {
       '#detail .dtM{width:14px;height:14px;flex:0 0 14px;margin-top:1px}',
       '#detail .dtM svg{width:14px;height:14px;display:block}',
       '#detail .dtT{font-size:10.5px;line-height:1.3;color:' + g('.72') + '}',
+      '#detail .dtChip{display:inline-block;padding:1px 4px;margin-right:5px;border:1px solid ' + TEAL + ';',
+      'color:' + g('.95') + ';font-size:9px;font-weight:700;letter-spacing:.1em;vertical-align:1px}',
       '#detail .dtH{display:flex;align-items:center;gap:6px;margin-top:9px}',
       '#detail .dtHb{flex:1 1 auto;height:6px;background:' + g('.1') + ';display:block}',
       '#detail .dtHb i{display:block;height:100%;width:0%;background:' + g('.35') + ';transition:width .2s linear}',
@@ -155,13 +164,17 @@ FZ.table = (function () {
 
   function flashNo(b) { b.classList.remove('no'); void b.offsetWidth; b.classList.add('no'); }
 
+  function plainOf(e) {
+    return e.plain || ((FZ.copy && FZ.copy.fire) ? (FZ.copy.fire[e.sym] || '') : '');
+  }
+
   function build() {
     if (built) return;
-    if (!window.FZ || !FZ.EL || !FZ.EL.length) { pending = true; return; }
+    if (!window.FZ || !FZ.EL || !FZ.EL.length) return;
     wrap = document.getElementById('tableWrap');
     tbl = document.getElementById('etable');
     detail = document.getElementById('detail');
-    if (!tbl) { pending = true; return; }
+    if (!tbl) return;
 
     var st = document.getElementById('fzTableCSS') || el('style');
     st.id = 'fzTableCSS';
@@ -198,7 +211,7 @@ FZ.table = (function () {
         '<div class="dtP"></div>' +
         '<div class="dtR"><span class="dtM">' + MK.trig + '</span><span class="dtT" data-k="trigger"></span></div>' +
         '<div class="dtR"><span class="dtM">' + MK.eff + '</span><span class="dtT" data-k="effect"></span></div>' +
-        '<div class="dtR"><span class="dtM">' + MK.cnt + '</span><span class="dtT" data-k="counter"></span></div>' +
+        '<div class="dtR"><span class="dtM">' + MK.cnt + '</span><span class="dtT" data-k="counter"><b class="dtChip"></b><span class="dtCt"></span></span></div>' +
         '<div class="dtH"><span class="dtHb"><i></i></span><span class="dtF"></span></div>';
       var x = el('button', 'dtX');
       x.type = 'button';
@@ -220,9 +233,13 @@ FZ.table = (function () {
     document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && openSym) api.close(); });
     window.addEventListener('resize', function () { fitH = -1; fit(); if (openSym) place(); });
 
-    if (FZ.bus) FZ.bus.on('fire', function (d) { if (d && d.sym) pulse(d.sym); });
+    if (FZ.bus) {
+      FZ.bus.on('fire', function (d) { if (d && d.sym) pulse(d.sym); });
+      FZ.bus.on('outbreak:open', function (d) { if (d && d.sym) pulse(d.sym); });
+      FZ.bus.on('outbreak:answered', function (d) { if (d && d.sym) pulse(d.sym); });
+    }
 
-    built = true; pending = false;
+    built = true;
     setEnabled(live);
     fit();
   }
@@ -240,7 +257,7 @@ FZ.table = (function () {
       if (typeof set.forEach === 'function') set.forEach(function (s) { live.add(s); });
       else if (Array.isArray(set)) set.forEach(function (s) { live.add(s); });
     }
-    if (!built) { pending = true; return; }
+    if (!built) return;
     cells.forEach(function (c, sym) {
       var isLive = live.has(sym);
       var fresh = isLive && !known.has(sym);
@@ -259,6 +276,17 @@ FZ.table = (function () {
     if (!built) { build(); if (!built) return; }
     var t = performance.now();
     if (t - fitT > 500) { fitT = t; if (wrap && wrap.clientHeight !== fitH) { fitH = wrap.clientHeight; fit(); } }
+
+    /* which cells are the player's live problem, and which has she already answered */
+    var burn = null, ob = (window.FZ && FZ.outbreak) ? FZ.outbreak : null;
+    if (ob && ob.list && ob.list.length) {
+      burn = new Set();
+      for (var b = 0; b < ob.list.length; b++) {
+        var o = ob.list[b];
+        if (o && o.sym && (!o.state || o.state === 'burning')) burn.add(o.sym);
+      }
+    }
+    var mast = ob ? ob.mastery : null;
     cells.forEach(function (c) {
       var e = c.e;
       var h = typeof e.heat === 'number' ? e.heat : 0;
@@ -277,6 +305,11 @@ FZ.table = (function () {
       if (ct !== c.ct) { c.n.classList.toggle('ct', ct); c.ct = ct; }
       var f = e.fires || 0;
       if (f !== c.fv) { c.fx.textContent = (f && !c.lk) ? (f > 99 ? '99' : String(f)) : ''; c.fv = f; }
+
+      var bn = !!(burn && burn.has(e.sym));
+      if (bn !== c.bn) { c.n.classList.toggle('brn', bn); c.bn = bn; }
+      var ms = !!(mast && mast[e.sym] && mast[e.sym].answered > 0) && !c.lk;
+      if (ms !== c.ms) { c.n.classList.toggle('mast', ms); c.ms = ms; }
     });
     if (openSym && t - lastPaint > 120) { lastPaint = t; liveBits(); }
   }
@@ -341,13 +374,23 @@ FZ.table = (function () {
     var s = detail.querySelector('.dtS'); if (s) s.textContent = e.sym || '';
     var n = detail.querySelector('.dtN'); if (n) n.textContent = e.nm || '';
     var p = detail.querySelector('.dtP');
-    if (p) p.textContent = e.plain || ((FZ.copy && FZ.copy.fire) ? (FZ.copy.fire[sym] || '') : '');
+    if (p) p.textContent = plainOf(e);
     var rows = detail.querySelectorAll('.dtT');
     for (var i = 0; i < rows.length; i++) {
       var k = rows[i].getAttribute('data-k');
-      rows[i].textContent = e[k] || '';
-      rows[i].parentNode.style.display = e[k] ? '' : 'none';
+      if (k === 'counter') continue;
+      var v = e[k] || '';
+      if (v === plainOf(e)) v = '';           /* never say the same sentence twice */
+      rows[i].textContent = v;
+      rows[i].parentNode.style.display = v ? '' : 'none';
     }
+    /* the counter row names the institution that answers this cell, by its tool label */
+    var tk = e.counterTool, tool = (tk && FZ.copy && FZ.copy.tools) ? FZ.copy.tools[tk] : null;
+    var chip = detail.querySelector('.dtChip'), ctx2 = detail.querySelector('.dtCt');
+    if (chip) { chip.textContent = tool ? (tool.label || '') : ''; chip.style.display = tool ? '' : 'none'; }
+    if (ctx2) ctx2.textContent = e.counter || (tool ? tool.blurb || '' : '');
+    var crow = chip ? chip.closest('.dtR') : null;
+    if (crow) crow.style.display = (tool || e.counter) ? '' : 'none';
     detail.classList.add('on');
     place();
     liveBits();

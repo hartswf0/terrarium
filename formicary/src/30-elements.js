@@ -260,7 +260,7 @@ fzElDef({
 
 fzElDef({
   sym: 'Cl', nm: 'Claim livelock', col: 1, row: 4, chapter: 7, counterTool: 'charter',
-  glyph: fzG('<circle cx="4" cy="10" r="2"/><circle cx="16" cy="10" r="2"/><path d="M6 7.5c3-3 5-3 8 0"/><path d="M14 12.5c-3 3-5 3-8 0"/><path d="M12 4.5l2.5 2.5-2.5 1.5"/><path d="M8 15.5l-2.5-2.5 2.5-1.5"/>'),
+  glyph: fzG('<rect x="8" y="8" width="4" height="4"/><path d="M3 5h13"/><path d="M13 2.5L16.5 5 13 7.5"/><path d="M17 15H4"/><path d="M7 12.5L3.5 15 7 17.5"/>'),
   /* CONSEQUENCE: cancels both claims and stuns both workers — the whole exchange was burned time. */
   detect(S, api) {
     const G = S._g; let hot = 0, who = null, at = null;
@@ -284,9 +284,10 @@ fzElDef({
   /* CONSEQUENCE: freezes discovery — no worker learns about any new job while this is lit. */
   detect(S, api) {
     const G = S._g;
-    if (G.n < 4 || G.targetTopN / G.n < 0.7) { S.imRun = 0; return; }
+    /* the colony's attention has collapsed onto one square while three or more sit open */
+    if (G.open.length < 3 || G.claimTotal < 4 || G.targetTopN / G.claimTotal < 0.6) { S.imRun = 0; return; }
     S.imRun++;
-    if (S.imRun < 40) return;
+    if (S.imRun < 30) return;
     S.exploreBlock = S.tick + 110;
     const j = api.jobById(G.targetTop);
     api.heat(0.05, { at: j ? { x: j.x, y: j.y } : { x: G.cx, y: G.cy }, who: G.targetTopIds, say: FZ.copy.fire.Im });
@@ -587,7 +588,7 @@ fzElDef({
 
 fzElDef({
   sym: 'Mm', nm: 'Missing mental models', col: 4, row: 3, chapter: 6, counterTool: 'lens',
-  glyph: fzG('<circle cx="5" cy="15" r="2.4"/><path d="M7.5 12.5l1.5-1.5"/><rect x="9" y="2" width="9" height="8" stroke-dasharray="2 2"/>'),
+  glyph: fzG('<circle cx="4.5" cy="15.5" r="2.6"/><path d="M7 13.5l2 -2"/><rect x="8.5" y="2" width="10" height="9" stroke-dasharray="2 2"/>'),
   /* CONSEQUENCE: sets S.blind — workers pick jobs without seeing existing claims, manufacturing collisions. */
   detect(S, api) {
     const G = S._g;

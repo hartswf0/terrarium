@@ -73,6 +73,13 @@ FZ.render = (function () {
     i = ((i % LINEAGE.length) + LINEAGE.length) % LINEAGE.length;
     return LINEAGE[i];
   }
+  /* The field only shouts about failures this chapter has taught. Chapter one has
+     to look calm even when two workers happen to share a job. */
+  function taught(sym) {
+    var e = (window.FZ && FZ.sim) ? FZ.sim.enabled : null;
+    if (!e || typeof e.has !== 'function') return true;
+    return e.has(sym);
+  }
   function idsOf(v) {
     if (!v) return [];
     if (Array.isArray(v)) return v;
@@ -119,12 +126,47 @@ FZ.render = (function () {
     for (var i = 0; i < FZ.EL.length; i++) { glyph(FZ.EL[i].sym, C.red); glyph(FZ.EL[i].sym, C.white); }
   }
 
+  /* A named tag: the element's own mark plus its two letters, on a hard plate.
+     Fires and outbreaks share it, so the flash and the thing it leaves behind
+     are visibly the same object. */
+  function tag(sym, cx, cy, col, al) {
+    ctx.font = '700 14px "IBM Plex Mono",ui-monospace,monospace';
+    var tw = ctx.measureText(sym || '').width;
+    var bw = 26 + tw + 11, bh = 26;
+    var bx = Math.max(3, Math.min(W - bw - 3, cx - bw / 2));
+    var by = Math.max(3, Math.min(H - bh - 3, cy - bh / 2));
+    A(al); ctx.fillStyle = C.black; ctx.fillRect(bx, by, bw, bh);
+    A(al); ctx.strokeStyle = col; ctx.lineWidth = 2.5;
+    ctx.strokeRect(bx + 1.25, by + 1.25, bw - 2.5, bh - 2.5);
+    markAt(sym, bx + 14, by + bh / 2, 17, col, al);
+    A(al); ctx.fillStyle = col;
+    ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+    ctx.fillText(sym || '', bx + 25, by + bh / 2 + 1);
+    return { x: bx, y: by, w: bw, h: bh };
+  }
+
   /* ------------------------------------------------------------------ beats */
-  function push(b) { b.t = now || performance.now(); beats.push(b); if (beats.length > 12) beats.splice(0, beats.length - 12); }
+  function push(b) {
+    b.t = now || performance.now();
+    if (b.k === 'fire') {
+      /* one element, one tag: a re-fire moves the mark, it does not stack a second one */
+      var fi = [];
+      for (var i = beats.length - 1; i >= 0; i--) {
+        if (beats[i].k !== 'fire') continue;
+        if (beats[i].sym === b.sym) beats.splice(i, 1); else fi.unshift(i);
+      }
+      /* and never let more than three named failures shout at once */
+      for (var k = 0; k <= fi.length - 3; k++) beats.splice(fi[k] - k, 1);
+    }
+    beats.push(b);
+    if (beats.length > 12) beats.splice(0, beats.length - 12);
+  }
 
   function ticker(text) {
     var el = document.getElementById('ticker');
-    if (!el || !text) return;
+    if (!el || text === undefined || text === null) return;
+    if (text === tickMine) { tickAt = performance.now(); return; }
+    if (!text) { if (el.textContent === tickMine) { el.textContent = ''; el.removeAttribute('data-tone'); } tickMine = ''; return; }
     el.textContent = text;
     el.setAttribute('data-tone', 'bad');
     el.classList.remove('tkin');
@@ -132,6 +174,21 @@ FZ.render = (function () {
     el.classList.add('tkin');
     tickMine = text; tickAt = performance.now();
   }
+  /* While something is burning, the readout says THAT — the sentence the player is
+     being asked to answer, not whatever fired most recently. */
+  function tickerHold(S) {
+    var O = live();
+    if (!O) return;
+    var best = null, bl = 2;
+    for (var i = 0; i < O.length; i++) {
+      var o = O[i];
+      if (!o || (o.state && o.state !== 'burning')) continue;
+      var l = o.fuse ? 1 - ((S.tick || 0) - (o.born || 0)) / o.fuse : 1;
+      if (l < bl) { bl = l; best = o; }
+    }
+    if (best) ticker(best.say || ((FZ.copy && FZ.copy.fire) ? FZ.copy.fire[best.sym] : '') || '');
+  }
+
   function tickerAge() {
     if (!tickMine) return;
     if (now - tickAt < 4200) return;
@@ -150,7 +207,12 @@ FZ.render = (function () {
       ticker(d.say || '');
     });
     FZ.bus.on('job:done', function (d) { if (d) push({ k: 'done', x: d.x, y: d.y, v: d.value || 1, life: 780 }); });
-    FZ.bus.on('job:lost', function (d) { if (d) push({ k: 'lost', x: d.x, y: d.y, life: 950 }); });
+    FZ.bus.on('job:lost', function (d) {
+      if (!d) return;
+      var n = 0;                       /* a wave of rollbacks must not bury the field */
+      for (var i = beats.length - 1; i >= 0; i--) if (beats[i].k === 'lost' && ++n > 3) { beats.splice(i, 1); }
+      push({ k: 'lost', x: d.x, y: d.y, life: 780 });
+    });
     FZ.bus.on('agent:hurt', function (d) {
       if (!d) return;
       push({ k: 'hurt', x: d.x, y: d.y, life: 520 });
@@ -159,6 +221,18 @@ FZ.render = (function () {
     FZ.bus.on('intervene', function (d) {
       if (!d || d.x === undefined || d.x === null) return;
       push({ k: 'act', x: d.x, y: d.y, ok: !!d.ok, life: 620 });
+    });
+    /* the outbreak loop: opening, closing, and the mark a miss leaves behind */
+    FZ.bus.on('outbreak:open', function (d) { if (d) push({ k: 'open', sym: d.sym, x: d.x, y: d.y, life: 620 }); });
+    FZ.bus.on('outbreak:answered', function (d) {
+      if (!d) return;
+      push({ k: 'shut', sym: d.sym, x: d.x, y: d.y, r: d.r || 60, life: 900 });
+      ticker('');
+    });
+    FZ.bus.on('outbreak:landed', function (d) {
+      if (!d) return;
+      push({ k: 'land', sym: d.sym, x: d.x, y: d.y, r: d.r || 60, life: 1000 });
+      push({ k: 'scar', x: d.x, y: d.y, life: 14000 });
     });
   }
 
@@ -176,11 +250,16 @@ FZ.render = (function () {
   }
 
   function grid() {
-    A(0.05); ctx.strokeStyle = C.white; ctx.lineWidth = 1;
+    var g = Math.max(38, Math.round(Math.min(W, H) / 6));
+    A(0.042); ctx.strokeStyle = C.white; ctx.lineWidth = 1;
     ctx.beginPath();
-    for (var x = 40; x < W; x += 40) { ctx.moveTo(Math.round(x) + 0.5, 0); ctx.lineTo(Math.round(x) + 0.5, H); }
-    for (var y = 40; y < H; y += 40) { ctx.moveTo(0, Math.round(y) + 0.5); ctx.lineTo(W, Math.round(y) + 0.5); }
+    for (var x = g; x < W; x += g) { ctx.moveTo(Math.round(x) + 0.5, 0); ctx.lineTo(Math.round(x) + 0.5, H); }
+    for (var y = g; y < H; y += g) { ctx.moveTo(0, Math.round(y) + 0.5); ctx.lineTo(W, Math.round(y) + 0.5); }
     ctx.stroke();
+  }
+  /* one mark size for the whole field, so a tall phone field is not a wall of specks */
+  function zoom() {
+    return Math.max(0.9, Math.min(1.5, Math.sqrt((W * H) / (360 * 300))));
   }
 
   /* ---------------------------------------------------------------- charter
@@ -206,10 +285,73 @@ FZ.render = (function () {
     }
   }
 
+  /* --------------------------------------------------------------- outbreaks
+     The core loop, drawn: a bounded place, a clock you can see run out, and the
+     name of the thing you are being asked to answer. Pass 2 draws the tags so
+     they sit above every body on the field. */
+  function live() {
+    var o = (window.FZ && FZ.outbreak && FZ.outbreak.list) ? FZ.outbreak.list : null;
+    return (o && o.length) ? o : null;
+  }
+
+  function outbreaks(S, pass) {
+    var O = live();
+    if (!O) return;
+    for (var i = 0; i < O.length; i++) {
+      var o = O[i];
+      if (!o || (o.state && o.state !== 'burning')) continue;
+      var x = X(o.x), y = Y(o.y), r = Math.max(26, (o.r || 60) * sx);
+      var fuse = o.fuse || 1;
+      var left = Math.max(0, Math.min(1, 1 - ((S.tick || 0) - (o.born || 0)) / fuse));
+      var urgent = left < 0.34;
+      var blink = urgent ? 0.55 + Math.abs(Math.sin(now * 0.012)) * 0.45 : 1;
+
+      if (pass === 1) {
+        /* the ground it covers */
+        A(0.055 * blink); ctx.fillStyle = C.red;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+        /* its boundary */
+        A(0.42 * blink); ctx.strokeStyle = C.red; ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]); ctx.lineDashOffset = -now * 0.012;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.stroke();
+        ctx.setLineDash([]); ctx.lineDashOffset = 0;
+        /* the fuse: a clock you read by looking, not by counting */
+        A(0.16); ctx.strokeStyle = C.white; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.arc(x, y, r - 4, 0, TAU); ctx.stroke();
+        if (left > 0) {
+          A(0.98 * blink); ctx.strokeStyle = C.red; ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.arc(x, y, r - 4, -Math.PI / 2, -Math.PI / 2 + left * TAU);
+          ctx.stroke();
+          var ha = -Math.PI / 2 + left * TAU;
+          A(blink); ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(x + Math.cos(ha) * (r - 10), y + Math.sin(ha) * (r - 10));
+          ctx.lineTo(x + Math.cos(ha) * (r + 2), y + Math.sin(ha) * (r + 2));
+          ctx.stroke();
+        }
+        /* it is doing damage the whole time it burns */
+        var pr = (now * 0.05) % 60;
+        A((1 - pr / 60) * 0.28 * blink);
+        ctx.strokeStyle = C.red; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(x, y, r - pr * (r / 60), 0, TAU); ctx.stroke();
+      } else {
+        var ty = y - r - 18;
+        if (ty < 16) ty = y + r + 18;
+        tag(o.sym, x, ty, C.red, blink);
+        A(0.5 * blink); ctx.strokeStyle = C.red; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, ty < y ? ty + 13 : ty - 13);
+        ctx.lineTo(x, ty < y ? y - r : y + r);
+        ctx.stroke();
+      }
+    }
+  }
+
   /* ------------------------------------------------------------------- jobs */
   function jobSide(j) {
     var v = typeof j.value === 'number' ? j.value : 1;
-    return Math.max(16, Math.min(34, 14 + v * 3.6));
+    return Math.max(16, Math.min(34, 14 + v * 3.6)) * zoom();
   }
 
   function drawJob(j, dim, S) {
@@ -217,10 +359,11 @@ FZ.render = (function () {
     var need = j.need || 1;
     var p = Math.max(0, Math.min(1, (j.progress || 0) / need));
     var blocked = j.prereq !== undefined && j.prereq !== null && j.prereq !== false && !prereqMet(j, S);
-    var a = dim * (blocked ? 0.62 : 1);
+    var a = dim * (blocked ? 0.78 : 1);
 
-    /* plate */
-    A(0.9 * a); ctx.fillStyle = C.black; ctx.fillRect(x - h, y - h, s, s);
+    /* plate: an unstarted job still has to read as an object, not an outline */
+    A(0.95 * a); ctx.fillStyle = C.black; ctx.fillRect(x - h, y - h, s, s);
+    A(0.1 * a); ctx.fillStyle = C.white; ctx.fillRect(x - h, y - h, s, s);
 
     /* progress — bold, bottom-up, unmistakable at arm's length */
     if (p > 0) {
@@ -239,8 +382,8 @@ FZ.render = (function () {
       ctx.fill();
     }
 
-    var contested = j.claims && (j.claims.size || j.claims.length || 0) > 1;
-    box(x, y, s, contested ? C.red : C.white, contested ? 2 : 1.5, (contested ? 0.95 : 0.6) * a);
+    var contested = j.claims && (j.claims.size || j.claims.length || 0) > 1 && taught('Co');
+    box(x, y, s, contested ? C.red : C.white, contested ? 2.5 : 2, (contested ? 0.98 : 0.85) * a);
 
     /* contested: two heads pointing in from opposite sides */
     if (contested) {
@@ -257,7 +400,7 @@ FZ.render = (function () {
       ctx.stroke();
     }
     /* locked: a bar across it, held by nobody working */
-    if (j.locked) {
+    if (j.locked && taught('Lo')) {
       A(0.95 * a); ctx.fillStyle = C.amber;
       ctx.fillRect(x - h - 3, y - 2.5, s + 6, 5);
       ctx.fillRect(x - 2.5, y - h - 4, 5, 5);
@@ -284,6 +427,7 @@ FZ.render = (function () {
     for (var i = 0; i < jobs.length; i++) {
       var j = jobs[i];
       if (j.prereq === undefined || j.prereq === null || j.prereq === false) continue;
+      if (!taught('Dp')) continue;
       var pj = jobIx.get(j.prereq);
       if (!pj) continue;
       var done = (pj.progress || 0) >= (pj.need || 1);
@@ -309,11 +453,14 @@ FZ.render = (function () {
     var stunned = (a.stun || 0) > 0;
     var idle = a.job === null || a.job === undefined || a.job === false;
 
+    /* a hard black halo so a pile of workers on one job stays countable */
+    disc(x, y, r + 1.7, C.black, 1);
+
     if (stunned) {
       /* struck: hollow, red-slashed, visibly out of the economy */
-      disc(x, y, r, col, 0.22 * dim);
-      ring(x, y, r, col, 1.5, 0.5 * dim);
-      A(0.95 * dim); ctx.strokeStyle = C.red; ctx.lineWidth = 2;
+      disc(x, y, r, col, 0.18 * dim);
+      ring(x, y, r, col, 1.2, 0.42 * dim);
+      A(0.7 * dim); ctx.strokeStyle = C.red; ctx.lineWidth = 1.6;
       ctx.beginPath();
       ctx.moveTo(x - r * 0.8, y - r * 0.8); ctx.lineTo(x + r * 0.8, y + r * 0.8);
       ctx.moveTo(x + r * 0.8, y - r * 0.8); ctx.lineTo(x - r * 0.8, y + r * 0.8);
@@ -328,8 +475,20 @@ FZ.render = (function () {
       A(0.9 * dim); ctx.fillStyle = C.black;
       ctx.fillRect(x - 1, y - 1, 2, 2);
     }
+    /* holding more work than it can do: one tick per job, all of them rotting */
+    var hn = (a.hold && a.hold.length && taught('Ow')) ? a.hold.length : 0;
+    if (hn > 1) {
+      A(0.9 * dim); ctx.strokeStyle = C.amber; ctx.lineWidth = 2;
+      for (var q2 = 0; q2 < hn && q2 < 5; q2++) {
+        var qa = -Math.PI / 2 + (q2 - (Math.min(hn, 5) - 1) / 2) * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(x + Math.cos(qa) * (r + 2), y + Math.sin(qa) * (r + 2));
+        ctx.lineTo(x + Math.cos(qa) * (r + 6), y + Math.sin(qa) * (r + 6));
+        ctx.stroke();
+      }
+    }
     /* incorrigible: a hard shell nothing you do gets through */
-    if (a.corrigible === false || a.incorrigible) {
+    if ((a.corrigible === false || a.incorrigible) && taught('Cr')) {
       A(0.85 * dim); ctx.strokeStyle = C.red; ctx.lineWidth = 1.5;
       ctx.beginPath();
       for (var i = 0; i < 8; i++) {
@@ -341,6 +500,19 @@ FZ.render = (function () {
     if (a.flash) ring(x, y, r + 3 + (1 - Math.min(1, a.flash)) * 5, C.white, 2, 0.55 * Math.min(1, a.flash) * dim);
     var ht = hurtAt.get(a.id);
     if (ht !== undefined && now - ht < 600) ring(x, y, r + 4, C.red, 1.5, (1 - (now - ht) / 600) * 0.8 * dim);
+  }
+
+  /* is a burning outbreak already naming this failure at this spot? */
+  function covered(b) {
+    var O = live();
+    if (!O) return false;
+    for (var i = 0; i < O.length; i++) {
+      var o = O[i];
+      if (!o || o.sym !== b.sym || (o.state && o.state !== 'burning')) continue;
+      var dx = o.x - b.x, dy = o.y - b.y;
+      if (dx * dx + dy * dy < 3600) return true;
+    }
+    return false;
   }
 
   /* -------------------------------------------------------- the causal beat */
@@ -372,50 +544,39 @@ FZ.render = (function () {
         ring(ax, ay, 11 + Math.sin(age * 0.012) * 1.5, C.red, 2, 0.95 * fade);
       }
 
-      /* the name, at the place: the element's own mark plus its symbol */
-      if (b.sym) {
-        var tw = 0;
-        ctx.font = '700 14px "IBM Plex Mono",ui-monospace,monospace';
-        tw = ctx.measureText(b.sym).width;
-        var bw = 26 + tw + 11, bh = 26;
-        var bx = Math.max(3, Math.min(W - bw - 3, x - bw / 2));
-        var by = y - 36 - ease(snap) * 6;
-        if (by < 3) by = Math.min(H - bh - 3, y + 22);
-        A(0.95 * fade); ctx.fillStyle = C.black; ctx.fillRect(bx, by, bw, bh);
-        A(0.98 * fade); ctx.strokeStyle = C.red; ctx.lineWidth = 2.5;
-        ctx.strokeRect(bx + 1.25, by + 1.25, bw - 2.5, bh - 2.5);
-        markAt(b.sym, bx + 14, by + bh / 2, 17, C.red, 0.98 * fade);
-        A(0.98 * fade); ctx.fillStyle = C.red;
-        ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
-        ctx.fillText(b.sym, bx + 25, by + bh / 2 + 1);
-        /* pointer from the tag down to the exact spot */
+      /* the name, at the place — unless an outbreak already stands here saying it */
+      if (b.sym && !covered(b)) {
+        var ty2 = y - 53 - ease(snap) * 8;
+        if (ty2 < 16) ty2 = Math.min(H - 16, y + 53);
+        var bx2 = tag(b.sym, x, ty2, C.red, fade);
+        var px2 = Math.max(bx2.x + 6, Math.min(bx2.x + bx2.w - 6, x));
+        var y1 = ty2 > y ? bx2.y : bx2.y + bx2.h, y2 = ty2 > y ? y + 30 : y - 30;
         A(0.9 * fade); ctx.strokeStyle = C.red; ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(Math.max(bx + 6, Math.min(bx + bw - 6, x)), by > y ? by : by + bh);
-        ctx.lineTo(x, by > y ? y + 12 : y - 12);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(px2, y1); ctx.lineTo(px2, y2); ctx.lineTo(x, y2); ctx.stroke();
       }
       return true;
     }
 
     if (b.k === 'done') {
       var e = ease(k);
-      box(x, y, 16 + e * 30, C.teal, 2.5 - k * 2, (1 - k) * 0.95);
+      if (k < 0.3) { A((1 - k / 0.3) * 0.9); ctx.fillStyle = C.teal; ctx.fillRect(x - 13, y - 13, 26, 26); }
+      box(x, y, 18 + e * 34, C.teal, 3 - k * 2.4, (1 - k) * 0.98);
+      box(x, y, 18 + e * 18, C.teal, 2 - k * 1.6, (1 - k) * 0.6);
       var n = Math.max(1, Math.min(6, Math.round(b.v)));
-      A((1 - k) * 0.95); ctx.fillStyle = C.teal;
-      for (var p = 0; p < n; p++) ctx.fillRect(x - n * 3 + p * 6, y - 10 - e * 26, 3.5, 3.5);
+      A((1 - k) * 0.98); ctx.fillStyle = C.teal;
+      for (var p = 0; p < n; p++) ctx.fillRect(x - n * 3.5 + p * 7, y - 12 - e * 30, 4, 4);
       return true;
     }
 
     if (b.k === 'lost') {
-      var e2 = ease(k), d = 4 + e2 * 22;
-      A((1 - k) * 0.95); ctx.strokeStyle = C.red; ctx.lineWidth = 2;
+      var e2 = ease(k), d = 3 + e2 * 16;
+      A((1 - k) * 0.7); ctx.strokeStyle = C.red; ctx.lineWidth = 1.5;
       var q = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
       for (var f = 0; f < 4; f++) {
         var fx = x + q[f][0] * d, fy = y + q[f][1] * d;
-        ctx.strokeRect(fx - 5, fy - 5, 10, 10);
+        ctx.strokeRect(fx - 3.5, fy - 3.5, 7, 7);
       }
-      brackets(x, y, 8 + e2 * 6, 5, C.red, 2, (1 - k) * 0.8);
+      brackets(x, y, 7 + e2 * 5, 4, C.red, 1.5, (1 - k) * 0.65);
       return true;
     }
 
@@ -429,6 +590,53 @@ FZ.render = (function () {
         ctx.lineTo(x + Math.cos(an2) * (10 + e3 * 14), y + Math.sin(an2) * (10 + e3 * 14));
         ctx.stroke();
       }
+      return true;
+    }
+
+    /* an outbreak opening: the field flinches at the exact spot */
+    if (b.k === 'open') {
+      var eo = ease(k);
+      brackets(x, y, 60 - eo * 22, 10, C.red, 3, 1 - k);
+      ring(x, y, 10 + eo * 30, C.red, 3 - k * 2, (1 - k) * 0.9);
+      return true;
+    }
+    /* answered: the boundary closes, in the colour of things that work */
+    if (b.k === 'shut') {
+      var es = ease(k), r0 = Math.max(26, (b.r || 60) * sx);
+      ring(x, y, r0 * (1 - es * 0.86), C.teal, 3.5 - k * 2, (1 - k) * 0.98);
+      A((1 - k) * 0.9); ctx.strokeStyle = C.teal; ctx.lineWidth = 3;
+      for (var s2 = 0; s2 < 4; s2++) {
+        var sa = -Math.PI / 4 + s2 * (TAU / 4), rr = r0 * (1 - es) + 6;
+        ctx.beginPath();
+        ctx.moveTo(x + Math.cos(sa) * rr, y + Math.sin(sa) * rr);
+        ctx.lineTo(x + Math.cos(sa) * (rr - 10), y + Math.sin(sa) * (rr - 10));
+        ctx.stroke();
+      }
+      if (b.sym && k < 0.75) tag(b.sym, x, y - r0 - 18 < 16 ? y + r0 + 18 : y - r0 - 18, C.teal, 1 - k / 0.75);
+      return true;
+    }
+    /* it landed: the boundary bursts outward and leaves a mark */
+    if (b.k === 'land') {
+      var el2 = ease(k), r1 = Math.max(26, (b.r || 60) * sx);
+      ring(x, y, r1 * (1 + el2 * 0.5), C.red, 4 - k * 3, (1 - k) * 0.95);
+      A((1 - k) * 0.9); ctx.strokeStyle = C.red; ctx.lineWidth = 2.5;
+      for (var l2 = 0; l2 < 8; l2++) {
+        var la = (l2 / 8) * TAU, d4 = r1 * (0.4 + el2 * 0.7);
+        ctx.beginPath();
+        ctx.moveTo(x + Math.cos(la) * d4, y + Math.sin(la) * d4);
+        ctx.lineTo(x + Math.cos(la) * (d4 + 13), y + Math.sin(la) * (d4 + 13));
+        ctx.stroke();
+      }
+      return true;
+    }
+    /* the scar a miss leaves on the ground */
+    if (b.k === 'scar') {
+      var a5 = (1 - k) * 0.4;
+      A(a5); ctx.strokeStyle = C.red; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x - 7, y - 7); ctx.lineTo(x + 7, y + 7);
+      ctx.moveTo(x + 7, y - 7); ctx.lineTo(x - 7, y + 7);
+      ctx.stroke();
       return true;
     }
 
@@ -449,7 +657,7 @@ FZ.render = (function () {
     var pulse = 0.72 + Math.sin(now * 0.006) * 0.18;
 
     if (am.kind === 'charter') {
-      var r = (FZ.sim && FZ.sim.charterR) || 72;
+      var r = (FZ.sim && FZ.sim.charterR) || 82;
       charter(x, y, r * sx, pulse, false);
       ring(x, y, 4, C.teal, 2, 0.9);
       return;
@@ -504,6 +712,11 @@ FZ.render = (function () {
 
     if (typeof S.tick === 'number' && S.tick < lastTick) { peak.clear(); hurtAt.clear(); beats.length = 0; }
     lastTick = S.tick || 0;
+    if ((lastTick % 600) === 0 && peak.size > 64) {
+      var alive = new Set();
+      for (var pk2 = 0; pk2 < (S.jobs || []).length; pk2++) alive.add(S.jobs[pk2].id);
+      peak.forEach(function (v, k2) { if (!alive.has(k2)) peak.delete(k2); });
+    }
 
     var agents = S.agents || [], jobs = S.jobs || [];
     agentIx.clear(); jobIx.clear();
@@ -530,10 +743,11 @@ FZ.render = (function () {
     var chs = S.charters || [];
     for (var c = 0; c < chs.length; c++) charter(X(chs[c].x), Y(chs[c].y), (chs[c].r || 60) * sx, 1, true);
 
+    outbreaks(S, 1);
     prereqLinks(S, dimBase);
 
     /* a rumor is a job-shaped hole: dashed, empty, drifting */
-    if (S.rumor) {
+    if (S.rumor && taught('Gu')) {
       var rx = X(S.rumor.x), ry = Y(S.rumor.y), rp = 0.55 + Math.sin(now * 0.005) * 0.3;
       A(rp); ctx.strokeStyle = C.amber; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
       ctx.strokeRect(rx - 11, ry - 11, 22, 22);
@@ -548,7 +762,7 @@ FZ.render = (function () {
     /* contested claims stay visible after the beat fades: the failure is a state */
     for (var t = 0; t < jobs.length; t++) {
       var job = jobs[t];
-      var cl = job.claims ? idsOf(job.claims) : [];
+      var cl = (job.claims && taught('Co')) ? idsOf(job.claims) : [];
       if (cl.length < 2) continue;
       for (var u = 0; u < cl.length; u++) {
         var ca = agentIx.get(cl[u]);
@@ -567,11 +781,11 @@ FZ.render = (function () {
         var tj = jobIx.get(ag.job);
         if (!tj) continue;
         var d1 = (fset && !fset.has(ag.id)) ? 0.3 : 1;
-        line(X(ag.x), Y(ag.y), X(tj.x), Y(tj.y), lineage(ag.hue), 1, 0.34 * d1 * (focusing ? 1 : 1));
+        line(X(ag.x), Y(ag.y), X(tj.x), Y(tj.y), lineage(ag.hue), 1.2, 0.5 * d1);
       }
     }
 
-    var rad = agents.length > 30 ? 5.5 : agents.length > 20 ? 6.2 : 7;
+    var rad = (agents.length > 30 ? 5.8 : agents.length > 20 ? 6.4 : 7.2) * zoom();
     for (var m = 0; m < agents.length; m++) {
       var a2 = agents[m];
       drawAgent(a2, rad, (fset && !fset.has(a2.id)) ? dimBase : 1, S);
@@ -590,6 +804,8 @@ FZ.render = (function () {
       }
     }
 
+    outbreaks(S, 2);
+
     /* Beats. Everything that is not a fire draws in place; a fire first pulls the
        whole field down so the one thing that just went wrong is the only thing lit. */
     var fires = [];
@@ -602,8 +818,9 @@ FZ.render = (function () {
       var dk = 0;
       for (var d2 = 0; d2 < fires.length; d2++) {
         var ag2 = now - fires[d2].t;
-        if (ag2 < 420) dk = Math.max(dk, (1 - ag2 / 420) * 0.46);
+        if (ag2 < 460) dk = Math.max(dk, (1 - ag2 / 460) * 0.58);
       }
+      if (fires.length > 2) dk *= 0.5;   /* in a storm, stop strobing the field */
       if (dk > 0.01) { A(dk); ctx.fillStyle = C.black; ctx.fillRect(0, 0, W, H); }
       for (var d3 = fires.length - 1; d3 >= 0; d3--) drawBeat(fires[d3]);
     }
@@ -618,6 +835,7 @@ FZ.render = (function () {
     A(0.16); ctx.strokeStyle = C.white; ctx.lineWidth = 1;
     ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
     A(1);
+    tickerHold(S);
     tickerAge();
   }
 

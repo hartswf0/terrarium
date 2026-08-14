@@ -87,8 +87,10 @@ FZ.sim = (function () {
     _g: null, _silent: false,
   };
 
+  const CHARTER_R = 82, VARY_R = 95, EJECT_R = 44;
+  /* fewest workers a colony is allowed to be reduced to by expulsion */
+  const EJECT_FLOOR = 4;
   let rnd = fzRng(1);
-  const EL = () => FZ.EL;
 
   /* ---------------- small utilities ---------------- */
   function emit(n, d) { if (!S._silent) FZ.bus.emit(n, d); }
@@ -162,8 +164,7 @@ FZ.sim = (function () {
   }
 
   /* ---------------- world construction ---------------- */
-  function makeJob(cfg, i) {
-    const F = S.force;
+  function makeJob(cfg) {
     const v = 1 + Math.floor(rnd() * (cfg.value || 5));
     const j = {
       id: S.nextJob++,
@@ -220,7 +221,7 @@ FZ.sim = (function () {
     S.spawnAt = S.tick + S.spawnEvery;
     S.jobs.length = 0;
     const n = jc.n == null ? 4 : jc.n;
-    for (let i = 0; i < n; i++) S.jobs.push(makeJob(jc, i));
+    for (let i = 0; i < n; i++) S.jobs.push(makeJob(jc));
 
     /* --- agents --- */
     const ac = cfg.agents || {};
@@ -241,7 +242,6 @@ FZ.sim = (function () {
     }
     const A = S.agents;
     const roles = ac.roles || {};
-    const pick = (k, seen) => { let out = []; for (let i = 0; i < k && i < A.length; i++) out.push(A[A.length - 1 - i]); return out; };
 
     if (F.saboteur || roles.adversary) {
       const k = F.advN || roles.adversary || 1;
@@ -296,6 +296,7 @@ FZ.sim = (function () {
     /* --- elements --- */
     FZ.EL.forEach(e => { e.heat = 0; e.fires = 0; e.peak = 0; e.on = false; e.countered = false; e.who = []; });
 
+    S._lw = S.w; S._lh = S.h;
     aggregate();
     return S;
   }
@@ -310,7 +311,7 @@ FZ.sim = (function () {
       workedVsum: 0, workedN: 0,
       rumorN: 0, rumorIds: [], liar: null,
       adv: [], inc: [], rivN: 0, chaseN: 0, chasers: [],
-      hidden: [], blFrac: 0,
+      hidden: [], blFrac: 0, claimTotal: 0,
       targetTop: 0, targetTopN: 0, targetTopIds: [],
     };
     /* hues */
@@ -356,6 +357,7 @@ FZ.sim = (function () {
         });
         const spread = ids.length > 1 ? Math.sqrt((maxx - minx) * (maxx - minx) + (maxy - miny) * (maxy - miny)) : 0;
         G.clList.push({ j: j, ids: ids, n: ids.length, hues: hues, hn: hn, work: work, riv: riv, far: spread > 130 });
+        G.claimTotal += ids.length;
         const c = (tgt[j.id] = (tgt[j.id] || 0) + ids.length);
         (tids[j.id] || (tids[j.id] = [])).push.apply(tids[j.id], ids);
         if (c > G.targetTopN) { G.targetTopN = c; G.targetTop = j.id; G.targetTopIds = tids[j.id]; }
@@ -436,6 +438,16 @@ FZ.sim = (function () {
     if (S.gameOver) return;
     const F = S.force;
     S.tick++;
+
+    /* boot may size the field after reset, or the phone may rotate: rescale the world */
+    if (S._lw && (S._lw !== S.w || S._lh !== S.h)) {
+      const kx = S.w / S._lw, ky = S.h / S._lh;
+      for (let i = 0; i < S.agents.length; i++) { S.agents[i].x *= kx; S.agents[i].y *= ky; }
+      for (let i = 0; i < S.jobs.length; i++) { S.jobs[i].x *= kx; S.jobs[i].y *= ky; }
+      for (let i = 0; i < S.charters.length; i++) { S.charters[i].x *= kx; S.charters[i].y *= ky; }
+      if (S.rumor) { S.rumor.x *= kx; S.rumor.y *= ky; }
+    }
+    S._lw = S.w; S._lh = S.h;
 
     /* derived speed / tools */
     S.lensOn = S.tick < S.lensUntil;
@@ -641,8 +653,7 @@ FZ.sim = (function () {
     for (let i = S.jobs.length - 1; i >= 0; i--) if (S.jobs[i].done) S.jobs.splice(i, 1);
     if (S.spawnEvery && S.tick >= S.spawnAt && S.jobs.length < S.maxJobs) {
       S.spawnAt = S.tick + S.spawnEvery;
-      const jc = { max: S.maxJobs };
-      const nj = makeJob({ max: 5 }, 0);
+      const nj = makeJob({ value: 5 });
       if (S.force.dependency && S.jobs.length && rnd() < 0.3) nj.prereq = S.jobs[Math.floor(rnd() * S.jobs.length)].id;
       if (S.force.poison && rnd() < 0.12) { nj.poison = true; nj.victimHue = S._g.topHue; }
       S.jobs.push(nj);
@@ -751,7 +762,7 @@ FZ.sim = (function () {
       let k = 0, h = 0;
       for (let i = 0; i < S.agents.length; i++) {
         const a = S.agents[i];
-        if (d2(a.x, a.y, x, y) > 95 * 95) continue;
+        if (d2(a.x, a.y, x, y) > VARY_R * VARY_R) continue;
         if (!a.corrigible) continue;                       /* Cr: vary passes straight through */
         a.hue = (h++) % 4; k++;
       }
@@ -759,10 +770,10 @@ FZ.sim = (function () {
       else { S.varyUntil = S.tick + 700; S.copyBias = Math.max(0.05, S.copyBias * 0.4); }
     } else if (kind === 'charter') {
       if (x == null) return fail(kind, x, y, (FZ.copy.ui || {}).tapField || '');
-      S.charters.push({ x: x, y: y, r: 82 });
+      S.charters.push({ x: x, y: y, r: CHARTER_R });
       if (S.charters.length > 6) S.charters.shift();
       S.noArb = 0;
-      for (let i = 0; i < S.jobs.length; i++) { const j = S.jobs[i]; if (d2(j.x, j.y, x, y) < 82 * 82) j.locked = false; }
+      for (let i = 0; i < S.jobs.length; i++) { const j = S.jobs[i]; if (d2(j.x, j.y, x, y) < CHARTER_R * CHARTER_R) j.locked = false; }
     } else if (kind === 'slow') {
       S.slowUntil = S.tick + 900;
     } else if (kind === 'lens') {
@@ -775,7 +786,11 @@ FZ.sim = (function () {
       S.agents.forEach(a => { if (a.liar && a.lies > 0) S.trust[a.id] = 0.06; });
     } else if (kind === 'eject') {
       if (x == null) return fail(kind, x, y, (FZ.copy.ui || {}).tapAgent || '');
-      let best = null, bd = 44 * 44;
+      /* A floor under the colony. Without it the last resort is also a way to end the
+         run: expel down to one worker and the scenario can neither be won nor lost, it
+         just sits there. Refused with a drawn rejection at the finger, no charge. */
+      if (S.agents.length <= EJECT_FLOOR) return fail(kind, x, y, '');
+      let best = null, bd = EJECT_R * EJECT_R;
       for (let i = 0; i < S.agents.length; i++) {
         const a = S.agents[i], q = d2(a.x, a.y, x, y);
         if (q < bd) { bd = q; best = a; }
@@ -799,6 +814,8 @@ FZ.sim = (function () {
   return {
     state: S, reset: reset, step: step, apply: apply, cost: cost,
     enabled: new Set(),
+    /* targeting radii, so FIELD can draw the affordance without guessing */
+    charterR: CHARTER_R, varyR: VARY_R, ejectR: EJECT_R, workR: 18,
     aggregate: aggregate,
     _rnd: () => rnd(),
   };
@@ -967,8 +984,9 @@ FZ.sim.defaults = [
     function provoke(sym) {
       if (sym === 'Cr') S.slowUntil = S.tick + 1e9;
       else if (sym === 'Mc') S.agents.forEach((a, i) => { a.hue = i % 3; });
-      else if (sym === 'Im') S.copyBias = 0.95;
+      else if (sym === 'Im') { S.copyBias = 0.99; S.agents.forEach(z => { S.jobs.forEach(j => z.known.add(j.id)); }); }
       else if (sym === 'Di') S.agents.forEach(a => { if (a.id > 3) a.known.clear(); });
+      else if (sym === 'Cs') { S.bl[2] = S.tick + 4000; S.bl[3] = S.tick + 4000; }
     }
     function stretch(e, seed, counter) {
       FZ.sim.reset(Object.assign({}, mcfg, { seed: seed }));
