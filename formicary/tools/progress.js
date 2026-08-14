@@ -20,8 +20,11 @@ const VERDICT = { win: '#19e6c8', close: '#ffd23f', lose: '#ff2e2e', pending: '#
 const pieces = st.pieces.map(p => {
   const rounds = (p.rounds || []).slice().reverse().map(r => {
     const shots = (r.shots || []).map(s => {
-      const d = img(s.file);
-      return d ? `<figure><img src="${d}" alt="${esc(s.label)}"><figcaption>${esc(s.label)}</figcaption></figure>` : '';
+      // accept either "name.png" or {file,label}
+      const file = typeof s === 'string' ? s : s.file;
+      const label = typeof s === 'string' ? s.replace(/\.png$/, '') : (s.label || s.file);
+      const d = img(file);
+      return d ? `<figure><img src="${d}" alt="${esc(label)}"><figcaption>${esc(label)}</figcaption></figure>` : '';
     }).join('');
     return `<div class="round">
       <div class="rhead"><span class="rn">ROUND ${esc(r.n)}</span>
