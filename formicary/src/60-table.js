@@ -118,7 +118,7 @@ FZ.table = (function () {
       '#detail.ct .dtC{display:block}',
       '#detail .dtX{flex:0 0 auto;display:block;width:100%;min-height:46px;border:0;border-top:2px solid ' + g('.85') + ';',
       'background:' + page + ';color:' + g('.95') + ';font-family:inherit;font-size:12px;font-weight:700;letter-spacing:.12em;cursor:pointer}',
-    ].join('');
+    ].join('').replace(/W \.fzc/g, '#tableWrap .fzc');
   }
 
   /* --------------------------------------------------------------- building */
@@ -130,7 +130,7 @@ FZ.table = (function () {
   }
 
   function makeCell(e) {
-    var b = el('button', 'cell lk');
+    var b = el('button', 'cell fzc lk');
     b.type = 'button';
     b.setAttribute('data-sym', e.sym);
     /* family identity is the column's top rule; the cell's left rule belongs to heat */
@@ -324,8 +324,8 @@ FZ.table = (function () {
     var per = Math.floor((avail - (rows - 1) * 3 - 16) / (rows + 1));
     per = Math.max(30, Math.min(52, per));
     wrap.style.setProperty('--ch', per + 'px');
-    wrap.style.setProperty('--nf', (per >= 44 ? 8 : per >= 38 ? 7.6 : 7.2) + 'px');
-    wrap.classList.toggle('l1', per < 44);
+    wrap.style.setProperty('--nf', (per >= 46 ? 8 : per >= 40 ? 7.6 : 7.2) + 'px');
+    wrap.classList.toggle('l1', per < 42);
     wrap.classList.toggle('hn', per < 34);
   }
 

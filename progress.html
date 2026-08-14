@@ -34,52 +34,40 @@ footer{font-size:11px;color:rgba(0,0,0,.55);margin-top:20px;border-top:1px solid
 </style></head><body>
 <h1>FORMICARY — BUILD PROGRESS</h1>
 <div class="meta">
-  <span class="tally">0 / 7 PIECES WON</span>
+  <span class="tally">0 / 5 PIECES WON</span>
   <span class="tally">ROUND 1</span>
   updated scaffolding
 </div>
-<p class="meta">Client verdict on the baseline: NOT VERY PLAYABLE. That is a structural diagnosis, not a polish note, so a tenth law was added to the standard — L10 THE CORE LOOP — and a seventh piece to build it. The mechanic: a detector firing now opens a timed OUTBREAK, drawn where it happened and named in plain words, which the player must answer with the right institution before the fuse runs out. Right answer resolves it visibly; wrong answer explains why; expiry does real damage. A piece cannot be marked won while L10 scores below 8.</p>
+<p class="meta">Client verdict on the baseline: NOT VERY PLAYABLE. Structural, so the fix is structural. Two changes followed. (1) A tenth law, L10 THE CORE LOOP: a detector firing now opens a timed OUTBREAK, drawn where it happened and named in plain words, which the player must answer with the right institution before the fuse runs out. No piece can be marked won while L10 scores below 8. (2) The client supplied the real source paper, which the egress proxy had blocked. Its four sections ARE the table's four families, the 117 target turns out to be a direct citation, and it hands us the decision the game was missing: institutions TRADE OFF rather than upgrade. LEDGER catches the liar and teaches the colony to ignore the lone dissenter; LENS reveals everything including the rumour. Sub-agent concurrency is capped at 2 on this box, so the seven pieces are consolidated into five.</p>
 <section class="piece">
-    <h2><span class="pid">G</span> PLAY — the outbreak loop
+    <h2><span class="pid">P</span> PLAY — the outbreak loop and the hands that drive it
       <span class="verdict" style="border-color:#3b82f6;color:#3b82f6">PENDING</span></h2>
-    <p class="owns">src/45-outbreak.js</p>
-    <p class="judged">JUDGED ON — Law 10 the core loop: a decision every few seconds, a knowable right answer, immediate located consequence, real answerable time pressure, and mastery that accumulates</p>
+    <p class="owns">src/45-outbreak.js, src/70-controls.js</p>
+    <p class="judged">JUDGED ON — L10 the core loop above all: a decision every few seconds, a knowable right answer, immediate located consequence, real answerable time pressure, mastery that accumulates. Then L4 tiny interaction surface and L8 one clear next action, 44px thumb targets.</p>
     <div class="round"><div class="body">not started</div></div>
   </section><section class="piece">
-    <h2><span class="pid">A</span> CHAPTERS — the teaching sequence
+    <h2><span class="pid">T</span> TEACH — the ten-chapter sequence
       <span class="verdict" style="border-color:#3b82f6;color:#3b82f6">PENDING</span></h2>
     <p class="owns">src/80-chapters.js, src/90-boot.js</p>
-    <p class="judged">JUDGED ON — Law 1 one idea at a time, Law 2 play first name second, Law 6 run it again and see, Law 8 no dead time, Law 9 the sandbox is the reward</p>
+    <p class="judged">JUDGED ON — L1 one new idea at a time, L2 play first name second, L6 run it again and see (the chapter 4 A/B), L8 no dead time, L9 the sandbox is the reward</p>
     <div class="round"><div class="body">not started</div></div>
   </section><section class="piece">
-    <h2><span class="pid">B</span> FIELD — canvas legibility
+    <h2><span class="pid">R</span> READ — field and table legibility
       <span class="verdict" style="border-color:#3b82f6;color:#3b82f6">PENDING</span></h2>
-    <p class="owns">src/50-render.js</p>
-    <p class="judged">JUDGED ON — Law 3 the causal beat is visible, Law 7 mobile legibility at 390px, can a stranger read the field in three seconds</p>
+    <p class="owns">src/50-render.js, src/60-table.js</p>
+    <p class="judged">JUDGED ON — L3 the causal beat visible, immediate and co-located; L7 readable at 390px; can a stranger read the field in three seconds; does a lit cell point at bodies on the field</p>
     <div class="round"><div class="body">not started</div></div>
   </section><section class="piece">
-    <h2><span class="pid">C</span> TABLE — the taxonomy as knowledge
-      <span class="verdict" style="border-color:#3b82f6;color:#3b82f6">PENDING</span></h2>
-    <p class="owns">src/60-table.js</p>
-    <p class="judged">JUDGED ON — Law 2 naming lands as recognition, Law 3 a lit cell is diagnostic within seconds, 28 cells legible on a phone</p>
-    <div class="round"><div class="body">not started</div></div>
-  </section><section class="piece">
-    <h2><span class="pid">D</span> SIM — 28 real detectors
+    <h2><span class="pid">W</span> WORLD — 28 detectors, trade-offs, balance
       <span class="verdict" style="border-color:#3b82f6;color:#3b82f6">PENDING</span></h2>
     <p class="owns">src/30-elements.js, src/40-sim.js</p>
-    <p class="judged">JUDGED ON — audit.js: all 28 fire, every counter measurably works, difficulty curve is real, deterministic seeds</p>
+    <p class="judged">JUDGED ON — audit.js all 28 fire with working counters; CONTRACT section 15 trade-offs actually implemented and felt; conflicts resolve into force/passivity/truce/unsettled; speed raises throughput AND aggression; ch9 losable but winnable</p>
     <div class="round"><div class="body">not started</div></div>
   </section><section class="piece">
-    <h2><span class="pid">E</span> CONTROLS — six institutions on a thumb
-      <span class="verdict" style="border-color:#3b82f6;color:#3b82f6">PENDING</span></h2>
-    <p class="owns">src/70-controls.js</p>
-    <p class="judged">JUDGED ON — Law 4 tiny interaction surface, Law 7 44px targets one-handed, Law 8 always one clear next action</p>
-    <div class="round"><div class="body">not started</div></div>
-  </section><section class="piece">
-    <h2><span class="pid">F</span> SHELL — the visual system and the voice
+    <h2><span class="pid">S</span> SHELL — visual system and voice
       <span class="verdict" style="border-color:#3b82f6;color:#3b82f6">PENDING</span></h2>
     <p class="owns">src/00-head.html, src/10-style.css, src/15-body.html, src/20-copy.js</p>
-    <p class="judged">JUDGED ON — Law 5 plainspoken warm funny voice, palette and typographic discipline, no layout break 320-430px</p>
+    <p class="judged">JUDGED ON — L5 plainspoken warm funny voice, palette and typographic discipline, no layout break 320-430px, the real research facts landing as content rather than footnotes</p>
     <div class="round"><div class="body">not started</div></div>
   </section>
 <footer>Each piece is built by one sub-agent and judged by a separate critic with fresh context, which opens the real running build, scores it against the nine laws of The Evolution of Trust, and names the single biggest remaining gap. A piece is WON only when the critic honestly prefers ours.</footer>

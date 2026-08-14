@@ -311,7 +311,8 @@ fzElDef({
       if (!a) continue;
       while (a.hold.length) api.drop(a, a.hold[0]);
       const dx = a.x - S.rumor.x, dy = a.y - S.rumor.y;
-      if (dx * dx + dy * dy < 400) a.stun = Math.max(a.stun, 34);
+      /* the walk was the waste; the stun is the moment of arriving at nothing, once per lie */
+      if (dx * dx + dy * dy < 500 && a.gu !== S.rumor.rid) { a.gu = S.rumor.rid; a.stun = Math.max(a.stun, 34); }
     }
     api.heat(0.06, { at: { x: S.rumor.x, y: S.rumor.y }, who, say: FZ.copy.fire.Gu });
   },

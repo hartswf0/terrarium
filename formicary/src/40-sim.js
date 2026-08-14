@@ -485,6 +485,14 @@ FZ.sim = (function () {
       const a = A[i];
       if (a.flash > 0) a.flash--;
       if (a.chase != null) { a.chaseFor = (a.chaseFor || 0) + 1; if (a.chaseFor > 190) { a.chase = null; a.esc = 0; a.chaseFor = 0; } }
+      /* stood on the phantom long enough to work out there is nothing there */
+      if (a.chaseRumor) {
+        if (!S.rumor) { a.chaseRumor = false; a.duped = 0; }
+        else if (d2(a.x, a.y, S.rumor.x, S.rumor.y) < 22 * 22) {
+          a.duped = (a.duped || 0) + 1;
+          if (a.duped > 80) { a.chaseRumor = false; a.duped = 0; }
+        }
+      }
       if (a.stun > 0) { a.stun -= T; continue; }
 
       /* churners exist to make the livelock visible */
@@ -508,10 +516,7 @@ FZ.sim = (function () {
 
       /* target */
       let tx = a.x, ty = a.y, chasing = false;
-      if (a.chaseRumor && S.rumor) {
-        tx = S.rumor.x; ty = S.rumor.y;
-        if (d2(a.x, a.y, tx, ty) < 16 * 16) { a.duped = (a.duped || 0) + 1; if (a.duped > 40) { a.chaseRumor = false; a.duped = 0; } }
-      } else if (a.chaseRumor) a.chaseRumor = false;
+      if (a.chaseRumor && S.rumor) { tx = S.rumor.x; ty = S.rumor.y; }
       else if (a.chase != null) {
         const t = agentById(a.chase);
         if (t) { tx = t.x; ty = t.y; chasing = true; } else a.chase = null;

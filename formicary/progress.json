@@ -1,55 +1,41 @@
 {
   "round": 0,
   "updated": "scaffolding",
-  "note": "Client verdict on the baseline: NOT VERY PLAYABLE. That is a structural diagnosis, not a polish note, so a tenth law was added to the standard \u2014 L10 THE CORE LOOP \u2014 and a seventh piece to build it. The mechanic: a detector firing now opens a timed OUTBREAK, drawn where it happened and named in plain words, which the player must answer with the right institution before the fuse runs out. Right answer resolves it visibly; wrong answer explains why; expiry does real damage. A piece cannot be marked won while L10 scores below 8.",
+  "note": "Client verdict on the baseline: NOT VERY PLAYABLE. Structural, so the fix is structural. Two changes followed. (1) A tenth law, L10 THE CORE LOOP: a detector firing now opens a timed OUTBREAK, drawn where it happened and named in plain words, which the player must answer with the right institution before the fuse runs out. No piece can be marked won while L10 scores below 8. (2) The client supplied the real source paper, which the egress proxy had blocked. Its four sections ARE the table's four families, the 117 target turns out to be a direct citation, and it hands us the decision the game was missing: institutions TRADE OFF rather than upgrade. LEDGER catches the liar and teaches the colony to ignore the lone dissenter; LENS reveals everything including the rumour. Sub-agent concurrency is capped at 2 on this box, so the seven pieces are consolidated into five.",
   "pieces": [
     {
-      "id": "G",
-      "name": "PLAY \u2014 the outbreak loop",
-      "owns": "src/45-outbreak.js",
-      "judged": "Law 10 the core loop: a decision every few seconds, a knowable right answer, immediate located consequence, real answerable time pressure, and mastery that accumulates",
+      "id": "P",
+      "name": "PLAY \u2014 the outbreak loop and the hands that drive it",
+      "owns": "src/45-outbreak.js, src/70-controls.js",
+      "judged": "L10 the core loop above all: a decision every few seconds, a knowable right answer, immediate located consequence, real answerable time pressure, mastery that accumulates. Then L4 tiny interaction surface and L8 one clear next action, 44px thumb targets.",
       "rounds": []
     },
     {
-      "id": "A",
-      "name": "CHAPTERS \u2014 the teaching sequence",
+      "id": "T",
+      "name": "TEACH \u2014 the ten-chapter sequence",
       "owns": "src/80-chapters.js, src/90-boot.js",
-      "judged": "Law 1 one idea at a time, Law 2 play first name second, Law 6 run it again and see, Law 8 no dead time, Law 9 the sandbox is the reward",
+      "judged": "L1 one new idea at a time, L2 play first name second, L6 run it again and see (the chapter 4 A/B), L8 no dead time, L9 the sandbox is the reward",
       "rounds": []
     },
     {
-      "id": "B",
-      "name": "FIELD \u2014 canvas legibility",
-      "owns": "src/50-render.js",
-      "judged": "Law 3 the causal beat is visible, Law 7 mobile legibility at 390px, can a stranger read the field in three seconds",
+      "id": "R",
+      "name": "READ \u2014 field and table legibility",
+      "owns": "src/50-render.js, src/60-table.js",
+      "judged": "L3 the causal beat visible, immediate and co-located; L7 readable at 390px; can a stranger read the field in three seconds; does a lit cell point at bodies on the field",
       "rounds": []
     },
     {
-      "id": "C",
-      "name": "TABLE \u2014 the taxonomy as knowledge",
-      "owns": "src/60-table.js",
-      "judged": "Law 2 naming lands as recognition, Law 3 a lit cell is diagnostic within seconds, 28 cells legible on a phone",
-      "rounds": []
-    },
-    {
-      "id": "D",
-      "name": "SIM \u2014 28 real detectors",
+      "id": "W",
+      "name": "WORLD \u2014 28 detectors, trade-offs, balance",
       "owns": "src/30-elements.js, src/40-sim.js",
-      "judged": "audit.js: all 28 fire, every counter measurably works, difficulty curve is real, deterministic seeds",
+      "judged": "audit.js all 28 fire with working counters; CONTRACT section 15 trade-offs actually implemented and felt; conflicts resolve into force/passivity/truce/unsettled; speed raises throughput AND aggression; ch9 losable but winnable",
       "rounds": []
     },
     {
-      "id": "E",
-      "name": "CONTROLS \u2014 six institutions on a thumb",
-      "owns": "src/70-controls.js",
-      "judged": "Law 4 tiny interaction surface, Law 7 44px targets one-handed, Law 8 always one clear next action",
-      "rounds": []
-    },
-    {
-      "id": "F",
-      "name": "SHELL \u2014 the visual system and the voice",
+      "id": "S",
+      "name": "SHELL \u2014 visual system and voice",
       "owns": "src/00-head.html, src/10-style.css, src/15-body.html, src/20-copy.js",
-      "judged": "Law 5 plainspoken warm funny voice, palette and typographic discipline, no layout break 320-430px",
+      "judged": "L5 plainspoken warm funny voice, palette and typographic discipline, no layout break 320-430px, the real research facts landing as content rather than footnotes",
       "rounds": []
     }
   ]
