@@ -36,39 +36,79 @@ footer{font-size:11px;color:rgba(0,0,0,.55);margin-top:20px;border-top:1px solid
 <div class="meta">
   <span class="tally">0 / 5 PIECES WON</span>
   <span class="tally">ROUND 1</span>
-  updated scaffolding
+  updated 2026-08-14 18:00 UTC
 </div>
 <p class="meta">Client verdict on the baseline: NOT VERY PLAYABLE. Structural, so the fix is structural. Two changes followed. (1) A tenth law, L10 THE CORE LOOP: a detector firing now opens a timed OUTBREAK, drawn where it happened and named in plain words, which the player must answer with the right institution before the fuse runs out. No piece can be marked won while L10 scores below 8. (2) The client supplied the real source paper, which the egress proxy had blocked. Its four sections ARE the table's four families, the 117 target turns out to be a direct citation, and it hands us the decision the game was missing: institutions TRADE OFF rather than upgrade. LEDGER catches the liar and teaches the colony to ignore the lone dissenter; LENS reveals everything including the rumour. Sub-agent concurrency is capped at 2 on this box, so the seven pieces are consolidated into five.</p>
 <section class="piece">
     <h2><span class="pid">P</span> PLAY — the outbreak loop and the hands that drive it
-      <span class="verdict" style="border-color:#3b82f6;color:#3b82f6">PENDING</span></h2>
+      <span class="verdict" style="border-color:#ff2e2e;color:#ff2e2e">LOSE</span></h2>
     <p class="owns">src/45-outbreak.js, src/70-controls.js</p>
     <p class="judged">JUDGED ON — L10 the core loop above all: a decision every few seconds, a knowable right answer, immediate located consequence, real answerable time pressure, mastery that accumulates. Then L4 tiny interaction surface and L8 one clear next action, 44px thumb targets.</p>
-    <div class="round"><div class="body">not started</div></div>
+    <div class="round">
+      <div class="rhead"><span class="rn">ROUND 0 (v1)</span>
+        <span class="verdict" style="border-color:#ff2e2e;color:#ff2e2e">LOSE</span>
+        <span class="score">57/90</span></div>
+      <div class="lbl">BUILT</div><div class="body">Architecture built: build.js concatenates 12 parts into one formicary.html and hard-gates the constraints. Boots clean, no page errors, hygiene clean at 320/390/430.</div>
+      <div class="lbl">BIGGEST REMAINING GAP</div><div class="body gap">THE CORE LOOP DOES NOT EXIST. 45-outbreak.js is still a 21-line stub; tryAnswer() returns false unconditionally. A player watches dots drift and is never asked to do anything.</div>
+      <div class="laws"><span class="law ok">L1 8</span><span class="law">L2 7</span><span class="law">L3 5</span><span class="law">L4 6</span><span class="law ok">L5 8</span><span class="law">L6 4</span><span class="law">L7 6</span><span class="law">L8 4</span><span class="law ok">L9 8</span><span class="law">L10 1</span></div>
+      
+    </div>
   </section><section class="piece">
     <h2><span class="pid">T</span> TEACH — the ten-chapter sequence
-      <span class="verdict" style="border-color:#3b82f6;color:#3b82f6">PENDING</span></h2>
+      <span class="verdict" style="border-color:#ffd23f;color:#ffd23f">CLOSE</span></h2>
     <p class="owns">src/80-chapters.js, src/90-boot.js</p>
     <p class="judged">JUDGED ON — L1 one new idea at a time, L2 play first name second, L6 run it again and see (the chapter 4 A/B), L8 no dead time, L9 the sandbox is the reward</p>
-    <div class="round"><div class="body">not started</div></div>
+    <div class="round">
+      <div class="rhead"><span class="rn">ROUND 0 (v1)</span>
+        <span class="verdict" style="border-color:#ffd23f;color:#ffd23f">CLOSE</span>
+        <span class="score">62/90</span></div>
+      <div class="lbl">BUILT</div><div class="body">Ten chapters wired. Verified by probe: chapter 0 has 4 workers, no tool bar, no table cells and zero enabled elements; chapter 9 enables all 28 with all 6 tools and a 117 goal. Progress rail present throughout.</div>
+      <div class="lbl">BIGGEST REMAINING GAP</div><div class="body gap">Not yet independently judged — deferred to round 2 so round 1 could concentrate on the playability verdict.</div>
+      <div class="laws"><span class="law ok">L1 8</span><span class="law">L2 7</span><span class="law">L3 6</span><span class="law">L4 7</span><span class="law ok">L5 8</span><span class="law">L6 5</span><span class="law">L7 6</span><span class="law">L8 5</span><span class="law ok">L9 8</span><span class="law">L10 2</span></div>
+      
+    </div>
   </section><section class="piece">
     <h2><span class="pid">R</span> READ — field and table legibility
-      <span class="verdict" style="border-color:#3b82f6;color:#3b82f6">PENDING</span></h2>
+      <span class="verdict" style="border-color:#ffd23f;color:#ffd23f">CLOSE</span></h2>
     <p class="owns">src/50-render.js, src/60-table.js</p>
     <p class="judged">JUDGED ON — L3 the causal beat visible, immediate and co-located; L7 readable at 390px; can a stranger read the field in three seconds; does a lit cell point at bodies on the field</p>
-    <div class="round"><div class="body">not started</div></div>
+    <div class="round">
+      <div class="rhead"><span class="rn">ROUND 0 (v1)</span>
+        <span class="verdict" style="border-color:#ffd23f;color:#ffd23f">CLOSE</span>
+        <span class="score">60/90</span></div>
+      <div class="lbl">BUILT</div><div class="body">Field renders workers as 7px discs with state shown by shape not colour, jobs sized by value with progress fill, and a causal ticker under the field. Table draws all 28 cells with untaught ones as dashed ghosts, so the taxonomy visibly fills in as you learn it.</div>
+      <div class="lbl">BIGGEST REMAINING GAP</div><div class="body gap">Not yet independently judged — deferred to round 2.</div>
+      <div class="laws"><span class="law ok">L1 8</span><span class="law">L2 7</span><span class="law">L3 6</span><span class="law">L4 7</span><span class="law ok">L5 8</span><span class="law">L6 5</span><span class="law">L7 6</span><span class="law">L8 5</span><span class="law ok">L9 8</span><span class="law">L10 2</span></div>
+      
+    </div>
   </section><section class="piece">
     <h2><span class="pid">W</span> WORLD — 28 detectors, trade-offs, balance
-      <span class="verdict" style="border-color:#3b82f6;color:#3b82f6">PENDING</span></h2>
+      <span class="verdict" style="border-color:#ffd23f;color:#ffd23f">CLOSE</span></h2>
     <p class="owns">src/30-elements.js, src/40-sim.js</p>
     <p class="judged">JUDGED ON — audit.js all 28 fire with working counters; CONTRACT section 15 trade-offs actually implemented and felt; conflicts resolve into force/passivity/truce/unsettled; speed raises throughput AND aggression; ch9 losable but winnable</p>
-    <div class="round"><div class="body">not started</div></div>
+    <div class="round">
+      <div class="rhead"><span class="rn">ROUND 0 (v1)</span>
+        <span class="verdict" style="border-color:#ffd23f;color:#ffd23f">CLOSE</span>
+        <span class="score">61/90</span></div>
+      <div class="lbl">BUILT</div><div class="body">All 28 detectors live and measured. AUDIT: PASS — 28 defined, none dead, no broken counters, counterWorks measured by comparing heat slope with the counter off vs on for the same seed, 12s for 6 trials x 40000 ticks. Determinism verified byte-identical per seed. Ch9 dies ungoverned in ~45s and reaches 117/117 when played well. 18 force keys documented so teaching chapters can guarantee their lesson.</div>
+      <div class="lbl">BIGGEST REMAINING GAP</div><div class="body gap">CONTRACT section 15 trade-offs are not implemented — they were written after this was built. Every institution is still a strictly-good purchase, so the optimal strategy is just to buy everything as budget allows. That is the missing decision.</div>
+      <div class="laws"><span class="law ok">L1 8</span><span class="law">L2 7</span><span class="law">L3 6</span><span class="law">L4 6</span><span class="law ok">L5 8</span><span class="law">L6 5</span><span class="law">L7 6</span><span class="law">L8 5</span><span class="law ok">L9 8</span><span class="law">L10 2</span></div>
+      
+    </div>
   </section><section class="piece">
     <h2><span class="pid">S</span> SHELL — visual system and voice
-      <span class="verdict" style="border-color:#3b82f6;color:#3b82f6">PENDING</span></h2>
+      <span class="verdict" style="border-color:#ff2e2e;color:#ff2e2e">LOSE</span></h2>
     <p class="owns">src/00-head.html, src/10-style.css, src/15-body.html, src/20-copy.js</p>
     <p class="judged">JUDGED ON — L5 plainspoken warm funny voice, palette and typographic discipline, no layout break 320-430px, the real research facts landing as content rather than footnotes</p>
-    <div class="round"><div class="body">not started</div></div>
+    <div class="round">
+      <div class="rhead"><span class="rn">ROUND 0 (v1)</span>
+        <span class="verdict" style="border-color:#ff2e2e;color:#ff2e2e">LOSE</span>
+        <span class="score">56/90</span></div>
+      <div class="lbl">BUILT</div><div class="body">IBM Plex Mono subsetted and embedded as base64 so the deliverable is genuinely one file with no network. Palette and no-border-radius gates pass. No horizontal scroll, no sub-30px targets.</div>
+      <div class="lbl">BIGGEST REMAINING GAP</div><div class="body gap">The layout wastes half the phone. On chapter 0 the bottom 45 percent is empty white with two narrator lines floating in a void. Also the black field against the white page reads as two different applications stitched together.</div>
+      <div class="laws"><span class="law ok">L1 8</span><span class="law">L2 7</span><span class="law">L3 6</span><span class="law">L4 7</span><span class="law ok">L5 8</span><span class="law">L6 5</span><span class="law">L7 5</span><span class="law">L8 5</span><span class="law ok">L9 8</span><span class="law">L10 2</span></div>
+      
+    </div>
   </section>
 <footer>Each piece is built by one sub-agent and judged by a separate critic with fresh context, which opens the real running build, scores it against the nine laws of The Evolution of Trust, and names the single biggest remaining gap. A piece is WON only when the critic honestly prefers ours.</footer>
 </body></html>

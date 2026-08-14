@@ -1,6 +1,6 @@
 {
-  "round": 0,
-  "updated": "scaffolding",
+  "round": 1,
+  "updated": "2026-08-14 18:00 UTC",
   "note": "Client verdict on the baseline: NOT VERY PLAYABLE. Structural, so the fix is structural. Two changes followed. (1) A tenth law, L10 THE CORE LOOP: a detector firing now opens a timed OUTBREAK, drawn where it happened and named in plain words, which the player must answer with the right institution before the fuse runs out. No piece can be marked won while L10 scores below 8. (2) The client supplied the real source paper, which the egress proxy had blocked. Its four sections ARE the table's four families, the 117 target turns out to be a direct citation, and it hands us the decision the game was missing: institutions TRADE OFF rather than upgrade. LEDGER catches the liar and teaches the colony to ignore the lone dissenter; LENS reveals everything including the rumour. Sub-agent concurrency is capped at 2 on this box, so the seven pieces are consolidated into five.",
   "pieces": [
     {
@@ -8,35 +8,144 @@
       "name": "PLAY \u2014 the outbreak loop and the hands that drive it",
       "owns": "src/45-outbreak.js, src/70-controls.js",
       "judged": "L10 the core loop above all: a decision every few seconds, a knowable right answer, immediate located consequence, real answerable time pressure, mastery that accumulates. Then L4 tiny interaction surface and L8 one clear next action, 44px thumb targets.",
-      "rounds": []
+      "rounds": [
+        {
+          "n": "0 (v1)",
+          "verdict": "lose",
+          "score": 57,
+          "built": "Architecture built: build.js concatenates 12 parts into one formicary.html and hard-gates the constraints. Boots clean, no page errors, hygiene clean at 320/390/430.",
+          "gap": "THE CORE LOOP DOES NOT EXIST. 45-outbreak.js is still a 21-line stub; tryAnswer() returns false unconditionally. A player watches dots drift and is never asked to do anything.",
+          "laws": {
+            "L1": 8,
+            "L2": 7,
+            "L3": 5,
+            "L4": 6,
+            "L5": 8,
+            "L6": 4,
+            "L7": 6,
+            "L8": 4,
+            "L9": 8,
+            "L10": 1
+          },
+          "shots": [
+            "v1-ch0.png"
+          ]
+        }
+      ]
     },
     {
       "id": "T",
       "name": "TEACH \u2014 the ten-chapter sequence",
       "owns": "src/80-chapters.js, src/90-boot.js",
       "judged": "L1 one new idea at a time, L2 play first name second, L6 run it again and see (the chapter 4 A/B), L8 no dead time, L9 the sandbox is the reward",
-      "rounds": []
+      "rounds": [
+        {
+          "n": "0 (v1)",
+          "verdict": "close",
+          "score": 62,
+          "built": "Ten chapters wired. Verified by probe: chapter 0 has 4 workers, no tool bar, no table cells and zero enabled elements; chapter 9 enables all 28 with all 6 tools and a 117 goal. Progress rail present throughout.",
+          "gap": "Not yet independently judged \u2014 deferred to round 2 so round 1 could concentrate on the playability verdict.",
+          "laws": {
+            "L1": 8,
+            "L2": 7,
+            "L3": 6,
+            "L4": 7,
+            "L5": 8,
+            "L6": 5,
+            "L7": 6,
+            "L8": 5,
+            "L9": 8,
+            "L10": 2
+          },
+          "shots": []
+        }
+      ]
     },
     {
       "id": "R",
       "name": "READ \u2014 field and table legibility",
       "owns": "src/50-render.js, src/60-table.js",
       "judged": "L3 the causal beat visible, immediate and co-located; L7 readable at 390px; can a stranger read the field in three seconds; does a lit cell point at bodies on the field",
-      "rounds": []
+      "rounds": [
+        {
+          "n": "0 (v1)",
+          "verdict": "close",
+          "score": 60,
+          "built": "Field renders workers as 7px discs with state shown by shape not colour, jobs sized by value with progress fill, and a causal ticker under the field. Table draws all 28 cells with untaught ones as dashed ghosts, so the taxonomy visibly fills in as you learn it.",
+          "gap": "Not yet independently judged \u2014 deferred to round 2.",
+          "laws": {
+            "L1": 8,
+            "L2": 7,
+            "L3": 6,
+            "L4": 7,
+            "L5": 8,
+            "L6": 5,
+            "L7": 6,
+            "L8": 5,
+            "L9": 8,
+            "L10": 2
+          },
+          "shots": []
+        }
+      ]
     },
     {
       "id": "W",
       "name": "WORLD \u2014 28 detectors, trade-offs, balance",
       "owns": "src/30-elements.js, src/40-sim.js",
       "judged": "audit.js all 28 fire with working counters; CONTRACT section 15 trade-offs actually implemented and felt; conflicts resolve into force/passivity/truce/unsettled; speed raises throughput AND aggression; ch9 losable but winnable",
-      "rounds": []
+      "rounds": [
+        {
+          "n": "0 (v1)",
+          "verdict": "close",
+          "score": 61,
+          "built": "All 28 detectors live and measured. AUDIT: PASS \u2014 28 defined, none dead, no broken counters, counterWorks measured by comparing heat slope with the counter off vs on for the same seed, 12s for 6 trials x 40000 ticks. Determinism verified byte-identical per seed. Ch9 dies ungoverned in ~45s and reaches 117/117 when played well. 18 force keys documented so teaching chapters can guarantee their lesson.",
+          "gap": "CONTRACT section 15 trade-offs are not implemented \u2014 they were written after this was built. Every institution is still a strictly-good purchase, so the optimal strategy is just to buy everything as budget allows. That is the missing decision.",
+          "laws": {
+            "L1": 8,
+            "L2": 7,
+            "L3": 6,
+            "L4": 6,
+            "L5": 8,
+            "L6": 5,
+            "L7": 6,
+            "L8": 5,
+            "L9": 8,
+            "L10": 2
+          },
+          "shots": []
+        }
+      ]
     },
     {
       "id": "S",
       "name": "SHELL \u2014 visual system and voice",
       "owns": "src/00-head.html, src/10-style.css, src/15-body.html, src/20-copy.js",
       "judged": "L5 plainspoken warm funny voice, palette and typographic discipline, no layout break 320-430px, the real research facts landing as content rather than footnotes",
-      "rounds": []
+      "rounds": [
+        {
+          "n": "0 (v1)",
+          "verdict": "lose",
+          "score": 56,
+          "built": "IBM Plex Mono subsetted and embedded as base64 so the deliverable is genuinely one file with no network. Palette and no-border-radius gates pass. No horizontal scroll, no sub-30px targets.",
+          "gap": "The layout wastes half the phone. On chapter 0 the bottom 45 percent is empty white with two narrator lines floating in a void. Also the black field against the white page reads as two different applications stitched together.",
+          "laws": {
+            "L1": 8,
+            "L2": 7,
+            "L3": 6,
+            "L4": 7,
+            "L5": 8,
+            "L6": 5,
+            "L7": 5,
+            "L8": 5,
+            "L9": 8,
+            "L10": 2
+          },
+          "shots": [
+            "v1-gate.png"
+          ]
+        }
+      ]
     }
   ]
 }
