@@ -110,6 +110,67 @@ screen. Mastery is the ticket to complexity.
 - Full-complexity mode exists, is genuinely deep, and arrives last.
 - Everything the player learned is still true and still useful in it.
 
+### L10. THERE IS A CORE LOOP, AND IT IS A GAME
+**This law was added after the first playtest verdict: "not very playable."** It is now the
+highest-priority law in this document, because a build can satisfy L1–L9 and still be a
+documentary rather than a game.
+
+EoT's core loop is small and relentless: you are shown a situation, you make a choice, you
+immediately see the payoff, the situation changes, repeat — every few seconds, for twenty
+minutes. The loop is the product. Everything else is packaging.
+
+A build passes L10 only if all five are true:
+
+1. **A decision arrives every few seconds.** Not a meter to watch — a thing to answer. If the
+   player can look away for thirty seconds and lose nothing, there is no loop.
+2. **The decision has a right answer the player can work out.** Not a guess, not a slider.
+   Reading the situation correctly is a *skill that improves*. A player on their tenth minute
+   must be measurably better than on their first, and must feel it.
+3. **The consequence is immediate, visible, and located.** Correct answers visibly resolve the
+   thing. Wrong answers visibly fail, and teach why they were wrong.
+4. **There is real time pressure, and it is answerable.** The window must be short enough to
+   create urgency and long enough that a competent player makes it. Pressure that cannot be
+   answered is just a losing animation.
+5. **Something accumulates.** The player ends a session with more than a score: mastery,
+   vocabulary, a filled-in table — visible evidence of what they now know.
+
+*Failure signature:* the player taps a button, a toast appears, and nothing on screen changes.
+This is the exact failure of the FORMICARY baseline, and no amount of chapter structure or
+visual polish fixes it.
+
+---
+
+## 2B. THE ANSWER FOR THIS BUILD — THE OUTBREAK LOOP
+
+The mechanic that makes 28 detectors into a game rather than a taxonomy:
+
+> A detector fires. Instead of silently warming a table cell, it opens an **OUTBREAK**: drawn
+> on the field at the exact place it happened, named in one plain sentence, with a visible
+> fuse of a few seconds. While it burns it does real damage. The player reads *which failure
+> this is* and answers it with the right institution, in the right place, before the fuse
+> runs out.
+>
+> - **Right institution, in time** → the outbreak visibly closes, strain is refunded, and the
+>   element's table cell is marked as one the player has personally answered.
+> - **Wrong institution** → it does not resolve, the budget is spent, and the game tells you
+>   plainly why that tool does not address this failure.
+> - **Fuse expires** → the damage lands — work rolls back, workers are stunned, strain spikes
+>   — and it leaves a scar.
+
+This satisfies L10 completely: a decision every few seconds (1), with a knowable right answer
+that rewards learning the taxonomy (2), immediate located consequence (3), a real and
+answerable clock (4), and a table that fills in with elements you have personally diagnosed (5).
+
+It also makes the *subject matter* playable rather than illustrated. The player is not watching
+multiagent failure; they are doing the actual job — triage under time pressure, with
+institutional instruments, faster than machine speed. `Sp` machine speed becomes the difficulty
+curve itself: as interaction rate rises, fuses get shorter and outbreaks arrive in pairs, until
+a human genuinely cannot keep up. **That is the argument of the whole piece, delivered as a
+mechanic instead of a sentence.**
+
+Scoring note for critics: L10 is worth 10 points like the others, but a build that fails L10
+cannot receive a `win` verdict on any piece, regardless of its other scores.
+
 ---
 
 ## 3. STRUCTURAL SPECIFICS WORTH STEALING

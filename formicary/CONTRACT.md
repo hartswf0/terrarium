@@ -17,6 +17,7 @@ Parts, concatenated in this order:
 | `20-copy.js` | `<script>` | VOICE |
 | `30-elements.js` | `<script>` | SIM |
 | `40-sim.js` | `<script>` | SIM |
+| `45-outbreak.js` | `<script>` | PLAY |
 | `50-render.js` | `<script>` | FIELD |
 | `60-table.js` | `<script>` | TABLE |
 | `70-controls.js` | `<script>` | CONTROLS |
@@ -317,6 +318,67 @@ FZ.chapters = {
 
 Any part may add elements **inside** the container it owns. No part may remove or rename an id
 listed above.
+
+---
+
+## 14. `FZ.outbreak` — THE CORE LOOP (`45-outbreak.js`, owned by PLAY)
+
+**This is the most important part of the build.** Added after the first playtest verdict:
+*"not very playable."* Read `REFERENCE-EOT.md` §2B before touching it.
+
+Without this layer, a detector firing only warms a table cell — the player taps a button, sees
+a toast, and nothing on screen changes. This layer turns every one of the 28 detectors into a
+timed diagnosis the player must answer.
+
+```js
+FZ.outbreak = {
+  list,                       // active outbreaks, read by FIELD and TABLE
+  update(S),                  // called once per tick by the rAF loop, AFTER FZ.sim.step()
+  tryAnswer(kind, x, y),      // -> {hit:Boolean, right:Boolean, sym, msg}
+  mastery,                    // {sym: {answered, missed}} — persisted to localStorage
+  reset(scenario),
+};
+```
+
+An outbreak:
+
+```js
+{ sym, x, y, r,            // where it happened, and the radius an answer must land within
+  born, fuse,              // tick born, ticks until it lands its damage
+  say,                     // FZ.copy.fire[sym] — the plain sentence
+  answers: ['charter'],    // tool kinds that resolve it (from the element)
+  state }                  // 'burning' | 'answered' | 'landed'
+```
+
+Rules:
+
+1. **Opening.** Subscribe to `fire`. An element that fires while it has no live outbreak opens
+   one at `at`. Cap concurrent outbreaks by chapter (ch1–7: 1, ch8: 2, ch9: 3) so the player
+   is pressured but never swamped.
+2. **The fuse** must be short enough to be urgent and long enough to be answerable — start
+   around 6 seconds of real time and **scale down with `S.speedMul`**. This is how `Sp` machine
+   speed becomes the difficulty curve rather than a caption.
+3. **Answering.** CONTROLS calls `tryAnswer(kind, x, y)` *before* `FZ.sim.apply`, so a correct
+   answer can also refund or discount the tool's cost.
+   - right tool, within `r`, before the fuse → `state='answered'`, strain refunded, small
+     budget reward, `mastery[sym].answered++`, emit `outbreak:answered`.
+   - wrong tool → do **not** resolve; emit `outbreak:wrong` with a plain sentence from
+     `FZ.copy.wrong[sym]` explaining why that instrument does not address this failure. This
+     is the teaching moment; make it generous, not punitive.
+   - fuse expires → apply the element's real damage, `mastery[sym].missed++`, leave a scar
+     mark, emit `outbreak:landed`.
+4. **Every element declares its answer.** Add `answers: [kind…]` to each of the 28 element
+   defs in `30-elements.js`. Every element must have at least one answering institution, and
+   the mapping must be *learnable from the counter text the player can already read*.
+5. **Mastery accumulates** across sessions in `localStorage` under `formicary.mastery`, and
+   TABLE renders it — a cell the player has personally diagnosed is marked. This is L10.5.
+
+Events emitted: `outbreak:open {sym,x,y,fuse}`, `outbreak:answered {sym,x,y}`,
+`outbreak:wrong {sym,kind,msg}`, `outbreak:landed {sym,x,y}`.
+
+FIELD draws the outbreak ring, its fuse, and its resolution. TABLE pulses and marks the cell.
+CONTROLS routes answers. CHAPTERS sets the concurrency cap and may pre-script the first
+outbreak of a teaching chapter so the lesson is guaranteed.
 
 ---
 

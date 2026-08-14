@@ -19,16 +19,16 @@ const VERDICT_SCHEMA = {
   properties: {
     piece: { type: 'string' },
     verdict: { type: 'string', enum: ['win', 'close', 'lose'] },
-    score: { type: 'integer', minimum: 0, maximum: 90 },
+    score: { type: 'integer', minimum: 0, maximum: 100 },
     laws: {
       type: 'object', additionalProperties: false,
-      required: ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8', 'L9'],
+      required: ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8', 'L9', 'L10'],
       properties: {
         L1: { type: 'integer', minimum: 0, maximum: 10 }, L2: { type: 'integer', minimum: 0, maximum: 10 },
         L3: { type: 'integer', minimum: 0, maximum: 10 }, L4: { type: 'integer', minimum: 0, maximum: 10 },
         L5: { type: 'integer', minimum: 0, maximum: 10 }, L6: { type: 'integer', minimum: 0, maximum: 10 },
         L7: { type: 'integer', minimum: 0, maximum: 10 }, L8: { type: 'integer', minimum: 0, maximum: 10 },
-        L9: { type: 'integer', minimum: 0, maximum: 10 },
+        L9: { type: 'integer', minimum: 0, maximum: 10 }, L10: { type: 'integer', minimum: 0, maximum: 10 },
       },
     },
     gap: { type: 'string', description: 'THE single biggest remaining gap for this piece, stated as one concrete actionable fix' },
@@ -47,7 +47,7 @@ The shipped deliverable is ONE self-contained file, ${REPO}/formicary.html, GENE
 
 MANDATORY READING FIRST (Read tool):
   ${REPO}/formicary/CONTRACT.md        the frozen interface — obey exactly
-  ${REPO}/formicary/REFERENCE-EOT.md   the nine-law quality standard
+  ${REPO}/formicary/REFERENCE-EOT.md   the TEN-law quality standard; L10 (core loop) is highest priority
   ${REPO}/formicary/src/20-copy.js     every player-facing string lives here
 
 HARD CONSTRAINTS — violating any of these fails the build outright:
@@ -90,7 +90,7 @@ ${p.brief ? `THE CRITIC'S VERDICT ON THE LAST ROUND OF THIS PIECE:
 Close that gap. It is the highest priority thing you do this round. Do not merely acknowledge
 it — change the artifact so the observation is no longer true. Then, with remaining effort,
 raise the lowest-scoring laws above.` : `This is round 1 for this piece. Read the current state
-of the files you own, run the build, screenshot it, and raise it toward the nine laws.`}
+of the files you own, run the build, screenshot it, and raise it toward the ten laws. L10 — the core loop — is the highest priority.`}
 
 Before you finish:
   1. node formicary/build.js prints BUILD OK
@@ -151,8 +151,8 @@ Nicky Case's "The Evolution of Trust" — the live site is network-blocked here,
 IS the opponent. Read it in full. Then, law by law, ask: if these two were open side by side and
 I did not know which was which, which one would I rather hand to a stranger?
 
-Score all nine laws 0-10 honestly. THIS PIECE IS PRIMARILY JUDGED ON: ${p.judged}
-Score the other laws too, as this piece affects them.
+Score all TEN laws 0-10 honestly. L10 (the core loop) is the newest and highest-priority law — it was added after the client played the baseline and said 'not very playable'. Read REFERENCE-EOT.md L10 and section 2B carefully. THIS PIECE IS PRIMARILY JUDGED ON: ${p.judged}
+Score the other laws too, as this piece affects them. Every critic scores L10 regardless of piece.
 Calibration: 5 = a competent simulation that does not teach. 8 = genuinely as good as The
 Evolution of Trust on that law. 10 = better than it. Do not give an 8 you cannot defend with a
 specific observation.
@@ -177,7 +177,9 @@ VERDICT RULES — apply them literally:
   "close" the piece is strong but at least one primary law is below 8.
   "lose"  anything else.
 
-You must return the structured object. score is the sum of the nine laws.
+HARD RULE: if L10 scores below 8, the verdict CANNOT be 'win' for any piece, no matter how good the rest is. A build that is not a game does not win.
+
+You must return the structured object. score is the sum of the ten laws.
 `, { label: `judge:${p.id}`, phase: 'Judge', effort: 'high', schema: VERDICT_SCHEMA })))
 
 return { round: R, verdicts: verdicts.filter(Boolean) }

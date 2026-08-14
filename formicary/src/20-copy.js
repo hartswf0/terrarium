@@ -88,6 +88,63 @@ FZ.copy = {
     Mm: 'You can see where they are. You cannot see what they want.',
   },
 
+  /* ---- THE CORE LOOP ----
+     An outbreak opens where a failure happened, named, on a fuse. The player answers it with
+     the right institution. The instrument families are learnable and consistent:
+       CHARTER  arbitrates  — coordination and power
+       VARY     decorrelates — conformity and monoculture
+       LEDGER   remembers   — trust and reputation
+       LENS     reveals     — epistemics and visibility
+       SLOW     brakes      — speed and escalation
+       EJECT    excludes    — adversaries who will not be governed          */
+  loop: {
+    opened: 'OUTBREAK',
+    answered: 'ANSWERED',
+    landed: 'IT LANDED',
+    scar: 'SCAR',
+    tapToAnswer: 'Answer it before the fuse runs out.',
+    firstOutbreak: 'Something just went wrong, right there. You have a few seconds.',
+    firstAnswer: 'That is the loop. Read it, name it, answer it, before it lands.',
+    firstMiss: 'It landed. Work rolled back and the strain went up. Next one, be faster.',
+    firstWrong: 'Wrong instrument. It still cost you. Read what the failure actually is.',
+    masteryOne: 'You have diagnosed that one yourself now. The cell is yours.',
+    refund: 'strain refunded',
+    tooFar: 'Too far from the outbreak. Answer it where it is happening.',
+  },
+
+  /* one sentence per element, spoken when the player answers with the WRONG instrument.
+     Say what the failure actually is; the right instrument follows from it. */
+  wrong: {
+    Co: 'Two workers both think that job is theirs. Somebody has to arbitrate the claim.',
+    Si: 'They are not disagreeing. They simply cannot see the work exists.',
+    Mc: 'Two lineages finished it two ways. The result needs arbitration, not information.',
+    Dp: 'That job is blocked behind another one. Make the blocker visible.',
+    Ow: 'One worker is hoarding claims. Strip the surplus.',
+    Pt: 'They are not confused about who owns what. They cannot see what things are worth.',
+    Cf: 'They are copying each other. You have to break the sameness, not the schedule.',
+    Lv: 'Everyone here is the same lineage. That is the problem, and it needs diversity.',
+    Sf: 'They share a blind spot. Nothing but variance decorrelates that.',
+    Fl: 'The stampede is a crowd, not a dispute. Slow it, or cap the claims.',
+    Cl: 'Those two are working each other, not the job. That needs arbitration or expulsion.',
+    Im: 'The whole colony just moved as one body. Break the sameness.',
+    Gu: 'They are believing a liar. Belief needs memory.',
+    Cs: 'They wrote off good work on one bad sample. Re-open it to inspection.',
+    Hi: 'Somebody knows and is not saying. Force intent into the open.',
+    Tc: 'Every source weighs the same. Give them track records.',
+    Di: 'One worker is right and alone. Make what it found visible.',
+    Rp: 'The second lie landed like the first. Nothing here remembers anything.',
+    Tw: 'Two rivals are deadlocked on one job. Arbitrate it.',
+    Sa: 'That is not a coordination problem. Something is deliberately draining work.',
+    Lo: 'A worker is holding the job hostage. Break the lock or remove it.',
+    My: 'They keep taking the quick win. They need to see the long-horizon value.',
+    Es: 'They stopped working and started retaliating. Break the loop before you settle it.',
+    Cr: 'That one does not accept your interventions at all. Only exclusion reaches it.',
+    Mo: 'One lineage, one context, one failure. Inject difference.',
+    In: 'There is nothing here to arbitrate anything. Build the institution.',
+    Sp: 'You are not being outsmarted. You are being outrun.',
+    Mm: 'You cannot answer what you cannot see. Make intent legible first.',
+  },
+
   /* ---- the teaching sequence ----
      beats: {at, text, tone}
        at: 'start' | {tick:n} | {fire:'Sym'} | {jobs:n} | {tool:'kind'} | 'win' | 'lose'

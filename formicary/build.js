@@ -14,6 +14,7 @@ const ORDER = [
   ['20-copy.js', 'js'],
   ['30-elements.js', 'js'],
   ['40-sim.js', 'js'],
+  ['45-outbreak.js', 'js'],
   ['50-render.js', 'js'],
   ['60-table.js', 'js'],
   ['70-controls.js', 'js'],
