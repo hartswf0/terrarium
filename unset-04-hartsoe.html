@@ -1674,6 +1674,7 @@ body.watcher-role #crosshair{display:none!important}
         <div style="color:#19e6c8; font-weight:700; font-size:11px; letter-spacing:0.2em; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;" id="prop-title">BLUEPRINT DRAFT</div>
         <div style="display:flex; gap:4px;">
             <button id="btn-draft-reject" class="mini-btn" style="border-color:#ff2e2e; color:#ff2e2e;">DISCARD</button>
+            <button id="btn-draft-develop" class="mini-btn" style="border-color:#ffc83d; color:#ffc83d;" title="rebuild this massing in the house kit">DEVELOP</button>
             <button id="btn-draft-commit" class="mini-btn" style="background:#19e6c8; color:#000; border-color:#19e6c8;">COMMIT</button>
         </div>
     </div>
@@ -22481,36 +22482,60 @@ resetDrive(); requestAnimationFrame(frame);
                      y0: Math.min(A.y0, B.y0), y1: Math.max(A.y1, B.y1) } : B; }, null);
       const shift = (list, dx, dy) => list.forEach((bth) => {
         bth.quad = bth.quad.map((pt) => [pt[0] + dx, pt[1] + dy]); });
-      for (let pass = 0; pass < bays.length + 2; pass++) {   // every stranded wing, not the first eight
-        const comp = bays.map(() => -1);
-        let n = 0;
-        for (let i = 0; i < bays.length; i++) {
-          if (comp[i] >= 0) continue;
-          const stack = [i]; comp[i] = n;
-          while (stack.length) { const k = stack.pop();
-            for (let j = 0; j < bays.length; j++)
-              if (comp[j] < 0 && abut(bays[k], bays[j])) { comp[j] = n; stack.push(j); } }
-          n++;
+      // Knit each LEVEL on its own. A volume upstairs can never share a wall
+      // with one downstairs, so mixing them left the loop picking the same
+      // stranded upper floor every pass and joining nothing. Floors are tied
+      // together by the stair instead.
+      const lvlsIn = [];
+      bays.forEach((bth) => { const lv = bth.level || 0; if (lvlsIn.indexOf(lv) < 0) lvlsIn.push(lv); });
+      lvlsIn.forEach((lv) => {
+        const sub = bays.filter((bth) => (bth.level || 0) === lv);
+        if (sub.length < 2) return;
+        for (let pass = 0; pass < sub.length + 2; pass++) {
+          const comp = sub.map(() => -1);
+          let n = 0;
+          for (let i = 0; i < sub.length; i++) {
+            if (comp[i] >= 0) continue;
+            const stack = [i]; comp[i] = n;
+            while (stack.length) { const k = stack.pop();
+              for (let j = 0; j < sub.length; j++)
+                if (comp[j] < 0 && abut(sub[k], sub[j])) { comp[j] = n; stack.push(j); } }
+            n++;
+          }
+          if (n <= 1) break;
+          const size = new Array(n).fill(0); comp.forEach((c) => size[c]++);
+          const main = size.indexOf(Math.max.apply(null, size));
+          let pick = -1;
+          for (let c = 0; c < n; c++) if (c !== main) { pick = c; break; }
+          if (pick < 0) break;
+          const moveCells = sub.filter((_, i) => comp[i] === pick);
+          const B = bbxOf(moveCells);
+          const Bc = [(B.x0 + B.x1) / 2, (B.y0 + B.y1) / 2];
+          // Abut a REAL ROOM, not the main mass's bounding box — a box corner
+          // is empty air, which is how wings ended up touching nothing at all.
+          let A = null, bestD = Infinity;
+          sub.filter((_, i) => comp[i] === main).forEach((mc) => {
+            const M = bb(mc);
+            const d = Math.hypot((M.x0 + M.x1) / 2 - Bc[0], (M.y0 + M.y1) / 2 - Bc[1]);
+            if (d < bestD) { bestD = d; A = M; }
+          });
+          if (!A) break;
+          const SHARE = 4.2;
+          const Ac = [(A.x0 + A.x1) / 2, (A.y0 + A.y1) / 2];
+          // slide alongside it, or slide above/below it — whichever moves less
+          let hdy = 0;
+          if (Math.min(A.y1, B.y1) - Math.max(A.y0, B.y0) < SHARE)
+            hdy = Bc[1] < Ac[1] ? (A.y0 + SHARE) - B.y1 : (A.y1 - SHARE) - B.y0;
+          const hdx = Bc[0] >= Ac[0] ? A.x1 - B.x0 : A.x0 - B.x1;
+          let vdx = 0;
+          if (Math.min(A.x1, B.x1) - Math.max(A.x0, B.x0) < SHARE)
+            vdx = Bc[0] < Ac[0] ? (A.x0 + SHARE) - B.x1 : (A.x1 - SHARE) - B.x0;
+          const vdy = Bc[1] >= Ac[1] ? A.y1 - B.y0 : A.y0 - B.y1;
+          const useH = Math.hypot(hdx, hdy) <= Math.hypot(vdx, vdy);
+          shift(moveCells, useH ? hdx : vdx, useH ? hdy : vdy);
         }
-        if (n <= 1) break;
-        const size = new Array(n).fill(0); comp.forEach((c) => size[c]++);
-        const main = size.indexOf(Math.max.apply(null, size));
-        let pick = -1;
-        for (let c = 0; c < n; c++) if (c !== main) { pick = c; break; }
-        if (pick < 0) break;
-        const mainCells = bays.filter((_, i) => comp[i] === main);
-        const moveCells = bays.filter((_, i) => comp[i] === pick);
-        const A = bbxOf(mainCells), B = bbxOf(moveCells);
-        const SHARE = 4.2;
-        let dy = 0;
-        const oy = Math.min(A.y1, B.y1) - Math.max(A.y0, B.y0);
-        if (oy < SHARE) {                                   // slide it into line first
-          dy = (B.y0 + B.y1) / 2 < (A.y0 + A.y1) / 2
-            ? (A.y0 + SHARE) - B.y1 : (A.y1 - SHARE) - B.y0;
-        }
-        const dx = (B.x0 + B.x1) / 2 >= (A.x0 + A.x1) / 2 ? A.x1 - B.x0 : A.x0 - B.x1;
-        shift(moveCells, dx, dy);
-      }      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+      });
+      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
       bays.forEach((b) => b.quad.forEach((pt) => { x0 = Math.min(x0, pt[0]); x1 = Math.max(x1, pt[0]);
         y0 = Math.min(y0, pt[1]); y1 = Math.max(y1, pt[1]); }));
       const zE = m.wallZ, halfD = Math.max(1, (y1 - y0) / 2), cy = (y0 + y1) / 2;
@@ -23061,18 +23086,18 @@ resetDrive(); requestAnimationFrame(frame);
       console.info('full trace on window.__houseTrace — .sent.system, .sent.user and .reply are the exact bytes');
     } catch (_) {}
   }
-  async function generateHouse(promptText) {
+  async function generateHouse(promptText, presetIR) {
     let mod;
     try { mod = await depotModule(); } catch (e) { try { notify('DEPOT UNREACHABLE — ' + e.message.slice(0, 40)); } catch (_) {} return null; }
     const kit = mod.KIT;
-    let ir = irFromUtterance(promptText);          // works with no model at all
-    // The local translation is the FLOOR. If the model's own design cannot be
-    // certified, we fall back to this rather than building nothing — which is
-    // what "the named shapes are the quality bar" actually has to mean.
-    const irLocal = JSON.parse(JSON.stringify(ir));
-    let usingModelPlan = false;
+    const irLocal = irFromUtterance(promptText);   // works with no model at all
+    // The local translation is the FLOOR. If a designed plan — the model's, or
+    // one developed from a massing study — cannot be certified, we fall back to
+    // this rather than building nothing.
+    let ir = presetIR ? JSON.parse(JSON.stringify(presetIR)) : JSON.parse(JSON.stringify(irLocal));
+    let usingModelPlan = !!presetIR;
     let cfg = null; try { cfg = getAIConfig(); } catch (_) {}
-    let usable = false; try { usable = aiLocalAvailable(cfg); } catch (_) {}
+    let usable = false; try { usable = !presetIR && aiLocalAvailable(cfg); } catch (_) {}
     houseStage(0, ir.morphology.topology.toUpperCase());
     // ── THE RECEIPT ────────────────────────────────────────────────────────
     // You cannot tell whether a build consulted a model or invented an answer,
@@ -23201,6 +23226,7 @@ resetDrive(); requestAnimationFrame(frame);
         // the design came back uncertifiable — keep the request, drop the plan
         usingModelPlan = false;
         trace.modelPlanRejected = why;
+        trace.rejectedPlanWas = presetIR ? 'developed massing' : 'model design';
         ir = JSON.parse(JSON.stringify(irLocal));
         houseStage(3, 'MODEL PLAN REFUSED — FALLING BACK TO THE LOCAL BUILD');
       } else ir = repairIR(ir, why);
@@ -23309,6 +23335,67 @@ resetDrive(); requestAnimationFrame(frame);
     });
     paint();
   })();
+  // ── MASSING STUDY → DEVELOPED DESIGN ─────────────────────────────────────
+  // The two builders were never rivals: the world builder is fast and free
+  // with form, the house kit is slow and careful with construction. That is
+  // exactly a massing model and the developed design that follows it. DEVELOP
+  // reads the blueprint's volumes as a plan and rebuilds them in the kit —
+  // real walls, openings, a roof from one field, foundations cut to the slope.
+  function massingToIR(draft, promptText) {
+    const wg = draft && draft.wg;
+    if (!wg || !wg.root) throw new Error('no blueprint staged');
+    const S = (curLand && curLand.scale) || 1.84, FT = 0.3048 / S;
+    wg.root.updateMatrixWorld(true);
+    const base = wg.root.position.clone();
+    const list = [];
+    if (wg.pending && wg.pending.length) wg.pending.forEach((sd) => { if (sd && sd.mesh) list.push(sd.mesh); });
+    if (!list.length) wg.root.traverse((o) => { if (o.isMesh) list.push(o); });
+    const cells = [];
+    list.forEach((mset) => {
+      mset.updateMatrixWorld(true);
+      const b = new THREE.Box3().setFromObject(mset);
+      if (!Number.isFinite(b.min.x) || !Number.isFinite(b.max.x)) return;
+      const wft = (b.max.x - b.min.x) / FT, dft = (b.max.z - b.min.z) / FT, hft = (b.max.y - b.min.y) / FT;
+      if (!(wft > 0 && dft > 0)) return;
+      if (wft * dft < 70) return;                 // a room, not a rail, a finial or a tree
+      if (hft < 4) return;                        // a volume, not a slab or a step
+      const x0 = (b.min.x - base.x) / FT, x1 = (b.max.x - base.x) / FT;
+      const y0 = -(b.max.z - base.z) / FT, y1 = -(b.min.z - base.z) / FT;   // W maps house y to -world z
+      if (![x0, x1, y0, y1].every(Number.isFinite)) return;
+      if (Math.max(Math.abs(x0), Math.abs(x1), Math.abs(y0), Math.abs(y1)) > 320) return;
+      cells.push({ area: wft * dft, poly: [[x0, y0], [x1, y0], [x1, y1], [x0, y1]],
+        level: Math.max(0, Math.min(3, Math.round(((b.min.y - base.y) / FT) / 9))) });
+    });
+    if (cells.length < 2) throw new Error('the massing has no room-sized volumes to develop');
+    cells.sort((a, b) => b.area - a.area);
+    const keep = cells.slice(0, 40);
+    const USES = ['living', 'kitchen', 'bath', 'bed', 'bed', 'study', 'dining', 'hall'];
+    keep.forEach((c, i) => { c.use = USES[Math.min(i, USES.length - 1)]; c.id = 'm' + i; delete c.area; });
+    const nm = (String(promptText || 'massing').replace(/[^a-z0-9 ]/gi, '').trim().slice(0, 20).toUpperCase() || 'MASSING');
+    return { language: 'HOUSE-WORLD-IR/1', program_id: 'DEVELOPED-MASSING', name: nm,
+      intent: { analogy: 'developed massing', irreducible_invariants: ['the massing silhouette'] },
+      morphology: { topology: 'cells', protected_voids: [],
+        massing: { wallZ: 9, rise: 4.6, roof: 'gable', cells: keep } },
+      spaces: ['living', 'kitchen', 'bed', 'bath'],
+      systems: { water_path: 'grade', fireplace: true }, deck: true };
+  }
+  window.__developMassing = function () {
+    const d = window.__wgDraft;
+    if (!d) { try { notify('NOTHING STAGED TO DEVELOP'); } catch (_) {} return; }
+    let ir;
+    try { ir = massingToIR(d, window.__lastDraftPrompt || 'massing'); }
+    catch (e) { try { notify('CANNOT DEVELOP — ' + String(e.message).slice(0, 44)); } catch (_) {} return; }
+    const n = ir.morphology.massing.cells.length;
+    try { scene.remove(d.wg.root); } catch (_) {}
+    window.__wgDraft = null;
+    const ui = document.getElementById('proposal-ui'); if (ui) ui.classList.add('gone');
+    try { notify('DEVELOPING THE MASSING — ' + n + ' VOLUMES INTO THE HOUSE KIT'); } catch (_) {}
+    generateHouse(window.__lastDraftPrompt || 'massing', ir);
+  };
+  document.getElementById('btn-draft-develop')
+    && document.getElementById('btn-draft-develop').addEventListener('click', () => window.__developMassing());
+  window.__massingToIR = massingToIR;
+  window.__IR_GEN = IR_GEN;
   window.__irFromUtterance = irFromUtterance;
   window.__compileHouseIR = compileHouseIR;
   window.__certifyHouse = certifyHouse;
