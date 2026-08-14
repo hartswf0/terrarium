@@ -12071,6 +12071,12 @@ async function runAIAgent() {
             clearInterval(aiProgressInterval);   // the house pipeline drives the HUD with real stages
             return;
         }
+        // Everything past this point is the WORLD builder, which draws in
+        // primitives and knows nothing of the house kit. Say so, so a prompt
+        // that lands here is never mistaken for a house that came out badly.
+        console.info('%c[BUILDER] world/WG path — not the house kit. '
+            + 'Name a building, attach a reference image, or say "house:" to use the house builder.',
+            'color:#ffc83d');
     } catch(_){}
     const sceneSummary = physicsMeshes.map(m => ({ type: m.userData.type, pos: m.getWorldPosition(new THREE.Vector3()).toArray() }));
     const systemPrompt = buildAISystemPrompt(sceneSummary);
@@ -23271,6 +23277,27 @@ resetDrive(); requestAnimationFrame(frame);
         try { notify('REFERENCE IMAGE ATTACHED — DESCRIBE THE HOUSE AND SEND'); } catch (_) {} };
       r.readAsDataURL(f);
     });
+    // drag a picture anywhere onto the field and it becomes the reference
+    const takeFile = (f, how) => {
+      if (!f || !/^image\//.test(f.type)) return false;
+      if (f.size > 8 * 1024 * 1024) { try { notify('IMAGE TOO BIG — KEEP IT UNDER 8MB'); } catch (_) {} return true; }
+      const r = new FileReader();
+      r.onload = () => { window.__houseRef = String(r.result); paint();
+        try { notify('REFERENCE IMAGE ' + how + ' — NOW DESCRIBE THE HOUSE'); } catch (_) {} };
+      r.readAsDataURL(f); return true;
+    };
+    ['dragenter', 'dragover'].forEach((ev) => window.addEventListener(ev, (e) => {
+      if (e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files')) {
+        e.preventDefault(); e.dataTransfer.dropEffect = 'copy';
+        btn.style.borderColor = '#ffc83d'; btn.style.color = '#ffc83d';
+      }
+    }));
+    window.addEventListener('dragleave', () => paint());
+    window.addEventListener('drop', (e) => {
+      const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f && /^image\//.test(f.type)) { e.preventDefault(); takeFile(f, 'DROPPED'); }
+      else paint();
+    });
     window.addEventListener('paste', (e) => {
       const it = e.clipboardData && [...e.clipboardData.items].find((x) => /^image\//.test(x.type));
       if (!it) return;
@@ -23308,12 +23335,31 @@ resetDrive(); requestAnimationFrame(frame);
     'donut|doughnut|ring|annulus|torus|orbital|roundhouse|drum',
     'starship|spaceship|ship|hull|pod|capsule|ark|hangar|terminal|bunker|vault|granary|mill',
     'nest|hive|burrow|treehouse|houseboat|refuge|hermitage|retreat|outpost|basecamp|compound',
+    // named building types and landmarks — "taj mahal" matched nothing, so it
+    // fell through to the world builder and came back as white primitives
+    'mahal|mausoleum|mosque|minaret|cathedral|basilica|duomo|synagogue|stupa|pyramid|sphinx',
+    'colosseum|parthenon|acropolis|forum|villa|dacha|chalet|longhouse|roundhouse|barrow',
+    'ranch|homestead|steading|croft|almshouse|orphanage|asylum|barracks|garrison|watchtower',
+    'gatehouse|toll|granary|oast|kiln|forge|foundry|brewery|winery|distillery|dairy|creamery',
+    'bakery|market|arcade|bazaar|caravanserai|bathhouse|spa|infirmary|surgery|schoolhouse',
+    'meetinghouse|moot|guildhall|townhall|courthouse|parliament|embassy|consulate|manse|rectory',
+    'vicarage|priory|friary|convent|nunnery|hermitary|dovecote|stable|byre|sty|coop|apiary',
+    'gate|gateway|arch|archway|portal|pylon|obelisk|monument|folly|gazebo|bandstand|belvedere',
+    'shelter|shack|lean-?to|cloche|conservatory|orangery|aviary|vivarium|planetarium|rotunda',
   ].join('|') + ')\\b', 'i');
   // …except when the prompt is plainly about the rig, which is the other domain
   const VEHICLE_WORDS = /\b(rig|car|truck|kart|bike|wheel|wheels|chassis|engine|ramp|jump|track|loop|spoiler|suspension|axle|drone|boat|plane|rocket)\b/i;
+  // A word list can never hold every building a person can name, so it is no
+  // longer the only way in. A reference image, or language about FORM, is a
+  // request for architecture too — and on real ground that belongs to the
+  // house kit, not to the world builder's white primitives.
+  const FORM_WORDS = /\b(shaped|shape|silhouette|footprint|floor ?plan|storey|story|storeys|stories|gable|eaves|courtyard|colonnade|portico|facade|façade|wing|annex|dwelling|inhabit|live in|rooms?|bedrooms?|kitchen|bathroom)\b/i;
   window.__isBuildingPrompt = (t) => {
     const x = String(t || '');
-    return BUILDING_WORDS.test(x) && !(VEHICLE_WORDS.test(x) && !/house|home|cabin|dwelling|tower|castle/i.test(x));
+    if (VEHICLE_WORDS.test(x) && !BUILDING_WORDS.test(x) && !FORM_WORDS.test(x)) return false;
+    if (BUILDING_WORDS.test(x) || FORM_WORDS.test(x)) return true;
+    try { if (window.__refImage && window.__refImage()) return true; } catch (_) {}
+    return false;
   };
   window.__archSystemPrompt = function (sceneSummary) {
     const S = (curLand && curLand.scale) || 1.84;             // metres per world unit
