@@ -2,31 +2,32 @@
 <body>
 <div id="app">
 
-  <header id="hdr">
-    <div id="chapTitle">FORMICARY</div>
-    <div id="chapCount"></div>
+  <!-- TOP. Quiet persistent state and nothing else. A specimen label in ink on paper:
+       how far through, how much work is done, how much food is left, how much strain
+       the colony is under. No boxes, no meters that shout, no chapter title — the gate
+       card just said it. CONTRACT §12. -->
+  <header id="crown">
     <div id="progressRail"></div>
+    <div id="hdr">
+      <div id="statusStrip"></div>
+      <div id="chapTitle"></div>
+      <div id="chapCount"></div>
+    </div>
   </header>
 
-  <div id="stage">
-    <canvas id="field"></canvas>
-    <div id="aimHint"></div>
-    <div id="ticker"></div>
-    <div id="statusStrip"></div>
-  </div>
+  <!-- CENTRE. Almost entirely colony. It grows to fill everything the crown does not
+       take, and the action bar floats over it only while there is a decision.
+       #stage is a pass-through wrapper kept for boot's canvas measurement. -->
+  <main id="world">
+    <div id="stage"><canvas id="field"></canvas></div>
+    <div id="tagLayer"></div>
+  </main>
 
-  <div id="say"></div>
+  <!-- BOTTOM. Absent unless there is a decision. CONTROLS fills and empties it. -->
+  <div id="act"></div>
 
-  <div id="tableWrap">
-    <div id="etable"></div>
-  </div>
-
-  <div id="detail"></div>
-
-  <nav id="bar"></nav>
-
+  <div id="guide"></div>
   <div id="gate"></div>
   <div id="about"></div>
-  <div id="toast"></div>
 
 </div>

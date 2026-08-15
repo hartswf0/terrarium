@@ -1,17 +1,39 @@
 /* ============================================================
-   80-chapters.js — THE TEACHING SEQUENCE.  OWNER: CHAPTERS.
-   FZ.chapters = { list, start(i), next(), retry(), index }
+   80-chapters.js — THE PASSAGES.  OWNER: CHAPTERS.
+   FZ.chapters = { list, start(i), next(), retry(), index, phase(), update(S) }
 
-   Law 1 is the spine of this file: the player is never looking at a control, a cell
-   or a readout they have not been taught. Tools arrive one at a time; the table is
-   absent in chapter 0 and fills in a chapter at a time; each status readout appears
-   in the chapter that earns it.
+   Ten passages in a colony's life. Each is a setup card, a short piece of play, and
+   a naming card. Nothing else. Three rules govern every line of this file:
 
-   The `enabled` set is curated per chapter through cfg.chapter + cfg.teach, so no
-   failure is ever live before the instrument that answers it exists. (reset() enables
-   everything with el.chapter <= cfg.chapter, union cfg.teach.)
+   HANDS ON THE COLONY, FAST.  The old opening asked a stranger to watch for forty
+   seconds before anything was tappable. That is the moment a stranger checks whether
+   they can skip. THE COLONY is now four or five seconds long — one pass of the store
+   wall filling, and out. TWO AT ONCE hands over the meeting stone the instant the
+   first double claim catches, which is inside two seconds of BEGIN. From the first
+   tap to the player's first real decision is now about six seconds, not forty.
 
-   Every sentence here comes from FZ.copy. This file invents no English.
+   ONE IDEA AT A TIME.  The enabled set is curated per passage. TWO AT ONCE runs on
+   chapter 0 plus teach:['Co'] — exactly ONE of the twenty-eight is live, so the only
+   thing that can happen is the thing the passage is about. THE MEETING STONE then
+   widens to the whole coordination family under that same single instrument, which
+   is a different idea: one institution answers many failures.
+
+   PLAY FIRST, NAME SECOND, AND THE GATE IS WHERE THE NAMING HAPPENS.  During play
+   there is no taxonomy anywhere — the tag names a phenomenon, and that is all
+   (AESTHETIC §6, CONTRACT §12.3). The moment the passage ends, this file stamps the
+   phenomena the player actually witnessed with their drawn mark, their two-letter
+   code and their formal name, counts how many times each was seen, and rules the
+   plate teal where the player answered it and red where it landed. Then the research.
+   The code is a receipt for something the player already owns.
+
+   Every sentence here comes from FZ.copy. This file invents no English; it renders
+   marks, numerals and codes, which are instrumentation.
+
+   DELETED THIS ROUND: the whole narrator apparatus — the beat script, the queue, the
+   drain, the #say strip, the six-second hold that waited for lines that no longer
+   exist before it would show a gate. VOICE emptied `beats` when the narrator strip
+   was abolished; this file now stops pretending to have one. There is one message
+   region and CONTROLS owns it.
    ============================================================ */
 window.FZ = window.FZ || {};
 
@@ -21,50 +43,67 @@ FZ.chapters = (function () {
   var ALL6 = ['charter', 'vary', 'slow', 'lens', 'ledger', 'eject'];
 
   /* ---------------------------------------------------------------- scenarios
-     One config per chapter. Chapter 4 has two: the same seed, twice, with one
-     difference between them. */
+     One config per passage. Passage 5 has two: the same seed, twice, with exactly
+     one difference between them. */
   var CFG = [
 
-    /* 0 — THE COLONY. no tools, no table, no failures. just read the field. */
+    /* 1 — THE COLONY.  No failures, no instruments, no reading. Four crumbs into the
+       store wall and out, in about five seconds. This passage exists so the player
+       knows what a crumb and a store socket ARE before anything breaks one; it is a
+       held breath, not a chapter, and it must not outstay that. */
     { id: 'ch0', chapter: 0, teach: [], tools: [], table: false,
       seed: 101, speed: 1, budget: 0, collapseMax: Infinity, outbreakCap: 0,
-      agents: { n: 4, hues: [0, 1, 2] },
-      jobs: { n: 2, max: 2, value: 5, spawnEvery: 130 },
+      agents: { n: 8, hues: [0, 1, 2] },
+      jobs: { n: 4, max: 4, value: 2, spawnEvery: 45 },
       goal: { jobs: 4 }, force: {} },
 
-    /* 1 — TWO AT ONCE. the first failure, and nothing you can do about it yet.
-       The table itself arrives the moment the first failure is named — play first,
-       name second, and the vocabulary appears as a receipt for what you just saw. */
-    { id: 'ch1', chapter: 1, tools: [], table: false, tableOnFire: true,
-      seed: 202, speed: 1, budget: 0, collapseMax: Infinity, outbreakCap: 0,
-      agents: { n: 8, hues: [0, 1] },
-      jobs: { n: 3, max: 3, value: 5, spawnEvery: 220 },
-      goal: { jobs: 4 }, force: { coordination: true, pairEvery: 150 } },
+    /* 2 — TWO AT ONCE.  ONE element is live in the entire simulation: Co. A worker can
+       now claim from anywhere, so two of them start the same crumb from opposite ends,
+       and the sim guarantees the first pair at tick 40 — under a second. The meeting
+       stone comes with it, because a decision the player cannot answer is not a
+       decision, and because the fastest way to teach the verb of this whole game
+       (put the instrument where the trouble is) is to let them do it immediately.
+       Budget 4 is one stone and no slack: a right answer is refunded, a wrong place
+       is not, and there is always another double claim coming. */
+    { id: 'ch1', chapter: 0, teach: ['Co'], tools: ['charter'], table: false,
+      seed: 202, speed: 1, budget: 4, collapseMax: Infinity, outbreakCap: 1,
+      agents: { n: 7, hues: [0, 1] },
+      jobs: { n: 3, max: 3, value: 9, spawnEvery: 150 },
+      goal: { jobs: 3 }, force: { coordination: true, pairEvery: 140 } },
 
-    /* 2 — THE CHARTER. the first institution. Co Mc In Ow Lo, all answered by it. */
+    /* 3 — THE MEETING STONE.  The same one instrument, now against the whole
+       coordination family: Co Mc Ow Lo In. The new idea is not the arch, it is that
+       one institution answers five different failures — and that the ground was
+       empty before you built it. */
     { id: 'ch2', chapter: 2, tools: ['charter'], table: true,
       seed: 303, speed: 1, budget: 9, collapseMax: Infinity, outbreakCap: 1,
-      agents: { n: 10, hues: [0, 1] },
-      jobs: { n: 4, max: 4, value: 5, spawnEvery: 240 },
-      goal: { jobs: 5 },
-      force: { coordination: true, pairEvery: 170, lock: true, lockN: 2, overload: true } },
+      agents: { n: 11, hues: [0, 1] },
+      jobs: { n: 4, max: 4, value: 5, spawnEvery: 200 },
+      goal: { jobs: 4 },
+      force: { coordination: true, pairEvery: 130, lock: true, lockN: 2, overload: true } },
 
-    /* 3 — THE STAMPEDE. conformity feeds flooding; the brake is the answer. */
-    { id: 'ch3', chapter: 2, teach: ['Cf', 'Fl'], tools: ['slow', 'charter'], table: true,
+    /* 4 — THE STAMPEDE. Conformity feeds flooding; the brake is the answer. Narrowed to
+       exactly those two elements — with the whole coordination family still live the
+       arch kept answering first and the passage never taught its own lesson. */
+    { id: 'ch3', chapter: 0, teach: ['Cf', 'Fl'], tools: ['slow', 'charter'], table: true,
       seed: 404, speed: 1, budget: 8, collapseMax: Infinity, outbreakCap: 1,
       agents: { n: 14, hues: [0, 1] },
-      jobs: { n: 5, max: 5, value: 5, spawnEvery: 200 },
-      goal: { jobs: 5 }, force: { stampede: true } },
+      jobs: { n: 5, max: 6, value: 5, spawnEvery: 90 },
+      goal: { jobs: 7 }, force: { stampede: true } },
 
-    /* 4a — ONE FAMILY, run one. one lineage, one blind spot, no instruments. */
+    /* 5a — ONE FAMILY, run one. One lineage, one blind spot, no instruments. This is
+       the control arm of the experiment and it is the only passage in the game where
+       the player is deliberately given nothing to do, so it is kept to about ten
+       seconds and the thing it is waiting for — the whole family falling over at the
+       same instant — is unmissable when it lands. */
     { id: 'ch4', chapter: 0, teach: ['Mo', 'Lv', 'Sf'], tools: [], table: true,
       seed: 505, speed: 1, budget: 0, collapseMax: Infinity, outbreakCap: 0,
       agents: { n: 12 },
-      jobs: { n: 5, max: 5, value: 5, spawnEvery: 260 },
-      goal: { survive: 1050 },
-      force: { monoculture: true, poison: true, poisonN: 2 } },
+      jobs: { n: 5, max: 5, value: 5, spawnEvery: 200 },
+      goal: { survive: 640 },
+      force: { monoculture: true, poison: true, poisonN: 3 } },
 
-    /* 5 — THE LIAR. memory. */
+    /* 6 — THE LIAR. memory. */
     { id: 'ch5', chapter: 0, teach: ['Gu', 'Tc', 'Rp', 'Cs', 'Co', 'Mc', 'In'],
       tools: ['ledger', 'charter'], table: true,
       seed: 606, speed: 1, budget: 7, collapseMax: 140, outbreakCap: 1,
@@ -73,7 +112,7 @@ FZ.chapters = (function () {
       goal: { jobs: 5 },
       force: { rumor: true, lieEvery: 340, poison: true, coordination: true, pairEvery: 280 } },
 
-    /* 6 — THE DARK. legibility. */
+    /* 7 — THE DARK. legibility. */
     { id: 'ch6', chapter: 0, teach: ['Mm', 'Hi', 'Di', 'Si', 'Co', 'Mc', 'In'],
       tools: ['lens', 'charter'], table: true,
       seed: 707, speed: 1, budget: 7, collapseMax: 140, outbreakCap: 1,
@@ -82,7 +121,7 @@ FZ.chapters = (function () {
       goal: { jobs: 5 },
       force: { silo: true, hidden: true, poison: true, dark: true, coordination: true, pairEvery: 240 } },
 
-    /* 7 — THE SPOIL-SPORT. the last resort. opens with the lens already lit. */
+    /* 8 — THE SPOIL-SPORT. the last resort. opens with the lens already lit. */
     { id: 'ch7', chapter: 0, teach: ['Sa', 'Cr', 'Tw', 'Es', 'Cl', 'Lo', 'Co', 'In'],
       tools: ['eject', 'lens', 'slow', 'charter'], table: true, openLens: true,
       seed: 808, speed: 1, budget: 9, collapseMax: 140, outbreakCap: 1,
@@ -92,7 +131,7 @@ FZ.chapters = (function () {
       force: { saboteur: true, advN: 1, incorrigible: true, incN: 1, rivals: true, rivalN: 2,
                churn: true, lock: true, lockN: 1 } },
 
-    /* 8 — MACHINE SPEED. everything learned so far, accelerating. */
+    /* 9 — MACHINE SPEED. everything learned so far, accelerating. */
     { id: 'ch8', chapter: 0,
       teach: ['Sp', 'Dp', 'My', 'Pt', 'Im', 'Cf', 'Fl', 'Co', 'Mc', 'In', 'Lo'],
       tools: ['slow', 'charter', 'lens', 'vary'], table: true,
@@ -103,7 +142,8 @@ FZ.chapters = (function () {
       force: { speed: true, speedmax: 2.6, speedrate: 700, dependency: true, myopia: true,
                stampede: true, coordination: true, pairEvery: 200 } },
 
-    /* 9 — THE FORMICARY. all twenty-eight, all six, 117 jobs. */
+    /* 10 — THE FORMICARY. all twenty-eight, all six, 117 crumbs. The sandbox is the
+       reward and it arrives last, and everything learned is still true inside it. */
     { id: 'ch9', chapter: 9, all: true, tools: ALL6.slice(), table: true,
       seed: 1117, speed: 1.15, budget: 8, collapseMax: 100, outbreakCap: 3,
       agents: { n: 16, hues: [0, 0, 0, 0, 0, 0, 0, 1] },
@@ -118,12 +158,16 @@ FZ.chapters = (function () {
       } },
   ];
 
-  /* 4b — the re-run. Identical seed, identical poison, identical length.
-     The one difference is that VARY exists. */
+  /* 5b — THE RE-RUN.  Identical seed, identical lineage, identical poison, identical
+     length. The ONE difference in the entire configuration is that the seed exists.
+     This is the controlled experiment the whole standard is built on, so nothing else
+     may drift: it is cloned from CFG[4] rather than written out again, and the diff
+     below is the whole diff. */
+  var AB_SEED = CFG[4].seed;
   var CFG4B = (function () {
-    var a = CFG[4], b = {};
-    for (var k in a) b[k] = a[k];
-    b.tools = ['vary'];
+    var a = CFG[4], b = {}, k;
+    for (k in a) b[k] = a[k];
+    b.tools = ['vary'];              /* <- the one variable */
     b.budget = 4;
     b.outbreakCap = 1;
     return b;
@@ -131,18 +175,24 @@ FZ.chapters = (function () {
 
   /* ------------------------------------------------------------------- state */
   var idx = 0, run = 0, phase = 'gate';
-  var beats = [], queue = [], shownAt = 0, cur = null, pending = null, pendAt = 0;
-  var abFires = [0, 0];              /* chapter 4: how hot Sf got, run 1 vs run 2 */
-  var used = {};                     /* tools spent this run */
-  var sfHit = 0;                     /* workers taken down by Sf this run */
+  var pending = null, pendAt = 0;
+  var witness = {}, ansd = {}, hit = {};   /* what the player saw, answered, was hit by */
+  var used = {};                           /* instruments spent this run */
+  var sfHit = 0;                           /* workers taken down together this run */
+  var abFires = [0, 0];
+  var abTries = 0;                         /* re-offers of the re-run, so it cannot loop */
   var counteredEver = {};
   var wired = false, built = false;
-  var app = null, gate = null, sayEl = null, rail = null, titleEl = null, countEl = null, strip = null, aboutEl = null;
+  var app = null, gate = null, rail = null, titleEl = null, countEl = null, strip = null, aboutEl = null;
   var stripCells = null;
   var api;
 
+  /* the world visibly settles on the deciding frame before the paper comes down */
+  var SETTLE = 600;
+
   function C(i) { return (FZ.copy.chapters && FZ.copy.chapters[i]) || {}; }
   function ui(k) { return (FZ.copy.ui && FZ.copy.ui[k]) || ''; }
+  function phen(s) { return (FZ.copy.phen && FZ.copy.phen[s]) || {}; }
   function cfgFor(i, r) { return (i === 4 && r === 1) ? CFG4B : CFG[i]; }
   function el(tag, cls, txt) {
     var n = document.createElement(tag);
@@ -151,93 +201,49 @@ FZ.chapters = (function () {
     return n;
   }
 
-  /* --------------------------------------------------------------- narrator */
-  function enqueue(text, tone) {
-    if (!text) return;
-    if (cur && cur.text === text) return;
-    for (var i = 0; i < queue.length; i++) if (queue[i].text === text) return;
-    queue.push({ text: text, tone: tone || 'plain' });
-  }
-  function drain() {
-    if (!queue.length || !sayEl) return;
-    var now = performance.now();
-    var hold = queue.length > 2 ? 1500 : 2600;
-    if (cur && now - shownAt < hold) return;
-    cur = queue.shift();
-    shownAt = now;
-    sayEl.textContent = cur.text;
-    sayEl.setAttribute('data-tone', cur.tone);
-    sayEl.classList.remove('in'); void sayEl.offsetWidth; sayEl.classList.add('in');
-  }
-
-  /* ------------------------------------------------------------------ beats */
-  function loadBeats(i) {
-    var src = C(i).beats || [];
-    beats = src.map(function (b) { return { at: b.at, text: b.text, tone: b.tone, used: false, headAt: null }; });
-    evc = {};
-    queue.length = 0; cur = null; shownAt = 0;
-    if (sayEl) { sayEl.textContent = ''; sayEl.removeAttribute('data-tone'); }
-  }
-  /* Beats are a script, not a set of independent triggers: only the next unspoken line
-     can fire, so a line that assumes the one before it can never arrive first.
-     Events (a detector firing, a tool being spent) are RECORDED rather than matched
-     on the spot, so a beat still gets its trigger if it was not yet the head when the
-     thing happened. A head beat whose trigger never comes at all is dropped after SKIP
-     ticks, so the narrator can never go permanently silent. */
-  var SKIP = 500;
-  var evc = {};                      /* recorded, unconsumed triggers */
-
-  function record(key) { evc[key] = (evc[key] || 0) + 1; pump(); }
-
-  function match(at, S) {
-    if (at === 'start') return 'start';
-    if (!at || typeof at !== 'object') return false;
-    if (at.tick != null) return S.tick >= at.tick;
-    if (at.jobs != null) return S.jobsDone >= at.jobs;
-    if (at.fire) return evc['fire:' + at.fire] > 0 ? 'fire:' + at.fire : false;
-    if (at.tool) return evc['tool:' + at.tool] > 0 ? 'tool:' + at.tool : false;
-    return false;
-  }
-
-  function pump() {
-    var S = FZ.sim.state;
-    for (var i = 0; i < beats.length; i++) {
-      var b = beats[i];
-      if (b.used) continue;
-      if (b.headAt == null) b.headAt = S.tick;
-      var m = match(b.at, S);
-      if (m) {
-        b.used = true;
-        if (typeof m === 'string' && evc[m]) evc[m]--;
-        FZ.bus.emit('say', { text: b.text, tone: b.tone });
-        return true;
-      }
-      if (S.tick - b.headAt < SKIP) return false;
-      /* Overdue — but only drop it if it is actually blocking a line that could speak
-         now. A trigger that is merely slow still gets to arrive. */
-      var blocking = false;
-      for (var j = i + 1; j < beats.length; j++) {
-        if (!beats[j].used && match(beats[j].at, S)) { blocking = true; break; }
-      }
-      if (!blocking) return false;
-      b.used = true;
-    }
-    return false;
-  }
-
   /* ------------------------------------------------------------------- chrome */
+  /* The naming plate and the A/B rail are instrumentation: rectilinear, mono, tabular,
+     and the only two signal colours on them are teal for held and red for landed. */
+  var CSS =
+    '.gtPlates{padding-top:9px;padding-bottom:4px}' +
+    '.npl{display:flex;align-items:center;gap:10px;margin:0 -16px;' +
+    'padding:9px 16px 9px 13px;border-left:3px solid rgba(0,0,0,.28);' +
+    'border-bottom:1px solid rgba(0,0,0,.13)}' +
+    '.npl.ok{border-left-color:#19e6c8}' +
+    '.npl.hit{border-left-color:#ff2e2e}' +
+    '.npl:last-child{border-bottom:0}' +
+    '.npg{flex:0 0 auto;width:22px;height:22px;color:#17150f}' +
+    '.npg svg{width:22px;height:22px;display:block}' +
+    '.npt{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}' +
+    '.npn{font-size:11.5px;font-weight:700;letter-spacing:.11em;line-height:1.14}' +
+    '.npc{font-size:9px;font-weight:500;letter-spacing:.14em;line-height:1.1;' +
+    'color:rgba(0,0,0,.5);text-transform:uppercase}' +
+    /* the two-letter code keeps its own casing — it is a symbol, not a word */
+    '.npc .npk{font-weight:700;letter-spacing:.06em;text-transform:none;color:rgba(0,0,0,.66)}' +
+    '.npv{flex:0 0 auto;min-width:16px;text-align:right;font-size:14px;font-weight:700;' +
+    'font-variant-numeric:tabular-nums;color:rgba(0,0,0,.55)}' +
+    '.gtAB .abk{flex:0 0 auto;font-size:9px;font-weight:500;letter-spacing:.1em;' +
+    'color:rgba(0,0,0,.4);font-variant-numeric:tabular-nums}';
+
+  function chromeCSS() {
+    if (document.getElementById('fzGateCSS')) return;
+    var s = document.createElement('style');
+    s.id = 'fzGateCSS';
+    s.textContent = CSS;
+    document.head.appendChild(s);
+  }
+
   function buildChrome() {
     if (built) return;
+    chromeCSS();
     app = document.getElementById('app');
     gate = document.getElementById('gate');
-    sayEl = document.getElementById('say');
     rail = document.getElementById('progressRail');
     titleEl = document.getElementById('chapTitle');
     countEl = document.getElementById('chapCount');
     strip = document.getElementById('statusStrip');
     aboutEl = document.getElementById('about');
 
-    /* header: title + count + the about affordance, not front-loaded */
     var hdr = document.getElementById('hdr');
     if (hdr && titleEl && countEl && !document.getElementById('aboutBtn')) {
       var row = el('div', 'hrow');
@@ -318,8 +324,49 @@ FZ.chapters = (function () {
     });
   }
 
+  /* ------------------------------------------------------------ the naming
+     THE PAYOFF, not an interruption. The player has just spent thirty seconds
+     watching a phenomenon and answering it by its body. Here it gets its drawn
+     mark, its scientific code and its formal name — and a count of how many times
+     it happened to this particular colony. The rule down the left edge is the
+     verdict: teal where she answered it, red where it landed on her. */
+  function witnessed() {
+    var out = [], s, e;
+    for (s in witness) {
+      e = FZ.ELBY ? FZ.ELBY[s] : null;
+      if (!e || !witness[s]) continue;
+      out.push({ e: e, n: witness[s], ok: !!ansd[s], hit: !!hit[s] });
+    }
+    out.sort(function (a, b) { return (b.ok - a.ok) || (b.n - a.n); });
+    return out.slice(0, 3);
+  }
+
+  function plateRow(r) {
+    var row = el('div', 'npl' + (r.ok ? ' ok' : (r.hit ? ' hit' : '')));
+    var g = el('span', 'npg');
+    if (r.e.glyph) g.innerHTML = r.e.glyph;
+    row.appendChild(g);
+    var t = el('span', 'npt');
+    t.appendChild(el('span', 'npn', phen(r.e.sym).name || r.e.nm || ''));
+    var c = el('span', 'npc');
+    c.appendChild(el('b', 'npk', r.e.sym));
+    c.appendChild(document.createTextNode('  ' + (r.e.nm || '')));
+    t.appendChild(c);
+    row.appendChild(t);
+    row.appendChild(el('span', 'npv', String(r.n)));
+    return row;
+  }
+
+  /* the head is VOICE's 'WHAT THAT WAS'. It sits over the plate, because the plate IS
+     what that was; the research paragraph reads on from it with no second label. */
   function learnBlock(inn, i) {
+    var w = witnessed();
     inn.appendChild(el('div', 'gtHead', ui('learned')));
+    if (w.length) {
+      var box = el('div', 'gtPlates');
+      w.forEach(function (r) { box.appendChild(plateRow(r)); });
+      inn.appendChild(box);
+    }
     inn.appendChild(el('div', 'gtBody', C(i).learn || ''));
   }
 
@@ -333,33 +380,40 @@ FZ.chapters = (function () {
     }, 'good');
   }
 
-  /* chapter 4, between the two runs and after them */
-  function rerunGate() {
-    phase = 'result';
-    showGate(function (box) {
-      var inn = head(box, 4);
-      inn.appendChild(el('div', 'gtWin', C(4).win || ''));
-      box.appendChild(gateBtn(ui('again'), function () { begin(4, 1); }));
-    }, 'good');
-  }
-  /* one row per run: how hot Sf got, on the same heat scale the table has been
-     showing all game. Same seed, same poison, one difference. */
-  function abRow(n, sym, val, isB, scale) {
+  /* ------------------------------------------------------- the controlled re-run
+     One row per run, on one shared scale: how many workers went down in the same
+     instant. Same seed stamped on both rows, same element, same length of run — so
+     the only thing that can explain a shorter bar is the seed. */
+  function abRow(n, val, isB, scale) {
     var r = el('div', 'abr' + (isB ? ' b' : ''));
     r.appendChild(el('span', 'abn', String(n)));
-    var e = FZ.ELBY ? FZ.ELBY[sym] : null;
+    var e = FZ.ELBY ? FZ.ELBY.Sf : null;
     var g = el('span', 'abg');
     if (e && e.glyph) g.innerHTML = e.glyph;
     r.appendChild(g);
-    r.appendChild(el('span', 'abs', sym));
+    r.appendChild(el('span', 'abk', String(AB_SEED)));
     var bar = el('span', 'abb');
     var fill = el('i');
-    fill.style.width = Math.max(0, Math.min(100, Math.round(val / (scale || 1) * 100))) + '%';
+    fill.style.width = Math.max(val > 0 ? 3 : 0, Math.min(100, Math.round(val / (scale || 1) * 100))) + '%';
     bar.appendChild(fill);
     r.appendChild(bar);
     r.appendChild(el('span', 'abv', String(val)));
     return r;
   }
+
+  /* between the two runs: what run one cost, and the one thing to change */
+  function rerunGate() {
+    phase = 'result';
+    showGate(function (box) {
+      var inn = head(box, 4);
+      inn.appendChild(el('div', 'gtWin', C(4).win || ''));
+      var ab = el('div', 'gtAB');
+      ab.appendChild(abRow(1, abFires[0], false, Math.max(1, abFires[0])));
+      inn.appendChild(ab);
+      box.appendChild(gateBtn(ui('again'), function () { begin(4, 1); }));
+    }, 'good');
+  }
+
   function afterGate() {
     phase = 'result';
     showGate(function (box) {
@@ -368,8 +422,8 @@ FZ.chapters = (function () {
       inn.appendChild(el('div', 'gtWin', rr.after || ''));
       var ab = el('div', 'gtAB');
       var sc = Math.max(1, abFires[0], abFires[1]);
-      ab.appendChild(abRow(1, 'Sf', abFires[0], false, sc));
-      ab.appendChild(abRow(2, 'Sf', abFires[1], true, sc));
+      ab.appendChild(abRow(1, abFires[0], false, sc));
+      ab.appendChild(abRow(2, abFires[1], true, sc));
       inn.appendChild(ab);
       learnBlock(inn, 4);
       box.appendChild(gateBtn(ui('next'), function () { api.next(); }));
@@ -383,6 +437,12 @@ FZ.chapters = (function () {
       var inn = head(box, idx);
       var sen = (FZ.copy.fire && FZ.copy.fire[why]) || '';
       inn.appendChild(el('div', 'gtWin', sen));
+      var e = FZ.ELBY ? FZ.ELBY[why] : null;
+      if (e) {
+        var box2 = el('div', 'gtPlates');
+        box2.appendChild(plateRow({ e: e, n: witness[why] || 1, ok: false, hit: true }));
+        inn.appendChild(box2);
+      }
       box.appendChild(gateBtn(ui('retry'), function () { begin(idx, run); }));
     }, 'bad');
   }
@@ -402,9 +462,13 @@ FZ.chapters = (function () {
       live.slice(0, 5).forEach(function (e) { l1.appendChild(pmRow(e, e.fires)); });
       inn.appendChild(l1);
     }
+    /* the second list only earns its space when it is not the first list again. An
+       ungoverned run answers nothing, so the two are identical and one of them is noise. */
     var never = live.filter(function (e) { return !counteredEver[e.sym]; });
-    var same = never.slice(0, 5).every(function (e, k) { return live[k] === e; });
-    if (never.length && !(same && never.length <= 5)) {
+    var top = never.slice(0, 5);
+    var same = top.length === Math.min(5, live.length) &&
+      top.every(function (e, k) { return live[k] === e; });
+    if (never.length && !same) {
       inn.appendChild(el('div', 'gtHead', (FZ.copy.end && FZ.copy.end.unusedTitle) || ''));
       var l2 = el('div', 'gtList');
       never.slice(0, 5).forEach(function (e) { l2.appendChild(pmRow(e, e.fires)); });
@@ -489,19 +553,20 @@ FZ.chapters = (function () {
   function wire() {
     if (wired) return;
     wired = true;
-    FZ.bus.on('say', function (d) { if (d) enqueue(d.text, d.tone); });
+    /* WHAT THE PLAYER ACTUALLY WITNESSED. Counted here, per run, from the live
+       simulation — never asserted. The gate can only name what really happened. */
     FZ.bus.on('fire', function (d) {
-      if (!d || phase !== 'play') return;
-      /* chapter 4 counts the bodies: how many workers one synchronized failure takes
-         down at once is the whole difference between the two runs. */
+      if (!d || !d.sym || phase !== 'play') return;
+      witness[d.sym] = (witness[d.sym] || 0) + 1;
+      /* the re-run counts bodies: how many workers one synchronized failure takes
+         down at the same instant is the whole difference between the two runs. */
       if (idx === 4 && d.sym === 'Sf') sfHit += (d.who && d.who.length) || 1;
-      if (app && cfgFor(idx, run).tableOnFire) app.classList.remove('noTable');
-      record('fire:' + d.sym);
     });
+    FZ.bus.on('outbreak:answered', function (d) { if (d && d.sym) ansd[d.sym] = 1; });
+    FZ.bus.on('outbreak:landed', function (d) { if (d && d.sym) hit[d.sym] = 1; });
     FZ.bus.on('intervene', function (d) {
-      if (!d || !d.ok) return;
-      if (d.kind) used[d.kind] = (used[d.kind] || 0) + 1;
-      if (phase === 'play') record('tool:' + d.kind);
+      if (!d || !d.ok || !d.kind) return;
+      used[d.kind] = (used[d.kind] || 0) + 1;
     });
     FZ.bus.on('goal', function () { if (phase === 'play') won(); });
     FZ.bus.on('lose', function (d) { if (phase === 'play') lost(d && d.why); });
@@ -510,11 +575,12 @@ FZ.chapters = (function () {
   function begin(i, r) {
     buildChrome();
     wire();
-    idx = i; run = r || 0;
+    idx = i; run = r || 0; api.index = i;
     var cfg = cfgFor(i, run);
 
     pending = null;
     used = {};
+    witness = {}; ansd = {}; hit = {};
     sfHit = 0;
     counteredEver = {};
     FZ.sim.reset(cfg);
@@ -531,34 +597,29 @@ FZ.chapters = (function () {
     railTo(i);
     stripFor(cfg);
 
-    loadBeats(i);
     hideGate();
     phase = 'play';
 
-    /* chapter 7 opens with the lens already lit — the copy assumes you can see */
+    /* passage 8 opens with the lantern already lit — the copy assumes you can see */
     if (cfg.openLens) FZ.sim.apply('lens');
 
     FZ.bus.emit('chapter:enter', { index: i, cfg: cfg });
-
-    /* the re-run speaks its own opening line: same colony, one difference */
-    if (i === 4 && run === 1) {
-      var rr = C(4).rerun || {};
-      FZ.bus.emit('say', { text: rr.intro || '', tone: 'name' });
-    }
-    pump();
-    drain();
   }
 
-  /* a gate never cuts the narrator off mid-thought: the world freezes on the deciding
-     frame, the remaining lines are spoken, then the card comes up. */
+  /* the world freezes on the deciding frame long enough to be read, then the paper
+     comes down. No queue, no narrator, no six-second wait for lines that do not exist. */
   function after(fn) { pending = fn; pendAt = performance.now(); }
 
   function won() {
     phase = 'result';
-    record('win');
     if (idx === 4) {
       abFires[run] = sfHit;
-      after(run === 0 ? rerunGate : afterGate);
+      if (run === 0) { after(rerunGate); return; }
+      /* the re-run only teaches if the one difference was actually spent. If it was
+         not, this was the same run twice and there is nothing to compare — offer it
+         again rather than showing an empty comparison. */
+      if (!used.vary && abTries < 2) { abTries++; after(rerunGate); return; }
+      after(afterGate);
       return;
     }
     if (idx >= CFG.length - 1) { after(function () { endGate(true); }); return; }
@@ -567,13 +628,12 @@ FZ.chapters = (function () {
 
   function lost(why) {
     phase = 'result';
-    record('lose');
     if (idx >= CFG.length - 1) { after(function () { endGate(false); }); return; }
     after(function () { loseGate(why || 'In'); });
   }
 
   api = {
-    list: CFG.map(function (c, i) { return { cfg: c, script: (C(i).beats || []) }; }),
+    list: CFG.map(function (c, i) { return { cfg: c, script: [] }; }),
     index: 0,
     phase: function () { return phase; },
 
@@ -583,10 +643,18 @@ FZ.chapters = (function () {
       i = Math.max(0, Math.min(CFG.length - 1, i | 0));
       idx = i; run = 0; api.index = i;
       pending = null;
+      witness = {}; ansd = {}; hit = {};
+      if (i !== 4) abTries = 0;
       var cfg = CFG[i];
       /* the gate is shown over a world that is already correct behind it */
       FZ.sim.reset(cfg);
-      if (FZ.table) FZ.table.setEnabled(FZ.sim.enabled);
+      /* and over a world with nothing left burning in it. Without this the previous
+         passage's live outbreak survives into the gate: FIELD keeps drawing a ring for
+         an incident in a colony that no longer exists, and the field guide — which by
+         contract may never open while something burns — can never be opened again for
+         the rest of the run, including at the between-episode moment it exists for. */
+      if (FZ.outbreak && FZ.outbreak.reset) FZ.outbreak.reset(cfg);
+      if (FZ.table) { FZ.table.close && FZ.table.close(); FZ.table.setEnabled(FZ.sim.enabled); }
       if (FZ.controls) FZ.controls.setAvailable([]);
       if (app) {
         app.classList.toggle('noTable', cfg.table === false);
@@ -610,21 +678,13 @@ FZ.chapters = (function () {
       api.index = idx;
       if (built) paintStrip(S);
       if (phase === 'play') {
-        pump();
-        /* the re-run only teaches if the one difference actually gets spent */
-        if (idx === 4 && run === 1 && !used.vary && S.tick === 320) {
-          FZ.bus.emit('say', { text: (C(4).rerun || {}).intro || '', tone: 'name' });
-        }
         for (var i = 0; i < FZ.EL.length; i++) {
           var e = FZ.EL[i];
           if (e.countered && FZ.sim.enabled.has(e.sym)) counteredEver[e.sym] = 1;
         }
       }
-      drain();
-      if (pending) {
-        var now = performance.now();
-        var quiet = !queue.length && now - shownAt > 1500;
-        if (quiet || now - pendAt > 6000) { var f = pending; pending = null; f(); }
+      if (pending && performance.now() - pendAt > SETTLE) {
+        var f = pending; pending = null; f();
       }
     },
   };

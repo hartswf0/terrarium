@@ -7,7 +7,7 @@
 (function () {
   'use strict';
 
-  var stage, canvas, strip, ticker, lastW = 0, lastH = 0;
+  var stage, canvas, crown, lastW = 0, lastH = 0;
 
   function applySize(w, h) {
     lastW = w; lastH = h;
@@ -25,7 +25,7 @@
     var h = Math.round(canvas.clientHeight);
     if (w < 40 || h < 40) {
       w = Math.round(stage.clientWidth);
-      h = Math.round(stage.clientHeight - ((strip && strip.offsetHeight) || 0) - ((ticker && ticker.offsetHeight) || 0));
+      h = Math.round(stage.clientHeight);
     }
     w = Math.max(160, w); h = Math.max(120, h);
     if (w === lastW && h === lastH) return;
@@ -35,8 +35,7 @@
   function boot() {
     stage = document.getElementById('stage');
     canvas = document.getElementById('field');
-    strip = document.getElementById('statusStrip');
-    ticker = document.getElementById('ticker');
+    crown = document.getElementById('crown');
 
     if (FZ.render && FZ.render.init && canvas) { try { FZ.render.init(canvas); } catch (e) { console.error(e); } }
     sizeField();
@@ -45,13 +44,14 @@
 
     window.addEventListener('resize', sizeField, { passive: true });
     window.addEventListener('orientationchange', function () { setTimeout(sizeField, 220); });
-    /* observe the canvas, not only the stage: the ticker growing to a second line
+    /* observe the canvas, not only the stage: the crown growing to a second line
        shrinks the field without changing the stage at all. */
     if (window.ResizeObserver) {
       try {
         var ro = new ResizeObserver(sizeField);
         if (stage) ro.observe(stage);
         if (canvas) ro.observe(canvas);
+        if (crown) ro.observe(crown);
       } catch (e) { }
     }
     document.addEventListener('gesturestart', function (e) { e.preventDefault(); });

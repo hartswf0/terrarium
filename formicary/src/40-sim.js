@@ -82,10 +82,111 @@
           SLOW lowers tempo, so it lowers both. It is a real brake, not a discount.
 
    ------------------------------------------------------------
+   THE BODIES — every failure is a thing you can watch happen
+   ------------------------------------------------------------
+   AESTHETIC.md §0: a failure that needs a caption is not finished. Each of the 28 declares
+   a `body` in 30-elements.js; these are the fields that make that body drawable. FIELD may
+   read every one of them and must write none. They are recomputed once per tick in
+   bodies(), after the detectors have had their say.
+
+   ON A WORKER
+     a.posture   one word, the whole vocabulary, chosen fresh every tick:
+                   'carry'  standing on its claim, doing the work (carrying posture)
+                   'haul'   walking to a job it has claimed, purposeful
+                   'tug'    at a contested claim, pulling against somebody — Co
+                   'jam'    one of five or more wedged into the same doorway — Fl
+                   'wait'   queued at work it is not allowed to touch — Lo, Dp, Cl
+                   'guard'  sitting on a claim or a hoard and not working it — Lo, Ow, Tw
+                   'march'  following the crowd or the rumour, confident — Gu, Im, Cf
+                   'chase'  has stopped working and only follows its rival — Es
+                   'wander' nothing to do, patrolling
+                   'idle'   lost a turf war by force or gave it up — drifting, out
+                   'down'   stunned
+     a.tx a.ty   where this worker INTENDS to go. Draw these as intention trails only when
+                 S.lensOn; that absence is the entire body of Mm, and of force.dark.
+     a.hesitate  0..1 rises when it turns away from work it distrusts or cannot read, and
+                 when it has nowhere to go. Draw as a pause, an antenna wobble. Cs, Mm.
+     a.load      0..1 how full its mandibles are — progress on the job it is carrying.
+     a.holdN     how many jobs it is sitting on at once. Three is a hoard. Ow.
+     a.follow    id of the worker whose choice it copied this time, else 0. Cf, Im.
+     a.trust     0..1 how much the colony credits this worker's word. Tc: all of them 1.
+     a.marks     how many of its lies the colony still remembers — 0 without a LEDGER even
+                 when a.lies is 3. Rp is those tally marks disappearing.
+     a.knows     ids of hazards this worker knows about and has not told anyone. Hi.
+     a.defiant   tick it last walked through an institution. Cr.
+     a.terr      0..1 how far it has retreated into owning its own patch (§15.2).
+     a.lockedOut a.gaveUp  how a rival episode ended for it (§15.3).
+
+   ON A JOB
+     j.crowd     workers physically on it right now. Six is a jam in one doorway. Fl.
+     j.queue     [ids] workers standing off it, waiting for it, doing nothing. Lo, Dp, Cl.
+     j.tug       [{id, ang}] the bearing each active claimant came in on. Two entries
+                 180 degrees apart is Co: they arrived from opposite tunnels and both pull.
+     j.trail     0..1 how heavily travelled the road to it is. One bright trail with cold
+                 ones beside it is Cf and Im; a trail of 0 on known-to-nobody work is Si.
+     j.dark      0..1 share of the colony that has never heard of it. Si, Di.
+     j.rot       0..1 how far this crumb has gone soft while nobody came. Pt, Cs, My.
+     j.unmake    0..1 work actively coming apart right now — negative progress. Sa.
+     j.undone    true if this was FINISHED work that a saboteur pulled back open. Sa.
+     j.split     tick until which a merge failure is visible on it as two copies. Mc.
+     j.hazard    true if poison and unrevealed — a hazard the colony cannot see. Hi.
+     j.lone      true if exactly one worker knows about it and it is the best one. Di.
+     j.locked    id of the worker sitting on it (already contractual). Lo.
+     j.shun      how often the skeptical herd refused it. Cs.
+     j.frozen    tick until which a turf war has it stopped dead. Tw.
+
+   ON THE COLONY
+     S.column    {job, ids} the colony moving as one body, when it is. Im, Cf.
+     S.lineage   [{hue, n}] the lineage census, biggest first. Mo, Lv.
+     S.fell      {hue, tick, ids} the last time a whole lineage went down together. Sf.
+     S.bigJob    id of the best open crumb, so a build can mark what is being walked past.
+     S.arb       true while arbitration is suspended and claims resolve into nothing. In.
+     S.weather   {frantic, dark, crowd, scarce} 0..1 conditions, not meters. Sp, Mm, Fl.
+     S.scars     [{x,y,sym,tick}] where misses landed. Wear on the architecture, kept.
+     S.works     [{kind,x,y,tick}] where institutions were built. History as architecture.
+
+   ------------------------------------------------------------
+   WHAT A MISS COSTS — strain, and why it no longer evaporates
+   ------------------------------------------------------------
+   Round-2 verdict: "the passive strain drain is a flat minus 3 per second, so a landed
+   incident's damage evaporates in about two seconds and budget sits pinned at its cap."
+   That is fixed here, in three parts:
+
+   1. THE FLAT DRAIN IS GONE. Strain no longer falls just because time passed. It rises
+      with the live weight of everything burning (RISE) and falls only two ways: the
+      colony BANKS WORK (a finished crumb is relief proportional to its value), or the
+      player ANSWERS an incident. A colony that is quiet — almost nothing burning — knits
+      itself back up slowly (EASE, and only below CALM). Idling is not a strategy.
+   2. A MISS LEAVES A FLOOR. Every landed incident raises S.scar, and strain can never
+      fall below S.scar. The floor fades in proportion to itself (SCAR_FADE, a time
+      constant near a minute), so it settles wherever your miss rate puts it instead of
+      being a debt the clock always pays off: the tenth miss costs more than the first,
+      and two misses inside half a minute COMPOUND rather than cancelling. Answering an
+      incident files a little of the scar away (SCAR_HEAL) but never all of it.
+   3. BUDGET IS NOT FREE. Only a crumb worth 3 or more feeds the colony, and the ceiling
+      is the scenario's own starting budget, not a flat 14. Spending has to be chosen.
+
+   Balance is MEASURED, not asserted, and measured through the real loop: __FZ.balance()
+   runs the sandbox headless with FZ.outbreak live inside the tick, and a synthetic player
+   who answers a given fraction of incidents correctly — committing ONCE per incident, as
+   a person does. The audit prints it. Measured, 14k ticks of the sandbox:
+
+     p=100%  survives 4/4   strain mean  0   scar  0
+     p= 85%  survives 4/4   strain mean 16   scar 16
+     p= 70%  survives 4/4   strain mean 40   scar 39      <- the 30-70 band, as specified
+     p= 50%  LOSES  2/4     strain mean 63   scar 77      (4/6 over 16k ticks)
+     p= 30%  LOSES  4/4
+     p=  0%  LOSES  4/4     inside two minutes
+
+   Change any constant in this section and re-run `node formicary/tools/balance.js`.
+
+   ------------------------------------------------------------
    THINGS OTHER PARTS MAY WANT TO KNOW
    ------------------------------------------------------------
    S.strainTop  [{sym, amt}] — the top contributors to this tick's strain rise. The strain
                 meter must always be locatable; this is where you locate it.
+   S.scar       the residual floor strain cannot fall below. Draw it under the strain mark
+                and a player can see what her misses have cost her that she cannot undo.
    S.tempo      the live speed multiplier after SLOW. Every heat gain is scaled by it.
    S.trustBias  S.ownership  S.aggro — the three trade-off dials, drawable.
    S.conflicts  [{mode,x,y,tick}] recent conflict endings. S.stat totals everything.
@@ -124,22 +225,54 @@ FZ.sim = (function () {
     strainTop: [], nextJob: 1, spawnEvery: 0, spawnAt: 0, maxJobs: 5, rumorSeq: 0,
     /* ---- the trade-off dials (§15) ---- */
     trustBias: 0, ownership: 0, aggro: 0, ownEnabled: true,
-    conflicts: [], stat: null,
+    conflicts: [], stat: null, waiting: 0,
+    /* ---- what a miss costs: the residual floor strain cannot fall below ---- */
+    scar: 0, scars: [], works: [], budgetMax: 14,
+    /* ---- THE BODIES: colony-wide observables, rebuilt each tick in bodies() ---- */
+    column: null, lineage: [], fell: null, bigJob: 0, arb: false,
+    weather: { frantic: 0, dark: 0, crowd: 0, scarce: 0 },
     _g: null, _silent: false, _said: null,
   };
   function freshStat() {
     return { done: 0, force: 0, passivity: 0, truce: 0, unsettled: 0,
-             lockouts: 0, sabotage: 0, esc: 0, shunned: 0, duped: 0 };
+             lockouts: 0, sabotage: 0, esc: 0, shunned: 0, duped: 0,
+             missed: 0, answered: 0 };
   }
   S.stat = freshStat();
 
   const CHARTER_R = 82, VARY_R = 95, EJECT_R = 44;
   /* fewest workers a colony is allowed to be reduced to by expulsion */
   const EJECT_FLOOR = 4;
+  /* how far off the crumb a claimant stands. WORK_R is 18, so RIM keeps both hands on the
+     work while putting them on OPPOSITE SIDES of it — that is what makes Co a tug and not
+     an overlap. QUEUE_R is outside the work radius on purpose: a queue is not working. */
+  const RIM = 10, QUEUE_R = 27, QUEUE_MAX = 2, WAIT_TICKS = 190;
+  /* ---- what a miss costs (see WHAT A MISS COSTS at the top) ---- */
+  const CARRY = 0.30,         /* the share of live failure a colony carries without harm */
+        RISE = 0.036,         /* strain per unit of pressure ABOVE what it can carry */
+        EASE = 0.013,         /* and how slowly a quiet colony knits itself back up */
+        SCAR_ADD = 7.5,       /* a landed incident leaves this much floor behind */
+        SCAR_HEAL = 0.6,      /* answering one files a little of the floor away */
+        /* The floor fades in PROPORTION to itself, not by a fixed amount per second. That
+           is what makes misses compound instead of queueing: a flat decay is a debt the
+           clock always pays off, so the tenth miss costs no more than the first. This one
+           settles wherever your miss rate puts it — a time constant near a minute — and a
+           player who misses a third of them lives permanently at forty. */
+        SCAR_FADE = 0.00019;
   let rnd = fzRng(1);
 
   /* ---------------- small utilities ---------------- */
-  function emit(n, d) { if (!S._silent) FZ.bus.emit(n, d); }
+  /* S._silent === true   headless measurement: nothing leaves the sim.
+     S._silent === 'loop'  the BALANCE harness: the two events the incident layer is
+                           built on get through, so the real core loop runs headless,
+                           while `say`, `goal` and `lose` stay inside — a harness must not
+                           be able to advance a chapter or speak to a player who is not
+                           there. Everything else behaves exactly as it does in play. */
+  const LOOP_EVENTS = { fire: 1, intervene: 1 };
+  function emit(n, d) {
+    if (S._silent === 'loop') { if (LOOP_EVENTS[n]) FZ.bus.emit(n, d); return; }
+    if (!S._silent) FZ.bus.emit(n, d);
+  }
   function dist(a, b) { const dx = a.x - b.x, dy = a.y - b.y; return Math.sqrt(dx * dx + dy * dy); }
   function d2(ax, ay, bx, by) { const dx = ax - bx, dy = ay - by; return dx * dx + dy * dy; }
   function agentById(id) { const A = S.agents; for (let i = 0; i < A.length; i++) if (A[i].id === id) return A[i]; return null; }
@@ -233,6 +366,23 @@ FZ.sim = (function () {
     if (rnd() < 0.5 && !S.lensOn) S.bl[j.value] = S.tick + 900;
     emit('agent:hurt', { id: a.id, x: a.x, y: a.y });
   }
+  /* FINISHED WORK COMES APART. A saboteur's rollback used to be a number going down and
+     nothing on screen. Now the banked chamber physically re-opens where it was destroyed:
+     a job appears at three quarters full and visibly draining. That is the body of Sa. */
+  function unmake(x, y) {
+    if (S.jobsDone <= 0) return null;
+    S.jobsDone--;
+    const j = makeJob({ value: 4 });
+    j.x = clamp(x, 34, S.w - 34); j.y = clamp(y, 34, S.h - 34);
+    j.progress = j.need * 0.75; j.seenProg = j.progress;
+    j.undone = true; j.unmake = 1; j.trail = 0.45;
+    S.jobs.push(j);
+    for (let i = 0; i < S.agents.length; i++) {
+      const a = S.agents[i];
+      if (d2(a.x, a.y, j.x, j.y) < 150 * 150) a.known.add(j.id);
+    }
+    return j;
+  }
   function spawnRumor(liar) {
     const x = 30 + rnd() * (S.w - 60), y = 30 + rnd() * (S.h - 60);
     S.rumor = { x: x, y: y, until: S.tick + 620, by: liar ? liar.id : 0, rid: ++S.rumorSeq };
@@ -252,6 +402,10 @@ FZ.sim = (function () {
       done: false, age: 0, stale: 0, neglect: 0, churn: 0, churnAt: 0,
       soloRun: 0, lastProg: 0, stall: 0, frozen: 0, knownBy: 0,
       shun: 0,                              /* §15.1 how often the skeptical herd refused it */
+      /* ---- THE BODIES: what this crumb looks like from across the room ---- */
+      crowd: 0, queue: [], tug: [], trail: 0, dark: 1, rot: 0,
+      unmake: 0, undone: false, split: 0, hazard: false, lone: false,
+      seenProg: 0,
     };
     return j;
   }
@@ -274,8 +428,14 @@ FZ.sim = (function () {
     S.varMul = 1; S.monoMul = 1; S.blind = 0;
     S.trustBias = 0; S.ownership = 0; S.aggro = 0;
     S.conflicts = []; S.stat = freshStat(); S._said = {};
+    S.scar = 0; S.scars = []; S.works = []; S.waiting = 0;
+    S.column = null; S.lineage = []; S.fell = null; S.bigJob = 0; S.arb = false;
+    S.weather = { frantic: 0, dark: 0, crowd: 0, scarce: 0 };
     S.copyBias = F.stampede ? 0.85 : 0.06;
     S.budget = cfg.budget == null ? 6 : cfg.budget;
+    /* the ceiling is the scenario's own opening hand, not a flat fourteen. A budget that
+       sits pinned at its cap is a resource the player never has to think about. */
+    S.budgetMax = cfg.budgetMax == null ? Math.max(4, S.budget) : cfg.budgetMax;
     S.collapse = 0;
     S.collapseMax = cfg.collapseMax == null ? 100 : cfg.collapseMax;
     S.speedMul = cfg.speed || 1; S.baseSpeed = S.speedMul; S.tempo = S.speedMul;
@@ -326,6 +486,10 @@ FZ.sim = (function () {
         liar: false, lies: 0, chase: null, chaseRumor: false, churner: false,
         pk: null, drained: 0, idleRun: 0, pcool: 0, avoid: null, heardRumor: 0, lockAt: 0,
         wx: null, wy: null, wt: 0,          /* where an idle worker is patrolling to */
+        /* ---- THE BODIES: what this worker is visibly doing, every tick ---- */
+        posture: 'wander', tx: 0, ty: 0, hesitate: 0, load: 0, holdN: 0,
+        follow: 0, trust: 1, marks: 0, knows: [], defiant: 0,
+        waitFor: null, waitUntil: 0, rimx: 0, rimy: 0,
         /* §15.2 how far this worker has retreated into owning its own patch */
         terr: 0,
         /* §15.3 how a rival episode is going, and how it ended for this worker */
@@ -508,16 +672,22 @@ FZ.sim = (function () {
     /* copying is cheap */
     const terr = a.terr || 0;
     const cands = [];
+    /* THE BODY OF A BLOCKED CLAIM. A worker turned away from work it wanted does not
+       silently pick something else on the far side of the field — it walks over and WAITS.
+       That standing line is the body of Lo, of Dp and of the ownership regime: the crumb
+       is right there, one ant is sitting on it, and three more have nothing to do. */
+    let blk = null, blkD = Infinity;
+    function bar(j) { const q = d2(a.x, a.y, j.x, j.y); if (q < blkD) { blkD = q; blk = j; } }
     for (let i = 0; i < S.jobs.length; i++) {
       const j = S.jobs[i];
       if (j.done) continue;
       if (!S.lensOn && !a.known.has(j.id)) continue;
       /* a written-off job is re-opened to inspection by the LENS, not by the ledger */
       if (S.bl[j.value] > S.tick && !S.lensOn) continue;
-      if (j.locked !== false && j.locked !== a.id) continue;
-      if (ownedByOther(j, a)) continue;                 /* §15.2 that file has an owner */
+      if (j.locked !== false && j.locked !== a.id) { bar(j); continue; }
+      if (ownedByOther(j, a)) { bar(j); continue; }      /* §15.2 that file has an owner */
       if (a.avoid && a.avoid.has(j.id)) continue;
-      if (S.lensOn && j.prereq) { const p = jobById(j.prereq); if (p && !p.done) continue; }
+      if (S.lensOn && j.prereq) { const p = jobById(j.prereq); if (p && !p.done) { bar(j); continue; } }
       if (S.lensOn && j.poison && a.hue === j.victimHue) continue;
       /* §15.2 THE OWNERSHIP BILL: a territorial worker will not share a job anyone is
          actually working — and will annex any job nobody is. Fewer collisions, because
@@ -533,19 +703,30 @@ FZ.sim = (function () {
       /* §15.1 THE SKEPTICISM BILL: the herd will not follow a job only one worker vouches
          for. That is the same disposition that catches the liar, pointed at the dissenter. */
       if (skept > 0.25 && j.claims.size === 1 && !j.claims.has(a.id) && rnd() < skept * 0.85) {
+        /* the body of Cs: a worker visibly balking at work it has been taught to distrust */
         j.shun += 1; S.stat.shunned++;
+        a.hesitate = Math.min(1, a.hesitate + 0.25);
         continue;
       }
       cands.push(j);
     }
-    if (!cands.length) return;
+    if (!cands.length) {
+      if (blk) queueUp(a, blk);
+      else a.hesitate = Math.min(1, a.hesitate + 0.02);
+      return;
+    }
 
     if (rnd() < S.copyBias) {
       let best = null, bc = -1;
       for (let i = 0; i < cands.length; i++) if (cands[i].claims.size > bc) { bc = cands[i].claims.size; best = cands[i]; }
-      if (best && bc > 0) { S.copyN++; a.copied = true; claim(a, best); return; }
+      if (best && bc > 0) {
+        S.copyN++; a.copied = true;
+        /* "that one keeps following the others" — the id it followed, so it can be drawn */
+        best.claims.forEach(id => { if (!a.follow) a.follow = id; });
+        claim(a, best); return;
+      }
     }
-    a.copied = false;
+    a.copied = false; a.follow = 0;
     let best = null, bs = -1;
     for (let i = 0; i < cands.length; i++) {
       const j = cands[i];
@@ -555,7 +736,29 @@ FZ.sim = (function () {
       const sc = (val / (1 + d * 0.02)) * crowd * (0.85 + rnd() * 0.3);
       if (sc > bs) { bs = sc; best = j; }
     }
+    /* the crumb it actually wanted is barred and much nearer than the consolation prize:
+       it goes and stands there instead. Waiting is the cost, and the cost is visible. */
+    if (blk && (!best || blkD < d2(a.x, a.y, best.x, best.y) * 0.64)) { queueUp(a, blk); return; }
     if (best) claim(a, best);
+  }
+
+  /* stand off the crumb, on the side you came in from, and do nothing. QUEUE_R is outside
+     the working radius: a queue that could reach the work would not be a queue. */
+  function queueUp(a, j) {
+    if (!j || S.tick < (a.waitCool || 0)) return;
+    /* A QUEUE IS A SIGN, NOT A STATE OF THE WORLD. Three ants stopped behind one stuck
+       claim is a failure you can read across the room; nine is a colony that has simply
+       stopped, and the eye cannot tell which crumb is the problem. So the colony will
+       never spend more than a third of itself standing in line. */
+    if (S.waiting >= Math.max(1, S.agents.length * 0.3)) return;
+    if (j.queue.length >= QUEUE_MAX && j.queue.indexOf(a.id) < 0) return;
+    const dx = a.x - j.x, dy = a.y - j.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
+    a.waitFor = j.id;
+    a.waitUntil = S.tick + WAIT_TICKS;
+    S.waiting++;
+    a.rimx = j.x + dx / d * QUEUE_R;
+    a.rimy = j.y + dy / d * QUEUE_R;
+    a.hesitate = Math.min(1, a.hesitate + 0.3);
   }
 
   /* ---------------- one tick ---------------- */
@@ -573,6 +776,15 @@ FZ.sim = (function () {
       if (S.rumor) { S.rumor.x *= kx; S.rumor.y *= ky; }
     }
     S._lw = S.w; S._lh = S.h;
+
+    /* THE CEILING IS THE SIM'S, NOT THE CALLER'S. The incident layer refunds a correct
+       answer, and a refund that can stack past the scenario's opening hand turns food into
+       a number nobody has to think about — the exact complaint the round-2 verdict made.
+       Refunds top the colony back up; they do not accumulate into a war chest. */
+    if (S.budget > S.budgetMax) S.budget = S.budgetMax;
+    /* same reason: whatever the incident layer did between frames, strain is the colony's
+       number and it lives inside the colony's range */
+    if (S.collapseMax !== Infinity && S.collapse > S.collapseMax) S.collapse = S.collapseMax;
 
     /* derived speed / tools */
     S.lensOn = S.tick < S.lensUntil;
@@ -689,8 +901,21 @@ FZ.sim = (function () {
         else { const j = nearestOpen(a.x, a.y); if (j) claim(a, j); }
       }
 
-      if (!a.hold.length && !a.chaseRumor && a.chase == null) decide(a);
-      else if (rnd() < 0.004 * T) decide(a);
+      /* a worker in a queue stops queuing when the bar lifts, when the crumb is gone, or
+         when it has stood there long enough to give up on it and go somewhere else */
+      if (a.waitFor != null) {
+        const wj = jobById(a.waitFor);
+        const barred = wj && !wj.done &&
+          ((wj.locked !== false && wj.locked !== a.id) || ownedByOther(wj, a) ||
+           (S.lensOn && wj.prereq && (function () { const p = jobById(wj.prereq); return p && !p.done; })()));
+        if (!barred || S.tick > a.waitUntil) {
+          a.waitFor = null;
+          a.waitCool = S.tick + (barred ? 340 : 0);   /* gave up: it will not queue again soon */
+        }
+      }
+
+      if (!a.hold.length && !a.chaseRumor && a.chase == null && a.waitFor == null) decide(a);
+      else if (a.waitFor == null && rnd() < 0.004 * T) decide(a);
 
       /* §15.2 an owner enforces its ownership: whatever it holds, it holds alone. Nobody
          else's copy of that work is ever integrated, so two lineages can no longer finish
@@ -755,9 +980,25 @@ FZ.sim = (function () {
         let bj = null, bp = -1;
         for (let k = 0; k < S.jobs.length; k++) { const j = S.jobs[k]; if (!j.done && j.progress > bp) { bp = j.progress; bj = j; } }
         if (bj) { tx = bj.x; ty = bj.y; }
+      } else if (a.waitFor != null) {
+        tx = a.rimx; ty = a.rimy;                    /* stand in the queue and do nothing */
       } else if (a.hold.length) {
         const j = jobById(a.hold[0]);
-        if (j && !j.done) { tx = j.x; ty = j.y; } else drop(a, a.hold[0]);
+        if (j && !j.done) {
+          tx = j.x; ty = j.y;
+          /* TWO ANTS, ONE CRUMB, OPPOSITE TUNNELS. A contested claim is not an overlap:
+             each claimant stands on the side it arrived from and pulls the crumb its own
+             way. RIM is inside the working radius, so both are genuinely working it — and
+             that is exactly why the work does not add up. This is the body of Co. */
+          if (j.claims.size > 1) {
+            const ox = (a.cfx == null ? a.x : a.cfx) - j.x, oy = (a.cfy == null ? a.y : a.cfy) - j.y;
+            const od = Math.sqrt(ox * ox + oy * oy) || 1;
+            /* a crowd stands wider than a pair, so eight on one crumb reads as bodies
+               wedged all round one doorway and not as a single black blot */
+            const rr = j.claims.size >= 5 ? RIM + 4.5 : RIM;
+            tx = j.x + ox / od * rr; ty = j.y + oy / od * rr;
+          }
+        } else drop(a, a.hold[0]);
       } else {
         /* A worker with nothing to do PATROLS. It used to jitter in place, which meant a
            colony that had lost track of every job could sit still forever while the player
@@ -770,6 +1011,9 @@ FZ.sim = (function () {
         tx = a.wx; ty = a.wy;
       }
 
+      /* where this worker INTENDS to go. Drawn as an intention trail only under the LENS;
+         its absence in the dark is the whole body of Mm. */
+      a.tx = tx; a.ty = ty;
       const dx = tx - a.x, dy = ty - a.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
       const sp = 2.1 * T * (chasing ? 1.8 : 1);
       if (d > 3) { a.vx = dx / d * sp; a.vy = dy / d * sp; a.x += a.vx; a.y += a.vy; }
@@ -888,8 +1132,12 @@ FZ.sim = (function () {
       j.claims.forEach(id => { const a = agentById(id); if (a) drop(a, j.id); });
       j.claims.clear();
       S.jobsDone++; S.stat.done++;
-      S.budget = Math.min(14, S.budget + 1);
-      S.collapse = Math.max(0, S.collapse - 1.2);
+      /* only a real crumb feeds the colony. Small work keeps the lights on and buys
+         nothing — which is why hunting small crumbs (My, Pt) is a losing strategy and
+         why the budget is no longer a number pinned at its ceiling. */
+      if (j.value >= 3) S.budget = Math.min(S.budgetMax, S.budget + 1);
+      /* BANKED WORK IS THE COLONY'S ONLY PASSIVE RECOVERY. Relief scales with the crumb. */
+      S.collapse = Math.max(S.scar, S.collapse - (0.3 + 0.2 * j.value));
       emit('job:done', { x: j.x, y: j.y, value: j.value });
     }
     /* ---- respawn ---- */
@@ -906,6 +1154,9 @@ FZ.sim = (function () {
 
     if (S.tick % 900 === 0) { S.pickN = Math.round(S.pickN / 2); S.pickLow = Math.round(S.pickLow / 2); }
 
+    /* ---- give every failure a body the eye can find ---- */
+    bodies();
+
     /* ---- strain ---- */
     strain();
 
@@ -916,6 +1167,101 @@ FZ.sim = (function () {
       else if (S.collapse >= S.collapseMax) { S.gameOver = true; S.won = false; emit('lose', { why: strainWhy() }); }
       else if (S.agents.length === 0) { S.gameOver = true; S.won = false; emit('lose', { why: 'Mo' }); }
     }
+  }
+
+  /* ============================================================
+     THE BODIES — recomputed once per tick, read by FIELD, written by nobody else.
+     Nothing here decides anything; it only makes what already happened observable.
+     The header of this file is the full index. AESTHETIC.md §0: if the queue is drawn,
+     delete the queue label; if the crumb visibly rots, delete the neglect meter.
+     ============================================================ */
+  function bodies() {
+    const A = S.agents, J = S.jobs, G = S._g, T = S.tempo || 1;
+    const n = Math.max(1, A.length);
+
+    /* ---- the crumbs ---- */
+    let bigV = 0, bigId = 0, crowdMax = 0;
+    for (let i = 0; i < J.length; i++) {
+      const j = J[i];
+      j.crowd = 0; j.queue.length = 0; j.tug.length = 0;
+      /* work coming apart is work whose fill ran BACKWARDS this tick — Sa, Co, a burning
+         outbreak. It is the same fact whichever caused it, so it is one drawable field. */
+      const d = j.progress - j.seenProg; j.seenProg = j.progress;
+      j.unmake = clamp(j.unmake + (d < 0 ? Math.min(0.6, -d * 0.10) : -0.014 * T), 0, 1);
+      j.rot = clamp(Math.max(j.neglect / 300, j.stale / 260, j.soloRun / 240), 0, 1);
+      j.dark = clamp(1 - j.knownBy / n, 0, 1);
+      j.hazard = !!(j.poison && !j.revealed);
+      j.lone = j.knownBy <= 1 && j.value >= 3;
+      /* a road nobody walks fades. A road everybody walks is the only road there is. */
+      j.trail = clamp(j.trail - 0.0024 * T, 0, 1);
+      if (!j.done && j.value > bigV) { bigV = j.value; bigId = j.id; }
+    }
+    S.bigJob = bigId;
+
+    /* ---- the workers ---- */
+    const hc = {};
+    S.waiting = 0;
+    for (let i = 0; i < A.length; i++) {
+      const a = A[i];
+      hc[a.hue] = (hc[a.hue] || 0) + 1;
+      a.holdN = a.hold.length;
+      a.hesitate = Math.max(0, a.hesitate - 0.007 * T);
+      a.trust = S.trust[a.id] == null ? 1 : S.trust[a.id];
+      /* what the colony still remembers about this worker. Without a LEDGER: nothing,
+         however many times it has lied. Rp is these marks being wiped. */
+      a.marks = (S.ledgerOn && a.lies) ? a.lies : 0;
+      if (a.pk && a.pk.size) {
+        a.knows.length = 0;
+        a.pk.forEach(id => { const j = jobById(id); if (j && !j.done && !j.revealed) a.knows.push(id); });
+      } else if (a.knows.length) a.knows.length = 0;
+
+      const held = a.hold.length ? jobById(a.hold[0]) : null;
+      a.load = held ? clamp(held.progress / Math.max(1, held.need), 0, 1) : 0;
+
+      let p = 'wander';
+      if (a.stun > 0) p = 'down';
+      else if (S.tick < a.idleUntil) p = 'idle';
+      else if (a.chase != null) p = 'chase';
+      else if (a.chaseRumor) p = 'march';
+      else if (a.waitFor != null) {
+        p = 'wait'; S.waiting++;
+        const wj = jobById(a.waitFor);
+        if (wj) { if (wj.queue.length < 8) wj.queue.push(a.id); wj.trail = clamp(wj.trail + 0.004 * T, 0, 1); }
+      } else if (held) {
+        const near = d2(a.x, a.y, held.x, held.y) < 21 * 21;
+        if (!near) p = 'haul';
+        else if (a.locker || held.locked === a.id || S.tick < held.frozen) p = 'guard';
+        else if (a.holdN >= 3) p = 'guard';
+        /* five on one crumb is not two ants pulling opposite ways, it is a doorway with a
+           crowd wedged in it, and it should not be drawn the same way. Fl, not Co. */
+        else if (held.claims.size >= 5) p = 'jam';
+        else if (held.claims.size > 1) p = 'tug';
+        else p = 'carry';
+        if (near) {
+          held.crowd++;
+          if (held.crowd > crowdMax) crowdMax = held.crowd;
+          /* the bearing it came in on. Two of these pointing opposite ways IS Co. */
+          const ox = (a.cfx == null ? a.x : a.cfx) - held.x, oy = (a.cfy == null ? a.y : a.cfy) - held.y;
+          held.tug.push({ id: a.id, ang: Math.atan2(oy, ox) });
+        }
+        held.trail = clamp(held.trail + 0.006 * T, 0, 1);
+      } else if (a.follow) p = 'march';
+      a.posture = p;
+    }
+
+    /* ---- the colony ---- */
+    S.lineage.length = 0;
+    for (const k in hc) S.lineage.push({ hue: +k, n: hc[k] });
+    S.lineage.sort((p, q) => q.n - p.n);
+    /* the colony moving as one body: most of the claims in the field on one crumb */
+    S.column = (G && G.targetTopN >= 3 && G.claimTotal && G.targetTopN / G.claimTotal > 0.55)
+      ? { job: G.targetTop, ids: G.targetTopIds } : null;
+    S.arb = S.tick < S.noArb;
+    const W = S.weather;
+    W.frantic = clamp((T - 1) / 1.4, 0, 1);
+    W.dark = S.lensOn ? 0 : (S.blind ? 1 : 0.55);
+    W.crowd = clamp(crowdMax / Math.max(3, n * 0.4), 0, 1);
+    W.scarce = clamp(1 - (G ? G.open.length : 0) / Math.max(1, S.maxJobs), 0, 1);
   }
 
   /* ============================================================
@@ -1041,6 +1387,8 @@ FZ.sim = (function () {
     poison: poison,
     spawnRumor: spawnRumor,
     nearestOpen: nearestOpen,
+    /* pull a banked job back open, where it was destroyed, still visibly draining */
+    unmake: unmake,
     /* §15.2 push a worker toward owning its own patch instead of sharing one */
     own(a, amt) { if (a && S.ownEnabled) a.terr = Math.min(1, (a.terr || 0) + amt); },
     /* §15.3 book pressure on a rival episode; it terminates in one of four ways */
@@ -1069,6 +1417,7 @@ FZ.sim = (function () {
       const scale = (e.countered ? 0.18 : 1) * (S.tempo || 1);
       e.heat = Math.min(1, e.heat + amount * scale);
       if (o.who) e.who = o.who;
+      if (o.at) e.at = o.at;      /* where this failure is happening, for whoever draws it */
       if (!e.on && e.heat >= 0.35) {
         e.on = true; e.fires++;
         emit('fire', {
@@ -1081,25 +1430,60 @@ FZ.sim = (function () {
     };
   }
 
-  /* ---------------- strain ---------------- */
+  /* ---------------- strain ----------------
+     Read WHAT A MISS COSTS at the top of this file before changing a number here.
+     There is NO passive drain. Strain rises with what is burning and falls only when the
+     colony banks work or the player answers an incident — and it can never fall below
+     S.scar, the residue of everything that has already landed on this colony. */
   const METAW = { Mo: 1.5, In: 1.5, Sp: 1.5, Mm: 1.5 };
   function strain() {
-    let load = 0;
+    let load = 0, live = 0;
     const top = [];
     const els = FZ.EL, en = FZ.sim.enabled;
     for (let i = 0; i < els.length; i++) {
       const e = els[i];
-      if (!en.has(e.sym) || e.heat < 0.06) continue;
+      if (!en.has(e.sym)) continue;
+      live++;
+      if (e.heat < 0.06) continue;
       const amt = e.heat * (METAW[e.sym] || 1);
       load += amt;
       top.push({ sym: e.sym, amt: amt });
     }
     top.sort((a, b) => b.amt - a.amt);
     S.strainTop = top.slice(0, 4);
-    if (S.collapseMax !== Infinity) {
-      S.collapse = Math.max(0, S.collapse + (load * 0.007 - 0.05) * (S.tempo || 1));
-      if (S.collapse > S.collapseMax) S.collapse = S.collapseMax;
+    if (S.collapseMax === Infinity) return;
+    const T = S.tempo || 1;
+    /* the scar files itself down over about half a minute a miss. Slowly enough that two
+       misses inside that window ADD UP, which is the entire point of the mechanism. */
+    if (S.scar > 0) S.scar = Math.max(0, S.scar - (S.scar * SCAR_FADE + 0.0006) * T);
+    /* PRESSURE, not a total: mean live heat across the failures this scenario has taught.
+       A chapter with four detectors and a sandbox with twenty-eight are then on the same
+       scale, and a colony is judged on how much of what it knows about is on fire. */
+    const pressure = load / Math.max(1, live);
+    /* Above what it can carry, strain accrues. Below, the colony knits itself back up —
+       slowly, and only because it is quiet, never merely because time passed. */
+    const net = pressure - CARRY;
+    let c = S.collapse + (net > 0 ? net * RISE : net * EASE) * T;
+    if (c < S.scar) c = S.scar;
+    if (c < 0) c = 0;
+    if (c > S.collapseMax) c = S.collapseMax;
+    S.collapse = c;
+  }
+  /* an incident landed. It leaves a floor behind, and a mark on the ground where it was. */
+  function scarUp(d) {
+    S.stat.missed++;
+    if (S.collapseMax === Infinity) return;
+    S.scar = Math.min(S.collapseMax * 0.92, S.scar + SCAR_ADD);
+    if (d && d.x != null) {
+      S.scars.push({ x: d.x, y: d.y, sym: d.sym || '', tick: S.tick });
+      if (S.scars.length > 14) S.scars.shift();
     }
+  }
+  /* an incident was answered in time. Some of the residue is filed away — never all of it. */
+  function scarDown() {
+    S.stat.answered++;
+    if (S.collapseMax === Infinity) return;
+    S.scar = Math.max(0, S.scar - SCAR_HEAL);
   }
   function strainWhy() { return S.strainTop.length ? S.strainTop[0].sym : 'In'; }
 
@@ -1176,6 +1560,21 @@ FZ.sim = (function () {
   function fail(kind, x, y, msg) {
     emit('intervene', { kind: kind, ok: false, msg: msg, x: x, y: y });
     return { ok: false, msg: msg };
+  }
+
+  /* THE COST OF A MISS LIVES HERE, NOT IN THE INCIDENT LAYER. PLAY owns the fuse and the
+     immediate hit; the colony owns what it is still carrying afterwards. Subscribing to
+     the events instead of exporting a setter keeps the two parts independent: whatever
+     45-outbreak.js decides an incident is worth, a landed one still leaves a floor. */
+  if (FZ.bus) {
+    FZ.bus.on('outbreak:landed', scarUp);
+    FZ.bus.on('outbreak:answered', scarDown);
+    /* history as architecture: where the colony has been governed, and by what */
+    FZ.bus.on('intervene', function (d) {
+      if (!d || !d.ok || d.x == null) return;
+      S.works.push({ kind: d.kind, x: d.x, y: d.y, tick: S.tick });
+      if (S.works.length > 16) S.works.shift();
+    });
   }
 
   return {
@@ -1257,6 +1656,32 @@ FZ.sim.defaults = [
     return FZ.sim.defaults[FZ.sim.defaults.length - 1];
   }
 
+  function bodyCensus() {
+    const P = {}, J = S.jobs, A = S.agents;
+    let queued = 0, tugging = 0, jam = 0, trail = 0, dark = 0, rot = 0, unmake = 0, hazard = 0;
+    for (let i = 0; i < A.length; i++) P[A[i].posture] = (P[A[i].posture] || 0) + 1;
+    for (let i = 0; i < J.length; i++) {
+      const j = J[i];
+      queued += j.queue.length;
+      if (j.tug.length > 1) tugging++;
+      if (j.crowd > jam) jam = j.crowd;
+      if (j.trail > trail) trail = j.trail;
+      if (j.dark > 0.7) dark++;
+      if (j.rot > 0.4) rot++;
+      if (j.unmake > 0.2) unmake++;
+      if (j.hazard) hazard++;
+    }
+    return {
+      posture: P, queued: queued, tugging: tugging, jam: jam,
+      trail: +trail.toFixed(2), dark: dark, rot: rot, unmake: unmake, hazard: hazard,
+      column: S.column ? S.column.ids.length : 0,
+      lineage: S.lineage.map(l => l.n),
+      scars: S.scars.length, works: S.works.length,
+      weather: { frantic: +S.weather.frantic.toFixed(2), dark: +S.weather.dark.toFixed(2),
+                 crowd: +S.weather.crowd.toFixed(2), scarce: +S.weather.scarce.toFixed(2) },
+    };
+  }
+
   function probe() {
     const hot = FZ.EL.filter(e => FZ.sim.enabled.has(e.sym))
       .slice().sort((a, b) => b.heat - a.heat).slice(0, 6)
@@ -1265,6 +1690,8 @@ FZ.sim.defaults = [
       chapter: FZ.chapters ? FZ.chapters.index : S.chapterIndex,
       tick: S.tick, jobsDone: S.jobsDone, jobsGoal: S.jobsGoal,
       budget: S.budget, collapse: +S.collapse.toFixed(1),
+      /* what the misses have cost that cannot be undone by playing well from here */
+      scar: +S.scar.toFixed(1), missed: S.stat.missed, answered: S.stat.answered,
       agents: S.agents.length, jobs: S.jobs.length,
       hot: hot,
       strain: S.strainTop.map(s => s.sym),
@@ -1272,6 +1699,9 @@ FZ.sim.defaults = [
       trustBias: +S.trustBias.toFixed(2), ownership: +S.ownership.toFixed(2),
       aggro: +S.aggro.toFixed(2), speedMul: +S.speedMul.toFixed(2),
       conflict: { force: S.stat.force, passivity: S.stat.passivity, truce: S.stat.truce, unsettled: S.stat.unsettled },
+      /* THE BODIES, as a census: proof the failures are things happening on the field and
+         not numbers in a table. If `queued` is zero while Lo is hot, the body is missing. */
+      bodies: bodyCensus(),
       enabled: Array.from(FZ.sim.enabled),
       tools: S.tools.slice(),
       gameOver: S.gameOver, won: S.won,
@@ -1345,6 +1775,151 @@ FZ.sim.defaults = [
       const a = S.agents.find(z => z.adversary || !z.corrigible);
       if (a) FZ.sim.apply('eject', a.x, a.y);
     } else FZ.sim.apply(k, x, y);
+  }
+
+  /* ============================================================
+     __FZ.balance() — THE GAME, MEASURED THROUGH THE GAME.
+
+     Round-2 verdict on the old numbers: "measured with the core loop switched off
+     entirely, so they describe a game nobody plays." So this harness runs the REAL loop:
+     FZ.sim.step() and then FZ.outbreak.update() every tick, exactly as 90-boot.js does,
+     with a synthetic player who reads the burning incident, waits a human beat, and
+     answers correctly a given fraction of the time. Everything else — the fuse, the
+     damage, the refund, the scar — is the shipped code path.
+
+     It reports, per accuracy p: whether the run survived, and the band strain lived in.
+     The target set by the critic: p=0.7 survives with strain oscillating 30–70; p=0.5
+     loses outright.
+
+     Two things are borrowed and put back: the mastery ledger (the harness must not mark
+     plates the player never answered) and FZ.chapters.phase, which the incident layer
+     checks before opening. Both are restored in the finally.
+     ============================================================ */
+  function balance(opts) {
+    opts = opts || {};
+    const ps = opts.ps || [1, 0.85, 0.7, 0.5, 0.3, 0];
+    const seeds = opts.seeds || [8821, 33417, 55221, 7];
+    const ticks = opts.ticks || 14000;
+    /* the sandbox by default; opts.chapter measures any teaching chapter the same way,
+       against its own goal, so "is chapter 5 winnable at 70%" is a question with a number */
+    let base = sandboxCfg();
+    if (opts.chapter != null && FZ.chapters && FZ.chapters.list && FZ.chapters.list[opts.chapter]) {
+      base = FZ.chapters.list[opts.chapter].cfg;
+    }
+    const cfg = opts.chapter != null ? base : Object.assign({}, base, { goal: { jobs: 1e9 } });
+    const OB = FZ.outbreak;
+    if (!OB) return [{ note: 'no outbreak layer' }];
+
+    /* ---- borrow ---- */
+    const keep = {};
+    try {
+      if (window.localStorage) for (let i = 0; i < window.localStorage.length; i++) {
+        const k = window.localStorage.key(i);
+        if (k && k.indexOf('formicary') === 0) keep[k] = window.localStorage.getItem(k);
+      }
+    } catch (e) { /* private mode: nothing to protect */ }
+    const heldMastery = JSON.stringify(OB.mastery || {});
+    const heldChapters = FZ.chapters;
+    FZ.chapters = { phase: function () { return 'play'; } };
+    S._silent = 'loop';                       /* only `fire` and `intervene` get through */
+
+    /* the player's hand: the right instrument for this incident, if she owns it */
+    function rightTool(o) {
+      const A = (o.answers || []).slice(), T = S.tools;
+      for (let i = 0; i < A.length; i++) if (T.indexOf(A[i]) > -1 && S.budget >= FZ.sim.cost(A[i])) return A[i];
+      return null;
+    }
+    function wrongTool(o) {
+      const A = o.answers || [], T = S.tools;
+      for (let i = 0; i < T.length; i++) if (A.indexOf(T[i]) < 0 && S.budget >= FZ.sim.cost(T[i])) return T[i];
+      return null;
+    }
+    /* an expulsion has to name the body, exactly as the player must find it on the field */
+    function bodyFor(o) {
+      let a = null;
+      if (o.who && o.who.length) a = S.agents.find(z => z.id === o.who[0]);
+      if (!a) a = S.agents.find(z => z.adversary) || S.agents.find(z => !z.corrigible) ||
+                  S.agents.find(z => z.locker) || S.agents.find(z => z.churner);
+      return a;
+    }
+    function answer(o, correct) {
+      const kind = correct ? rightTool(o) : wrongTool(o);
+      if (!kind) return false;
+      let x = o.x, y = o.y;
+      if (kind === 'eject') { const b = bodyFor(o); if (!b) return false; x = b.x; y = b.y; }
+      OB.tryAnswer(kind, x, y);               /* CONTROLS calls this first, then apply */
+      FZ.sim.apply(kind, x, y);
+      return true;
+    }
+
+    const out = [];
+    try {
+      for (let pi = 0; pi < ps.length; pi++) {
+        const p = ps[pi];
+        let lost = 0, won = 0, sumEnd = 0, sumMean = 0, lo = 1e9, hi = -1e9, banked = 0;
+        let miss = 0, ans = 0, scarEnd = 0;
+        for (let k = 0; k < seeds.length; k++) {
+          FZ.sim.reset(Object.assign({}, cfg, { seed: seeds[k] }));
+          OB.reset(cfg);
+          let acted = 0, n = 0, sum = 0, mn = 1e9, mx = -1e9;
+          /* ONE COMMITMENT PER INCIDENT. A player reads the body, picks an instrument and
+             lives with it; she does not machine-gun all six until one sticks. Without this
+             the harness quietly answers everything at any p, and reports a game that is
+             not the game — which is how the previous round's numbers came out flattering. */
+          const done = {};
+          for (let i = 0; i < ticks && !S.gameOver; i++) {
+            FZ.sim.step();
+            OB.update(S);
+            /* a human beat: she does not answer the instant it opens, and she cannot
+               answer more often than she can move a thumb */
+            const o = OB.current();
+            if (o && !done[o.id] && S.tick - acted > 34 && S.tick - o.born > 45) {
+              done[o.id] = 1;
+              if (FZ.sim._rnd() < p) { if (answer(o, true)) acted = S.tick; }
+              else if (FZ.sim._rnd() < 0.5) { if (answer(o, false)) acted = S.tick; }
+              /* the rest of the time she simply does not get there, and it lands */
+            }
+            if (i > 600) { n++; sum += S.collapse; if (S.collapse < mn) mn = S.collapse; if (S.collapse > mx) mx = S.collapse; }
+          }
+          if (S.gameOver && !S.won) lost++;
+          if (S.won) won++;
+          sumEnd += S.collapse; sumMean += n ? sum / n : 0;
+          if (mn < lo) lo = mn; if (mx > hi) hi = mx;
+          banked += S.jobsDone; miss += S.stat.missed; ans += S.stat.answered;
+          scarEnd += S.scar;
+        }
+        const nS = seeds.length;
+        out.push({
+          p: p, lost: lost, won: won, of: nS,
+          mean: +(sumMean / nS).toFixed(1),
+          band: [Math.round(lo), Math.round(hi)],
+          end: +(sumEnd / nS).toFixed(1),
+          scar: +(scarEnd / nS).toFixed(1),
+          answered: Math.round(ans / nS), missed: Math.round(miss / nS),
+          jobs: Math.round(banked / nS),
+        });
+      }
+    } finally {
+      S._silent = false;
+      FZ.chapters = heldChapters;
+      /* put the ledger back exactly as it was */
+      try {
+        const m = OB.mastery;
+        for (const k in m) delete m[k];
+        const held = JSON.parse(heldMastery);
+        for (const k in held) m[k] = held[k];
+        if (window.localStorage) {
+          for (let i = window.localStorage.length - 1; i >= 0; i--) {
+            const k = window.localStorage.key(i);
+            if (k && k.indexOf('formicary') === 0 && !(k in keep)) window.localStorage.removeItem(k);
+          }
+          for (const k in keep) window.localStorage.setItem(k, keep[k]);
+        }
+      } catch (e) { }
+      OB.reset(cfg);
+      FZ.sim.reset(cfg);
+    }
+    return out;
   }
 
   /* ============================================================
@@ -1538,6 +2113,16 @@ FZ.sim.defaults = [
     return out;
   }
 
+  /* one line per accuracy, so the audit prints the loop's balance without knowing the shape */
+  function balanceLines(list) {
+    return list.map(r => 'p=' + Math.round(r.p * 100) + '%  ' +
+      (r.lost ? 'LOST ' + r.lost + '/' + r.of : 'survived ' + r.of + '/' + r.of) +
+      (r.won ? ' (won ' + r.won + ')' : '') +
+      '  strain mean ' + r.mean + ' band ' + r.band[0] + '-' + r.band[1] +
+      '  scar ' + r.scar + '  answered ' + r.answered + ' missed ' + r.missed +
+      '  jobs ' + r.jobs);
+  }
+
   /* one-line-per-claim rendering, so the audit can print the proof without knowing the shape */
   function tradeLines(list) {
     return list.map(c => {
@@ -1628,7 +2213,7 @@ FZ.sim.defaults = [
         FZ.sim.reset(Object.assign({}, cfg, { seed: 5150 + k * 977 }));
         for (let i = 0; i < cap && !S.gameOver; i++) {
           FZ.sim.step();
-          if (policy && i % 90 === 0) playWell();
+          if (policy && i % 60 === 0) playWell();
         }
         if (S.gameOver && !S.won) lost++;
         if (S.won) won++;
@@ -1640,11 +2225,18 @@ FZ.sim.defaults = [
     const played = ch9(true, 55000);
 
     S._silent = false;
+
+    /* ---- part 5: THE LOOP, MEASURED THROUGH THE LOOP. Not the sim with the game
+           switched off — the shipped tick, with FZ.outbreak live inside it and a player
+           who answers a stated fraction of incidents correctly. ---- */
+    const bal = opts.balance === false ? [] : balance(opts.bal);
+
     FZ.sim.reset(cfg);
 
     return {
       elements: res,
       trades: trades,
+      balance: bal,
       notes: {
         ms: Date.now() - t0,
         trials: trials, ticks: ticks, resets: resets,
@@ -1652,6 +2244,7 @@ FZ.sim.defaults = [
         runsLost: lostRuns,
         tradeoffs: tradeLines(trades),
         tradeoffsFailed: tradeFail.length ? tradeFail : 'none',
+        balance: bal.length ? balanceLines(bal) : 'skipped',
         ch9Ungoverned: idle.lost + '/2 collapsed inside 12k ticks, ' + idle.jobs + ' jobs banked',
         ch9WellPlayed: played.won + '/2 reached the 117-job goal inside 55k ticks (' + played.lost + ' collapsed), ' + played.jobs + ' jobs banked',
         method: 'fires/peak from the ch9 sandbox with auto-played interventions; counterWorks from the same seed run twice, counter forced on at tick ' + WARM + ' (best of up to three seeds), comparing mean heat over the following ' + RUN + ' ticks (works = 20% or better reduction). null means the element never got hot enough in the measurement window to compare honestly.',
@@ -1661,6 +2254,8 @@ FZ.sim.defaults = [
 
   window.__FZ = {
     probe: probe, audit: audit, goto: goto, sim: FZ.sim, forceCounter: forceCounter,
+    /* the core loop, measured through the core loop: __FZ.balance() -> [{p,lost,band,…}] */
+    balance: balance, balanceLines: balanceLines,
     /* §15 proof, runnable on its own: __FZ.tradeoffs() -> [{claim,pass,rows}] */
     tradeoffs: function (o) { S._silent = true; const r = tradeoffs(o); S._silent = false; return r; },
     tradeLines: tradeLines,

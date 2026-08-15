@@ -1,30 +1,32 @@
 /* ============================================================
-   45-outbreak.js — THE CORE LOOP.  OWNER: PLAY.
-   See CONTRACT.md §14 and REFERENCE-EOT.md §2B.
+   45-outbreak.js — THE INCIDENT.  OWNER: PLAY.
+   See CONTRACT.md §14, AESTHETIC.md §6, REFERENCE-EOT.md §2B and L11.
 
-   A detector firing used to warm a table cell and nothing else. Here it opens an
-   OUTBREAK: a bounded place on the field, named in one plain sentence, on a fuse of a
-   few seconds, doing real damage the whole time it burns. The player reads which
-   failure it is and answers it with the right institution, in the right place, in time.
+   THE GRAMMAR IS THREE BEATS, IN THIS ORDER, AND NOTHING ELSE:
 
-     right instrument, inside the ring, before the fuse   -> it closes, the strain is
-        refunded, the cell is marked as one she has answered herself
-     wrong instrument                                     -> it does not close, and the
-        game says plainly what the failure actually is
-     the fuse runs out                                    -> the damage lands where it
-        happened: work rolls back, workers go down, strain spikes, a scar stays
+     1. INCIDENT      something goes wrong and gets a BODY. A ring, a queue, ants that
+                      cannot take the crumb, work sliding backwards. Nothing is written.
+                      This file opens it and burns it; FIELD draws the body.
+     2. RECOGNITION   TAG_DELAY ticks later — a beat after the eye has already found the
+                      trouble — ONE small paper tag names the phenomenon in two lines.
+                      CONTROLS hangs it. No two-letter code. Ever. Codes live in the guide.
+     3. INTERVENTION  ONE contextual action surface, and only while a decision is live.
 
-   FIELD draws the ring, the fuse and the resolution; TABLE pulses and marks the cell;
-   CONTROLS routes every tap through tryAnswer() before FZ.sim.apply, so a correct
-   diagnosis can be paid back and a wrong one can teach. This file draws nothing and
-   contains no English: every sentence comes from FZ.copy.
+   What was deleted this round, deliberately: every narrator line this file used to emit
+   (`firstOutbreak`, `firstMiss`, `firstWrong`, `firstAnswer`, `masteryOne`). They were a
+   second and third explanation of an event that already has a tag and a body. At most one
+   message exists on screen at any instant, so the extra voices are not quieted, they are
+   gone.
 
-   WHICH INSTRUMENT ANSWERS WHAT is not arbitrary and is not hidden. Each element's
-   answer set is exactly the instruments NAMED in the counter line the player can already
-   read on its table cell (FZ.copy.detail[sym].counter), so the mapping is learnable by
-   tapping the cell — with one deliberate exception, noted at Sa below.
+   WHICH INSTRUMENT ANSWERS WHAT is not arbitrary and is not hidden. Each element's answer
+   set is the instruments genuinely countering it in the sim.
      CHARTER arbitrates  VARY decorrelates  LEDGER remembers
      LENS reveals        SLOW brakes        EJECT excludes
+
+   AND EJECT ANSWERS NOTHING UNLESS THE BODY YOU REMOVED IS THE ONE DOING IT. That was the
+   round-one correctness bug: expelling an honest worker who happened to be standing inside a
+   burning sabotage ring banked an ANSWERED and a refund while the real saboteur kept
+   draining. See culprit() below.
    ============================================================ */
 window.FZ = window.FZ || {};
 
@@ -34,8 +36,8 @@ FZ.outbreak = (function () {
   /* sym -> the instruments that resolve it.
      SIM is the authority (`el.answers`, CONTRACT §14.4). This table is the fallback if an
      element ever ships without one, and a generosity margin: an instrument that genuinely
-     counters the element in the sim is accepted even when the cell's counter line names a
-     different one first. Being right for a readable reason is never punished. */
+     counters the element in the sim is accepted even when the guide names a different one
+     first. Being right for a readable reason is never punished. */
   var ANSWERS = {
     /* coordination */
     Co: ['charter'],
@@ -54,9 +56,7 @@ FZ.outbreak = (function () {
     /* epistemics */
     Gu: ['ledger'],
     /* Cs: the LEDGER is the CAUSE, not the cure (§15.1 — skepticism up amplifies Cs, and
-       the audit measures it going up). Only the LENS re-opens what was written off, and
-       only the LENS is in counteredBy. Accepting a ledger here would pay the player for
-       the exact move that made it worse. */
+       the audit measures it going up). Only the LENS re-opens what was written off. */
     Cs: ['lens'],
     Hi: ['lens'],
     Tc: ['ledger'],
@@ -64,8 +64,6 @@ FZ.outbreak = (function () {
     Rp: ['ledger'],
     /* goals and power */
     Tw: ['charter'],
-    /* Sa: the counter line says find it with a LENS, then EJECT. Only the expulsion
-       ends it, so only the expulsion answers it — looking is not doing. */
     Sa: ['eject'],
     Lo: ['charter', 'eject'],
     My: ['lens'],
@@ -78,11 +76,55 @@ FZ.outbreak = (function () {
     Mm: ['lens'],
   };
 
+  /* THE PHENOMENON NAMES — what the paper tag says.
+     A name a naturalist would write on a card pinned beside the thing, and one plain line
+     underneath. No taxonomy, no trigger/effect/counter, no code: those are the field
+     guide's job and the guide is closed while anything is burning.
+
+     VOICE owns the words. If `FZ.copy.phen` exists it wins outright; this table is the
+     fallback so the piece is never mute, and is requested for 20-copy.js in the report. */
+  var PHEN = {
+    Co: ['CLAIMED TWICE', 'Two of them started it from opposite ends.'],
+    Si: ['NOBODY KNOWS', 'Most of the colony never heard this work exists.'],
+    Mc: ['TWO FINISHES', 'They both finished it, differently. It will not join.'],
+    Dp: ['WAITING ON NOTHING', 'This one is stuck behind work nobody is doing.'],
+    Ow: ['ONE PAIR OF HANDS', 'One worker is holding three jobs. All three rot.'],
+    Pt: ['BUSY AND POOR', 'They grind the small crumbs and leave the big one.'],
+    Cf: ['EVERYONE FOLLOWS', 'They pick whatever the others already picked.'],
+    Lv: ['ALL ONE KIND', 'Nearly every worker here has the same lineage.'],
+    Sf: ['FELL TOGETHER', 'One blind spot, shared. They went down at the same moment.'],
+    Fl: ['THE STAMPEDE', 'Eight on one crumb. More hands, less work.'],
+    Cl: ['PASSING IT BACK', 'Two of them trade the claim and never work it.'],
+    Im: ['ONE BODY', 'The whole colony just made the same move.'],
+    Gu: ['CHASING A RUMOUR', 'There is nothing there. They are going anyway.'],
+    Cs: ['WRITTEN OFF', 'One bad crumb, and they shun every crumb like it.'],
+    Hi: ['KNEW AND SAID NOTHING', 'Someone walked past that hazard and kept quiet.'],
+    Tc: ['ALL VOICES EQUAL', 'Every source weighs the same. One of them is lying.'],
+    Di: ['RIGHT AND ALONE', 'One worker found the best crumb. Nobody followed.'],
+    Rp: ['LIED TWICE', 'Second lie. Nothing here remembers the first.'],
+    Tw: ['BOTH SITTING ON IT', 'Two rivals, one crumb, and neither will move.'],
+    Sa: ['COMING APART', 'Finished work is quietly draining away.'],
+    Lo: ['STUCK CLAIM', 'Someone claimed it and stopped.'],
+    My: ['QUICK WINS ONLY', 'They keep taking the small crumb over the big one.'],
+    Es: ['ONLY EACH OTHER', 'The rivals stopped working. Now they only chase.'],
+    Cr: ['WILL NOT BE GOVERNED', 'That one walks straight through whatever you put down.'],
+    Mo: ['ONE OF EVERYTHING', 'One lineage, one habit, one way to be wrong.'],
+    In: ['NO INSTITUTION', 'Nothing here settles anything.'],
+    Sp: ['TOO FAST FOR HANDS', 'Everything sped up. You did not.'],
+    Mm: ['DARK', 'You can see where they are. Not what they want.'],
+  };
+
+  /* said when the player expels a body that was not the one doing it — the correctness
+     fix has to SAY something, and it must not say "answered". VOICE may override with
+     FZ.copy.loop.wrongBody. */
+  var WRONG_BODY = 'That one was working. Whatever is doing this is still in here.';
+
   /* ticks. The rAF loop steps once per frame, so ~60 ticks is a second.
      The fuse shortens with machine speed: that is how Sp becomes the difficulty
      curve rather than a caption. */
   var FUSE = 400, FUSE_MIN = 168, FUSE_MAX = 620;
   var FIRST_GRACE = 1.5;          /* the first one you ever see waits for you */
+  var TAG_DELAY = 40;             /* beat 1 before beat 2: the body arrives before the name */
   var COOL_OK = 210, COOL_MISS = 160;
   var KEEP = 130;                 /* how long a resolved outbreak stays inspectable */
   var BURN_DRAIN = 0.05;          /* progress lost per tick inside a burning ring */
@@ -95,7 +137,8 @@ FZ.outbreak = (function () {
   var cool = {};
   var pend = null;                /* an answer awaiting the sim's verdict on the spend */
   var seen = 0;                   /* outbreaks opened this run */
-  var said = {};                  /* one-off narrator lines, once per session */
+  var seq = 0;                    /* outbreak ids, so a tag can stay attached to one thing */
+  var focusId = 0;                /* the one the player has pointed at, if any */
   var wired = false;
   var lastW = 0, lastH = 0;
   var api;
@@ -106,11 +149,13 @@ FZ.outbreak = (function () {
   function fireLine(sym) { return (FZ.copy && FZ.copy.fire && FZ.copy.fire[sym]) || ''; }
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
   function emit(n, d) { if (FZ.bus) FZ.bus.emit(n, d); }
-  function say(key, tone) {
-    if (said[key]) return;
-    said[key] = 1;
-    var t = loop(key);
-    if (t) emit('say', { text: t, tone: tone || 'plain' });
+
+  /* the two lines of the paper tag. VOICE first, fallback second, never a code. */
+  function phen(sym) {
+    var c = FZ.copy && FZ.copy.phen && FZ.copy.phen[sym];
+    if (c && (c.name || c.line)) return { name: c.name || '', line: c.line || '' };
+    var f = PHEN[sym];
+    return f ? { name: f[0], line: f[1] } : { name: '', line: fireLine(sym) };
   }
 
   /* ------------------------------------------------------------------ mastery */
@@ -146,7 +191,7 @@ FZ.outbreak = (function () {
   }
 
   /* Only ever ask a question the player has been handed an instrument to answer.
-     An outbreak nothing in the bar can close is not a decision, it is a punishment. */
+     An incident nothing in her hands can close is not a decision, it is a punishment. */
   function answerable(sym, st) {
     var A = answersFor(sym), T = st.tools || [];
     for (var i = 0; i < A.length; i++) if (T.indexOf(A[i]) > -1) return true;
@@ -186,16 +231,24 @@ FZ.outbreak = (function () {
     if (seen === 0) fuse = Math.round(fuse * FIRST_GRACE);
     seen++;
 
+    var p = phen(d.sym);
     var o = {
+      id: ++seq,
       sym: d.sym,
-      /* kept just inside the field: an outbreak you cannot see the clock on is not a
+      /* kept just inside the field: an incident you cannot see the clock on is not a
          decision. The fuse arc starts at twelve o'clock, so the top of the ring is the
          part that must survive. */
       x: clamp(at.x, 22, st.w - 22),
       y: clamp(at.y, 26, st.h - 22),
       r: r,
       born: st.tick,
+      /* BEAT ONE BEFORE BEAT TWO. For this many ticks the incident is only a body: ants
+         piling up, work sliding back, a ring drawn where it is happening. The name arrives
+         after the eye has already gone there. */
+      tagAt: st.tick + TAG_DELAY,
       fuse: fuse,
+      name: p.name,
+      line: p.line,
       say: d.say || fireLine(d.sym),
       answers: answersFor(d.sym).slice(),
       who: (d.who || []).slice(),
@@ -203,8 +256,10 @@ FZ.outbreak = (function () {
       endAt: 0,
     };
     list.push(o);
+    /* the player is looking at whatever most recently caught fire, unless she has
+       deliberately pointed at something else that is still burning */
+    if (!current(true)) focusId = o.id;
     emit('outbreak:open', { sym: o.sym, x: o.x, y: o.y, fuse: o.fuse, r: o.r });
-    say('firstOutbreak', 'bad');
   }
 
   /* ------------------------------------------------------------------- damage */
@@ -256,7 +311,6 @@ FZ.outbreak = (function () {
 
     mark(o.sym, 'missed');
     emit('outbreak:landed', { sym: o.sym, x: o.x, y: o.y, r: o.r });
-    say('firstMiss', 'bad');
   }
 
   /* it closes: the failure visibly cools, and the instrument is paid back */
@@ -269,14 +323,12 @@ FZ.outbreak = (function () {
     st.budget = Math.min(14, st.budget + back + 1);
     if (st.collapseMax !== Infinity) st.collapse = Math.max(0, st.collapse - ANSWER_RELIEF);
 
-    /* the cell drops out of the red immediately: the consequence is in the table too */
+    /* the element drops out of the red immediately: the consequence is in the guide too */
     var e = el(o.sym);
     if (e) { e.heat = Math.min(e.heat, 0.1); e.on = false; }
 
-    var m = mark(o.sym, 'answered');
+    mark(o.sym, 'answered');
     emit('outbreak:answered', { sym: o.sym, x: o.x, y: o.y, r: o.r });
-    say('firstAnswer', 'good');
-    if (m.answered === 1) say('masteryOne', 'good');
   }
 
   /* it stopped on its own terms: the element is genuinely countered and has gone cold,
@@ -290,6 +342,41 @@ FZ.outbreak = (function () {
   }
 
   /* ------------------------------------------------------------------ answers */
+
+  /* THE CORRECTNESS FIX (round-one bug).
+     EJECT is the only instrument that names a BODY rather than a place, so it is the only
+     one that can be aimed at the wrong thing while still landing inside the ring. Expelling
+     an honest worker out of a burning sabotage ring used to bank an ANSWERED and refund the
+     spend while the saboteur kept draining — a bot banked eleven of them and gutted the
+     colony while its strain climbed.
+
+     An expulsion answers an incident only when the body removed IS the one causing it. The
+     detectors already hand us the implicated ids on `fire`; the role flags are the backstop
+     for a culprit that fired before this ring opened. Anything else is a wrong answer that
+     says so, costs the budget, costs the colony a worker, and leaves the real one working. */
+  function victimOf(st, x, y) {
+    if (x == null) return null;
+    var R = (FZ.sim && FZ.sim.ejectR) || 44, best = null, bd = R * R;
+    for (var i = 0; i < st.agents.length; i++) {
+      var a = st.agents[i], dx = a.x - x, dy = a.y - y, q = dx * dx + dy * dy;
+      if (q < bd) { bd = q; best = a; }
+    }
+    return best;
+  }
+  function culprit(o, a) {
+    if (!a) return false;
+    if (o.who && o.who.length && o.who.indexOf(a.id) > -1) return true;
+    switch (o.sym) {
+      case 'Sa': return !!a.adversary;
+      case 'Cr': return !a.corrigible;
+      case 'Lo': return !!a.locker;
+      case 'Cl': return !!(a.churner || a.colluder);
+      /* eject is not the named instrument for anything else; if it ever becomes one,
+         the caller has to teach this function who the body is. */
+      default: return false;
+    }
+  }
+
   /* CONTROLS calls this BEFORE FZ.sim.apply. The spend can still fail (no budget, a
      tap with no worker under it), so the outcome is held until the sim reports back
      on `intervene`, and rolled back if nothing was actually spent. */
@@ -298,14 +385,33 @@ FZ.outbreak = (function () {
     var miss = { hit: false, right: false, sym: null, msg: '' };
     if (!st || !kind) return miss;
 
+    /* An expulsion is judged on the body, not on the distance: the saboteur wanders, and
+       hunting it down outside the ring is exactly the skill the LENS is sold for. */
+    if (kind === 'eject') {
+      var o = current(true) || null, i;
+      if (!o) { for (i = 0; i < list.length; i++) if (list[i].state === 'burning') { o = list[i]; break; } }
+      if (!o || o.answers.indexOf('eject') < 0) {
+        if (o) { pend = { o: o, kind: kind, right: false }; return { hit: true, right: false, sym: o.sym, msg: wrongLine(o.sym) }; }
+        return miss;
+      }
+      var v = victimOf(st, x, y);
+      if (!v) return miss;                       /* no body under the finger; sim will refuse */
+      if (culprit(o, v)) {
+        pend = { o: o, kind: kind, right: true };
+        return { hit: true, right: true, sym: o.sym, msg: loop('answered') };
+      }
+      pend = { o: o, kind: kind, right: false, body: true };
+      return { hit: true, right: false, sym: o.sym, msg: loop('wrongBody') || WRONG_BODY };
+    }
+
     var best = null, bd = Infinity, near = null;
-    for (var i = 0; i < list.length; i++) {
-      var o = list[i];
-      if (o.state !== 'burning') continue;
-      var d = (x == null) ? 0 : Math.sqrt((o.x - x) * (o.x - x) + (o.y - y) * (o.y - y));
-      var reach = o.r + 26;
-      if (d <= reach) { if (d < bd) { bd = d; best = o; } }
-      else if (o.answers.indexOf(kind) > -1 && !near) near = o;
+    for (var k = 0; k < list.length; k++) {
+      var c = list[k];
+      if (c.state !== 'burning') continue;
+      var d = (x == null) ? 0 : Math.sqrt((c.x - x) * (c.x - x) + (c.y - y) * (c.y - y));
+      var reach = c.r + 26;
+      if (d <= reach) { if (d < bd) { bd = d; best = c; } }
+      else if (c.answers.indexOf(kind) > -1 && !near) near = c;
     }
 
     if (!best) {
@@ -316,7 +422,7 @@ FZ.outbreak = (function () {
 
     if (best.answers.indexOf(kind) > -1) {
       pend = { o: best, kind: kind, right: true };
-      return { hit: true, right: true, sym: best.sym, msg: loop('answered') + ' — ' + loop('refund') };
+      return { hit: true, right: true, sym: best.sym, msg: loop('answered') };
     }
     pend = { o: best, kind: kind, right: false };
     return { hit: true, right: false, sym: best.sym, msg: wrongLine(best.sym) };
@@ -329,17 +435,42 @@ FZ.outbreak = (function () {
     if (!st || !d || !d.ok) return;              /* nothing was spent — nothing happened */
     if (p.o.state !== 'burning') return;
     if (p.right) { resolve(p.o, p.kind, st); return; }
-    emit('outbreak:wrong', { sym: p.o.sym, kind: p.kind, msg: wrongLine(p.o.sym) });
-    say('firstWrong', 'bad');
+    emit('outbreak:wrong', {
+      sym: p.o.sym, kind: p.kind, body: !!p.body,
+      msg: p.body ? (loop('wrongBody') || WRONG_BODY) : wrongLine(p.o.sym),
+      x: p.o.x, y: p.o.y,
+    });
   }
 
-  /* ------------------------------------------------------------------- update */
+  /* ---------------------------------------------------------------- the focus */
+  /* THE ONE BEING ASKED ABOUT. There is exactly one paper tag, so exactly one incident
+     owns the words at a time; the others stay legible from their bodies alone (CONTRACT
+     §12.1). Default is whichever is closest to landing — the one that will hurt first —
+     unless the player has tapped a different burning ring to read it. */
+  function current(ignoreDelay) {
+    var st = S();
+    if (!st) return null;
+    var i, o, ready = [];
+    for (i = 0; i < list.length; i++) {
+      o = list[i];
+      if (o.state !== 'burning') continue;
+      if (!ignoreDelay && st.tick < o.tagAt) continue;
+      ready.push(o);
+    }
+    if (!ready.length) return null;
+    for (i = 0; i < ready.length; i++) if (ready[i].id === focusId) return ready[i];
+    var best = ready[0], bl = left(best, st);
+    for (i = 1; i < ready.length; i++) { var l = left(ready[i], st); if (l < bl) { bl = l; best = ready[i]; } }
+    return best;
+  }
+
+  /* -------------------------------------------------------------------- update */
   function update(st) {
     if (!st) return;
     if (!wired) wire();
 
-    /* the phone rotated, or the ticker grew a line: the sim rescales its world, so
-       the outbreaks have to move with it or they point at nothing. */
+    /* the phone rotated, or a panel grew a line: the sim rescales its world, so
+       the incidents have to move with it or they point at nothing. */
     if (lastW && lastH && (lastW !== st.w || lastH !== st.h)) {
       var kx = st.w / lastW, ky = st.h / lastH;
       for (var q = 0; q < list.length; q++) { list[q].x *= kx; list[q].y *= ky; }
@@ -354,6 +485,7 @@ FZ.outbreak = (function () {
         else if (st.tick - o.born >= o.fuse) land(o, st);
         else burn(o, st);
       } else if (st.tick >= o.endAt) {
+        if (list[i].id === focusId) focusId = 0;
         list.splice(i, 1);
       }
     }
@@ -364,8 +496,8 @@ FZ.outbreak = (function () {
     wired = true;
     FZ.bus.on('fire', open);
     FZ.bus.on('intervene', settle);
-    FZ.bus.on('lose', function () { list.length = 0; pend = null; });
-    FZ.bus.on('goal', function () { list.length = 0; pend = null; });
+    FZ.bus.on('lose', function () { list.length = 0; pend = null; focusId = 0; });
+    FZ.bus.on('goal', function () { list.length = 0; pend = null; focusId = 0; });
   }
 
   load();
@@ -382,6 +514,7 @@ FZ.outbreak = (function () {
       pend = null;
       cool = {};
       seen = 0;
+      focusId = 0;
       var st = S();
       lastW = st ? st.w : 0; lastH = st ? st.h : 0;
       cap = (scenario && scenario.outbreakCap != null) ? scenario.outbreakCap : 1;
@@ -392,8 +525,29 @@ FZ.outbreak = (function () {
     update: update,
     tryAnswer: tryAnswer,
 
+    /* the incident that owns the paper tag and the action surface right now */
+    current: current,
+
+    /* the player pointed at the field: if she pointed at a burning ring, that is the one
+       she is reading now, and the tag moves to it. Returns true if the focus changed. */
+    focusAt: function (x, y) {
+      var best = null, bd = Infinity;
+      for (var i = 0; i < list.length; i++) {
+        var o = list[i];
+        if (o.state !== 'burning') continue;
+        var dx = o.x - x, dy = o.y - y, d = Math.sqrt(dx * dx + dy * dy);
+        if (d < o.r + 26 && d < bd) { bd = d; best = o; }
+      }
+      if (!best || best.id === focusId) return false;
+      focusId = best.id;
+      return true;
+    },
+
+    /* fraction of fuse remaining, 1 -> 0, for whoever needs to draw a clock */
+    left: function (o) { var st = S(); return (st && o) ? clamp(left(o, st), 0, 1) : 0; },
+
     /* the one a tap should be judged against when the instrument is untargeted:
-       whichever is closest to landing. CONTROLS uses this. */
+       whichever is closest to landing. */
     urgent: function () {
       var st = S();
       if (!st) return null;
@@ -414,6 +568,9 @@ FZ.outbreak = (function () {
       return n;
     },
 
+    /* the two lines of the tag, for anyone who must show a phenomenon by name.
+       Never a two-letter code — that is the guide's, and only the guide's. */
+    phen: phen,
     answersFor: answersFor,
   };
   return api;

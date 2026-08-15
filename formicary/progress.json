@@ -1,6 +1,6 @@
 {
-  "round": 3,
-  "updated": "2026-08-15 02:34 UTC",
+  "round": 4,
+  "updated": "2026-08-15 05:47 UTC",
   "note": "DIRECTION CHANGE, round 3. The client played the working build and found it incoherent: an amber instruction, a red fire line, a narrator line and an open detail card on screen at once, three of them paraphrasing each other, with the open card describing a different failure than the one burning. The answer is not less information but MORE INFORMATION EMBODIED IN THE WORLD. AESTHETIC.md is now the governing law: CIVIC NATURALISM, two registers \u2014 the colony is human and tactile, the instrumentation is spare and diagrammatic. Rigor is not discarded, it is moved out of the foreground. The new law, and the eleventh scored criterion, is one question: WHAT FACT DOES THIS ALLOW ME NOT TO WRITE? Retired: the black-and-white palette, the no-border-radius ban, the permanent 28-cell table, the permanent six-button tool bar. Kept: one self-contained file, all 28 real detectors, no emoji, IBM Plex Mono, and the outbreak loop, whose mechanics the client called good \u2014 only its presentation changes. The chain was red thing, code, sentence, table, concept, answer. It becomes incident, recognition, intervention.",
   "pieces": [
     {
@@ -8,42 +8,198 @@
       "name": "NEST \u2014 the colony as the dashboard",
       "owns": "src/50-render.js",
       "judged": "L11 the Depiction Law above all. Traffic, sameness, perception, possession and weather must be READABLE AS BEHAVIOUR. Seven idle ants visibly wander rather than reading idle:7. Congestion is a crowd at a doorway. History is wear on the architecture. Lineage is trail pattern. Ants get gait, posture and hesitation so a player says 'why are all five carrying the same thing' unprompted.",
-      "rounds": []
+      "rounds": [
+        {
+          "n": 3,
+          "verdict": "close",
+          "score": 81,
+          "laws": {
+            "L1": 7,
+            "L2": 8,
+            "L3": 6,
+            "L4": 8,
+            "L5": 8,
+            "L6": 7,
+            "L7": 6,
+            "L8": 8,
+            "L9": 8,
+            "L10": 8,
+            "L11": 7
+          },
+          "built": "The field is a cutaway nest now, and it carries facts that used to be sentences. The score is grain filling sockets in the chamber wall. The nest is excavated live, so architecture IS history. Placing a meeting stone leaves a permanent ring of drawn stones in the wall. Strain is water: a soil tide rising from the bottom with a persistent tidemark, drowning the lower third at 100. Machine speed drops grit from the roof. A miss bursts a red shock ring and leaves hatch scars at those exact coordinates. With the lantern lit, blue intention lines fan from every ant to what it wants, and the saboteur is the one ant with no line \u2014 the whole sabotage puzzle solved visually with zero explanatory text.",
+          "gap": "The tag still asserts what the picture does not show. It says 'Eight on one crumb' while thirteen ants render as a single 45px black clot you cannot count. And 5 of 17 sampled incidents had their answer ring clipped by the viewport edge, with one centred underneath the action bar \u2014 the thing you are told to tap is behind the button.",
+          "shots": [
+            "r3N-ch7-a.png",
+            "r3N-ch7-b.png",
+            "r3N-c9-a.png",
+            "r3N-c9-b.png",
+            "r3N-c9-c.png"
+          ]
+        }
+      ]
     },
     {
       "id": "I",
       "name": "INCIDENT \u2014 one paper tag, one action, nothing else",
       "owns": "src/45-outbreak.js, src/70-controls.js",
       "judged": "incident then recognition then intervention. At most ONE message on screen ever. No taxonomy code during play. The six institutions become folk technology whose silhouette teaches its function: meeting stone, branching seed, tally wall, lantern, bell, threshold.",
-      "rounds": []
+      "rounds": [
+        {
+          "n": 3,
+          "verdict": "close",
+          "score": 86,
+          "laws": {
+            "L1": 8,
+            "L2": 8,
+            "L3": 8,
+            "L4": 9,
+            "L5": 8,
+            "L6": 7,
+            "L7": 8,
+            "L8": 8,
+            "L9": 8,
+            "L10": 8,
+            "L11": 7
+          },
+          "built": "Incident, recognition, intervention. One paper tag near the thing, one contextual action, and nothing else \u2014 verified in the DOM at a two-incident moment: exactly one tag element, no narrator strip, no toast, no table. The action bar is absent whenever nothing is burning. The six institutions are folk technology now: meeting stone, seed, tally, lantern, bell, threshold. No two-letter code appears anywhere during play.",
+          "gap": "THE EMPTY GROUND (the missing-institution incident) has no body. It is the first tag a player meets in four episodes and the second-most-fired detector in the sandbox, and at 4x zoom its ring contains nothing but two ordinary ants standing near a chamber. The fact exists only in the sentence, which is exactly what the Depiction Law forbids.",
+          "shots": [
+            "r3I-ch1-a.png",
+            "r3I-ch1-b.png",
+            "r3I-ch1-c.png",
+            "r3I-ch1-d.png",
+            "r3I-wrong-a.png",
+            "r3I-wrong-b.png"
+          ]
+        }
+      ]
     },
     {
       "id": "G",
       "name": "GUIDE \u2014 the naturalist's collection",
       "owns": "src/60-table.js",
       "judged": "The 28-cell matrix becomes collectible plates, blank until witnessed, drawn when seen, stamped when answered. Never openable during a decision. Taxonomy as knowledge you discovered about a species, not documentation shipped with the software.",
-      "rounds": []
+      "rounds": [
+        {
+          "n": 3,
+          "verdict": "close",
+          "score": 88,
+          "laws": {
+            "L1": 9,
+            "L2": 9,
+            "L3": 8,
+            "L4": 9,
+            "L5": 8,
+            "L6": 8,
+            "L7": 7,
+            "L8": 8,
+            "L9": 9,
+            "L10": 8,
+            "L11": 9
+          },
+          "built": "Highest depiction score of the round. The 28-cell matrix is gone; the taxonomy is a naturalist's collection. Each plate carries a glyph, a common name, a drawn mechanism diagram, one plain line, and the scientific code in small type at the bottom with seen, answered and missed counts plus a stamp of the institution that answered it. Uncollected plates are dashed empty slots. The guide cannot be opened while anything is burning.",
+          "gap": "The first collected plate does not announce itself. Nothing flags a specimen as new until the player has already opened the drawer once, so the drawer pull first appears as a plain unlabelled box in the corner of an episode card whose dominant call to action is BEGIN. The collection mechanic is invisible at the exact moment it should hook.",
+          "shots": [
+            "r3N-gd-g1.png",
+            "r3I-guide-a.png",
+            "r3I-guide-b.png",
+            "r3I-guide2-a.png",
+            "r3I-guide2-b.png"
+          ]
+        }
+      ]
     },
     {
       "id": "S",
       "name": "SHELL \u2014 civic naturalism, and the abolished HUD",
       "owns": "src/00-head.html, src/10-style.css, src/15-body.html, src/20-copy.js",
       "judged": "The material/signal palette split. Quiet crown, colony-owned centre, bottom that is ABSENT unless there is a decision. Every string must have survived the Depiction Law.",
-      "rounds": []
+      "rounds": [
+        {
+          "n": 3,
+          "verdict": "close",
+          "score": 89,
+          "laws": {
+            "L1": 8,
+            "L2": 9,
+            "L3": 8,
+            "L4": 9,
+            "L5": 8,
+            "L6": 8,
+            "L7": 9,
+            "L8": 9,
+            "L9": 9,
+            "L10": 8,
+            "L11": 8
+          },
+          "built": "The permanent HUD is abolished. Quiet crown, colony-owned centre, an action region that is absent rather than empty. The material/signal palette split is enforced by the build: the hex census is exactly the allowlist and nothing else. 84 detail-card lines, 12 tool blurbs, 60 narrator beats and 10 loop strings were DELETED because the colony can now be seen. What replaced them is 28 phenomenon names with one plain line each.",
+          "gap": "The colony is 85 percent of the screen and completely inert to touch. Pressing MEETING STONE auto-places it at the focused incident, so the chapter-3 card that says 'put it where the trouble is' is instructing a gesture the game does not accept.",
+          "shots": [
+            "r3S-320.png",
+            "r3S-ab-about.png",
+            "r3S-ab-aboutfull.png",
+            "r3S-act-quiet.png"
+          ]
+        }
+      ]
     },
     {
       "id": "W",
       "name": "WORLD \u2014 28 detectors, trade-offs, balance",
       "owns": "src/30-elements.js, src/40-sim.js",
       "judged": "audit all 28 fire with working counters; section-15 trade-offs proven; misses must COST; balance measured through the live loop; and every element needs a body \u2014 a depictable behaviour the renderer can show without a caption",
-      "rounds": []
+      "rounds": [
+        {
+          "n": 3,
+          "verdict": "close",
+          "score": 92,
+          "laws": {
+            "L1": 8,
+            "L2": 9,
+            "L3": 8,
+            "L4": 8,
+            "L5": 8,
+            "L6": 9,
+            "L7": 9,
+            "L8": 8,
+            "L9": 8,
+            "L10": 9,
+            "L11": 8
+          },
+          "built": "Misses now cost, and the difficulty curve is real and measured THROUGH the live loop: answering 100 percent survives 4/4 with strain 0-7; 85 percent survives with strain to 47; 70 percent survives with strain to 89; 50 percent LOSES half its runs; 30 and 0 percent lose everything. Ungoverned collapses inside 12k ticks. All six trade-offs re-verified with numbers, including truce only becoming reachable under a charter, and speed raising throughput and aggression together.",
+          "gap": "The ledger/lens trade-off is the most interesting idea in the simulation and it is still a paragraph rather than something played. Stage it as an A/B passage on an identical seed: one run with only the tally, where the liar is answered but the lone dissenter is then disbelieved, and one with only the lantern, where the dissenter is heard but the rumour spreads.",
+          "shots": []
+        }
+      ]
     },
     {
       "id": "T",
       "name": "TEACH \u2014 the episode sequence",
       "owns": "src/80-chapters.js, src/90-boot.js",
       "judged": "L1 one idea at a time, L2 play first name second, L8 hands on the game within five seconds, L6 the A/B re-run, L9 the sandbox is the reward",
-      "rounds": []
+      "rounds": [
+        {
+          "n": 3,
+          "verdict": "close",
+          "score": 93,
+          "laws": {
+            "L1": 9,
+            "L2": 9,
+            "L3": 8,
+            "L4": 9,
+            "L5": 8,
+            "L6": 9,
+            "L7": 9,
+            "L8": 9,
+            "L9": 9,
+            "L10": 9,
+            "L11": 8
+          },
+          "built": "Best score of the round. Hands are on the game in the first seconds instead of at 0:41. The gates are now the only place taxonomy appears, so naming lands as the payoff after the episode rather than as a prerequisite \u2014 play first, name second, done properly.",
+          "gap": "Passage 10 is a sandbox you are handed rather than one you author. Give it a pre-run setup card with three dials the player sets before beginning \u2014 lineages, pace, and which three instruments they take \u2014 each drawn as its already-learned silhouette, with the seed frozen and stamped so the re-run is the player's own experiment.",
+          "shots": []
+        }
+      ]
     }
   ]
 }

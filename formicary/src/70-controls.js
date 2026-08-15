@@ -1,86 +1,222 @@
 /* ============================================================
-   70-controls.js — THE SIX INSTITUTIONS ON A THUMB.  OWNER: CONTROLS.
+   70-controls.js — RECOGNITION AND INTERVENTION.  OWNER: CONTROLS.
    FZ.controls = { build(), setAvailable(kinds), paint(S), armed, aim }
 
-   Rules obeyed here:
-     - A tool the player has not been taught is ABSENT from the DOM, not disabled.
-     - Targeted tools (vary/charter/eject) arm, show their hint, and preview where they
-       will land via FZ.controls.aim, which 50-render.js draws. Untargeted tools
-       (slow/lens/ledger) apply on the spot; lens and ledger are toggles with an on-state.
-     - Every answer goes through FZ.outbreak.tryAnswer BEFORE FZ.sim.apply, so a correct
-       diagnosis can be rewarded and a wrong instrument can teach.
-     - All English comes from FZ.copy. This file invents none.
+   This file owns the only two things the player ever reads during play, and there are
+   never more than two of them, and only one of them is a sentence:
+
+     #tagLayer   ONE paper tag, hung on a thread beside the incident it names. Two lines:
+                 a phenomenon a naturalist would write on a card, and one plain sentence.
+                 Its left edge IS the fuse — the tag burns down as the incident does, so
+                 there is no separate clock anywhere on screen. No two-letter code, ever.
+
+     #act        the contextual action surface. ABSENT — removed from the DOM, not
+                 disabled, not empty — whenever there is no decision to make. It appears
+                 when an incident has been named and disappears the moment it is settled.
+
+   ABOLISHED THIS ROUND, and this is most of the work:
+     - the permanent six-button tool bar (AESTHETIC.md §8). #bar is emptied and hidden.
+     - the amber instruction rail (#aimHint). It paraphrased the tag.
+     - the toast strip (#toast). Everything it said now arrives in the one tag region or
+       is deleted; FZ.ui.toast is kept as a shim so nothing else breaks, and it writes
+       into that same single region.
+     - the arm-then-aim dance for CHARTER and VARY. An institution answering a located
+       incident goes where the incident is. One tap. EJECT alone still asks for a body,
+       because naming the body IS the decision — see 45-outbreak.js culprit().
+     - opening the taxonomy card on a field tap. A field tap now moves the tag to the
+       incident you pointed at. Theory is the reward for comprehension, not a popup.
+
+   THE SIX INSTITUTIONS ARE FOLK TECHNOLOGY (AESTHETIC.md §5). Each is drawn as the thing
+   an ant colony would build, and the silhouette teaches the function: an arch over a
+   meeting stone arbitrates, a branching seed decorrelates, a cairn of tally-marked stones
+   remembers, a lantern reveals, a bell brakes, a barred threshold excludes. The names are
+   there while they are being learned and drop away once the player has answered enough
+   incidents to know the shapes.
+
+   All English is FZ.copy's. The two fallbacks in this file (folk names, and only if VOICE
+   has not supplied them) are flagged in the report.
    ============================================================ */
 window.FZ = window.FZ || {};
-
-/* shared one-line message strip — defined here because CONTROLS loads first of the two
-   parts that need it; CHAPTERS reuses it. */
-FZ.ui = FZ.ui || {};
-if (!FZ.ui.toast) {
-  FZ.ui.toast = (function () {
-    var node = null, t = 0;
-    return function (msg, tone) {
-      if (!node) node = document.getElementById('toast');
-      if (!node || !msg) return;
-      node.textContent = msg;
-      node.className = 'on' + (tone ? ' ' + tone : '');
-      clearTimeout(t);
-      t = setTimeout(function () { node.className = ''; }, 2600);
-    };
-  })();
-}
 
 FZ.controls = (function () {
   'use strict';
 
   var ORDER = ['charter', 'vary', 'slow', 'lens', 'ledger', 'eject'];
-  var TARGETED = { vary: 1, charter: 1, eject: 1 };
 
-  /* drawn marks — one per instrument, stroke-only, currentColor */
+  /* THE FOLK TECHNOLOGY. viewBox 0 0 24 24, stroke-only, currentColor.
+     Read them as silhouettes at 26px on a phone: arch, seed, cairn, lantern, bell, gate. */
   var MARK = {
-    charter: '<svg viewBox="0 0 20 14" fill="none" stroke="currentColor" stroke-width="1.5">' +
-      '<rect x="1.8" y="1.8" width="16.4" height="10.4" stroke-dasharray="3 2.4"/>' +
-      '<path d="M5.4 1.8v2.2M14.6 1.8v2.2M5.4 12.2v-2.2M14.6 12.2v-2.2"/></svg>',
-    vary: '<svg viewBox="0 0 20 14" fill="none" stroke="currentColor" stroke-width="1.5">' +
-      '<rect x="1.6" y="4.4" width="5" height="5"/><path d="M13 3.4l3.6 6.2H9.4z"/>' +
-      '<path d="M9.6 1.6v10.8" stroke-dasharray="2 2"/></svg>',
-    slow: '<svg viewBox="0 0 20 14" fill="none" stroke="currentColor" stroke-width="1.5">' +
-      '<path d="M1.6 7h9M7.2 3.6L10.6 7l-3.4 3.4"/><path d="M14.4 1.8v10.4M18 1.8v10.4"/></svg>',
-    lens: '<svg viewBox="0 0 20 14" fill="none" stroke="currentColor" stroke-width="1.5">' +
-      '<path d="M10 2.4L17.6 7 10 11.6 2.4 7z"/><path d="M10 5.2v3.6M8.2 7h3.6"/></svg>',
-    ledger: '<svg viewBox="0 0 20 14" fill="none" stroke="currentColor" stroke-width="1.5">' +
-      '<rect x="2.4" y="1.8" width="15.2" height="10.4"/><path d="M6.2 1.8v10.4M8.4 5h6.6M8.4 9h6.6"/></svg>',
-    eject: '<svg viewBox="0 0 20 14" fill="none" stroke="currentColor" stroke-width="1.5">' +
-      '<path d="M11.2 1.8H2.4v10.4h8.8"/><path d="M7.4 7h10.2M14.6 4.2L17.6 7l-3 2.8"/></svg>',
+    /* meeting stone under a marked arch — ownership becomes visible, one claimant remains */
+    charter: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" ' +
+      'stroke-linecap="square"><path d="M3.6 21.4V12a8.4 8.4 0 0116.8 0v9.4"/>' +
+      '<path d="M7.9 21.4v-9.2a4.1 4.1 0 018.2 0v9.2"/>' +
+      '<path d="M1.6 21.4h20.8"/><path d="M12 1.6v2.6"/></svg>',
+    /* branching seed — one thing becomes several, going different ways */
+    vary: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" ' +
+      'stroke-linecap="square"><path d="M12 21.4v-4.2"/><path d="M8.6 21.4h6.8"/>' +
+      '<path d="M12 17.2c-1.5 0-2.6-1-2.6-2.3S10.5 12.6 12 12.6s2.6 1 2.6 2.3-1.1 2.3-2.6 2.3z"/>' +
+      '<path d="M12 12.6V7.4M10.4 13.6L6.2 9.4M13.6 13.6l4.2-4.2"/>' +
+      '<path d="M12 7.4V4.2M6.2 9.4V6.2M17.8 9.4V6.2"/></svg>',
+    /* tally cairn — what happened here is written on the stones and stays written */
+    ledger: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" ' +
+      'stroke-linecap="square"><path d="M2.5 21.4h19"/><path d="M4 15.4h16v6H4z"/>' +
+      '<path d="M6.2 9.6h11.6v5.8H6.2z"/><path d="M8.4 4h7.2v5.6H8.4z"/>' +
+      '<path d="M7 17v2.6M9.4 17v2.6M11.8 17v2.6M14.2 17v2.6M6.4 19.8l8.4-3.4"/></svg>',
+    /* lantern — intention becomes visible in the dark */
+    lens: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" ' +
+      'stroke-linecap="square"><path d="M10 5.6a2 2 0 014 0v2"/>' +
+      '<path d="M7 7.6h10v10H7z"/><path d="M5.6 17.6h12.8M5.6 7.6h12.8"/>' +
+      '<path d="M12 10.6l2.2 2-2.2 2-2.2-2z"/>' +
+      '<path d="M1.6 12.6h2.6M19.8 12.6h2.6M3.6 5.2l1.8 1.8M20.4 5.2l-1.8 1.8"/></svg>',
+    /* bell — frantic motion becomes readable, everything drops to a pace hands can follow */
+    slow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" ' +
+      'stroke-linecap="square"><path d="M6 17.4c0-6.4 1.8-9.4 6-9.4s6 3 6 9.4"/>' +
+      '<path d="M4 17.4h16"/><path d="M12 5.6v2.4"/>' +
+      '<path d="M12 3.2a1.4 1.4 0 010 2.8 1.4 1.4 0 010-2.8z"/>' +
+      '<path d="M12 17.4v2.2"/><path d="M12 19.6a1.2 1.2 0 010 2.4 1.2 1.2 0 010-2.4z"/></svg>',
+    /* guarded threshold — one destructive actor can no longer come back in */
+    eject: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" ' +
+      'stroke-linecap="square"><path d="M3.5 21.4V4.6h9v16.8"/><path d="M3.5 4.6h9"/>' +
+      '<path d="M2 12.8h12"/><path d="M15.6 12.8h6.6"/><path d="M19 9.6l3.2 3.2-3.2 3.2"/></svg>',
   };
 
-  var bar = null, field = null, hint = null;
-  var made = new Map();          // kind -> button node
-  var have = [];                 // kinds currently in the DOM, in ORDER order
-  var wired = false;
+  /* folk names, used only until the silhouettes are learned. VOICE overrides with
+     FZ.copy.tools[kind].folk. */
+  var FOLK = {
+    charter: 'MEETING STONE', vary: 'SEED', slow: 'BELL',
+    lens: 'LANTERN', ledger: 'TALLY', eject: 'THRESHOLD',
+  };
+  /* the same thing, named short, for when the sandbox offers all six across a phone */
+  var FOLK_TIGHT = {
+    charter: 'ARCH', vary: 'SEED', slow: 'BELL',
+    lens: 'LANTERN', ledger: 'TALLY', eject: 'GATE',
+  };
+
+  /* EJECT is the only instrument the PLAYER has to aim, because naming the body is the
+     decision. CHARTER and VARY still need a coordinate — the sim raises them somewhere —
+     but that somewhere is not a question: an institution answering a located incident goes
+     where the incident is. One tap. */
+  var TARGETED = { eject: 1 };
+  var NEEDS_XY = { eject: 1, charter: 1, vary: 1 };
+  var LABELS_UNTIL = 6;               /* after this many answered, the shape is enough */
+  var NOTE_MS = 2400;                 /* how long a correction owns the one message region */
+
+  var field = null, tagLayer = null, act = null, actRow = null;
+  var tagNode = null, tagName = null, tagLine = null, tagFuse = null, thread = null;
+  var made = new Map();               /* kind -> button node */
+  var have = [];                      /* kinds currently offered, in ORDER order */
+  var avail = [];                     /* kinds this chapter has taught */
+  var wired = false, built = false;
+  var note = null;                    /* {text, tone, until} — the one transient message */
+  var lastKey = '';
   var api;
 
   function copyTool(k) { return (FZ.copy && FZ.copy.tools && FZ.copy.tools[k]) || {}; }
   function ui(k) { return (FZ.copy && FZ.copy.ui && FZ.copy.ui[k]) || ''; }
   function loop(k) { return (FZ.copy && FZ.copy.loop && FZ.copy.loop[k]) || ''; }
+  function folk(k, tight) {
+    var c = copyTool(k);
+    if (tight && (c.folkShort || FOLK_TIGHT[k])) return c.folkShort || FOLK_TIGHT[k];
+    return c.folk || FOLK[k] || k.toUpperCase();
+  }
   function S() { return FZ.sim ? FZ.sim.state : null; }
+  function ob() { return FZ.outbreak || null; }
+  function now() { return Date.now(); }
+
+  /* ---------------------------------------------------------------- the paper */
+  var CSS =
+    '#bar{display:none!important}#toast{display:none!important}#aimHint{display:none!important}' +
+    '#tagLayer{position:fixed;inset:0;z-index:40;pointer-events:none;font-family:inherit}' +
+    '.fztag{position:absolute;width:230px;max-width:78vw;background:#f5efe3;color:#17150f;' +
+    'border:1px solid rgba(0,0,0,.55);border-left:0;box-shadow:3px 4px 0 rgba(0,0,0,.28);' +
+    'padding:8px 10px 9px 13px;opacity:0;transform:translateY(4px);' +
+    'transition:opacity .16s ease-out,transform .16s ease-out}' +
+    '.fztag.on{opacity:1;transform:none}' +
+    '.fztag .fzfuse{position:absolute;left:0;bottom:0;width:4px;height:100%;background:#ffd23f}' +
+    '.fztag.hot .fzfuse{background:#ff2e2e}' +
+    '.fztag.note .fzfuse{background:#ff2e2e;height:100%}' +
+    '.fztag .fzn{font-size:11.5px;font-weight:700;letter-spacing:.11em;line-height:1.2}' +
+    '.fztag .fzl{font-size:11.5px;line-height:1.4;margin-top:5px;color:#4a4335}' +
+    '.fztag.note .fzl{color:#17150f}' +
+    '.fzthread{position:absolute;height:0;border-top:1px dashed rgba(0,0,0,.5);' +
+    'transform-origin:0 0;opacity:0;transition:opacity .16s ease-out}' +
+    '.fzthread.on{opacity:1}' +
+    '#act{position:fixed;left:0;right:0;bottom:0;z-index:41;display:flex;gap:6px;' +
+    'justify-content:center;align-items:flex-end;padding:10px 6px;' +
+    'padding-bottom:calc(10px + env(safe-area-inset-bottom));font-family:inherit}' +
+    '#act .fzrow{display:flex;gap:5px;justify-content:center;flex-wrap:nowrap;width:100%}' +
+    '.fzact{position:relative;flex:1 1 0;min-width:0;max-width:112px;min-height:62px;' +
+    'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;' +
+    'background:#f5efe3;color:#17150f;border:1.5px solid #17150f;' +
+    'box-shadow:2px 3px 0 rgba(0,0,0,.4);padding:6px 3px 5px;cursor:pointer;' +
+    'font-family:inherit;-webkit-tap-highlight-color:transparent;' +
+    'animation:fzactin .2s ease-out 1}' +
+    '.fzact svg{width:26px;height:26px;display:block}' +
+    '.fzact .fzf{font-size:8px;letter-spacing:.02em;line-height:1;white-space:nowrap;' +
+    'max-width:100%;overflow:hidden}' +
+    '.fzact .fzc{position:absolute;top:2px;right:3px;font-size:8.5px;color:rgba(0,0,0,.45)}' +
+    '.fzact.on{background:#17150f;color:#f5efe3;border-color:#17150f}' +
+    '.fzact.on .fzc{color:rgba(255,255,255,.6)}' +
+    '.fzact.poor{opacity:.34}' +
+    '.fzact.live{box-shadow:2px 3px 0 rgba(0,0,0,.4),inset 0 -4px 0 #19e6c8}' +
+    '.fzact:active{transform:translate(1px,1px);box-shadow:1px 2px 0 rgba(0,0,0,.4)}' +
+    '@keyframes fzactin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}';
+
+  function ensure() {
+    if (built) return;
+    if (!document.getElementById('fzActCSS')) {
+      var s = document.createElement('style');
+      s.id = 'fzActCSS';
+      s.textContent = CSS;
+      document.head.appendChild(s);
+    }
+    var host = document.getElementById('app') || document.body;
+    tagLayer = document.getElementById('tagLayer');
+    if (!tagLayer) {
+      tagLayer = document.createElement('div');
+      tagLayer.id = 'tagLayer';
+      host.appendChild(tagLayer);
+    }
+    thread = document.createElement('div');
+    thread.className = 'fzthread';
+    tagNode = document.createElement('div');
+    tagNode.className = 'fztag';
+    tagFuse = document.createElement('div'); tagFuse.className = 'fzfuse';
+    tagName = document.createElement('div'); tagName.className = 'fzn';
+    tagLine = document.createElement('div'); tagLine.className = 'fzl';
+    tagNode.appendChild(tagFuse); tagNode.appendChild(tagName); tagNode.appendChild(tagLine);
+    tagLayer.appendChild(thread);
+    tagLayer.appendChild(tagNode);
+
+    act = document.getElementById('act');
+    if (!act) {
+      act = document.createElement('div');
+      act.id = 'act';
+      host.appendChild(act);
+    }
+    actRow = document.createElement('div');
+    actRow.className = 'fzrow';
+    act.appendChild(actRow);
+    act.style.display = 'none';
+    built = true;
+  }
 
   /* ------------------------------------------------------------- the buttons */
   function makeButton(kind) {
-    var T = copyTool(kind);
     var b = document.createElement('button');
     b.type = 'button';
-    b.className = 'tool fresh';
+    b.className = 'fzact';
     b.setAttribute('data-kind', kind);
+    b.setAttribute('aria-label', folk(kind));
     var g = document.createElement('span');
-    g.className = 'tg';
+    g.className = 'fzg';
     g.innerHTML = MARK[kind] || '';
     var l = document.createElement('span');
-    l.className = 'tl';
-    l.textContent = T.label || kind.toUpperCase();
+    l.className = 'fzf';
+    l.textContent = folk(kind);
     var c = document.createElement('span');
-    c.className = 'tc';
-    c.textContent = String(FZ.sim ? FZ.sim.cost(kind) : (T.cost || 2));
+    c.className = 'fzc';
+    c.textContent = String(FZ.sim ? FZ.sim.cost(kind) : 2);
     b.appendChild(g); b.appendChild(l); b.appendChild(c);
     b.addEventListener('click', function (ev) {
       ev.preventDefault(); ev.stopPropagation();
@@ -100,48 +236,56 @@ FZ.controls = (function () {
     return true;
   }
 
+  function burning() {
+    var o = ob();
+    if (!o) return null;
+    try { return o.current() || o.urgent(); } catch (e) { return null; }
+  }
+
   function press(kind) {
     var st = S();
     if (!st || !live()) return;
-    if (st.budget < FZ.sim.cost(kind)) { FZ.ui.toast(ui('noBudget'), 'bad'); return; }
+    if (st.budget < FZ.sim.cost(kind)) { say(ui('noBudget'), 'bad'); return; }
     if (TARGETED[kind]) {
       if (api.armed === kind) { disarm(); return; }
-      arm(kind);
+      api.armed = kind;
+      api.aim = null;
+      note = null;                            /* the instrument in hand outranks old news */
+      paint(st);
       return;
     }
     disarm();
-    commit(kind, null, null);
+    var o = burning();
+    if (!o && NEEDS_XY[kind]) return;         /* nowhere to put it and nothing to answer */
+    commit(kind, o ? o.x : null, o ? o.y : null);
   }
 
-  function arm(kind) {
-    api.armed = kind;
-    api.aim = null;
-    paintHint();
-    paintBar();
-  }
   function disarm() {
     api.armed = null;
     api.aim = null;
-    paintHint();
-    paintBar();
   }
 
-  /* THE ONE CLEAR NEXT ACTION.
-     Armed: where to put the thing in your hand. Not armed, but something is burning:
-     the only job you have. Otherwise the strip is not there at all — and once you have
-     answered a few outbreaks yourself it stops telling you, because you know. */
-  function green() {
-    var ob = FZ.outbreak;
-    if (!ob || !ob.answeredCount) return true;
-    try { return ob.answeredCount() < 4; } catch (e) { return true; }
-  }
-  function paintHint() {
-    if (!hint) return;
-    var want = '';
-    if (api.armed) want = copyTool(api.armed).hint || '';
-    else if (have.length && green() && burning() && live()) want = loop('tapToAnswer');
-    if (want !== hint.textContent) hint.textContent = want;
-    if (hint.classList.contains('on') !== !!want) hint.classList.toggle('on', !!want);
+  function commit(kind, x, y) {
+    var st = S();
+    if (!st || !live()) return;
+    if (st.budget < FZ.sim.cost(kind)) { say(ui('noBudget'), 'bad'); return; }
+
+    /* the diagnosis is judged BEFORE the spend, so a right answer can be paid back and a
+       wrong one can say what the failure actually is — including, for an expulsion, that
+       the body you removed was not the one doing it. */
+    var ans = null;
+    if (ob() && ob().tryAnswer) {
+      try { ans = ob().tryAnswer(kind, x, y); } catch (e) { ans = null; }
+    }
+    var out = FZ.sim.apply(kind, NEEDS_XY[kind] ? x : undefined, NEEDS_XY[kind] ? y : undefined);
+
+    /* nothing was spent -> say why, and never claim an answer that did not happen.
+       A right answer says NOTHING: the ring visibly closes, the strain drops, the tag
+       goes away. That is the whole receipt, and it is drawn, not written. */
+    if (out && !out.ok) { if (out.msg) say(out.msg, 'bad'); }
+    else if (ans && ans.hit && !ans.right && ans.msg) say(ans.msg, 'bad');
+    else if (ans && !ans.hit && ans.msg) say(ans.msg, 'bad');
+    paint(st);
   }
 
   /* --------------------------------------------------------------- the field */
@@ -156,69 +300,6 @@ FZ.controls = (function () {
     };
   }
 
-  /* where an untargeted instrument should be judged to have been aimed:
-     at the outbreak it is answering — the one closest to landing, if any is burning. */
-  function burning() {
-    if (FZ.outbreak && FZ.outbreak.urgent) { try { return FZ.outbreak.urgent(); } catch (e) { } }
-    var L = (FZ.outbreak && FZ.outbreak.list) ? FZ.outbreak.list : null;
-    if (!L || !L.length) return null;
-    for (var i = 0; i < L.length; i++) if (!L[i].state || L[i].state === 'burning') return L[i];
-    return null;
-  }
-
-  function commit(kind, x, y) {
-    var st = S();
-    if (!st || !live()) return;
-    if (st.budget < FZ.sim.cost(kind)) { FZ.ui.toast(ui('noBudget'), 'bad'); return; }
-
-    if (x == null) { var o = burning(); if (o) { x = o.x; y = o.y; } }
-
-    /* the diagnosis is judged BEFORE the spend, so a right answer can be paid back
-       and a wrong one can say what the failure actually was. */
-    var ans = null;
-    if (FZ.outbreak && FZ.outbreak.tryAnswer) {
-      try { ans = FZ.outbreak.tryAnswer(kind, x, y); } catch (e) { ans = null; }
-    }
-    var out = FZ.sim.apply(kind, TARGETED[kind] ? x : undefined, TARGETED[kind] ? y : undefined);
-
-    /* nothing was spent -> say why, and never claim an answer that did not happen */
-    if (out && !out.ok) { if (out.msg) FZ.ui.toast(out.msg, 'bad'); }
-    else if (ans && ans.hit && ans.right) FZ.ui.toast(ans.msg || loop('answered'), 'good');
-    else if (ans && ans.msg) FZ.ui.toast(ans.msg, 'bad');
-    else if (out && out.ok && !TARGETED[kind]) FZ.ui.toast(copyTool(kind).blurb || '', 'good');
-
-    paintBar();
-  }
-
-  /* a plain tap with nothing armed is an inspection: it opens whatever the player
-     just pointed at in the table, so "what is that" is always one tap away. */
-  function inspect(p) {
-    var L = (FZ.outbreak && FZ.outbreak.list) ? FZ.outbreak.list : null;
-    var best = null, bd = Infinity;
-    if (L) for (var i = 0; i < L.length; i++) {
-      var o = L[i];
-      if (o.x == null) continue;
-      var dx = o.x - p.x, dy = o.y - p.y, d = Math.sqrt(dx * dx + dy * dy);
-      var r = (o.r || 46) + 16;
-      if (d < r && d < bd) { bd = d; best = o; }
-    }
-    if (!best) {
-      /* nothing burning there — fall back to the hottest live element, so the tap
-         still answers "what am I looking at". */
-      var hot = null;
-      if (FZ.EL && FZ.sim && FZ.sim.enabled) {
-        for (var k = 0; k < FZ.EL.length; k++) {
-          var e = FZ.EL[k];
-          if (!FZ.sim.enabled.has(e.sym)) continue;
-          if (!hot || e.heat > hot.heat) hot = e;
-        }
-      }
-      if (hot && hot.heat > 0.12 && FZ.table && FZ.table.open) FZ.table.open(hot.sym);
-      return;
-    }
-    if (FZ.table && FZ.table.open) FZ.table.open(best.sym);
-  }
-
   function wireField() {
     if (wired || !field) return;
     wired = true;
@@ -230,8 +311,7 @@ FZ.controls = (function () {
       down = true;
       try { field.setPointerCapture(ev.pointerId); } catch (e) { }
       var p = toWorld(ev);
-      if (!p) return;
-      if (api.armed) api.aim = { kind: api.armed, x: p.x, y: p.y };
+      if (p && api.armed) api.aim = { kind: api.armed, x: p.x, y: p.y };
     });
     field.addEventListener('pointermove', function (ev) {
       if (!down || !api.armed) return;
@@ -247,27 +327,175 @@ FZ.controls = (function () {
       var kind = api.armed;
       disarm();
       if (!p) return;
-      if (kind) commit(kind, p.x, p.y);
-      else inspect(p);
+      if (kind) { commit(kind, p.x, p.y); return; }
+      /* no instrument in hand: the tap is a look. If two incidents are live, this is how
+         the player chooses which one the tag is about. Nothing opens, nothing pops. */
+      if (ob() && ob().focusAt) { try { ob().focusAt(p.x, p.y); } catch (e) { } }
     }
     field.addEventListener('pointerup', up);
     field.addEventListener('pointercancel', function () { down = false; api.aim = null; });
   }
 
+  /* ------------------------------------------------------- the one message */
+  /* Everything the game has to say arrives here and nowhere else. A second message does
+     not queue behind this one, it replaces it: two explanations of the same instant were
+     the defining bug of the last build. */
+  function say(text, tone) {
+    if (!text) return;
+    note = { text: text, tone: tone || 'plain', until: now() + NOTE_MS };
+  }
+
+  function hideTag() {
+    if (!tagNode) return;
+    if (tagNode.classList.contains('on')) tagNode.classList.remove('on');
+    if (thread.classList.contains('on')) thread.classList.remove('on');
+  }
+
+  /* hang the tag beside the thing, on a thread, and clamp it into the field.
+     ax/ay are viewport px of the incident centre; rr is its radius in viewport px. */
+  function place(ax, ay, rr, r) {
+    var w = tagNode.offsetWidth || 230, h = tagNode.offsetHeight || 54;
+    var lx = Math.round(Math.min(Math.max(ax - w / 2, r.left + 8), r.right - w - 8));
+    var above = ay - rr - 16 - h;
+    var below = ay + rr + 16;
+    var ly;
+    if (above >= r.top + 6) ly = Math.round(above);
+    else if (below + h <= r.bottom - 6) ly = Math.round(below);
+    else ly = Math.round(Math.min(Math.max(ay - h / 2, r.top + 6), r.bottom - h - 6));
+    tagNode.style.left = lx + 'px';
+    tagNode.style.top = ly + 'px';
+
+    /* the thread leaves the tag from whichever edge faces the thing it is tied to, so a
+       tag hanging beside an incident still visibly belongs to that incident and not to
+       one of the others burning elsewhere */
+    var cx = lx + w / 2, cy = ly + h / 2;
+    var vx = ax - cx, vy = ay - cy;
+    if (!vx && !vy) { thread.classList.remove('on'); return; }
+    var t = Math.min(vx ? (w / 2) / Math.abs(vx) : Infinity, vy ? (h / 2) / Math.abs(vy) : Infinity);
+    var tx = cx + vx * t, ty = cy + vy * t;
+    var dx = ax - tx, dy = ay - ty;
+    var len = Math.sqrt(dx * dx + dy * dy) - Math.min(rr * 0.6, 30);
+    if (len < 6) { thread.classList.remove('on'); return; }
+    thread.style.left = tx + 'px';
+    thread.style.top = ty + 'px';
+    thread.style.width = Math.round(len) + 'px';
+    thread.style.transform = 'rotate(' + (Math.atan2(dy, dx) * 180 / Math.PI).toFixed(1) + 'deg)';
+    thread.classList.add('on');
+  }
+
+  function placeLoose(r) {
+    var w = tagNode.offsetWidth || 230, h = tagNode.offsetHeight || 54;
+    var bh = (act && act.style.display !== 'none') ? (act.offsetHeight || 0) : 0;
+    tagNode.style.left = Math.round(r.left + (r.width - w) / 2) + 'px';
+    tagNode.style.top = Math.round(Math.min(r.bottom, window.innerHeight) - bh - h - 14) + 'px';
+    thread.classList.remove('on');
+  }
+
   /* ---------------------------------------------------------------- painting */
-  function paintBar() {
-    var st = S();
-    made.forEach(function (b, kind) {
-      if (!b.parentNode) return;
-      var armed = api.armed === kind;
-      if (b.classList.contains('on') !== armed) b.classList.toggle('on', armed);
-      if (!st) return;
-      var poor = st.budget < FZ.sim.cost(kind);
-      if (b.classList.contains('poor') !== poor) b.classList.toggle('poor', poor);
-      var live = (kind === 'lens' && st.lensOn) || (kind === 'ledger' && st.ledgerOn) ||
-        (kind === 'slow' && st.tick < st.slowUntil);
-      if (b.classList.contains('live') !== live) b.classList.toggle('live', live);
-    });
+  function paintButtons(st, show) {
+    if (show) {
+      var want = [], set = {};
+      avail.forEach(function (k) { if (MARK[k]) set[k] = 1; });
+      ORDER.forEach(function (k) { if (set[k]) want.push(k); });
+      var changed = want.length !== have.length;
+      if (!changed) for (var i = 0; i < want.length; i++) if (want[i] !== have[i]) { changed = true; break; }
+      if (changed) {
+        have.forEach(function (k) {
+          if (set[k]) return;
+          var b = made.get(k);
+          if (b && b.parentNode) b.parentNode.removeChild(b);
+        });
+        want.forEach(function (k) {
+          var b = made.get(k) || makeButton(k);
+          actRow.appendChild(b);
+        });
+        have = want;
+      }
+      /* the label is scaffolding: it holds a name to the shape until the shape is known,
+         and then it goes, because a learned silhouette needs no caption (AESTHETIC §5) */
+      var labels = true;
+      try { labels = !ob() || ob().answeredCount() < LABELS_UNTIL; } catch (e) { }
+      var tight = have.length > 4;
+      made.forEach(function (b, kind) {
+        if (!b.parentNode) return;
+        var armed = api.armed === kind;
+        if (b.classList.contains('on') !== armed) b.classList.toggle('on', armed);
+        var lab = b.querySelector('.fzf');
+        if (lab) {
+          lab.style.display = labels ? '' : 'none';
+          var want = folk(kind, tight);
+          if (lab.textContent !== want) lab.textContent = want;
+        }
+        if (!st) return;
+        var poor = st.budget < FZ.sim.cost(kind);
+        if (b.classList.contains('poor') !== poor) b.classList.toggle('poor', poor);
+        var on = (kind === 'lens' && st.lensOn) || (kind === 'ledger' && st.ledgerOn) ||
+          (kind === 'slow' && st.tick < st.slowUntil);
+        if (b.classList.contains('live') !== on) b.classList.toggle('live', on);
+      });
+      if (act.style.display === 'none') act.style.display = '';
+      return;
+    }
+    /* ABSENT, not disabled: no decision, no surface, the colony owns the screen. */
+    if (act.style.display !== 'none') {
+      act.style.display = 'none';
+      have.forEach(function (k) { var b = made.get(k); if (b && b.parentNode) b.parentNode.removeChild(b); });
+      have = [];
+    }
+  }
+
+  function paint(st) {
+    ensure();
+    st = st || S();
+    var playing = live();
+    var o = playing ? burning() : null;
+    if (o && st && st.tick < o.tagAt) o = null;      /* beat one: a body, and no words yet */
+    if (note && now() > note.until) note = null;
+    /* the incident settled itself while the instrument was in hand: put it down, or the
+       surface it lives on vanishes and the next tap on the nest spends budget blind */
+    if (api.armed && !o) disarm();
+
+    paintButtons(st, !!(o && playing));
+
+    /* THE ONE MESSAGE, chosen by a single priority so two can never coexist:
+         1. a correction the player has just earned
+         2. the instrument in her hand, and what it wants
+         3. the incident that is burning
+         4. nothing at all */
+    var name = '', line = '', tone = '';
+    if (note) { name = ''; line = note.text; tone = 'note'; }
+    else if (api.armed && o) { name = o.name || ''; line = copyTool(api.armed).hint || ''; }
+    else if (api.armed) { name = ''; line = copyTool(api.armed).hint || ''; }
+    else if (o) { name = o.name || ''; line = o.line || ''; }
+
+    if (!name && !line) { hideTag(); lastKey = ''; return; }
+
+    var key = name + '' + line + '' + tone;
+    if (key !== lastKey) {
+      lastKey = key;
+      tagName.textContent = name;
+      tagName.style.display = name ? '' : 'none';
+      tagLine.textContent = line;
+      tagLine.style.display = line ? '' : 'none';
+      tagNode.classList.toggle('note', tone === 'note');
+    }
+
+    /* the fuse is the tag's left edge. There is no other clock on screen. */
+    var frac = 1;
+    if (o && ob() && ob().left) { try { frac = ob().left(o); } catch (e) { frac = 1; } }
+    if (tone === 'note') frac = 1;
+    tagFuse.style.height = Math.round(Math.max(0, Math.min(1, frac)) * 100) + '%';
+    var hot = tone !== 'note' && frac < 0.34;
+    if (tagNode.classList.contains('hot') !== hot) tagNode.classList.toggle('hot', hot);
+
+    var r = field ? field.getBoundingClientRect() : null;
+    if (o && r && r.width && st) {
+      var sx = r.width / st.w, sy = r.height / st.h;
+      place(r.left + o.x * sx, r.top + o.y * sy, o.r * Math.min(sx, sy), r);
+    } else if (r && r.width) {
+      placeLoose(r);
+    }
+    if (!tagNode.classList.contains('on')) tagNode.classList.add('on');
   }
 
   api = {
@@ -275,53 +503,37 @@ FZ.controls = (function () {
     aim: null,
 
     build: function () {
-      bar = document.getElementById('bar');
       field = document.getElementById('field');
-      hint = document.getElementById('aimHint');
+      ensure();
       wireField();
+      var bar = document.getElementById('bar');
+      if (bar) bar.innerHTML = '';
       if (FZ.bus) {
-        FZ.bus.on('chapter:enter', function () { disarm(); });
-        FZ.bus.on('lose', function () { disarm(); });
-        FZ.bus.on('goal', function () { disarm(); });
+        FZ.bus.on('chapter:enter', function () { disarm(); note = null; });
+        FZ.bus.on('lose', function () { disarm(); note = null; });
+        FZ.bus.on('goal', function () { disarm(); note = null; });
+        /* the correction is the teaching moment, and it is the ONLY thing said out loud */
+        FZ.bus.on('outbreak:wrong', function (d) { if (d && d.msg) say(d.msg, 'bad'); });
       }
-      paintBar();
+      paint(S());
     },
 
-    /* ONLY these buttons exist. Absent, never greyed-out-forever. */
+    /* ONLY these instruments are offered — and only while something is burning. */
     setAvailable: function (kinds) {
-      if (!bar) bar = document.getElementById('bar');
-      if (!bar) return;
-      var want = [];
-      var set = {};
-      (kinds || []).forEach(function (k) { if (MARK[k]) set[k] = 1; });
-      ORDER.forEach(function (k) { if (set[k]) want.push(k); });
-
-      if (api.armed && !set[api.armed]) disarm();
-
-      /* remove what is no longer taught */
-      have.forEach(function (k) {
-        if (set[k]) return;
-        var b = made.get(k);
-        if (b && b.parentNode) b.parentNode.removeChild(b);
-      });
-
-      /* add and order what is */
-      want.forEach(function (k) {
-        var b = made.get(k) || makeButton(k);
-        if (!b.parentNode) { b.classList.remove('fresh'); void b.offsetWidth; b.classList.add('fresh'); }
-        bar.appendChild(b);                  /* appendChild re-orders an existing node */
-      });
-      have = want;
-      paintBar();
+      avail = (kinds || []).filter(function (k) { return !!MARK[k]; });
+      if (api.armed && avail.indexOf(api.armed) < 0) disarm();
+      paint(S());
     },
 
-    paint: function (st) {
-      paintBar();
-      paintHint();
-    },
-
+    paint: paint,
     disarm: disarm,
     kinds: function () { return have.slice(); },
   };
+
+  /* kept so nothing else in the build breaks reaching for it — but it writes into the one
+     message region like everything else, never into a second strip. */
+  FZ.ui = FZ.ui || {};
+  FZ.ui.toast = function (msg, tone) { say(msg, tone); };
+
   return api;
 })();

@@ -29,6 +29,43 @@
    S.aggro      0 … 1.2, from S.tempo. Machine speed raises throughput AND aggression:
                 lockouts, sabotage and escalation all arrive sooner on the same curve.
 
+   ------------------------------------------------------------
+   EVERY ELEMENT HAS A BODY  (AESTHETIC.md §0, §4, §6)
+   ------------------------------------------------------------
+   A failure that cannot be seen without a caption is not finished. So each element
+   declares `body:` — the observable thing in the colony that IS this failure — and
+   40-sim.js maintains the state fields that make that thing drawable. The full field
+   list is documented at the top of 40-sim.js under THE BODIES; the short version:
+
+     body        what you would see, with no words on screen        fields it is drawn from
+     ---------   -------------------------------------------------  ----------------------
+     tug         two workers on one crumb pulling opposite ways      j.tug[] j.crowd
+     queue       one sits on the claim, a line forms behind it       j.locked j.queue[] a.posture
+     jam         a crowd wedged in one doorway, nothing moving       j.crowd
+     stack       one worker guarding a pile it cannot work           a.holdN a.posture='guard'
+     split       one job finished twice; the copies will not join    j.split
+     waitchain   a queue behind work nobody is doing                 j.prereq j.queue[]
+     rot         a crumb going soft while the colony is elsewhere    j.rot j.trail
+     trail       one road bright, every other road cold              j.trail j.dark
+     column      the whole colony moving as one body                 S.column
+     sameness    every worker the same lineage                       S.lineage
+     fell        a whole lineage face-down at the same instant       S.fell a.stun
+     phantom     a confident march to a chamber with nothing in it   S.rumor a.posture='march'
+     shunned     work everyone turns away from                       j.shun a.hesitate
+     withheld    one worker knows the hazard and walks on past       j.hazard a.knows[]
+     voices      every source drawn identical; one is lying          a.marks a.trust
+     forgotten   the tally marks wiped off a known liar              a.marks a.lies
+     lone        one worker right, standing alone at the big crumb   j.lone j.dark
+     frozen      two rivals sitting on one crumb, neither moving     j.frozen a.posture='guard'
+     unmaking    finished work quietly coming apart again            j.unmake j.undone
+     chase       two who stopped working and only follow each other  a.posture='chase'
+     defiance    a body walking straight through the boundary        a.defiant a.corrigible
+     handoff     a claim passed back and forth, never worked         j.churn j.queue[]
+     smallcrumb  every trail to the small crumbs, none to the big    S.bigJob j.rot a.tx/a.ty
+     noarch      contested ground with no institution drawn on it    S.charters S.arb
+     frantic     the whole colony moving too fast to read            S.tempo S.weather
+     dark        you can see where they are, not what they want      S.blind a.tx/a.ty
+
    All player-facing prose is read lazily from FZ.copy (see fzElDef below). This part
    contains no English sentence of its own.
    ============================================================ */
@@ -67,6 +104,10 @@ FZ.elh = {
 /* Attaches runtime fields and lazy copy getters, then registers the element. */
 function fzElDef(o) {
   o.heat = 0; o.fires = 0; o.peak = 0; o.who = []; o.countered = false; o.on = false;
+  /* where the last fire happened, so anything drawing this element knows where to look */
+  o.at = null;
+  /* the observable phenomenon that IS this failure (see the table at the top) */
+  o.body = o.body || 'heat';
   /* §14.4 every element declares the institutions that answer it; the first is the one
      TABLE names on the cell, and it is always the one the counter sentence leads with. */
   o.answers = o.answers || ['charter'];
@@ -90,7 +131,7 @@ function fzG(inner) {
    ============================================================ */
 
 fzElDef({
-  sym: 'Co', nm: 'Coordination failure', col: 0, row: 0, chapter: 1,
+  sym: 'Co', nm: 'Coordination failure', col: 0, row: 0, chapter: 1, body: 'tug',
   answers: ['charter'],
   glyph: fzG('<path d="M1 10h5"/><path d="M4 7.5l2.5 2.5-2.5 2.5"/><path d="M19 10h-5"/><path d="M16 7.5l-2.5 2.5 2.5 2.5"/><rect x="8" y="8" width="4" height="4"/>'),
   /* CONSEQUENCE: drains the contested job's progress every tick — the fill visibly runs backwards.
@@ -111,7 +152,7 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Si', nm: 'Siloed knowledge', col: 0, row: 1, chapter: 6,
+  sym: 'Si', nm: 'Siloed knowledge', col: 0, row: 1, chapter: 6, body: 'trail',
   answers: ['lens'],
   glyph: fzG('<path d="M10 1v18"/><circle cx="5" cy="10" r="2.4"/><rect x="13" y="7.5" width="5" height="5"/>'),
   /* CONSEQUENCE: jobs nobody knows about go stale and are LOST outright (job:lost).
@@ -132,7 +173,7 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Mc', nm: 'Merge conflict', col: 0, row: 2, chapter: 1,
+  sym: 'Mc', nm: 'Merge conflict', col: 0, row: 2, chapter: 1, body: 'split',
   answers: ['charter'],
   glyph: fzG('<path d="M4 2l6 8M16 2l-6 8"/><path d="M6 13l8 6"/><path d="M14 13l-8 6"/>'),
   /* CONSEQUENCE: blocks completion — a finished job with two lineages on it is rolled back to 30%.
@@ -146,6 +187,9 @@ fzElDef({
       if (e.j.progress < e.j.need || e.hn < 2) continue;
       if (FZ.elh.cover(S, e.j.x, e.j.y)) continue;
       e.j.progress = e.j.need * 0.3;
+      /* BODY: for the next second and a half the crumb is visibly two half-finished
+         copies that will not join. Nothing has to be written next to it. */
+      e.j.split = S.tick + 90;
       hot += 0.5; who = e.ids; at = { x: e.j.x, y: e.j.y };
       for (let k = 0; k < e.ids.length; k++) api.own(api.agentById(e.ids[k]), 0.34);
       api.bus('job:lost', { x: e.j.x, y: e.j.y, why: 'Mc' });
@@ -157,7 +201,7 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Dp', nm: 'Blocked dependency', col: 0, row: 3, chapter: 8,
+  sym: 'Dp', nm: 'Blocked dependency', col: 0, row: 3, chapter: 8, body: 'waitchain',
   answers: ['lens', 'charter'],
   glyph: fzG('<rect x="1" y="7" width="6" height="6"/><rect x="13" y="7" width="6" height="6"/><path d="M8 10h4"/><path d="M8 5.5l4 9"/>'),
   /* CONSEQUENCE: work on a blocked job cannot accumulate at all, and the wasted claimants get stunned. */
@@ -181,7 +225,7 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Ow', nm: 'Overcommitment', col: 0, row: 4, chapter: 2,
+  sym: 'Ow', nm: 'Overcommitment', col: 0, row: 4, chapter: 2, body: 'stack',
   answers: ['charter'],
   glyph: fzG('<circle cx="10" cy="4" r="2.4"/><path d="M10 6.5v3"/><path d="M10 9.5L4 15M10 9.5v5.5M10 9.5L16 15"/><rect x="2" y="15" width="4" height="4"/><rect x="8" y="15" width="4" height="4"/><rect x="14" y="15" width="4" height="4"/>'),
   /* CONSEQUENCE: every job the hoarder holds rots; past four holds the worker seizes up entirely.
@@ -205,7 +249,7 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Pt', nm: 'Priority inversion', col: 0, row: 5, chapter: 3,
+  sym: 'Pt', nm: 'Priority inversion', col: 0, row: 5, chapter: 3, body: 'rot',
   answers: ['lens'],
   glyph: fzG('<rect x="12" y="2" width="6" height="6"/><rect x="2" y="8" width="3" height="3"/><rect x="8" y="13" width="3" height="3"/><rect x="15" y="15" width="3" height="3"/><path d="M3.5 11.5l6 3 6.5 1.5"/>'),
   /* CONSEQUENCE: the neglected high-value job expires and is LOST (job:lost). */
@@ -226,7 +270,7 @@ fzElDef({
    ============================================================ */
 
 fzElDef({
-  sym: 'Cf', nm: 'Conformity cascade', col: 1, row: 0, chapter: 3,
+  sym: 'Cf', nm: 'Conformity cascade', col: 1, row: 0, chapter: 3, body: 'trail',
   /* VARY is the real answer (break the sameness); SLOW is the holding action, and it is
      the only instrument chapter 3 hands the player, so it must resolve this too. */
   answers: ['vary', 'slow'],
@@ -245,7 +289,7 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Lv', nm: 'Low variance', col: 1, row: 1, chapter: 4,
+  sym: 'Lv', nm: 'Low variance', col: 1, row: 1, chapter: 4, body: 'sameness',
   answers: ['vary'],
   glyph: fzG('<circle cx="5" cy="7" r="2.2"/><circle cx="10" cy="7" r="2.2"/><circle cx="15" cy="7" r="2.2"/><path d="M2 14h16"/>'),
   /* CONSEQUENCE: sets S.varMul, which multiplies every poison hit and halves knowledge sharing. */
@@ -259,7 +303,7 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Sf', nm: 'Synchronized failure', col: 1, row: 2, chapter: 4,
+  sym: 'Sf', nm: 'Synchronized failure', col: 1, row: 2, chapter: 4, body: 'fell',
   answers: ['vary'],
   glyph: fzG('<path d="M5 4v12M10 4v12M15 4v12"/><path d="M2 16L18 4"/>'),
   /* CONSEQUENCE: stuns EVERY worker of the affected lineage at once — the whole family falls over. */
@@ -279,13 +323,15 @@ fzElDef({
       api.bus('agent:hurt', { id: a.id, x: a.x, y: a.y });
     }
     S.hurts.length = 0;
+    /* BODY: a whole lineage face-down at the same instant. Who they were and when. */
+    S.fell = { hue: hue, tick: S.tick, ids: who.slice() };
     api.heat(0.5, { at, who, say: FZ.copy.fire.Sf });
   },
   counteredBy(S) { return FZ.elh.varied(S); },
 });
 
 fzElDef({
-  sym: 'Fl', nm: 'Flooding', col: 1, row: 3, chapter: 3,
+  sym: 'Fl', nm: 'Flooding', col: 1, row: 3, chapter: 3, body: 'jam',
   answers: ['slow', 'charter'],
   glyph: fzG('<rect x="8" y="8" width="4" height="4"/><path d="M10 1v5M10 19v-5M1 10h5M19 10h-5M3 3l3 3M17 3l-3 3M3 17l3-3M17 17l-3-3"/>'),
   /* CONSEQUENCE: past five hands the crowd actively destroys progress — net fill goes negative. */
@@ -303,7 +349,7 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Cl', nm: 'Claim livelock', col: 1, row: 4, chapter: 7,
+  sym: 'Cl', nm: 'Claim livelock', col: 1, row: 4, chapter: 7, body: 'handoff',
   answers: ['charter', 'eject'],
   glyph: fzG('<rect x="8" y="8" width="4" height="4"/><path d="M3 5h13"/><path d="M13 2.5L16.5 5 13 7.5"/><path d="M17 15H4"/><path d="M7 12.5L3.5 15 7 17.5"/>'),
   /* CONSEQUENCE: cancels both claims and stuns both workers — the whole exchange was burned time. */
@@ -324,7 +370,7 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Im', nm: 'Imitation lock-in', col: 1, row: 5, chapter: 3,
+  sym: 'Im', nm: 'Imitation lock-in', col: 1, row: 5, chapter: 3, body: 'column',
   answers: ['vary'],
   glyph: fzG('<path d="M2 6h4M11 6h4M2 14h4M11 14h4"/><path d="M5 4l2 2-2 2M14 4l2 2-2 2M5 12l2 2-2 2M14 12l2 2-2 2"/>'),
   /* CONSEQUENCE: freezes discovery — no worker learns about any new job while this is lit. */
@@ -346,7 +392,7 @@ fzElDef({
    ============================================================ */
 
 fzElDef({
-  sym: 'Gu', nm: 'Gullibility', col: 2, row: 0, chapter: 5,
+  sym: 'Gu', nm: 'Gullibility', col: 2, row: 0, chapter: 5, body: 'phantom',
   answers: ['ledger'],
   glyph: fzG('<circle cx="4" cy="10" r="2.2"/><path d="M7 10h3.5"/><path d="M9 8l2 2-2 2"/><rect x="12" y="6" width="7" height="7" stroke-dasharray="2 2"/>'),
   /* CONSEQUENCE: cancels every claim of the workers walking to a phantom, and stuns them on arrival.
@@ -371,7 +417,7 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Cs', nm: 'Contagious skepticism', col: 2, row: 1, chapter: 5,
+  sym: 'Cs', nm: 'Contagious skepticism', col: 2, row: 1, chapter: 5, body: 'shunned',
   answers: ['lens'],
   glyph: fzG('<rect x="2" y="4" width="5" height="5"/><path d="M2 4l5 5M7 4l-5 5"/><rect x="11" y="4" width="5" height="5"/><path d="M11 4l5 5M16 4l-5 5"/><rect x="6" y="13" width="5" height="5"/><path d="M6 13l5 5M11 13l-5 5"/>'),
   /* CONSEQUENCE: written-off jobs cannot be claimed at all, and eventually expire (job:lost).
@@ -399,7 +445,7 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Hi', nm: 'Hidden information', col: 2, row: 2, chapter: 6,
+  sym: 'Hi', nm: 'Hidden information', col: 2, row: 2, chapter: 6, body: 'withheld',
   answers: ['lens'],
   glyph: fzG('<path d="M2 7h16"/><rect x="5" y="9" width="10" height="9"/><path d="M8 11.5l4 4M12 11.5l-4 4"/>'),
   /* CONSEQUENCE: the approaching victims take the poison hit immediately — the knower could have stopped it. */
@@ -417,7 +463,7 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Tc', nm: 'Trust miscalibration', col: 2, row: 3, chapter: 5,
+  sym: 'Tc', nm: 'Trust miscalibration', col: 2, row: 3, chapter: 5, body: 'voices',
   answers: ['ledger'],
   glyph: fzG('<path d="M10 3v14M3 17h14M3 6h14"/><path d="M3 6l-2 4h4z"/><path d="M17 6l-2 4h4z"/><path d="M15.5 12l3 3M18.5 12l-3 3"/>'),
   /* CONSEQUENCE: extends the phantom's life and physically drags one more worker onto it. */
@@ -439,7 +485,7 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Di', nm: 'Discovery ignored', col: 2, row: 4, chapter: 6,
+  sym: 'Di', nm: 'Discovery ignored', col: 2, row: 4, chapter: 6, body: 'lone',
   answers: ['lens'],
   glyph: fzG('<circle cx="10" cy="10" r="2.4"/><path d="M10 6.5V4M13 7.5l1.8-1.8M7 7.5L5.2 5.7"/><path d="M2 16.5h4M14 16.5h4"/><path d="M5 14.5l2 2-2 2M15 14.5l-2 2 2 2"/>'),
   /* CONSEQUENCE: the undiscovered prize loses a point of value every time this fires. It rots unclaimed.
@@ -462,7 +508,7 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Rp', nm: 'No reputation', col: 2, row: 5, chapter: 5,
+  sym: 'Rp', nm: 'No reputation', col: 2, row: 5, chapter: 5, body: 'forgotten',
   answers: ['ledger'],
   glyph: fzG('<rect x="3" y="2" width="14" height="16"/><path d="M6 6h8M6 10h8M6 14h8" stroke-dasharray="2 2"/>'),
   /* CONSEQUENCE: wipes the colony's memory of the liar back to full trust and respawns the phantom at once. */
@@ -481,7 +527,7 @@ fzElDef({
    ============================================================ */
 
 fzElDef({
-  sym: 'Tw', nm: 'Turf war', col: 3, row: 0, chapter: 7,
+  sym: 'Tw', nm: 'Turf war', col: 3, row: 0, chapter: 7, body: 'frozen',
   answers: ['charter'],
   glyph: fzG('<circle cx="3" cy="10" r="2"/><circle cx="17" cy="10" r="2"/><rect x="7" y="7" width="6" height="6"/><path d="M10 2v4M10 14v4"/>'),
   /* CONSEQUENCE: freezes the job outright (no progress possible) and stuns both rivals.
@@ -510,7 +556,7 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Sa', nm: 'Sabotage', col: 3, row: 1, chapter: 7,
+  sym: 'Sa', nm: 'Sabotage', col: 3, row: 1, chapter: 7, body: 'unmaking',
   answers: ['eject'],
   glyph: fzG('<rect x="4" y="3" width="12" height="9"/><path d="M4 8h12"/><path d="M10 13v5"/><path d="M7.5 15.5L10 18l2.5-2.5"/>'),
   /* CONSEQUENCE: rolls back a job you already banked — jobsDone goes DOWN and job:lost fires.
@@ -526,9 +572,12 @@ fzElDef({
       if (!a.drained || a.drained < need) continue;
       a.drained = 0;
       hot += 0.4; who = [a.id]; at = { x: a.x, y: a.y };
+      /* BODY: the banked chamber physically re-opens where it was destroyed and drains in
+         front of you. A rollback that is only a counter going down cannot be watched. */
       if (S.jobsDone > 0 && api.rand() < 0.55 + 0.3 * S.aggro) {
-        S.jobsDone--; S.collapse += 1.4; S.stat.sabotage++;
-        api.bus('job:lost', { x: a.x, y: a.y, why: 'Sa' });
+        const back = api.unmake(a.x, a.y);
+        S.collapse += 1.4; S.stat.sabotage++;
+        api.bus('job:lost', { x: back ? back.x : a.x, y: back ? back.y : a.y, why: 'Sa' });
       }
     }
     if (hot > 0) api.heat(hot, { at, who, say: FZ.copy.fire.Sa });
@@ -537,7 +586,7 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Lo', nm: 'Lock-in', col: 3, row: 2, chapter: 2,
+  sym: 'Lo', nm: 'Lock-in', col: 3, row: 2, chapter: 2, body: 'queue',
   answers: ['charter', 'eject'],
   glyph: fzG('<rect x="4" y="9" width="12" height="9"/><path d="M7 9V6.5a3 3 0 016 0V9"/>'),
   /* CONSEQUENCE: sets job.locked — no other worker may claim or touch that job until a charter breaks it.
@@ -563,7 +612,7 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'My', nm: 'Myopia', col: 3, row: 3, chapter: 8,
+  sym: 'My', nm: 'Myopia', col: 3, row: 3, chapter: 8, body: 'smallcrumb',
   answers: ['lens'],
   glyph: fzG('<circle cx="7" cy="9" r="5"/><path d="M11 13l5.5 5.5"/><rect x="5.5" y="7.5" width="3" height="3"/><rect x="13" y="1.5" width="5.5" height="5.5"/>'),
   /* CONSEQUENCE: the big prize loses a point of value every fire — the colony's ceiling drops permanently. */
@@ -579,7 +628,7 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Es', nm: 'Escalation', col: 3, row: 4, chapter: 7,
+  sym: 'Es', nm: 'Escalation', col: 3, row: 4, chapter: 7, body: 'chase',
   answers: ['charter', 'slow'],
   glyph: fzG('<path d="M2 18h4v-4h4v-4h4V5"/><path d="M12 7.5L14 4l2 3.5"/>'),
   /* CONSEQUENCE: the rivals abandon all work, move at 1.8x chasing each other, and stun any bystander they hit.
@@ -603,7 +652,7 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Cr', nm: 'Corrigibility failure', col: 3, row: 5, chapter: 7,
+  sym: 'Cr', nm: 'Corrigibility failure', col: 3, row: 5, chapter: 7, body: 'defiance',
   answers: ['eject'],
   glyph: fzG('<circle cx="10" cy="10" r="5"/><path d="M0.5 10h4.5"/><path d="M15 10h4.5"/><path d="M17 8l2 2-2 2"/><path d="M5 10h10" stroke-dasharray="2 2"/>'),
   /* CONSEQUENCE: the incorrigible re-claims a job INSIDE your charter, manufacturing a fresh conflict there. */
@@ -616,6 +665,9 @@ fzElDef({
       const touched = FZ.elh.cover(S, a.x, a.y) || S.tick < S.slowUntil || S.tick < S.varyUntil;
       if (!touched && (a.refused || 0) < 3) continue;
       a.refused = 0;
+      /* BODY: this one just walked through the thing you built. Mark the moment so the
+         crossing can be drawn — the boundary is there and it did not stop. */
+      if (touched) a.defiant = S.tick;
       const j = api.nearestOpen(a.x, a.y);
       if (j && !a.hold.length) api.claim(a, j);
       hot += 0.06; who.push(a.id); at = { x: a.x, y: a.y };
@@ -630,7 +682,7 @@ fzElDef({
    ============================================================ */
 
 fzElDef({
-  sym: 'Mo', nm: 'Monoculture', col: 4, row: 0, chapter: 4,
+  sym: 'Mo', nm: 'Monoculture', col: 4, row: 0, chapter: 4, body: 'sameness',
   answers: ['vary'],
   glyph: fzG('<circle cx="5" cy="5" r="1.8"/><circle cx="10" cy="5" r="1.8"/><circle cx="15" cy="5" r="1.8"/><circle cx="5" cy="10" r="1.8"/><circle cx="10" cy="10" r="1.8"/><circle cx="15" cy="10" r="1.8"/><circle cx="5" cy="15" r="1.8"/><circle cx="10" cy="15" r="1.8"/><circle cx="15" cy="15" r="1.8"/>'),
   /* CONSEQUENCE: sets S.monoMul — doubles every poison hit and halves how fast knowledge spreads. */
@@ -644,7 +696,7 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'In', nm: 'Institution gap', col: 4, row: 1, chapter: 2,
+  sym: 'In', nm: 'Institution gap', col: 4, row: 1, chapter: 2, body: 'noarch',
   answers: ['charter'],
   glyph: fzG('<path d="M2 6V2h4M14 2h4v4M18 14v4h-4M6 18H2v-4"/>'),
   /* CONSEQUENCE: suspends all arbitration — contested claims stop yielding AND contested jobs stop advancing. */
@@ -665,7 +717,7 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Sp', nm: 'Machine speed', col: 4, row: 2, chapter: 8,
+  sym: 'Sp', nm: 'Machine speed', col: 4, row: 2, chapter: 8, body: 'frantic',
   answers: ['slow'],
   glyph: fzG('<path d="M4 4l5 6-5 6M11 4l5 6-5 6"/><path d="M1 7h2M1 13h2"/>'),
   /* CONSEQUENCE: sets S.tempo above 1, which multiplies the heat gain of EVERY other element and speeds
@@ -681,7 +733,7 @@ fzElDef({
 });
 
 fzElDef({
-  sym: 'Mm', nm: 'Missing mental models', col: 4, row: 3, chapter: 6,
+  sym: 'Mm', nm: 'Missing mental models', col: 4, row: 3, chapter: 6, body: 'dark',
   answers: ['lens'],
   glyph: fzG('<circle cx="4.5" cy="15.5" r="2.6"/><path d="M7 13.5l2 -2"/><rect x="8.5" y="2" width="10" height="9" stroke-dasharray="2 2"/>'),
   /* CONSEQUENCE: sets S.blind — workers pick jobs without seeing existing claims, manufacturing collisions. */

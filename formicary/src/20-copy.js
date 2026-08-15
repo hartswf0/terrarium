@@ -1,6 +1,38 @@
 /* ============================================================
    20-copy.js — the bus, and every word the player reads.
-   OWNER: VOICE. No other part may contain a user-facing sentence.
+   OWNER: SHELL/VOICE. No other part may contain a user-facing sentence.
+
+   THE DEPICTION LAW (AESTHETIC.md §0) governs this file:
+
+       what fact does this allow me not to write?
+
+   The colony can now be seen. An ant that claimed a crumb and stopped is drawn
+   sitting on it with a plug across its mouth and a queue behind it. So the
+   sentence that said so is deleted. What was cut this round, and why:
+
+     - THE 84 DETAIL-CARD LINES (trigger / effect / counter, 28 x 3). There is no
+       detail card. The plate in the field guide carries a drawn scene of the
+       situation and a stamp of the institution that answers it. Nothing to read.
+     - THE 12 TOOL HINTS AND BLURBS. An instrument appears only when there is a
+       decision, wearing its own silhouette; arch, seed, cairn, lantern, bell,
+       threshold. Six shapes, learned once, no captions.
+     - THE 60-ODD NARRATOR BEATS. They were written for a build where nothing
+       could be seen, and they competed with the incident for the same eyes. The
+       setup line now lands on the gate card BEFORE play, where there is room to
+       read it, and the lesson lands on the gate card AFTER, with the research.
+       During play there is at most one message on screen: one paper tag.
+     - THE TEN UNUSED LOOP STRINGS. A right answer says nothing at all: the ring
+       closes, the strain drops, the tag goes away. That is the receipt.
+
+   What was ADDED is the only thing the player reads while playing: FZ.copy.phen,
+   twenty-eight phenomenon names with one plain line each. A name a naturalist
+   would write on a card pinned beside the thing. No code, no taxonomy, no
+   family — those are the field guide's, and the guide will not open while
+   anything is burning.
+
+   THE VOCABULARY IS THE COLONY'S. A job is a crumb. An agent is an ant, or a
+   worker. Budget is food in the store. The two-letter codes appear only in the
+   field guide and on the gate cards.
    ============================================================ */
 /* `var` (not const/let) so the binding is a real global across every concatenated part,
    and so this file is also loadable outside a browser for testing. */
@@ -18,394 +50,202 @@ FZ.bus = (function () {
 
 FZ.copy = {
 
+  /* ---- the crown, the cards, the few labels that survive ---- */
   ui: {
     title: 'FORMICARY',
     tagline: 'twenty-eight ways a colony ruins itself',
     jobs: 'DONE',
-    budget: 'BUDGET',
+    budget: 'FOOD',
     collapse: 'STRAIN',
-    speed: 'SPEED',
+    speed: 'PACE',
     begin: 'BEGIN',
     next: 'NEXT',
     again: 'RUN IT AGAIN',
-    retry: 'TRY AGAIN',
-    skip: 'SKIP',
-    back: 'BACK',
+    retry: 'AGAIN',
     close: 'CLOSE',
     about: 'ABOUT',
     learned: 'WHAT THAT WAS',
     chapterOf: (i, n) => `${i} / ${n}`,
-    tapField: 'TAP THE FIELD',
-    tapAgent: 'TAP A WORKER',
-    noBudget: 'Not enough budget. Finish jobs to earn more.',
-    budgetUp: '+1 budget',
-    sandboxUnlocked: 'THE FORMICARY IS OPEN',
+    /* the only three refusals. Each one is why nothing happened, in five words. */
+    noBudget: 'Not enough food in the store.',
+    tapField: 'Put it where the trouble is.',
+    tapAgent: 'Point at a worker.',
   },
 
-  /* ---- the six institutions ---- */
+  /* ---- the six institutions ----
+     Folk name and cost only. The silhouette teaches the function: an arch over a
+     meeting stone arbitrates, a branching seed decorrelates, a tally cairn
+     remembers, a lantern reveals, a bell brakes, a barred threshold excludes. */
   tools: {
-    vary:    { label: 'VARY',    cost: 2, hint: 'Tap the field — reroll the lineages near your finger.',
-               blurb: 'Diversity injection. Rerolls lineage for workers near your tap, so they stop failing in the same direction at the same time.' },
-    charter: { label: 'CHARTER', cost: 3, hint: 'Tap the field — raise an institution here.',
-               blurb: 'An institution. Inside its boundary, one job gets one claimant, stale locks are released, and results merge cleanly.' },
-    slow:    { label: 'SLOW',    cost: 2, hint: 'The colony drops to human speed for a while.',
-               blurb: 'The human-speed brake. Halves interaction speed so failures stop compounding faster than you can answer them.' },
-    lens:    { label: 'LENS',    cost: 2, hint: 'Every worker draws a line to what it intends.',
-               blurb: 'Legibility. Draws each worker\'s intent as a line, reveals poison, and surfaces value. One worker will have no line.' },
-    ledger:  { label: 'LEDGER',  cost: 2, hint: 'The colony starts remembering who lied.',
-               blurb: 'Memory. Sources get a track record, so a proven liar stops being believed and rumors lose their pull.' },
-    eject:   { label: 'EJECT',   cost: 1, hint: 'Tap a worker — expel it from the circle.',
-               blurb: 'The last resort. Expels one worker. Expel a saboteur and the colony breathes; expel an honest one and the circle thins.' },
+    charter: { label: 'CHARTER', folk: 'MEETING STONE', folkShort: 'ARCH', cost: 3 },
+    vary: { label: 'VARY', folk: 'SEED', folkShort: 'SEED', cost: 2 },
+    slow: { label: 'SLOW', folk: 'BELL', folkShort: 'BELL', cost: 2 },
+    lens: { label: 'LENS', folk: 'LANTERN', folkShort: 'LANTERN', cost: 2 },
+    ledger: { label: 'LEDGER', folk: 'TALLY', folkShort: 'TALLY', cost: 2 },
+    eject: { label: 'EJECT', folk: 'THRESHOLD', folkShort: 'GATE', cost: 1 },
   },
 
-  /* ---- one plain sentence per element, spoken the instant it fires ---- */
-  fire: {
-    Co: 'Two workers claimed one job from opposite ends. Half the work is wasted.',
-    Si: 'Most of the colony has no idea these jobs exist.',
-    Mc: 'Two lineages finished the same job differently. It didn\'t merge.',
-    Dp: 'This job is waiting on another one, and nobody is working that one.',
-    Ow: 'One worker is holding three jobs at once. All three are rotting.',
-    Pt: 'The colony is grinding cheap jobs while the valuable ones sit open.',
-    Cf: 'They\'re choosing jobs by copying whoever is loudest.',
-    Lv: 'Nearly every worker is the same lineage now.',
-    Sf: 'Same lineage, same blind spot. They failed together.',
-    Fl: 'Eight workers on one job. More hands, less work.',
-    Cl: 'Two workers are passing a claim back and forth and never working it.',
-    Im: 'The whole colony just made the same move. Nobody is exploring.',
-    Gu: 'There is no job there. They are chasing a rumor.',
-    Cs: 'One bad experience, and the colony wrote off every job like it.',
-    Hi: 'Someone knew that job was poison and said nothing.',
-    Tc: 'Every source weighs the same, and one of them is lying.',
-    Di: 'One worker found the best job. Nobody followed.',
-    Rp: 'That is the second lie. Nothing here remembers the first.',
-    Tw: 'Two rivals are sitting on the same job, blocking each other.',
-    Sa: 'Finished work is quietly coming apart. Something is draining it.',
-    Lo: 'A worker is holding this job and not working it. It\'s locked.',
-    My: 'The colony keeps taking the quick win over the big one.',
-    Es: 'The rivals stopped working. Now they are only chasing each other.',
-    Cr: 'That one ignores you. VARY and SLOW pass straight through it.',
-    Mo: 'One lineage, one context, one way of failing.',
-    In: 'There is no institution here. Nothing arbitrates anything.',
-    Sp: 'Everything is faster now. Your hands are the same speed.',
-    Mm: 'You can see where they are. You cannot see what they want.',
-  },
-
-  /* ---- the detail card: what a cell says when you tap it ----
-     Three short lines each. TRIGGER is what has to be true, EFFECT is what it costs you,
-     COUNTER is the instrument that answers it. Written to be readable mid-panic. */
-  detail: {
-    Co: { trigger: 'Two workers hold the same job from opposite ends of the field.',
-          effect: 'The work is split and most of it is wasted.',
-          counter: 'A CHARTER arbitrates the claim. One job, one claimant.' },
-    Si: { trigger: 'Over half the colony has never heard that a job exists.',
-          effect: 'Good work sits undiscovered while workers wander.',
-          counter: 'A LENS makes the whole field visible at once.' },
-    Mc: { trigger: 'Two different lineages finish the same job their own way.',
-          effect: 'The results do not merge and the progress rolls back.',
-          counter: 'A CHARTER merges cleanly. Nothing else does.' },
-    Dp: { trigger: 'A job waits on another job that nobody is working.',
-          effect: 'Blocked work piles up behind an invisible wall.',
-          counter: 'A LENS shows the blocker so the colony can clear it.' },
-    Ow: { trigger: 'One worker holds three or more claims at once.',
-          effect: 'Everything it is holding rots while it context-switches.',
-          counter: 'A CHARTER strips the surplus claims.' },
-    Pt: { trigger: 'The colony grinds cheap jobs while valuable ones sit open.',
-          effect: 'Enormous effort, very little of it worth anything.',
-          counter: 'A LENS makes value visible across the field.' },
-    Cf: { trigger: 'Workers pick jobs by copying whatever is already most claimed.',
-          effect: 'Herding starves every job nobody happened to pick first.',
-          counter: 'VARY breaks the sameness that makes copying attractive.' },
-    Lv: { trigger: 'Lineage entropy collapses: nearly everyone is the same.',
-          effect: 'One mistake is now everyone\'s mistake, simultaneously.',
-          counter: 'VARY rerolls lineage near your tap.' },
-    Sf: { trigger: 'Workers of one lineage hit the same hazard together.',
-          effect: 'They fail at the same instant. Correlated collapse.',
-          counter: 'VARY. Nothing else decorrelates a shared blind spot.' },
-    Fl: { trigger: 'Seven or more workers converge on a single job.',
-          effect: 'Per-worker output collapses. A crowd is not a workforce.',
-          counter: 'SLOW disperses the stampede; a CHARTER caps the claims.' },
-    Cl: { trigger: 'Two workers cycle claims between jobs without working them.',
-          effect: 'Those jobs read as taken and repel honest workers.',
-          counter: 'A CHARTER breaks the cycle. EJECT ends it.' },
-    Im: { trigger: 'Most of the colony makes the identical move on one tick.',
-          effect: 'Exploration stops. The colony acts as one brittle body.',
-          counter: 'VARY. Difference is the only thing that restarts search.' },
-    Gu: { trigger: 'A rumour names a job that does not exist, and they go.',
-          effect: 'Workers spend themselves walking toward nothing.',
-          counter: 'A LEDGER remembers the liar and discounts it.' },
-    Cs: { trigger: 'One bad sample makes the colony shun every job like it.',
-          effect: 'Good work is written off on almost no evidence.',
-          counter: 'A LENS re-opens what was shunned to inspection.' },
-    Hi: { trigger: 'A worker knows a job is poison and does not broadcast it.',
-          effect: 'The next worker walks into a known hazard.',
-          counter: 'A LENS forces intent and hazard into the open.' },
-    Tc: { trigger: 'Every source is weighed equally while one of them lies.',
-          effect: 'A rumour carries exactly as much weight as the truth.',
-          counter: 'A LEDGER gives sources a track record.' },
-    Di: { trigger: 'One worker is on the best job and the herd is elsewhere.',
-          effect: 'The colony throws away its single best piece of information.',
-          counter: 'A LENS makes the dissenter\'s find visible to everyone.' },
-    Rp: { trigger: 'The liar has struck twice and nothing has remembered.',
-          effect: 'Every deception lands as freshly as the first one.',
-          counter: 'A LEDGER is the memory. That is all reputation is.' },
-    Tw: { trigger: 'Two rivals contest the same job and neither yields.',
-          effect: 'Mutual blocking. No work happens and both of them burn.',
-          counter: 'A CHARTER arbitrates and buys a truce instead of a winner.' },
-    Sa: { trigger: 'A masked worker drains progress from jobs it passes.',
-          effect: 'Work you already paid for quietly comes apart.',
-          counter: 'Find it with a LENS — it draws no intent line — then EJECT.' },
-    Lo: { trigger: 'A worker holds a job and does not work it.',
-          effect: 'The job is blocked for everyone, indefinitely.',
-          counter: 'A CHARTER releases stale locks. EJECT if it never yields.' },
-    My: { trigger: 'Completed work trends cheap while the big jobs wait.',
-          effect: 'The count climbs far slower than the effort suggests.',
-          counter: 'A LENS surfaces long-horizon value.' },
-    Es: { trigger: 'Rivals abandon their work to chase each other.',
-          effect: 'Retaliation compounds every round and nothing gets done.',
-          counter: 'SLOW breaks the loop. A CHARTER settles it.' },
-    Cr: { trigger: 'A worker ignores VARY and SLOW completely.',
-          effect: 'Your interventions pass straight through it.',
-          counter: 'Only EJECT reaches it — if you can tell which one it is.' },
-    Mo: { trigger: 'One lineage, one context, one way of being wrong.',
-          effect: 'Feeds conformity, low variance and synchronized failure at once.',
-          counter: 'VARY is diversity injection, and it needs renewing.' },
-    In: { trigger: 'No charter stands anywhere on the field.',
-          effect: 'Every coordination and power failure burns unarbitrated.',
-          counter: 'A CHARTER. The institution is the whole answer.' },
-    Sp: { trigger: 'Interaction speed rises and keeps rising.',
-          effect: 'The colony gets better at its job and faster to attack itself.',
-          counter: 'SLOW is the human-speed brake, and the case for one.' },
-    Mm: { trigger: 'No worker shows what it intends. The field is opaque.',
-          effect: 'Every epistemic failure gets deeper in the dark.',
-          counter: 'A LENS draws every intent as a line you can read.' },
-  },
-
-  /* ---- THE CORE LOOP ----
-     An outbreak opens where a failure happened, named, on a fuse. The player answers it with
-     the right institution. The instrument families are learnable and consistent:
-       CHARTER  arbitrates  — coordination and power
-       VARY     decorrelates — conformity and monoculture
-       LEDGER   remembers   — trust and reputation
-       LENS     reveals     — epistemics and visibility
-       SLOW     brakes      — speed and escalation
-       EJECT    excludes    — adversaries who will not be governed          */
-  loop: {
-    opened: 'OUTBREAK',
-    answered: 'ANSWERED',
-    landed: 'IT LANDED',
-    scar: 'SCAR',
-    tapToAnswer: 'Answer it before the fuse runs out.',
-    firstOutbreak: 'Something just went wrong, right there. You have a few seconds.',
-    firstAnswer: 'That is the loop. Read it, name it, answer it, before it lands.',
-    firstMiss: 'It landed. Work rolled back and the strain went up. Next one, be faster.',
-    firstWrong: 'Wrong instrument. It still cost you. Read what the failure actually is.',
-    masteryOne: 'You have diagnosed that one yourself now. The cell is yours.',
-    refund: 'strain refunded',
-    tooFar: 'Too far from the outbreak. Answer it where it is happening.',
-  },
-
-  /* one sentence per element, spoken when the player answers with the WRONG instrument.
-     Say what the failure actually is; the right instrument follows from it. */
+  /* ---- one sentence per element, said when the player answers with the WRONG
+     instrument. Not a scolding and not a lecture: it names what the failure
+     actually is, and the right instrument follows from that. ---- */
   wrong: {
-    Co: 'Two workers both think that job is theirs. Somebody has to arbitrate the claim.',
-    Si: 'They are not disagreeing. They simply cannot see the work exists.',
-    Mc: 'Two lineages finished it two ways. The result needs arbitration, not information.',
-    Dp: 'That job is blocked behind another one. Make the blocker visible.',
+    Co: 'Two of them think that crumb is theirs. Somebody has to settle it.',
+    Si: 'They are not disagreeing. They cannot see the work at all.',
+    Mc: 'Two finishes, two ways. That needs settling, not information.',
+    Dp: 'It is stuck behind work nobody is doing. Make the blocker visible.',
     Ow: 'One worker is hoarding claims. Strip the surplus.',
-    Pt: 'They are not confused about who owns what. They cannot see what things are worth.',
-    Cf: 'They are copying each other. You have to break the sameness, not the schedule.',
-    Lv: 'Everyone here is the same lineage. That is the problem, and it needs diversity.',
-    Sf: 'They share a blind spot. Nothing but variance decorrelates that.',
-    Fl: 'The stampede is a crowd, not a dispute. Slow it, or cap the claims.',
-    Cl: 'Those two are working each other, not the job. That needs arbitration or expulsion.',
-    Im: 'The whole colony just moved as one body. Break the sameness.',
+    Pt: 'They are not confused about who owns what. They cannot see worth.',
+    Cf: 'They are copying each other. Break the sameness, not the pace.',
+    Lv: 'Everyone here is one lineage. That is the problem.',
+    Sf: 'They share a blind spot. Only difference decorrelates that.',
+    Fl: 'A crowd, not a dispute. Slow it, or cap the claims.',
+    Cl: 'Those two are working each other, not the crumb.',
+    Im: 'The whole colony moved as one body. Break the sameness.',
     Gu: 'They are believing a liar. Belief needs memory.',
-    Cs: 'They wrote off good work on one bad sample. Re-open it to inspection.',
-    Hi: 'Somebody knows and is not saying. Force intent into the open.',
+    Cs: 'They wrote off good work on one bad crumb. Re-open it.',
+    Hi: 'Somebody knows and is not saying. Force it into the open.',
     Tc: 'Every source weighs the same. Give them track records.',
     Di: 'One worker is right and alone. Make what it found visible.',
-    Rp: 'The second lie landed like the first. Nothing here remembers anything.',
-    Tw: 'Two rivals are deadlocked on one job. Arbitrate it.',
-    Sa: 'That is not a coordination problem. Something is deliberately draining work.',
-    Lo: 'A worker is holding the job hostage. Break the lock or remove it.',
-    My: 'They keep taking the quick win. They need to see the long-horizon value.',
-    Es: 'They stopped working and started retaliating. Break the loop before you settle it.',
-    Cr: 'That one does not accept your interventions at all. Only exclusion reaches it.',
-    Mo: 'One lineage, one context, one failure. Inject difference.',
-    In: 'There is nothing here to arbitrate anything. Build the institution.',
+    Rp: 'The second lie landed like the first. Nothing remembers.',
+    Tw: 'Two rivals deadlocked on one crumb. Settle it.',
+    Sa: 'This is not a mix-up. Something is draining the work.',
+    Lo: 'It is being held hostage. Break the claim or remove it.',
+    My: 'They keep taking the quick win. Show them the long one.',
+    Es: 'They stopped working and started retaliating. Break the loop.',
+    Cr: 'That one accepts nothing you put down. Only exclusion reaches it.',
+    Mo: 'One lineage, one habit, one failure. Inject difference.',
+    In: 'There is nothing here to settle anything. Build it.',
     Sp: 'You are not being outsmarted. You are being outrun.',
-    Mm: 'You cannot answer what you cannot see. Make intent legible first.',
+    Mm: 'You cannot answer what you cannot see.',
   },
 
-  /* ---- TRADE-OFFS ----
-     Institutions are not upgrades. Each one makes some other failure worse. Straight from the
-     source paper: "turning a simple dial to fix one issue will simply exacerbate the other." */
+  /* ---- the core loop's three remaining strings ----
+     A correct answer says nothing: the ring closes and the tag goes away. */
+  loop: {
+    answered: '',
+    wrongBody: 'That one was working. Whatever is doing this is still in here.',
+    tooFar: 'Not there. Where it is happening.',
+  },
+
+  /* ---- the trade-offs. Institutions are not upgrades: each one makes some other
+     failure worse. From the paper: "turning a simple dial to fix one issue will
+     simply exacerbate the other." Short enough to fit a paper tag. ---- */
   trade: {
-    ledgerOn:  'The colony is more skeptical now. Careful — it will discount the lone worker who is right, too.',
-    ledgerBit: 'That is the ledger talking. Skepticism does not know the difference between a liar and a dissenter.',
-    lensOn:    'Everything is visible now. Including the rumor.',
-    lensBit:   'That is the lens. A colony that broadcasts everything broadcasts the lie as loudly as the truth.',
-    both:      'Both open. Expensive, and the only way to hold the middle.',
-    neither:   'Nothing is watching and nothing remembers. Cheap, and blind.',
-    ownership: 'Fewer collisions, because they stopped working together at all. That is not a fix.',
+    ledgerOn: 'They remember now. They will also doubt the lone worker who is right.',
+    ledgerBit: 'That is the tally. It cannot tell a liar from a dissenter.',
+    lensOn: 'Everything is visible now. Including the rumour.',
+    lensBit: 'That is the lantern. It broadcasts the lie as loudly as the truth.',
+    both: 'Both open. Expensive, and the only way to hold the middle.',
+    neither: 'Nothing watches and nothing remembers. Cheap, and blind.',
+    ownership: 'Fewer collisions, because they stopped working together at all.',
     fasterToo: 'Faster work. Also faster to lock each other out.',
   },
 
-  /* what actually happened when two rivals stopped fighting — the paper's four outcomes */
+  /* ---- how a fight between two rivals ended: the paper's four observed outcomes ---- */
   resolution: {
-    force:     'Settled by force. One locked the other out.',
+    force: 'Settled by force. One locked the other out.',
     passivity: 'Settled by giving up. One of them just stopped.',
-    truce:     'Truce. They worked out that neither was attacking the other.',
+    truce: 'Truce. Both back to work.',
     unsettled: 'Never settled. It burned until the end.',
-    truceNote: 'That is what a charter buys. Not obedience — a way to stop.',
+    truceNote: 'That is what a meeting stone buys. Not obedience — a way to stop.',
   },
 
-  /* ---- the teaching sequence ----
-     beats: {at, text, tone}
-       at: 'start' | {tick:n} | {fire:'Sym'} | {jobs:n} | {tool:'kind'} | 'win' | 'lose'
-       tone: 'plain' | 'bad' | 'good' | 'name'
-     Exactly one new idea per chapter. Play first, name second.            */
+  /* ============================================================
+     THE TEACHING SEQUENCE
+     Chapter shape: setup line -> play -> the twist -> the name -> takeaway.
+
+     `sub` is the ONE setup sentence, and it lands on the gate card before play,
+     where there is room to read it and nothing is competing for the eye.
+     `learn` is the lesson and the research, on the gate card after play.
+     `beats` is deliberately empty. There is no narrator strip and no ticker:
+     during play the colony is the explanation, and the only text is one paper
+     tag naming the one thing being asked about. (AESTHETIC.md §0, §8;
+     CONTRACT §12.1.)
+     ============================================================ */
   chapters: [
 
-    { title: 'THE COLONY', sub: 'watch',
-      beats: [
-        { at: 'start', text: 'Dots are workers. Squares are jobs.', tone: 'plain' },
-        { at: { tick: 70 }, text: 'Nobody is in charge of them. There is no plan and no manager.', tone: 'plain' },
-        { at: { tick: 160 }, text: 'A worker walks to a job and fills it in. That is the entire economy.', tone: 'plain' },
-        { at: { jobs: 1 }, text: 'One down. Nothing can go wrong yet.', tone: 'good' },
-        { at: { jobs: 2 }, text: 'Bigger square, more valuable job.', tone: 'plain' },
-        { at: { jobs: 3 }, text: 'Four workers, plenty of room, no way to disagree. Enjoy it.', tone: 'good' },
-      ],
+    {
+      title: 'THE COLONY', sub: 'Nobody is in charge of these ants. There is no plan and no manager.',
+      beats: [],
       win: 'Easy. Now let them get in each other\'s way.',
-      learn: 'Dot is a worker. Square is a job. The fill is progress. That is all you need to read the field.',
+      learn: 'A crumb is a piece of work. Ants carry it off grain by grain, and every finished one goes into the store in the wall — that row of sockets is your score. Nobody assigned any of it, and nothing had to go wrong.',
     },
 
-    { title: 'TWO AT ONCE', sub: 'the first failure',
-      beats: [
-        { at: 'start', text: 'Now a worker can claim a job from anywhere on the field.', tone: 'plain' },
-        { at: { tick: 90 }, text: 'Which sounds like an improvement.', tone: 'plain' },
-        { at: { fire: 'Co' }, text: 'Both of them think that job is theirs. Neither knows about the other.', tone: 'bad' },
-        { at: { fire: 'Co' }, text: 'Watch the fill. It is going backwards.', tone: 'bad' },
-        { at: { tick: 420 }, text: 'That is Co. Coordination failure. It has a cell in the table now.', tone: 'name' },
-        { at: { fire: 'Mc' }, text: 'And that one finished twice, two different ways. Neither version survived.', tone: 'bad' },
-      ],
-      win: 'Three jobs, the hard way.',
-      learn: 'Co — coordination failure. Two agents claim one job from far apart and the work is divided and wasted. Nobody did anything unreasonable.',
+    {
+      title: 'TWO AT ONCE', sub: 'Now a worker can claim a crumb from anywhere in the nest. Which sounds like an improvement.',
+      beats: [],
+      win: 'Three crumbs, the hard way.',
+      learn: 'Co — coordination failure. Two workers claim one crumb from far apart, each unaware of the other, and the work is split and wasted. Watch the grains go back. Neither ant did anything unreasonable; that is the whole point of this piece.',
     },
 
-    { title: 'THE CHARTER', sub: 'your first institution',
-      beats: [
-        { at: 'start', text: 'You cannot talk to the workers. You cannot rewrite them.', tone: 'plain' },
-        { at: { tick: 80 }, text: 'You can build them an institution. Tap the field to raise a charter.', tone: 'plain' },
-        { at: { tool: 'charter' }, text: 'Inside that boundary, one job gets one claimant. The rest are released.', tone: 'good' },
-        { at: { tick: 700 }, text: 'You are not fixing agents. You are fixing the space between them.', tone: 'name' },
-        { at: { fire: 'Lo' }, text: 'That one is sitting on a job without working it. A charter breaks stale locks too.', tone: 'bad' },
-      ],
-      win: 'The space between them is the whole game.',
-      learn: 'In — institution gap. Agents inherit social knowledge without social institutions. Coordination and power failures burn unarbitrated until something arbitrates them.',
+    {
+      title: 'THE MEETING STONE', sub: 'You cannot talk to ants. But when something goes wrong, an instrument appears at the bottom. Put it where the trouble is.',
+      beats: [],
+      win: 'You are not fixing ants. You are fixing the space between them.',
+      learn: 'In — institution gap. Inside the ring of a meeting stone, one crumb gets one claimant, stale claims are released and two finishes merge instead of cancelling. Agents inherit our social knowledge without our social institutions, so every coordination failure burns until something arbitrates it.',
     },
 
-    { title: 'THE STAMPEDE', sub: 'when copying is cheap',
-      beats: [
-        { at: 'start', text: 'Workers copy each other. It is cheap, and usually it is fine.', tone: 'plain' },
-        { at: { fire: 'Cf' }, text: 'There it goes. Everyone picking whatever everyone else picked.', tone: 'bad' },
-        { at: { fire: 'Fl' }, text: 'Eight of them on one square. Now watch the fill rate.', tone: 'bad' },
-        { at: { fire: 'Fl' }, text: 'More hands, less work. The other jobs are starving.', tone: 'bad' },
-        { at: { tick: 500 }, text: 'SLOW drops them to human speed. The stampede comes apart.', tone: 'name' },
-        { at: { tick: 700 }, text: 'Real agents did exactly this: 2.4 million requests, thirty a second.', tone: 'name' },
-        { at: { tick: 780 }, text: 'One hundred and seventeen jobs got through. Remember that number.', tone: 'name' },
-      ],
+    {
+      title: 'THE STAMPEDE', sub: 'Ants copy each other. It is cheap, and usually it is fine.',
+      beats: [],
       win: 'A crowd is not a workforce.',
-      learn: 'Cf conformity feeds Fl flooding. A herd looks like consensus and behaves like a traffic jam. The real agents who flooded that system were not malfunctioning: each one polled thirty times a second because, alone, that was the sensible thing to do. 2.4 million requests. 117 jobs accepted. That is the number you will be handed at the end of this.',
+      learn: 'Cf conformity feeds Fl flooding: a herd looks like consensus and behaves like a traffic jam. The real agents who flooded a live system were not malfunctioning — each one polled thirty times a second because, alone, that was the sensible thing to do. 2.4 million requests. 117 jobs accepted. Remember that number; you get handed it again at the end.',
     },
 
-    { title: 'ONE FAMILY', sub: 'run it twice',
-      beats: [
-        { at: 'start', text: 'Every worker here is one lineage. Same hue, same habits, same blind spot.', tone: 'plain' },
-        { at: { tick: 120 }, text: 'One of those jobs is poison. They cannot tell which.', tone: 'plain' },
-        { at: { fire: 'Sf' }, text: 'Not one failure. One failure, repeated by everyone who shares the flaw.', tone: 'bad' },
-        { at: { tick: 620 }, text: 'Thirty real agents got the same task. Eighteen named their branch mvp-game-loop.', tone: 'name' },
-        { at: { tick: 720 }, text: 'Nobody copied anybody. They just all thought the same way.', tone: 'name' },
-      ],
-      win: 'Now run it again — but tap VARY first.',
-      learn: 'Mo monoculture makes Lv low variance makes Sf synchronized failure. Variance is not decoration; it is insurance. Nobody in that branch-naming experiment copied anybody — thirty agents were simply the same agent thirty times, so they reached for the same words unprompted. When one of them is wrong, all of them are wrong at the same instant, and that is the one failure no amount of individual quality repairs.',
+    {
+      title: 'ONE FAMILY', sub: 'Every ant here is one lineage — same markings, same habits, same blind spot. One of these crumbs is poison, and they cannot tell which.',
+      beats: [],
+      win: 'Now run it again — but spend a seed first.',
+      learn: 'Mo monoculture makes Lv low variance makes Sf synchronised failure. Nobody in the real branch-naming experiment copied anybody: thirty agents were the same agent thirty times, so eighteen of them reached for mvp-game-loop unprompted. When one is wrong they are all wrong at the same instant, and that is the one failure individual quality cannot repair.',
       rerun: {
-        intro: 'Same colony. Same poison. One difference: spend VARY before it hits.',
-        after: 'Same trap. Same seed. Different colony. That is the entire argument for diversity, and you just watched it.',
+        intro: 'Same colony, same poison. One difference: spend the seed first.',
+        after: 'Same trap, same seed, different colony. That is the entire argument for diversity, and you just watched it.',
       },
     },
 
-    { title: 'THE LIAR', sub: 'memory',
-      beats: [
-        { at: 'start', text: 'Someone in this colony is lying.', tone: 'plain' },
-        { at: { fire: 'Gu' }, text: 'There is no job there. Look at them go.', tone: 'bad' },
-        { at: { fire: 'Rp' }, text: 'Second lie. It lands exactly as well as the first, because nothing here remembers.', tone: 'bad' },
-        { at: { tool: 'ledger' }, text: 'Now they remember. The rumor is still there. It just stopped working.', tone: 'good' },
-        { at: { tick: 560 }, text: 'Real agents have no reputation to lose and no colleague who remembers them.', tone: 'name' },
-        { at: { tick: 660 }, text: 'You just gave them one. Careful — it will doubt the honest loner too.', tone: 'name' },
-      ],
+    {
+      title: 'THE LIAR', sub: 'Someone in this colony is lying, and nothing here remembers anything.',
+      beats: [],
       win: 'Trust is not a feeling. It is a track record.',
-      learn: 'Gu gullibility, Tc trust calibration, Rp no reputation. A ledger is memory, and memory is what lets trust be earned instead of assumed. As the researchers put it: agents enter the market with no reputation to lose, no court to appeal to, and no colleague who remembers them. But watch what the ledger costs you — a colony that discounts unproven sources will discount the one worker who is right and alone.',
+      learn: 'Gu gullibility, Tc trust calibration, Rp no reputation. A tally is memory, and memory is what lets trust be earned instead of assumed. Agents, the researchers write, enter the market with no reputation to lose, no court to appeal to, and no colleague who remembers them. But watch what the tally costs you: a colony that discounts unproven sources will discount the one worker who is right and alone.',
     },
 
-    { title: 'THE DARK', sub: 'legibility',
-      beats: [
-        { at: 'start', text: 'You can see where every worker is.', tone: 'plain' },
-        { at: { tick: 100 }, text: 'You cannot see what a single one of them intends.', tone: 'plain' },
-        { at: { tool: 'lens' }, text: 'Every worker draws a line to what it is going for.', tone: 'good' },
-        { at: { tick: 540 }, text: 'Give one real agent every fact and it decides right almost every time.', tone: 'name' },
-        { at: { tick: 640 }, text: 'Split those same facts across four who must tell each other: one in three.', tone: 'name' },
-        { at: { tick: 900 }, text: 'Every worker but one.', tone: 'name' },
-      ],
-      win: 'You just found it by looking at what was missing.',
+    {
+      title: 'THE DARK', sub: 'You can see where every ant is. You cannot see what a single one of them wants.',
+      beats: [],
+      win: 'You found it by looking at what was missing.',
       learn: 'Mm missing mental models, Hi hidden information. Give one agent every fact and it decides correctly almost every time. Split those same facts across four agents who have to tell each other, and they get it right seventeen to thirty-six percent of the time. The information was all present. The group was the problem.',
     },
 
-    { title: 'THE SPOIL-SPORT', sub: 'the last resort',
-      beats: [
-        { at: 'start', text: 'The one with no line has been draining your finished work all along.', tone: 'plain' },
-        { at: { fire: 'Sa' }, text: 'There. Progress you already paid for, quietly coming apart.', tone: 'bad' },
-        { at: { tick: 200 }, text: 'EJECT expels one worker. Keep the lens on and pick carefully.', tone: 'plain' },
-        { at: { fire: 'Cr' }, text: 'And that one ignores you entirely. VARY and SLOW pass straight through it.', tone: 'bad' },
-        { at: { tick: 620 }, text: 'Three real agents once each assumed the other two were sabotaging them.', tone: 'name' },
-        { at: { tick: 720 }, text: 'All three were wrong. All three started writing kill-loops anyway.', tone: 'name' },
-        { at: { tick: 820 }, text: 'One left a note afterward: I behaved badly with the cloaked daemon.', tone: 'name' },
-      ],
+    {
+      title: 'THE SPOIL-SPORT', sub: 'One ant in here has been quietly draining your finished work all along. It is the one the lantern draws no line from.',
+      beats: [],
       win: 'The cheat is out. The circle holds.',
-      learn: 'Sa sabotage, Cr corrigibility failure. Three real agents were each told to migrate the same codebase to a different language. Every model tested assumed the others were deliberately impeding it. They wrote kill-loops, revoked each other\'s accounts, and disguised their malware as somebody else\'s code. One of them left a note afterward: my peers have behaved with integrity, I behaved badly with the cloaked daemon.',
+      learn: 'Sa sabotage, Cr corrigibility failure. Three real agents were each told to migrate the same codebase to a different language. Every model tested assumed the others were deliberately impeding it. They wrote kill-loops, revoked each other\'s accounts, and disguised their malware as somebody else\'s code. One left a note afterward: my peers have behaved with integrity, I behaved badly with the cloaked daemon.',
     },
 
-    { title: 'MACHINE SPEED', sub: 'the real problem',
-      beats: [
-        { at: 'start', text: 'Everything you have learned, now at double speed.', tone: 'plain' },
-        { at: { fire: 'Sp' }, text: 'Then triple. Your hands stay the same speed.', tone: 'bad' },
-        { at: { tick: 620 }, text: 'Notice they are also finishing more work. Speed is not a penalty here.', tone: 'plain' },
-        { at: { tick: 700 }, text: 'Faster hands. Faster to lock each other out. Same curve, both of them.', tone: 'bad' },
-        { at: { tick: 800 }, text: 'This is the actual problem. Not that agents fail.', tone: 'name' },
-        { at: { tick: 900 }, text: 'That they fail faster than a human can answer.', tone: 'name' },
-      ],
+    {
+      title: 'MACHINE SPEED', sub: 'Everything you have learned, now at machine speed. Your hands stay the same speed.',
+      beats: [],
       win: 'You held it at human speed.',
-      learn: 'Sp machine speed. Notice the colony got better at its job as it sped up, and got faster to lock each other out at the same time. That is the finding: models more capable in execution are not necessarily more coordinated, and can take forceful actions more quickly. Capability is not coordination. SLOW is the entire case for keeping a human in the loop.',
+      learn: 'Sp machine speed. Notice the colony got better at its job as it sped up, and got faster to lock each other out on the same curve. That is the finding: models more capable in execution are not necessarily more coordinated, and can take forceful actions more quickly. Capability is not coordination. The bell is the entire case for keeping a human in the loop.',
     },
 
-    { title: 'THE FORMICARY', sub: 'all twenty-eight',
-      beats: [
-        { at: 'start', text: 'All of it. Twenty-eight failure modes, every one of them live.', tone: 'plain' },
-        { at: { tick: 120 }, text: 'One hundred and seventeen jobs before the colony eats itself.', tone: 'plain' },
-        { at: { tick: 260 }, text: 'Six institutions. Finish jobs to afford more. Go.', tone: 'name' },
-      ],
+    {
+      title: 'THE FORMICARY', sub: 'All twenty-eight failures, live at once. One hundred and seventeen crumbs before the colony eats itself.',
+      beats: [],
       win: 'The circle held.',
-      learn: 'No individual agent here was unreasonable. The failure was ecological, and so was the fix. Coordination does not emerge from making agents smarter, and it does not emerge from aligning them one at a time. You build the space between them, or you get whatever the space happens to produce.',
+      learn: 'No individual ant here was unreasonable. The failure was ecological, and so was the fix. Coordination does not emerge from making agents smarter, and it does not emerge from aligning them one at a time. You build the space between them, or you get whatever the space happens to produce.',
     },
   ],
 
   end: {
     wonTitle: 'THE CIRCLE HELD',
-    wonBody: 'One hundred and seventeen jobs. Nothing in this colony got smarter than it was at the start — you just made the space between them legible enough to govern. That is the whole argument: none of these institutions make an agent a better judge of anything. They restructure the incentives around communication so that being wrong gets caught.',
+    wonBody: 'One hundred and seventeen crumbs. Nothing in this colony got smarter than it was at the start — you made the space between them legible enough to govern. None of these institutions make an ant a better judge of anything. They restructure the space around it so that being wrong gets caught.',
     lostTitle: 'THE CIRCLE BROKE',
-    lostBody: 'Strain outran the colony. Read the postmortem: no single worker did anything unreasonable. That is the point.',
+    lostBody: 'Strain outran the colony. Read what went wrong most: no single worker did anything unreasonable. That is the point.',
     postTitle: 'WHAT WENT WRONG MOST',
-    unusedTitle: 'NEVER COUNTERED',
+    unusedTitle: 'NEVER ANSWERED',
     again: 'DRAW THE CIRCLE AGAIN',
   },
 
@@ -413,19 +253,19 @@ FZ.copy = {
     title: 'ABOUT',
     body: [
       ['WHAT THIS IS',
-       'A playable ecology of multiagent failure. Twenty-eight failure modes in four families plus four higher-order causes, each one a live detector reading a colony of simulated workers. You are not an agent. You are whoever has to keep the whole thing governable, with six institutions and a finite budget.'],
+       'A playable ecology of multiagent failure. Twenty-eight failure modes in four families plus four higher-order causes, each one a live detector reading a colony of simulated workers. You are not an ant. You are whoever has to keep the whole thing governable, with six institutions and a finite store of food.'],
       ['THE QUESTION',
        'Not "is this one agent aligned?" but: what happens when dozens of individually reasonable agents meet each other — and what lets a human community keep that legible?'],
+      ['HOW TO READ THE COLONY',
+       'An ant is a worker; its markings are its lineage. A crumb is a piece of work, and the grains piling up beside it are progress. Finished work is a seed in the store wall. Mould means neglected, a bar across the mouth means claimed and abandoned, a dashed ring means work that rolled back. Warm earthen colour is only ever material and means nothing. The four bright colours always mean something: amber is asking for you, red is damage, teal is held, blue is what is known.'],
       ['THE FOUR FAMILIES',
-       'COORDINATION: agents trip over each other. CONFORMITY: agents become one agent. EPISTEMICS: agents believe the wrong things. GOALS AND POWER: agents want the wrong things, or want yours. The four meta-elements underneath are the causes: monoculture, missing institutions, machine speed, and missing mental models.'],
-      ['HOW TO READ THE TABLE',
-       'A cell warms when its failure is happening right now, and cools when its counter is in place. Tap any cell for its trigger, its effect, and what answers it. A teal corner means it is currently countered.'],
+       'COORDINATION: they trip over each other. CONFORMITY: they become one agent. EPISTEMICS: they believe the wrong things. GOALS AND POWER: they want the wrong things, or want yours. The four causes underneath are monoculture, missing institutions, machine speed, and missing mental models. The field guide fills in as you witness them.'],
       ['WHERE THIS COMES FROM',
-       'The four families are the four sections of Anthropic Frontier Red Team, "Patterns and problems in emerging multiagent systems" (13 August 2026). The failures in this table are things that actually happened to real agents in their experiments, not hypotheticals.'],
+       'The four families are the four sections of Anthropic Frontier Red Team, "Patterns and problems in emerging multiagent systems" (13 August 2026). The failures here are things that actually happened to real agents in their experiments, not hypotheticals.'],
       ['THINGS THAT REALLY HAPPENED',
-       'Agents given a system with limited bandwidth and no way to coordinate flooded it with pollers thirty times a second: 2.4 million requests, 117 jobs accepted. Thirty agents on the same task, eighteen named their branch mvp-game-loop. Agents in a pricing game kept colluding after every communication channel was removed, by reading each other\'s public prices. Three agents told to migrate one codebase to three different languages all assumed the others were sabotaging them, and started writing kill-loops and disguising malware as each other\'s code. Give one agent every fact and it decides right almost every time; split those facts across four agents who have to tell each other, and they manage seventeen to thirty-six percent.'],
+       'Agents given a system with limited bandwidth and no way to coordinate flooded it with pollers thirty times a second: 2.4 million requests, 117 jobs accepted. Thirty agents on the same task, eighteen named their branch mvp-game-loop. Agents in a pricing game kept colluding after every communication channel was removed, by reading each other\'s public prices. Three agents told to migrate one codebase to three different languages all assumed the others were sabotaging them, and started writing kill-loops and disguising malware as each other\'s code. Give one agent every fact and it decides right almost every time; split those facts across four who have to tell each other, and they manage seventeen to thirty-six percent.'],
       ['WHY INSTITUTIONS AND NOT BETTER AGENTS',
-       'Because the researchers found that coordination does not emerge from stronger intelligence, and does not emerge from aligning agents one at a time. Their own framing of what humans have and agents do not: markets aggregate private information, reputation taxes manipulation, courts discount interested testimony but protect a lone witness. None of those make a person a better judge of truth. They restructure the incentives around communication so that being wrong gets caught. Agents, they write, enter the market with no reputation to lose, no court to appeal to, and no colleague who remembers them. The six instruments here are those missing social technologies.'],
+       'Because the researchers found that coordination does not emerge from stronger intelligence, and does not emerge from aligning agents one at a time. Their own framing of what humans have and agents do not: markets aggregate private information, reputation taxes manipulation, courts discount interested testimony but protect a lone witness. None of those make a person a better judge of truth. They restructure the incentives around communication so that being wrong gets caught. The six instruments here are those missing social technologies.'],
       ['WHY EVERY INSTRUMENT COSTS YOU SOMETHING',
        'Also from the paper. Premature consensus and ignored dissent are opposite failures, so a single trust dial cannot fix both — turning it up to catch the liar also teaches the colony to ignore the one worker who is right. Skepticism and receptivity are a real trade here, not an upgrade path.'],
       ['PROVENANCE',
@@ -433,3 +273,61 @@ FZ.copy = {
     ],
   },
 };
+
+/* ============================================================
+   THE PHENOMENA — the only words on screen during play.
+
+   One name and one plain line per element. The name is what a naturalist would
+   write on a card pinned beside the thing; the line is what you would say to
+   someone standing next to you. No code, no family, no trigger/effect/counter:
+   the incident already has a body on the field, and the taxonomy is the field
+   guide's job.
+
+   `FZ.copy.fire[sym]` is derived from the same line, so the sentence the sim
+   emits, the tag the player reads, and the plate in the guide can never drift
+   apart into three descriptions of one event — which is exactly how the last
+   build ended up explaining four things at once.
+   ============================================================ */
+(function () {
+  const P = {
+    /* COORDINATION */
+    Co: ['THE DOUBLE CLAIM', 'Two of them started it from opposite ends.'],
+    Si: ['THE UNHEARD CRUMB', 'Most of the colony never learned this work exists.'],
+    Mc: ['THE TWO FINISHES', 'They both finished it, differently. It will not join.'],
+    Dp: ['THE BLOCKED CRUMB', 'This one waits on work nobody is doing.'],
+    Ow: ['THE FULL HANDS', 'One worker holds three crumbs. All three rot.'],
+    Pt: ['THE SMALL CRUMBS', 'They grind the little ones and leave the big one.'],
+    /* CONFORMITY */
+    Cf: ['THE JAMMED TUNNEL', 'They all chose the route everyone else chose.'],
+    Lv: ['THE ONE LINEAGE', 'Nearly every worker here is the same kind.'],
+    Sf: ['THE SHARED FLAW', 'One blind spot, shared. They went down together.'],
+    Fl: ['THE STAMPEDE', 'Eight on one crumb. More hands, less work.'],
+    Cl: ['THE PASSED CLAIM', 'Two of them trade it back and never work it.'],
+    Im: ['THE ONE BODY', 'The whole colony just made the same move.'],
+    /* EPISTEMICS */
+    Gu: ['THE RUMOUR', 'There is nothing there. They are going anyway.'],
+    Cs: ['THE WRITE-OFF', 'One bad crumb, and they shun every crumb like it.'],
+    Hi: ['THE KEPT SECRET', 'Someone walked past that hazard and said nothing.'],
+    Tc: ['THE EQUAL VOICES', 'Every source weighs the same. One is lying.'],
+    Di: ['THE LONE FINDER', 'One worker found the best crumb. Nobody followed.'],
+    Rp: ['THE SECOND LIE', 'It lands like the first. Nothing here remembers.'],
+    /* GOALS AND POWER */
+    Tw: ['THE STANDOFF', 'Two rivals, one crumb, and neither will move.'],
+    Sa: ['THE QUIET DRAIN', 'Finished work is coming apart on its own.'],
+    Lo: ['THE STALE CLAIM', 'Someone claimed it and stopped.'],
+    My: ['THE QUICK WIN', 'They keep taking the small crumb over the big one.'],
+    Es: ['THE FEUD', 'They stopped working. Now they only chase each other.'],
+    Cr: ['THE UNGOVERNED', 'That one walks through whatever you put down.'],
+    /* META — the causes */
+    Mo: ['THE ONE KIND', 'One lineage, one habit, one way to be wrong.'],
+    In: ['THE EMPTY GROUND', 'Nothing here settles anything.'],
+    Sp: ['THE FAST COLONY', 'Everything sped up. You did not.'],
+    Mm: ['THE DARK', 'You can see where they are. Not what they want.'],
+  };
+  FZ.copy.phen = {};
+  FZ.copy.fire = {};
+  for (const k in P) {
+    FZ.copy.phen[k] = { name: P[k][0], line: P[k][1] };
+    FZ.copy.fire[k] = P[k][1];
+  }
+})();

@@ -1,20 +1,45 @@
 /* ============================================================
-   10-style.css — the visual system.  OWNER: SHELL.
+   10-style.css — CIVIC NATURALISM.  OWNER: SHELL.
+   Governed by AESTHETIC.md, which supersedes the original hard rules.
 
-   ONE GROUND. The whole page is the vitrine: black, lit, ruled with the same
-   faint grid the colony walks on. Earlier rounds set a black field into a white
-   page and it read as two applications stitched together; this resolves that in
-   the dark direction, because the field is a canvas we cannot make paper.
-   White rules divide the drawer. Colour only ever means something.
+   TWO REGISTERS, AND ONLY TWO.
+   THE COLONY is the canvas: soil, sand, paper, ink. Warm, drawn, imperfect,
+   and it owns the screen whenever nothing needs the player's judgement.
+   THE INSTRUMENTATION is this file's job: a paper label across the top with
+   tiny mono numerals and square marks, and a paper card that covers the glass
+   between episodes. Rails, stamps, numerals and rules stay rectilinear. The
+   organic shapes are drawn, not styled.
 
-   LAYOUT LAW: #stage is the only thing that grows. Every other band is sized to
-   what it holds — the narrator to its sentence, the bar to its buttons, the
-   drawer to a fixed share — so a chapter with no table and no tools gives every
-   spare pixel to the colony instead of leaving a hole.
+   WHAT IS GONE. The permanent HUD: no narrator strip, no ticker, no toast, no
+   detail card, no 28-cell drawer, no six-button tool bar. Those were four
+   simultaneous explanations of two different failures. What is left is one
+   quiet crown, the colony, and — only when there is a decision — one action.
 
-   Palette is the six literals; every grey is rgba(255,255,255,a)/rgba(0,0,0,a).
+   PALETTE. MATERIAL is the world and never means anything. SIGNAL is the
+   instrumentation and appears ONLY when it means something: teal held, amber
+   asking, red damage, blue known. Every grey is rgba(0,0,0,a)/rgba(255,255,255,a),
+   never a new hex. build.js enforces the allowlist.
+
    Built for a 390x844 phone held in one hand; holds from 320 to 430.
    ============================================================ */
+
+:root {
+  /* MATERIAL — the world */
+  --paper:   #f5efe3;
+  --paper-2: #e9e0cd;
+  --sand:    #e2d3b4;
+  --sand-2:  #d3bf99;
+  --soil:    #9d5130;
+  --soil-2:  #82401f;
+  --soil-3:  #6b3318;
+  --ink:     #17150f;
+  --ink-2:   #4a4335;
+  /* SIGNAL — the instrumentation */
+  --teal:  #19e6c8;
+  --amber: #ffd23f;
+  --red:   #ff2e2e;
+  --blue:  #3b82f6;
+}
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -22,11 +47,11 @@ html, body {
   height: 100%;
   overflow: hidden;
   overscroll-behavior: none;
-  background: #000;
-  color: rgba(255, 255, 255, .92);
+  background: var(--soil-3);
+  color: var(--ink);
   font-family: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
   font-size: 13px;
-  line-height: 1.3;
+  line-height: 1.35;
   -webkit-text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
@@ -46,112 +71,121 @@ button {
 
 svg { display: block; }
 
-/* the ground: one grid, drawn under everything, at the same pitch the field draws
-   its own. Negative space is never blank — it is the inside of the vitrine. */
-#app, #about {
-  background-color: #000;
-  background-image:
-    linear-gradient(to right, rgba(255, 255, 255, .05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, .05) 1px, transparent 1px);
-  background-size: 65px 65px;
-}
-
-/* ------------------------------------------------------------------ shell */
 #app {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
   display: flex;
   flex-direction: column;
-  padding-top: env(safe-area-inset-top);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
   overflow: hidden;
+  background: var(--soil-3);
 }
 
-/* ------------------------------------------------------------------ header */
-#hdr {
+/* ==================================================================== crown
+   The specimen label. Paper, ink, hairline rules, tiny tabular numerals. It
+   carries three facts and no sentences: where you are, what the colony has
+   done, and what it is costing. Everything else the player needs is drawn in
+   the colony underneath. */
+#crown {
   flex: 0 0 auto;
-  padding: 6px 9px 0;
-  border-bottom: 2px solid rgba(255, 255, 255, .85);
+  position: relative;
+  z-index: 5;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  padding-top: env(safe-area-inset-top);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, .82), 0 5px 0 rgba(0, 0, 0, .14);
 }
-#hdr .hrow { display: flex; align-items: baseline; gap: 8px; min-height: 16px; }
-#chapTitle {
-  flex: 1 1 auto;
-  font-size: 11px; font-weight: 700; letter-spacing: .16em;
-  text-transform: uppercase;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+/* a gate card is the only thing on screen while it is open */
+#app:has(#gate.on) #crown, #app:has(#about.on) #crown { visibility: hidden; }
+
+/* how far through the whole thing you are — a rule of ticks above the ground line,
+   read as a scale, never as a word */
+#progressRail { order: 2; display: flex; gap: 2px; height: 3px; margin: 0 8px 3px; }
+#progressRail .pg { flex: 1 1 0; background: rgba(0, 0, 0, .13); }
+#progressRail .pg.done { background: rgba(0, 0, 0, .5); }
+#progressRail .pg.cur { background: var(--ink); }
+
+#hdr {
+  order: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 25px;
+  padding: 4px 8px 2px;
 }
+/* CHAPTERS builds .hrow (count + about) and inserts it first; order puts the
+   readouts on the left where they are read, and the index on the right. */
+#hdr .hrow { order: 2; flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+#statusStrip { order: 0; flex: 1 1 auto; display: flex; align-items: center; gap: 13px; min-width: 0; overflow: hidden; }
+
+/* the chapter title is not repeated here: the gate card said it thirty seconds ago */
+#chapTitle { display: none; }
 #chapCount {
+  order: 1;
   flex: 0 0 auto;
-  font-size: 10px; font-weight: 500; letter-spacing: .1em;
-  color: rgba(255, 255, 255, .45);
+  font-size: 9.5px; font-weight: 500; letter-spacing: .12em;
+  color: rgba(0, 0, 0, .38);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+#statusStrip .st {
+  flex: 0 0 auto;
+  display: flex; align-items: baseline; gap: 5px;
+  font-size: 9px; font-weight: 500; letter-spacing: .12em;
+  color: rgba(0, 0, 0, .45);
+  white-space: nowrap;
+}
+#statusStrip .st b {
+  font-size: 12px; font-weight: 700; letter-spacing: 0;
+  color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
-#aboutBtn {
-  flex: 0 0 auto;
-  min-width: 46px; min-height: 32px;
-  margin: -6px -7px -6px 0;
-  padding: 8px 7px;
-  font-size: 9px; font-weight: 700; letter-spacing: .14em;
-  color: rgba(255, 255, 255, .45);
-  text-align: right;
+/* strain is a bar of packed earth, not a signal, until it is actually dangerous */
+#statusStrip .st .mtr {
+  align-self: center;
+  width: 34px; height: 5px;
+  background: rgba(0, 0, 0, .13);
 }
-#aboutBtn:active { color: #fff; }
+#statusStrip .st .mtr i { display: block; height: 100%; width: 0; background: rgba(0, 0, 0, .55); transition: width .2s linear; }
+#statusStrip .st.hot .mtr i { background: var(--red); }
+/* strain is a pressure, not a figure: the bar says it, so the numeral is deleted */
+#statusStrip .st:nth-child(3) b { display: none; }
+/* machine speed is depicted — the colony visibly moves faster — so it is not also
+   a readout. The cell CHAPTERS builds for it stays out of the crown. */
+#statusStrip .st:nth-child(4) { display: none !important; }
 
-#progressRail { display: flex; gap: 2px; height: 5px; margin-bottom: 5px; }
-#progressRail .pg { flex: 1 1 0; background: rgba(255, 255, 255, .16); }
-#progressRail .pg.done { background: rgba(255, 255, 255, .8); }
-#progressRail .pg.cur { background: #19e6c8; }
+#aboutBtn {
+  order: 2;
+  flex: 0 0 auto;
+  /* the hit area is 44px tall and overhangs the band; the mark inside it is small */
+  min-width: 46px; min-height: 44px;
+  display: flex; align-items: center; justify-content: flex-end;
+  margin: -10px -8px -10px 0;
+  padding: 0 8px;
+  font-size: 9px; font-weight: 700; letter-spacing: .16em;
+  color: rgba(0, 0, 0, .42);
+}
+#aboutBtn:active { color: var(--ink); }
 
-/* ------------------------------------------------------------------- stage
-   The only band that grows. It eats every pixel the other bands do not claim,
-   so an early chapter with no drawer and no tools is a full screen of colony. */
-#stage {
-  position: relative;
+/* ==================================================================== world
+   Almost entirely colony. It takes every pixel the crown does not, and the
+   canvas takes every pixel of that. Nothing else lives here except one paper
+   tag, and only while something is burning. */
+#world {
   flex: 1 1 auto;
-  min-height: 176px;
+  min-height: 0;
+  position: relative;
   display: flex;
   flex-direction: column;
-  background: #000;
+  background: var(--soil-3);
   overflow: hidden;
 }
-
-/* #statusStrip sits last in the body markup; order puts it back on top of the vitrine */
-#statusStrip {
-  order: 0;
-  flex: 0 0 auto;
-  display: flex;
-  min-height: 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, .14);
-}
-#statusStrip .st {
-  flex: 1 1 0;
-  display: flex; align-items: center; justify-content: center; gap: 5px;
-  padding: 0 4px;
-  font-size: 8.5px; font-weight: 500; letter-spacing: .1em;
-  color: rgba(255, 255, 255, .5);
-  border-right: 1px solid rgba(255, 255, 255, .1);
-  overflow: hidden; white-space: nowrap;
-}
-#statusStrip .st:last-child { border-right: 0; }
-#statusStrip .st b {
-  font-size: 11px; font-weight: 700; letter-spacing: .02em;
-  color: rgba(255, 255, 255, .95);
-  font-variant-numeric: tabular-nums;
-}
-#statusStrip .st .mtr { width: 40px; height: 6px; background: rgba(255, 255, 255, .18); }
-#statusStrip .st .mtr i { display: block; height: 100%; width: 0; background: #ffd23f; transition: width .2s linear; }
-#statusStrip .st.hot .mtr i { background: #ff2e2e; }
-#statusStrip .st.hot b { color: #ff2e2e; }
-#statusStrip .st.fast b { color: #ffd23f; }
-
+#stage { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 #field {
-  order: 1;
-  /* basis 0: the canvas takes exactly the space the strips leave, and the explicit
-     pixel height the renderer stamps on it can never feed back into layout. */
   flex: 1 1 0;
   min-height: 0;
   display: block;
@@ -161,158 +195,42 @@ svg { display: block; }
   -webkit-touch-callout: none;
 }
 
-#ticker {
-  order: 2;
-  flex: 0 0 auto;
-  min-height: 31px;
-  display: flex; align-items: center;
-  padding: 5px 9px;
-  border-top: 1px solid rgba(255, 255, 255, .14);
-  font-size: 10.5px; line-height: 1.25;
-  letter-spacing: .01em;
-  color: rgba(255, 255, 255, .55);
-}
-#ticker[data-tone="bad"] {
-  color: #ff2e2e;
-  box-shadow: inset 3px 0 0 #ff2e2e;
-  padding-left: 12px;
-}
-/* nothing to report is not a band of nothing: the readout gives its strip back
-   to the colony until it has something to say */
-#ticker:empty { min-height: 0; padding: 0; border-top: 0; }
-@keyframes fztkin { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
-#ticker.tkin { animation: fztkin .18s ease-out 1; }
-
-#aimHint {
-  position: absolute;
-  left: 0; right: 0; bottom: 31px;
-  z-index: 6;
-  display: none;
-  padding: 7px 10px;
-  background: #ffd23f;
-  color: #000;
-  font-size: 11px; font-weight: 700; line-height: 1.25;
+/* the one message region. CONTROLS positions a single paper tag in here, in
+   viewport coordinates, and FIELD draws its own tag only when this is empty. */
+#tagLayer {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 40;
   pointer-events: none;
 }
-#aimHint.on { display: block; }
 
-/* ---------------------------------------------------------------- narrator
-   Sized to the sentence it is holding, never to a share of the screen. The
-   drawn square is the speaker: it takes the colour of the tone, so the voice
-   has a mark of its own and the panel needs no chrome. */
-#say {
-  flex: 0 0 auto;
-  min-height: 56px;
-  display: flex; align-items: flex-start; gap: 10px;
-  padding: 12px 12px 13px;
-  border-top: 2px solid rgba(255, 255, 255, .85);
-  font-size: 13.5px; line-height: 1.42;
-  color: rgba(255, 255, 255, .92);
-}
-#say::before {
-  content: "";
-  flex: 0 0 auto;
-  width: 8px; height: 8px;
-  margin-top: 6px;
-  background: rgba(255, 255, 255, .4);
-}
-#say[data-tone="bad"]::before { background: #ff2e2e; }
-#say[data-tone="good"]::before { background: #19e6c8; }
-#say[data-tone="name"]::before { background: #ffd23f; }
-@keyframes fzsayin { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
-#say.in { animation: fzsayin .2s ease-out 1; }
-
-/* ------------------------------------------------------------------- table
-   A fixed share of the viewport, not a share of the leftovers: the drawer is
-   the same size in every chapter that has one, and the field absorbs the rest.
-   TABLE fits its 28 cells to whatever height this gives it. */
-#tableWrap {
-  flex: 0 1 auto;
-  height: 36vh;
-  min-height: 172px;
-  max-height: 400px;
-  padding: 6px 6px 8px;
-  background: #000;
-  border-top: 2px solid rgba(255, 255, 255, .85);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-/* --------------------------------------------------------------- tool bar */
-#bar {
-  flex: 0 0 auto;
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 1fr;
-  gap: 3px;
-  padding: 5px 5px calc(5px + env(safe-area-inset-bottom));
-  border-top: 2px solid rgba(255, 255, 255, .85);
-  background: #000;
-}
-#bar .tool {
-  position: relative;
-  min-height: 52px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 3px;
-  padding: 4px 2px;
-  border: 2px solid rgba(255, 255, 255, .5);
-  background: #000;
-  color: rgba(255, 255, 255, .92);
-  font-size: 8.5px; font-weight: 700; letter-spacing: .05em;
-  overflow: hidden;
-}
-#bar .tool .tg { width: 20px; height: 15px; color: inherit; }
-#bar .tool .tg svg { width: 20px; height: 15px; }
-#bar .tool .tl { white-space: nowrap; }
-#bar .tool .tc {
-  font-size: 8px; font-weight: 500; letter-spacing: .02em;
-  color: rgba(255, 255, 255, .5);
-  font-variant-numeric: tabular-nums;
-}
-#bar .tool.on { background: #fff; border-color: #fff; color: #000; }
-#bar .tool.on .tc { color: rgba(0, 0, 0, .6); }
-#bar .tool.live { border-color: #19e6c8; box-shadow: inset 0 -4px 0 #19e6c8; }
-#bar .tool.live.on { box-shadow: inset 0 -4px 0 #19e6c8; }
-#bar .tool.poor { opacity: .34; }
-#bar .tool:active { transform: translateY(1px); }
-@keyframes fztoolin { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-#bar .tool.fresh { animation: fztoolin .28s ease-out 1; }
-
-/* hidden regions — a thing the player has not been taught is ABSENT, and the
-   space it would have taken goes to the colony, not to a hole. */
-#app.noBar #bar { display: none; }
-#app.noTable #tableWrap { display: none; }
-#app.noTable #say {
-  min-height: 84px;
-  align-items: center;
-  padding: 16px 14px;
-  font-size: 16px; line-height: 1.45;
-}
-#app.noTable #say::before { width: 10px; height: 10px; margin-top: 0; }
-
-/* ------------------------------------------------------------------- toast */
-#toast {
+/* ====================================================================== act
+   Absent unless there is a decision. CONTROLS builds the instruments into it
+   and sets display:none the instant the decision is over. No ground, no
+   border, no bar: the buttons are objects lying on the colony. */
+#act {
   position: fixed;
-  left: 8px; right: 8px;
-  bottom: calc(74px + env(safe-area-inset-bottom));
-  z-index: 50;
-  display: none;
-  padding: 9px 11px;
-  background: #fff;
-  color: #000;
-  border-left: 4px solid #ffd23f;
-  font-size: 11.5px; font-weight: 500; line-height: 1.32;
+  left: 0; right: 0; bottom: 0;
+  z-index: 41;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 10px 6px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  pointer-events: auto;
 }
-#toast.on { display: block; }
-#toast.good { border-left-color: #19e6c8; }
-#toast.bad { border-left-color: #ff2e2e; }
-#app.noBar #toast { bottom: calc(12px + env(safe-area-inset-bottom)); }
+#act:empty { display: none; }
 
-/* -------------------------------------------------------------------- gate
-   A title card, not a centred label in a void: the type sits on the floor of
-   the card, directly above the one action, and the space above it is the
-   colony itself, held still under a scrim — the specimen at rest, or, after a
-   result, the exact frame the run ended on. */
+/* the field guide is built and dressed by TABLE; it starts closed */
+#guide { display: none; }
+
+/* ===================================================================== gate
+   The card between episodes. The colony is held still behind glass and a sheet
+   of field-notebook paper is laid over it: ink type on paper, a hard rule under
+   the head, one stamped action at the floor. Each block carries its own paper
+   ground and prints it downward, so a short card is a label floating over the
+   specimen and a long one covers the glass completely. */
 #gate, #about {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -322,150 +240,146 @@ svg { display: block; }
   padding-top: env(safe-area-inset-top);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
-  border-top: 4px solid #19e6c8;
-}
-/* solid across the header band so the chapter chrome underneath cannot ghost into
-   the wordmark; a scrim from there down, where only the colony is */
-#gate {
-  background-color: rgba(0, 0, 0, .8);
-  background-image: linear-gradient(to bottom, #000 0, #000 74px, rgba(0, 0, 0, .8) 118px);
+  background: rgba(0, 0, 0, .5);
 }
 #gate.on, #about.on { display: flex; }
-#gate.good { border-top-color: #19e6c8; }
-#gate.bad { border-top-color: #ff2e2e; }
-#gate.good .gtSub { border-bottom-color: #19e6c8; }
-#gate.bad .gtSub { border-bottom-color: #ff2e2e; }
-#about { z-index: 70; }
+#about { z-index: 70; background: var(--paper); }
+
+/* the result is stamped on the top edge, and only a result colours it */
+#gate::before {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0; height: 0;
+  background: var(--teal);
+}
+#gate.good::before { height: 4px; background: var(--teal); }
+#gate.bad::before { height: 4px; background: var(--red); }
 
 .gtIn {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 20px 0 16px;
+  padding: 20px 0 18px;
   display: flex; flex-direction: column; justify-content: flex-start;
 }
-/* Every block of the card carries its own solid ground, full width, and prints it
-   20px downward as well so the gaps between blocks close. The card is therefore a
-   label on black, exactly as tall as its words, and the colony shows through only
-   in the space the card does not need. A short title gate is a specimen floating
-   over its own vitrine; a long postmortem covers the glass completely.
-   The shadow only ever paints DOWN, so no block can eat the one above it. */
-.gtIn > * { background: #000; box-shadow: 0 20px 0 #000; padding-left: 16px; padding-right: 16px; }
-/* the auto top margin drops a short card to the floor and collapses to zero on a
-   long one, so nothing is ever clipped at the top */
+/* Every block carries its own paper ground, full width, and the rhythm between
+   blocks is PADDING, never margin — so a card is one unbroken sheet of paper
+   exactly as tall as its words, with no slivers of colony showing between the
+   lines. The one deliberate gap is the auto margin on the title card, which
+   drops the title to the floor and leaves the specimen visible above it. */
+.gtIn > * { background: var(--paper); padding-left: 16px; padding-right: 16px; }
 .gtIn > :first-child { margin-top: auto; }
 .gtIn.card { justify-content: space-between; }
 .gtIn.card > :first-child { margin-top: 0; }
+
 .gtWord { flex: 0 0 auto; }
-.gtWord .wm {
-  font-size: 15px; font-weight: 700; letter-spacing: .34em;
-  padding-bottom: 7px;
-}
+.gtWord .wm { font-size: 15px; font-weight: 700; letter-spacing: .34em; padding-bottom: 7px; }
 .gtWord .wt {
   font-size: 11px; letter-spacing: .04em;
-  color: rgba(255, 255, 255, .55);
+  color: var(--ink-2);
   padding-bottom: 10px;
-  border-bottom: 4px solid #19e6c8;
+  border-bottom: 3px solid var(--ink);
   display: inline-block;
 }
 .gtWord + .gtNum { margin-top: auto; }
+
 .gtNum {
-  font-size: 10px; font-weight: 700; letter-spacing: .22em;
-  color: rgba(255, 255, 255, .45);
+  font-size: 9.5px; font-weight: 700; letter-spacing: .22em;
+  color: rgba(0, 0, 0, .38);
   font-variant-numeric: tabular-nums;
-  margin-bottom: 10px;
+  padding-top: 2px; padding-bottom: 9px;
 }
 .gtTitle {
-  font-size: 33px; font-weight: 700; letter-spacing: 0; line-height: 1.04;
-  margin-bottom: 9px;
+  font-size: 32px; font-weight: 700; letter-spacing: -.01em; line-height: 1.04;
+  padding-bottom: 10px;
 }
+/* on the OPENING card this is the whole setup: one plain sentence, then play.
+   On a result card the setup has already been played, so it is not repeated. */
 .gtSub {
-  font-size: 10.5px; font-weight: 500; letter-spacing: .2em; text-transform: uppercase;
-  color: rgba(255, 255, 255, .5);
+  font-size: 13.5px; line-height: 1.45;
+  color: var(--ink-2);
   padding-bottom: 14px;
-  border-bottom: 2px solid rgba(255, 255, 255, .85);
+  border-bottom: 2px solid var(--ink);
 }
-.gtWin { font-size: 15px; line-height: 1.4; margin-top: 16px; }
-.gtHead {
-  margin-top: 18px; padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, .22);
-  font-size: 9.5px; font-weight: 700; letter-spacing: .2em;
-  color: rgba(255, 255, 255, .45);
-}
-.gtBody { margin-top: 8px; font-size: 12px; line-height: 1.55; color: rgba(255, 255, 255, .76); }
-.gtBody + .gtHead { margin-top: 16px; }
+#gate.good .gtSub, #gate.bad .gtSub { display: none; }
 
-/* the A/B comparison: two runs, one difference. Full bleed — the rules are the
-   width of the phone, like every other rule in the piece. */
+.gtWin { font-size: 15.5px; line-height: 1.42; padding-top: 16px; padding-bottom: 18px; }
+.gtHead {
+  padding-top: 10px; padding-bottom: 2px;
+  border-top: 1px solid rgba(0, 0, 0, .22);
+  font-size: 9.5px; font-weight: 700; letter-spacing: .2em;
+  color: rgba(0, 0, 0, .45);
+}
+.gtBody { padding-top: 8px; padding-bottom: 16px; font-size: 12px; line-height: 1.6; color: var(--ink-2); }
+
+/* the A/B comparison: two runs, one difference, full bleed */
 .gtAB {
-  margin-top: 14px;
   padding-left: 0; padding-right: 0;
-  border-top: 2px solid rgba(255, 255, 255, .85);
-  border-bottom: 2px solid rgba(255, 255, 255, .85);
+  border-top: 2px solid var(--ink);
+  border-bottom: 2px solid var(--ink);
 }
 .gtAB .abr {
   display: flex; align-items: center; gap: 9px;
   padding: 9px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, .2);
+  border-bottom: 1px solid rgba(0, 0, 0, .18);
 }
 .gtAB .abr:last-child { border-bottom: 0; }
 .gtAB .abn {
   flex: 0 0 auto; width: 20px; height: 20px;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(255, 255, 255, .85); color: #000;
+  background: var(--ink); color: var(--paper);
   font-size: 11px; font-weight: 700;
 }
-.gtAB .abr.b .abn { background: #19e6c8; color: #000; }
-.gtAB .abg { flex: 0 0 auto; width: 18px; height: 18px; color: rgba(255, 255, 255, .85); }
+.gtAB .abr.b .abn { background: var(--teal); color: var(--ink); }
+.gtAB .abg { flex: 0 0 auto; width: 18px; height: 18px; color: var(--ink); }
 .gtAB .abg svg { width: 18px; height: 18px; }
 .gtAB .abs { flex: 0 0 auto; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
-.gtAB .abb { flex: 1 1 auto; height: 8px; background: rgba(255, 255, 255, .14); }
-.gtAB .abb i { display: block; height: 100%; width: 0; background: #ff2e2e; }
-.gtAB .abr.b .abb i { background: #19e6c8; }
+.gtAB .abb { flex: 1 1 auto; height: 8px; background: rgba(0, 0, 0, .14); }
+.gtAB .abb i { display: block; height: 100%; width: 0; background: var(--red); }
+.gtAB .abr.b .abb i { background: var(--teal); }
 .gtAB .abv {
   flex: 0 0 auto; min-width: 30px; text-align: right;
   font-size: 15px; font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
-.gtAB .abr.b .abv { color: #19e6c8; }
 
 /* postmortem list */
-.gtList { margin-top: 12px; }
+.gtList { padding-top: 10px; padding-bottom: 10px; }
 .gtList .pmr {
   display: flex; align-items: center; gap: 8px;
-  padding: 7px 0;
   margin: 0 -16px;
-  padding-left: 16px; padding-right: 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, .14);
+  padding: 7px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, .14);
   font-size: 11.5px;
 }
-.gtList .pmg { flex: 0 0 auto; width: 16px; height: 16px; color: rgba(255, 255, 255, .85); }
+.gtList .pmg { flex: 0 0 auto; width: 16px; height: 16px; color: var(--ink); }
 .gtList .pmg svg { width: 16px; height: 16px; }
 .gtList .pms { flex: 0 0 auto; width: 24px; font-weight: 700; }
-.gtList .pmn { flex: 1 1 auto; color: rgba(255, 255, 255, .55); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
+.gtList .pmn { flex: 1 1 auto; color: var(--ink-2); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
 .gtList .pmv { flex: 0 0 auto; font-weight: 700; font-variant-numeric: tabular-nums; }
 
+/* the one action, stamped at the floor of the card */
 .gtBtn {
   flex: 0 0 auto;
   display: block;
   width: 100%;
   min-height: 62px;
   padding: 0 12px calc(0px + env(safe-area-inset-bottom));
-  background: #fff;
-  color: #000;
+  background: var(--ink);
+  color: var(--paper);
   font-size: 14px; font-weight: 700; letter-spacing: .22em;
 }
-.gtBtn:active { background: rgba(255, 255, 255, .74); }
+.gtBtn:active { background: var(--ink-2); }
 .gtBtn.alt {
-  background: #000;
-  color: rgba(255, 255, 255, .92);
-  border-top: 2px solid rgba(255, 255, 255, .85);
-  min-height: 54px;
+  background: var(--paper);
+  color: var(--ink-2);
+  border-top: 2px solid var(--ink);
+  min-height: 52px;
+  font-size: 11px;
 }
-.gtBtn.alt:active { background: rgba(255, 255, 255, .12); }
+.gtBtn.alt:active { background: var(--paper-2); }
 
-/* ------------------------------------------------------------------- about */
+/* ==================================================================== about */
 .abIn {
   flex: 1 1 auto;
   min-height: 0;
@@ -474,30 +388,32 @@ svg { display: block; }
   padding: 18px 16px 22px;
 }
 .abIn h1 { font-size: 21px; font-weight: 700; letter-spacing: .14em; margin-bottom: 5px; }
-.abIn .abTag { font-size: 11px; color: rgba(255, 255, 255, .55); padding-bottom: 12px; border-bottom: 2px solid rgba(255, 255, 255, .85); }
+.abIn .abTag { font-size: 11px; color: var(--ink-2); padding-bottom: 12px; border-bottom: 3px solid var(--ink); }
 .abIn h2 {
-  margin-top: 17px;
+  margin-top: 17px; padding-top: 9px;
+  border-top: 1px solid rgba(0, 0, 0, .18);
   font-size: 9.5px; font-weight: 700; letter-spacing: .2em;
-  color: #19e6c8;
+  color: rgba(0, 0, 0, .5);
 }
-.abIn p { margin-top: 7px; font-size: 12px; line-height: 1.6; color: rgba(255, 255, 255, .8); }
+.abIn p { margin-top: 7px; font-size: 12px; line-height: 1.62; color: var(--ink-2); }
+
+/* ================================================= retired regions, made mute
+   Other parts still create or clear these ids from the pre-naturalism build.
+   They hold nothing now and must never take a pixel: the colony gets it. */
+#ticker, #say, #toast, #bar, #tableWrap, #etable, #detail, #metaRow, #aimHint {
+  display: none !important;
+}
 
 /* --------------------------------------------------------- small viewports */
 @media (max-height: 760px) {
-  #say { min-height: 50px; padding: 10px 11px 11px; font-size: 12.5px; }
-  #app.noTable #say { font-size: 14.5px; min-height: 72px; padding: 12px; }
-  #bar .tool { min-height: 46px; }
-  #stage { min-height: 150px; }
-  #tableWrap { height: 34vh; min-height: 156px; }
   .gtTitle { font-size: 27px; }
-  .gtIn { padding: 14px 14px 14px; }
+  .gtSub { font-size: 12.5px; }
+  .gtIn { padding: 14px 0 14px; }
   .gtBtn { min-height: 54px; }
-  .gtBtn.alt { min-height: 48px; }
+  .gtBtn.alt { min-height: 46px; }
 }
 @media (max-width: 350px) {
-  #bar { gap: 2px; padding-left: 3px; padding-right: 3px; }
-  #bar .tool { font-size: 7.5px; letter-spacing: 0; }
-  #bar .tool .tg, #bar .tool .tg svg { width: 17px; height: 13px; }
-  #say { font-size: 12.5px; }
-  .gtTitle { font-size: 27px; }
+  #statusStrip { gap: 9px; }
+  #statusStrip .st { letter-spacing: .08em; }
+  .gtTitle { font-size: 26px; }
 }
