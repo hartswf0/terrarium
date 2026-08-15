@@ -138,6 +138,39 @@ A build passes L10 only if all five are true:
 This is the exact failure of the FORMICARY baseline, and no amount of chapter structure or
 visual polish fixes it.
 
+### L11. THE DEPICTION LAW
+**Added after the client played the working build and said: "hard to understand what to do…
+too many popups and competing elements for my attention."** Governed in full by
+`AESTHETIC.md`, which supersedes the original hard rules.
+
+> **What fact does this allow me not to write?**
+
+The build is scored on how much text it **deleted by depicting instead**. Putting a picture
+next to the sentence earns nothing. Replacing the sentence is the work.
+
+A build passes L11 only if all five are true:
+
+1. **At most one message on screen at any instant.** One paper tag, or one action prompt —
+   never both saying the same thing, and never two describing different incidents. The
+   failing build showed an amber instruction, a red fire line, a narrator line and an open
+   detail card simultaneously, three of them paraphrasing each other, with the open card
+   describing a *different* failure than the one burning.
+2. **The incident has a body before it has a name.** incident → recognition → intervention.
+   An ant sits on a crumb, a queue forms, nothing moves — *then* a small tag says STUCK CLAIM.
+   Not: red ring → code → sentence → table → concept → answer.
+3. **No taxonomy during play.** The two-letter code appears only in the field guide. Theory is
+   the reward for comprehension, not the prerequisite for it.
+4. **No permanent HUD.** No permanent tool bar, no permanent explanation panel, no permanent
+   28-cell table. When nothing needs judgement, the colony owns the screen.
+5. **State is legible from the world.** Seven idle ants are visibly wandering, not `idle: 7`.
+   Congestion is a crowd at a doorway, not a meter. History is wear on the architecture, not a
+   log. Lineage is trail pattern, not a badge.
+
+*Failure signature:* a screen where the player must read three things to find out which one
+thing they are being asked about.
+
+Scoring note: like L10, **a build that fails L11 cannot receive a `win` verdict on any piece.**
+
 ---
 
 ## 2B. THE ANSWER FOR THIS BUILD — THE OUTBREAK LOOP

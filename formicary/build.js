@@ -33,16 +33,26 @@ for (const [file, kind] of ORDER) {
   else out += body + '\n';
 }
 
-// ---- hard-constraint gate -------------------------------------------------
+// ---- constraint gate ------------------------------------------------------
+// Governed by formicary/AESTHETIC.md (CIVIC NATURALISM), which supersedes the original
+// hard rules where they conflict. The border-radius ban is RETIRED: organic chambers,
+// tunnels and paper cards are the point. The instrumentation register stays rectilinear,
+// which is a rule of judgement and cannot be gated mechanically.
 const errs = [];
-if (/border-radius/i.test(out)) errs.push('border-radius appears in output');
-// emoji / pictographic ranges
+
+// emoji / pictographic ranges — still banned, drawn marks only
 const EMOJI = /[‼-㊙\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{1F1E6}-\u{1F1FF}]/u;
 if (EMOJI.test(out)) errs.push('emoji/pictographic character in output');
+
+// Palette is split by register (AESTHETIC.md §2): MATERIAL is the world and never means
+// anything; SIGNAL is the instrumentation and appears only when it means something.
+const MATERIAL = ['#f5efe3', '#e9e0cd', '#e2d3b4', '#d3bf99', '#9d5130', '#82401f', '#6b3318', '#17150f', '#4a4335'];
+const SIGNAL = ['#19e6c8', '#ffd23f', '#ff2e2e', '#3b82f6'];
+const BASE = ['#000', '#fff', '#000000', '#ffffff'];
+const ALLOWED = new Set([...MATERIAL, ...SIGNAL, ...BASE]);
 const hexes = [...out.matchAll(/#[0-9a-fA-F]{3,8}\b/g)].map(m => m[0].toLowerCase());
-const ALLOWED = new Set(['#000', '#fff', '#000000', '#ffffff', '#19e6c8', '#ffd23f', '#ff2e2e', '#3b82f6']);
 const bad = [...new Set(hexes.filter(h => !ALLOWED.has(h)))];
-if (bad.length) errs.push('off-palette hex colors: ' + bad.join(' '));
+if (bad.length) errs.push('off-palette hex colors (see AESTHETIC.md §2): ' + bad.join(' '));
 if (/\b(hsl|hsla)\(/i.test(out)) errs.push('hsl() color found — palette must be literal');
 if (!/IBM\+Plex\+Mono|IBM Plex Mono/.test(out)) errs.push('IBM Plex Mono missing');
 

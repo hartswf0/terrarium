@@ -1,5 +1,11 @@
 # FORMICARY — FROZEN INTERFACE CONTRACT
 
+> **READ `AESTHETIC.md` FIRST.** It is CIVIC NATURALISM, the governing design law, and it
+> **supersedes this document and the original hard rules wherever they conflict.** In
+> particular: the black-and-white palette, the no-border-radius ban, the permanent 28-cell
+> table and the permanent six-button tool bar are all **retired**. The Depiction Law —
+> *what fact does this allow me not to write?* — outranks every instruction here.
+
 **Read this completely before writing a line. Do not change any signature in this file.**
 If you believe a signature is wrong, implement it as written and say so in your report.
 
@@ -299,22 +305,35 @@ FZ.chapters = {
 
 ## 12. DOM SKELETON (defined in `15-body.html`, owned by SHELL — ids are contractual)
 
+Rebuilt for CIVIC NATURALISM (`AESTHETIC.md` §8). **The permanent HUD is abolished.** When
+nothing requires the player's judgement, the colony owns the screen.
+
 ```
 #app
-  #hdr        header strip
-    #chapTitle  #chapCount  #progressRail
-  #stage      the play area
-    #field      <canvas>
-    #aimHint    targeting hint over the field
-    #ticker     the causal readout line
-  #say        narrator panel (chapters write here)
-  #tableWrap  > #etable  (+ #metaRow)
-  #detail     element detail card (fixed)
-  #bar        intervention bar
-  #gate       full-screen chapter gate (title / result / continue)
+  #crown      TOP — very quiet persistent state. Small mono, low contrast, no boxes.
+              jobs done / food / colony strain. Nothing else, ever.
+  #world      CENTRE — almost entirely colony. Grows to fill everything not otherwise used.
+    #field      <canvas> — the nest. Tunnels, chambers, ants, brood, scars, weather.
+    #tagLayer   at most ONE paper tag at a time, positioned near its incident
+  #act        BOTTOM — EMPTY AND ABSENT unless there is a decision. One title, one
+              plain line, one button. Then it disappears again.
+  #guide      the field guide overlay (collected plates) — never open during a decision
+  #gate       full-screen episode card (title / result / continue)
   #about      about overlay
-  #toast
 ```
+
+**Rules that are part of the contract, not style notes:**
+
+1. **At most one message on screen at any instant.** `#tagLayer` holds at most one tag;
+   `#act` holds at most one prompt. There is no ticker, no narrator strip, no toast and no
+   detail card during play. The old build showed four simultaneous explanations of two
+   different failures — that is the defining bug this architecture exists to prevent.
+2. **`#act` is absent, not empty and not disabled**, whenever there is no decision.
+3. **The two-letter element code never renders inside `#world`, `#tagLayer` or `#act`.** Codes
+   live only in `#guide` and `#gate`. Play-time text names the *phenomenon* ("STUCK CLAIM"),
+   never the taxonomy.
+4. **`#guide` cannot be opened while an incident is burning.** Theory is the reward for
+   comprehension, never a thing competing with it.
 
 Any part may add elements **inside** the container it owns. No part may remove or rename an id
 listed above.

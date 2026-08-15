@@ -19,16 +19,17 @@ const VERDICT_SCHEMA = {
   properties: {
     piece: { type: 'string' },
     verdict: { type: 'string', enum: ['win', 'close', 'lose'] },
-    score: { type: 'integer', minimum: 0, maximum: 100 },
+    score: { type: 'integer', minimum: 0, maximum: 110 },
     laws: {
       type: 'object', additionalProperties: false,
-      required: ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8', 'L9', 'L10'],
+      required: ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8', 'L9', 'L10', 'L11'],
       properties: {
         L1: { type: 'integer', minimum: 0, maximum: 10 }, L2: { type: 'integer', minimum: 0, maximum: 10 },
         L3: { type: 'integer', minimum: 0, maximum: 10 }, L4: { type: 'integer', minimum: 0, maximum: 10 },
         L5: { type: 'integer', minimum: 0, maximum: 10 }, L6: { type: 'integer', minimum: 0, maximum: 10 },
         L7: { type: 'integer', minimum: 0, maximum: 10 }, L8: { type: 'integer', minimum: 0, maximum: 10 },
         L9: { type: 'integer', minimum: 0, maximum: 10 }, L10: { type: 'integer', minimum: 0, maximum: 10 },
+        L11: { type: 'integer', minimum: 0, maximum: 10 },
       },
     },
     gap: { type: 'string', description: 'THE single biggest remaining gap for this piece, stated as one concrete actionable fix' },
@@ -46,14 +47,19 @@ The shipped deliverable is ONE self-contained file, ${REPO}/formicary.html, GENE
 \`node formicary/build.js\` from ${REPO}/formicary/src/*. Never edit formicary.html directly.
 
 MANDATORY READING FIRST (Read tool):
+  ${REPO}/formicary/AESTHETIC.md       CIVIC NATURALISM — THE GOVERNING DESIGN LAW. Read this FIRST.
+                                       It supersedes the original hard rules where they conflict.
+  ${REPO}/formicary/RESEARCH.md        the source paper, mapped element by element
   ${REPO}/formicary/CONTRACT.md        the frozen interface — obey exactly
   ${REPO}/formicary/REFERENCE-EOT.md   the TEN-law quality standard; L10 (core loop) is highest priority
   ${REPO}/formicary/src/20-copy.js     every player-facing string lives here
 
 HARD CONSTRAINTS — violating any of these fails the build outright:
-  one HTML file; all 28 elements real detectors with real effects; no emoji, drawn marks only;
-  IBM Plex Mono; palette exactly #000 #fff #19e6c8 #ffd23f #ff2e2e #3b82f6 (greys via rgba);
-  no border-radius anywhere.
+  one self-contained HTML file, no network; all 28 elements stay real detectors with real
+  effects and working counters; no emoji, drawn marks only; IBM Plex Mono as the only face;
+  palette is the MATERIAL/SIGNAL split in AESTHETIC.md section 2 and build.js enforces it.
+  RETIRED (do not re-impose): the black-and-white-only palette, the no-border-radius ban,
+  the permanent 28-cell table, the permanent six-button tool bar.
 
 HOW TO RUN IT:
   cd ${REPO} && node formicary/build.js
@@ -151,7 +157,7 @@ Nicky Case's "The Evolution of Trust" — the live site is network-blocked here,
 IS the opponent. Read it in full. Then, law by law, ask: if these two were open side by side and
 I did not know which was which, which one would I rather hand to a stranger?
 
-Score all TEN laws 0-10 honestly. L10 (the core loop) is the newest and highest-priority law — it was added after the client played the baseline and said 'not very playable'. Read REFERENCE-EOT.md L10 and section 2B carefully. THIS PIECE IS PRIMARILY JUDGED ON: ${p.judged}
+Score all ELEVEN laws 0-10 honestly. L11 THE DEPICTION LAW is the newest and, with L10, the highest priority: read AESTHETIC.md in full, it is the governing design law and supersedes the original hard rules. L10 (the core loop) is the newest and highest-priority law — it was added after the client played the baseline and said 'not very playable'. Read REFERENCE-EOT.md L10 and section 2B carefully. THIS PIECE IS PRIMARILY JUDGED ON: ${p.judged}
 Score the other laws too, as this piece affects them. Every critic scores L10 regardless of piece.
 Calibration: 5 = a competent simulation that does not teach. 8 = genuinely as good as The
 Evolution of Trust on that law. 10 = better than it. Do not give an 8 you cannot defend with a
@@ -177,9 +183,9 @@ VERDICT RULES — apply them literally:
   "close" the piece is strong but at least one primary law is below 8.
   "lose"  anything else.
 
-HARD RULE: if L10 scores below 8, the verdict CANNOT be 'win' for any piece, no matter how good the rest is. A build that is not a game does not win.
+HARD RULE: if L10 or L11 scores below 8, the verdict CANNOT be 'win' for any piece, no matter how good the rest is. A build that is not a game does not win, and neither does a build that explains in text what it should have depicted.
 
-You must return the structured object. score is the sum of the ten laws.
+You must return the structured object. score is the sum of the eleven laws.
 `, { label: `judge:${p.id}`, phase: 'Judge', effort: 'high', schema: VERDICT_SCHEMA })))
 
 return { round: R, verdicts: verdicts.filter(Boolean) }

@@ -1,226 +1,49 @@
 {
-  "round": 2,
-  "updated": "2026-08-14 19:47 UTC",
-  "note": "Client verdict on the baseline: NOT VERY PLAYABLE. Structural, so the fix is structural. Two changes followed. (1) A tenth law, L10 THE CORE LOOP: a detector firing now opens a timed OUTBREAK, drawn where it happened and named in plain words, which the player must answer with the right institution before the fuse runs out. No piece can be marked won while L10 scores below 8. (2) The client supplied the real source paper, which the egress proxy had blocked. Its four sections ARE the table's four families, the 117 target turns out to be a direct citation, and it hands us the decision the game was missing: institutions TRADE OFF rather than upgrade. LEDGER catches the liar and teaches the colony to ignore the lone dissenter; LENS reveals everything including the rumour. Sub-agent concurrency is capped at 2 on this box, so the seven pieces are consolidated into five.",
+  "round": 3,
+  "updated": "2026-08-15 02:34 UTC",
+  "note": "DIRECTION CHANGE, round 3. The client played the working build and found it incoherent: an amber instruction, a red fire line, a narrator line and an open detail card on screen at once, three of them paraphrasing each other, with the open card describing a different failure than the one burning. The answer is not less information but MORE INFORMATION EMBODIED IN THE WORLD. AESTHETIC.md is now the governing law: CIVIC NATURALISM, two registers \u2014 the colony is human and tactile, the instrumentation is spare and diagrammatic. Rigor is not discarded, it is moved out of the foreground. The new law, and the eleventh scored criterion, is one question: WHAT FACT DOES THIS ALLOW ME NOT TO WRITE? Retired: the black-and-white palette, the no-border-radius ban, the permanent 28-cell table, the permanent six-button tool bar. Kept: one self-contained file, all 28 real detectors, no emoji, IBM Plex Mono, and the outbreak loop, whose mechanics the client called good \u2014 only its presentation changes. The chain was red thing, code, sentence, table, concept, answer. It becomes incident, recognition, intervention.",
   "pieces": [
     {
-      "id": "P",
-      "name": "PLAY \u2014 the outbreak loop and the hands that drive it",
+      "id": "N",
+      "name": "NEST \u2014 the colony as the dashboard",
+      "owns": "src/50-render.js",
+      "judged": "L11 the Depiction Law above all. Traffic, sameness, perception, possession and weather must be READABLE AS BEHAVIOUR. Seven idle ants visibly wander rather than reading idle:7. Congestion is a crowd at a doorway. History is wear on the architecture. Lineage is trail pattern. Ants get gait, posture and hesitation so a player says 'why are all five carrying the same thing' unprompted.",
+      "rounds": []
+    },
+    {
+      "id": "I",
+      "name": "INCIDENT \u2014 one paper tag, one action, nothing else",
       "owns": "src/45-outbreak.js, src/70-controls.js",
-      "judged": "L10 the core loop above all: a decision every few seconds, a knowable right answer, immediate located consequence, real answerable time pressure, mastery that accumulates. Then L4 tiny interaction surface and L8 one clear next action, 44px thumb targets.",
-      "rounds": [
-        {
-          "n": "0 (v1)",
-          "verdict": "lose",
-          "score": 57,
-          "built": "Architecture built: build.js concatenates 12 parts into one formicary.html and hard-gates the constraints. Boots clean, no page errors, hygiene clean at 320/390/430.",
-          "gap": "THE CORE LOOP DOES NOT EXIST. 45-outbreak.js is still a 21-line stub; tryAnswer() returns false unconditionally. A player watches dots drift and is never asked to do anything.",
-          "laws": {
-            "L1": 8,
-            "L2": 7,
-            "L3": 5,
-            "L4": 6,
-            "L5": 8,
-            "L6": 4,
-            "L7": 6,
-            "L8": 4,
-            "L9": 8,
-            "L10": 1
-          },
-          "shots": [
-            "v1-ch0.png"
-          ]
-        },
-        {
-          "n": 1,
-          "verdict": "close",
-          "score": 76,
-          "laws": {
-            "L1": 8,
-            "L2": 8,
-            "L3": 8,
-            "L4": 8,
-            "L5": 8,
-            "L6": 7,
-            "L7": 6,
-            "L8": 8,
-            "L9": 8,
-            "L10": 7
-          },
-          "built": "The outbreak loop is real and measured. A scripted competent player took 47 actions in 90 seconds \u2014 one decision every 1.9s \u2014 and survived at strain 7.5; hands-off, the same chapter hits strain 100 in 21.8s. Fuse is ~6.7s, floored at 2.8s, and scales with machine speed. A wrong instrument gives the plain diagnosis AND auto-opens the element card with its counter chip lit. A miss draws a scar at the exact spot, stuns the nearest workers and spikes strain. Mastery persists in localStorage.",
-          "gap": "Two failures. (1) Name plates collide: the ring's own label reads Sa while the ticker sentence belongs to In, and three plates stack with one half-occluded \u2014 so the player cannot tell which failure they are being asked to answer. (2) An exploit: ejecting an HONEST worker inside a burning Sa ring returns ANSWERED and refunds, while strain actually goes UP. A bot banked 11 correct Sa answers and gutted the colony from 16 workers to 4.",
-          "shots": [
-            "r1P-01first.png",
-            "r1P-02first2.png",
-            "r1P-03ch1a.png",
-            "r1P-04ch1b.png"
-          ]
-        }
-      ]
+      "judged": "incident then recognition then intervention. At most ONE message on screen ever. No taxonomy code during play. The six institutions become folk technology whose silhouette teaches its function: meeting stone, branching seed, tally wall, lantern, bell, threshold.",
+      "rounds": []
     },
     {
-      "id": "T",
-      "name": "TEACH \u2014 the ten-chapter sequence",
-      "owns": "src/80-chapters.js, src/90-boot.js",
-      "judged": "L1 one new idea at a time, L2 play first name second, L6 run it again and see (the chapter 4 A/B), L8 no dead time, L9 the sandbox is the reward",
-      "rounds": [
-        {
-          "n": "0 (v1)",
-          "verdict": "close",
-          "score": 62,
-          "built": "Ten chapters wired. Verified by probe: chapter 0 has 4 workers, no tool bar, no table cells and zero enabled elements; chapter 9 enables all 28 with all 6 tools and a 117 goal. Progress rail present throughout.",
-          "gap": "Not yet independently judged \u2014 deferred to round 2 so round 1 could concentrate on the playability verdict.",
-          "laws": {
-            "L1": 8,
-            "L2": 7,
-            "L3": 6,
-            "L4": 7,
-            "L5": 8,
-            "L6": 5,
-            "L7": 6,
-            "L8": 5,
-            "L9": 8,
-            "L10": 2
-          },
-          "shots": []
-        }
-      ]
+      "id": "G",
+      "name": "GUIDE \u2014 the naturalist's collection",
+      "owns": "src/60-table.js",
+      "judged": "The 28-cell matrix becomes collectible plates, blank until witnessed, drawn when seen, stamped when answered. Never openable during a decision. Taxonomy as knowledge you discovered about a species, not documentation shipped with the software.",
+      "rounds": []
     },
     {
-      "id": "R",
-      "name": "READ \u2014 field and table legibility",
-      "owns": "src/50-render.js, src/60-table.js",
-      "judged": "L3 the causal beat visible, immediate and co-located; L7 readable at 390px; can a stranger read the field in three seconds; does a lit cell point at bodies on the field",
-      "rounds": [
-        {
-          "n": "0 (v1)",
-          "verdict": "close",
-          "score": 60,
-          "built": "Field renders workers as 7px discs with state shown by shape not colour, jobs sized by value with progress fill, and a causal ticker under the field. Table draws all 28 cells with untaught ones as dashed ghosts, so the taxonomy visibly fills in as you learn it.",
-          "gap": "Not yet independently judged \u2014 deferred to round 2.",
-          "laws": {
-            "L1": 8,
-            "L2": 7,
-            "L3": 6,
-            "L4": 7,
-            "L5": 8,
-            "L6": 5,
-            "L7": 6,
-            "L8": 5,
-            "L9": 8,
-            "L10": 2
-          },
-          "shots": []
-        }
-      ]
+      "id": "S",
+      "name": "SHELL \u2014 civic naturalism, and the abolished HUD",
+      "owns": "src/00-head.html, src/10-style.css, src/15-body.html, src/20-copy.js",
+      "judged": "The material/signal palette split. Quiet crown, colony-owned centre, bottom that is ABSENT unless there is a decision. Every string must have survived the Depiction Law.",
+      "rounds": []
     },
     {
       "id": "W",
       "name": "WORLD \u2014 28 detectors, trade-offs, balance",
       "owns": "src/30-elements.js, src/40-sim.js",
-      "judged": "audit.js all 28 fire with working counters; CONTRACT section 15 trade-offs actually implemented and felt; conflicts resolve into force/passivity/truce/unsettled; speed raises throughput AND aggression; ch9 losable but winnable",
-      "rounds": [
-        {
-          "n": "0 (v1)",
-          "verdict": "close",
-          "score": 61,
-          "built": "All 28 detectors live and measured. AUDIT: PASS \u2014 28 defined, none dead, no broken counters, counterWorks measured by comparing heat slope with the counter off vs on for the same seed, 12s for 6 trials x 40000 ticks. Determinism verified byte-identical per seed. Ch9 dies ungoverned in ~45s and reaches 117/117 when played well. 18 force keys documented so teaching chapters can guarantee their lesson.",
-          "gap": "CONTRACT section 15 trade-offs are not implemented \u2014 they were written after this was built. Every institution is still a strictly-good purchase, so the optimal strategy is just to buy everything as budget allows. That is the missing decision.",
-          "laws": {
-            "L1": 8,
-            "L2": 7,
-            "L3": 6,
-            "L4": 6,
-            "L5": 8,
-            "L6": 5,
-            "L7": 6,
-            "L8": 5,
-            "L9": 8,
-            "L10": 2
-          },
-          "shots": []
-        },
-        {
-          "n": 1,
-          "verdict": "close",
-          "score": 71,
-          "laws": {
-            "L1": 7,
-            "L2": 8,
-            "L3": 6,
-            "L4": 6,
-            "L5": 8,
-            "L6": 9,
-            "L7": 7,
-            "L8": 6,
-            "L9": 7,
-            "L10": 7
-          },
-          "built": "All six section-15 trade-offs implemented and proven empirically in the audit \u2014 same seed, instrument off vs on, showing the intended element fall and the traded-off element rise. AUDIT: PASS with 28 live detectors. L6 scored 9, the highest single law of the round.",
-          "gap": "The strain economy cannot punish. Passive drain is a flat -3 strain per second, so a landed outbreak's damage evaporates in about two seconds, and budget sits pinned at its cap. Worse: the ch9 balance numbers were measured with the core loop switched off entirely, so they do not describe the game anyone actually plays.",
-          "shots": [
-            "r1W-01first.png",
-            "r1W-02gate.png",
-            "r1W-03ch1.png",
-            "r1W-04ch1b.png"
-          ]
-        }
-      ]
+      "judged": "audit all 28 fire with working counters; section-15 trade-offs proven; misses must COST; balance measured through the live loop; and every element needs a body \u2014 a depictable behaviour the renderer can show without a caption",
+      "rounds": []
     },
     {
-      "id": "S",
-      "name": "SHELL \u2014 visual system and voice",
-      "owns": "src/00-head.html, src/10-style.css, src/15-body.html, src/20-copy.js",
-      "judged": "L5 plainspoken warm funny voice, palette and typographic discipline, no layout break 320-430px, the real research facts landing as content rather than footnotes",
-      "rounds": [
-        {
-          "n": "0 (v1)",
-          "verdict": "lose",
-          "score": 56,
-          "built": "IBM Plex Mono subsetted and embedded as base64 so the deliverable is genuinely one file with no network. Palette and no-border-radius gates pass. No horizontal scroll, no sub-30px targets.",
-          "gap": "The layout wastes half the phone. On chapter 0 the bottom 45 percent is empty white with two narrator lines floating in a void. Also the black field against the white page reads as two different applications stitched together.",
-          "laws": {
-            "L1": 8,
-            "L2": 7,
-            "L3": 6,
-            "L4": 7,
-            "L5": 8,
-            "L6": 5,
-            "L7": 5,
-            "L8": 5,
-            "L9": 8,
-            "L10": 2
-          },
-          "shots": [
-            "v1-gate.png"
-          ]
-        },
-        {
-          "n": 1,
-          "verdict": "close",
-          "score": 78,
-          "laws": {
-            "L1": 8,
-            "L2": 9,
-            "L3": 8,
-            "L4": 7,
-            "L5": 7,
-            "L6": 8,
-            "L7": 6,
-            "L8": 8,
-            "L9": 9,
-            "L10": 8
-          },
-          "built": "Best score of the round. Layout now adapts to what a chapter contains. Constraints verified independently against the built file: zero border-radius, zero pictographic codepoints, palette exact, IBM Plex Mono embedded.",
-          "gap": "The taxonomy names are illegible. Element names render at 7.2px and are ellipsis-truncated in six of 28 cells at 390px \u2014 COORDINATION..., SYNCHRONIZED..., MISSING MENTAL... The vocabulary the whole piece exists to teach is below the 11px floor and, for six entries, literally cut off on the target device.",
-          "shots": [
-            "r1S-ab-after5.png",
-            "r1S-ab-gate5.png",
-            "r1S-abrun1.png",
-            "r1S-abrun2.png"
-          ]
-        }
-      ]
+      "id": "T",
+      "name": "TEACH \u2014 the episode sequence",
+      "owns": "src/80-chapters.js, src/90-boot.js",
+      "judged": "L1 one idea at a time, L2 play first name second, L8 hands on the game within five seconds, L6 the A/B re-run, L9 the sandbox is the reward",
+      "rounds": []
     }
   ]
 }
