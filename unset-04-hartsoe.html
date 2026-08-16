@@ -22433,8 +22433,10 @@ resetDrive(); requestAnimationFrame(frame);
         if (q.length === 3) q.push(q[2].slice());
         const snap = q.map((pt) => [Math.round(pt[0] * 4) / 4, Math.round(pt[1] * 4) / 4]);
         if (Math.abs(signedArea(snap)) < 30) return;          // a room, not a sliver
+        const ch = c && Number(c.h);
         bays.push({ id: String((c && c.id) || 'cell' + i), use: c && c.use,
-          level: Math.max(0, Math.min(4, (c && c.level) | 0)), quad: snap });
+          level: Math.max(0, Math.min(4, (c && c.level) | 0)), quad: snap,
+          h: Number.isFinite(ch) ? Math.min(26, Math.max(7, ch)) : undefined });
       });
       if (!bays.length) throw new Error('no usable cells — each needs 3 or 4 finite [x,y] corners and 30+ sq ft');
       // ── KNIT ── A designed plan whose rooms only touch at corners, or stand a
@@ -22535,17 +22537,44 @@ resetDrive(); requestAnimationFrame(frame);
           shift(moveCells, useH ? hdx : vdx, useH ? hdy : vdy);
         }
       });
-      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
-      bays.forEach((b) => b.quad.forEach((pt) => { x0 = Math.min(x0, pt[0]); x1 = Math.max(x1, pt[0]);
-        y0 = Math.min(y0, pt[1]); y1 = Math.max(y1, pt[1]); }));
-      const zE = m.wallZ, halfD = Math.max(1, (y1 - y0) / 2), cy = (y0 + y1) / 2;
+      // ── MASSES ── Cells that touch AND stand at the same height are one
+      // volume, and a volume is what takes a roof. One field over the whole
+      // plan gave a low wing and a tall tower the same ridge — the loss that
+      // made every developed massing read as a single lump.
+      const HOF = (b) => b.h || m.wallZ;
+      const massIx = new Array(bays.length).fill(-1);
+      let mn = 0;
+      for (let i = 0; i < bays.length; i++) {
+        if (massIx[i] >= 0) continue;
+        const stack = [i]; massIx[i] = mn;
+        while (stack.length) { const k = stack.pop();
+          for (let j = 0; j < bays.length; j++)
+            if (massIx[j] < 0 && (bays[k].level || 0) === (bays[j].level || 0)
+              && Math.abs(HOF(bays[k]) - HOF(bays[j])) <= 2 && abut(bays[k], bays[j])) {
+              massIx[j] = mn; stack.push(j); } }
+        mn++;
+      }
       const kind = m.roof || 'gable';
-      const field = kind === 'flat' ? () => zE + 0.8
-        : kind === 'shed' ? (x, y) => zE + ((y - y0) / Math.max(0.001, y1 - y0)) * m.rise
-        : (x, y) => zE + m.rise - Math.abs(y - cy) / halfD * m.rise;
-      const lv = bays.map((b) => b.level || 0);
-      return { bays, voids: [], roofField: field, roofLow: 'eave', grade: 0,
-        stacked: Math.max.apply(null, lv) > 0, tierH: m.wallZ };
+      let first = null;
+      for (let mi = 0; mi < mn; mi++) {
+        const mem = bays.filter((_, i) => massIx[i] === mi);
+        let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, hs = 0;
+        mem.forEach((b) => { b.quad.forEach((pt) => { x0 = Math.min(x0, pt[0]); x1 = Math.max(x1, pt[0]);
+          y0 = Math.min(y0, pt[1]); y1 = Math.max(y1, pt[1]); }); hs += HOF(b); });
+        const hAvg = hs / mem.length, lv = mem[0].level || 0;
+        const zTop = lv * m.wallZ + hAvg;                     // this volume's own wall head
+        const sx = Math.max(0.001, x1 - x0), sy = Math.max(0.001, y1 - y0);
+        const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+        const field = kind === 'flat' ? () => zTop + 0.8
+          : kind === 'shed' ? (x, y) => zTop + ((y - y0) / sy) * m.rise
+          : sx >= sy ? (x, y) => zTop + m.rise - Math.abs(y - cy) / (sy / 2) * m.rise
+                     : (x, y) => zTop + m.rise - Math.abs(x - cx) / (sx / 2) * m.rise;
+        mem.forEach((b) => { b.roof = field; b.head = zTop; });
+        if (!first) first = field;
+      }
+      const lvAll = bays.map((b) => b.level || 0);
+      return { bays, voids: [], roofField: first || (() => m.wallZ + m.rise), roofLow: 'eave',
+        grade: 0, stacked: Math.max.apply(null, lvAll) > 0, tierH: m.wallZ, masses: mn };
     },
     // any plan mask at all — letters, words, monograms, arbitrary figures
     figure(m) {
@@ -22676,7 +22705,9 @@ resetDrive(); requestAnimationFrame(frame);
     if (!G.bays.length) oops('the generator produced no bays');
     G.bays.forEach((b) => { b.quad = ccw(b.quad.map((p) => p.map(Number))); b.quad.forEach((p) => {
       if (!Number.isFinite(p[0]) || !Number.isFinite(p[1])) oops('bay ' + b.id + ' has a non-finite corner'); }); });
-    const zf = (p) => { const z = G.roofField(p[0], p[1]); return Number.isFinite(z) ? z : oops('the roof field returned a non-finite height'); };
+    // every height is asked OF A BAY, so a volume keeps its own roof
+    const zf = (p, b) => { const f = (b && b.roof) || G.roofField;
+      const z = f(p[0], p[1]); return Number.isFinite(z) ? z : oops('the roof field returned a non-finite height'); };
     const T = 0.66, FLOOR = 0.55, tierH = G.tierH || 0;
 
     // ── vertical prism over any plan polygon, built from the proven slab ───
@@ -22832,7 +22863,36 @@ resetDrive(); requestAnimationFrame(frame);
       const bw = Math.max.apply(null, fxs) - Math.min.apply(null, fxs);
       const bd = Math.max.apply(null, fys) - Math.min.apply(null, fys);
       const fits = (w, d) => bw >= w + 1.6 && bd >= d + 1.6;
-      if (b.use === 'kitchen') {
+      // Is this room square to the world? The kit's kitchen run is built along
+      // x at a fixed y, so on a turned room it hangs in mid-air.
+      const axial = b.quad.every((q, qi) => { const r = b.quad[(qi + 1) % b.quad.length];
+        return Math.abs(q[0] - r[0]) < 0.12 || Math.abs(q[1] - r[1]) < 0.12; });
+      if (b.use === 'kitchen' && !axial) {
+        // A NEW WORD: a counter run on a turned wall. Built on the room's
+        // longest edge, inset by half a wall, from the same slab the walls use.
+        let best = null;
+        for (let qi = 0; qi < b.quad.length; qi++) {
+          const p1 = b.quad[qi], p2 = b.quad[(qi + 1) % b.quad.length];
+          const L = ELEN(p1, p2); if (!best || L > best.L) best = { p1, p2, L };
+        }
+        if (best && best.L >= 8) {
+          const ux = (best.p2[0] - best.p1[0]) / best.L, uy = (best.p2[1] - best.p1[1]) / best.L;
+          let nx = -uy, ny = ux;                        // point the inset INTO the room
+          if ((c[0] - best.p1[0]) * nx + (c[1] - best.p1[1]) * ny < 0) { nx = -nx; ny = -ny; }
+          const run = Math.min(10, best.L - 2.4), s0 = (best.L - run) / 2;
+          const A1 = [best.p1[0] + ux * s0 + nx * 1.5, best.p1[1] + uy * s0 + ny * 1.5];
+          const B1 = [best.p1[0] + ux * (s0 + run) + nx * 1.5, best.p1[1] + uy * (s0 + run) + ny * 1.5];
+          A.slab(g, [A1[0], A1[1], z0 + FLOOR], [B1[0], B1[1], z0 + FLOOR],
+            [B1[0], B1[1], z0 + FLOOR + 3], [A1[0], A1[1], z0 + FLOOR + 3], 2.1, M.timber || M.siding, 2);
+          // the wall unit hangs ON the wall, so it is set back to touch it —
+          // at the counter's own inset it floats and carries no load path
+          const A2 = [best.p1[0] + ux * s0 + nx * 0.45, best.p1[1] + uy * s0 + ny * 0.45];
+          const B2 = [best.p1[0] + ux * (s0 + run) + nx * 0.45, best.p1[1] + uy * (s0 + run) + ny * 0.45];
+          A.slab(g, [A2[0], A2[1], z0 + FLOOR + 5.2], [B2[0], B2[1], z0 + FLOOR + 5.2],
+            [B2[0], B2[1], z0 + FLOOR + 7.1], [A2[0], A2[1], z0 + FLOOR + 7.1], 1.3, M.siding, 2);
+        }
+      }
+      else if (b.use === 'kitchen') {
         // the run must be inset INTO the bay from a wall it can hang on — taking
         // two corners and subtracting the thickness pushed the cabinets through
         // the south wall and left them touching nothing at all
@@ -22855,7 +22915,7 @@ resetDrive(); requestAnimationFrame(frame);
       const z0 = (b.level || 0) * tierH;
       if (G.stacked && (b.level || 0) !== topLevel) return z0 + m.wallZ;
       const mid = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
-      return Math.max(z0 + FLOOR + 7, zf(mid) - 0.45);
+      return Math.max(z0 + FLOOR + 7, zf(mid, b) - 0.45);
     };
     exterior.forEach((e) => {
       const b = e.bays[0], z0 = (b.level || 0) * tierH, zHead = headAt(b, e.a, e.b);
@@ -22875,19 +22935,20 @@ resetDrive(); requestAnimationFrame(frame);
     // ROOF · one height field, so adjacent sectors share their seam endpoints
     const topBays = G.stacked ? G.bays.filter((b) => (b.level || 0) === levels[levels.length - 1]) : G.bays;
     const OH = 1.4;
-    const roofQuad = (q) => A.slab(g, [q[0][0], q[0][1], zf(q[0])], [q[1][0], q[1][1], zf(q[1])],
-      [q[2][0], q[2][1], zf(q[2])], [q[3][0], q[3][1], zf(q[3])], 0.55, M.roof, 3);
-    topBays.forEach((b) => roofQuad(b.quad));      // corners are shared, so seams are exact
+    const roofQuad = (q, b) => A.slab(g, [q[0][0], q[0][1], zf(q[0], b)], [q[1][0], q[1][1], zf(q[1], b)],
+      [q[2][0], q[2][1], zf(q[2], b)], [q[3][0], q[3][1], zf(q[3], b)], 0.55, M.roof, 3);
+    topBays.forEach((b) => roofQuad(b.quad, b));   // corners are shared, so seams are exact
     exterior.forEach((e) => {                      // the overhang is a strip, not a scaled sector
       if (G.stacked && (e.bays[0].level || 0) !== topLevel) return;
       const c = centroid(e.bays[0].quad);
       const mid = [(e.a[0] + e.b[0]) / 2, (e.a[1] + e.b[1]) / 2];
       let nx = mid[0] - c[0], ny = mid[1] - c[1];
       const l = Math.hypot(nx, ny) || 1; nx /= l; ny /= l;
+      const eb = e.bays[0];
       const a2 = [e.a[0] + nx * OH, e.a[1] + ny * OH], b2 = [e.b[0] + nx * OH, e.b[1] + ny * OH];
-      roofQuad([e.a, e.b, b2, a2]);
-      A.slab(g, [a2[0], a2[1], zf(a2) - 0.62], [b2[0], b2[1], zf(b2) - 0.62],
-        [b2[0], b2[1], zf(b2) - 0.06], [a2[0], a2[1], zf(a2) - 0.06], 0.22, M.fascia || M.timber || M.siding, 3);
+      roofQuad([e.a, e.b, b2, a2], eb);
+      A.slab(g, [a2[0], a2[1], zf(a2, eb) - 0.62], [b2[0], b2[1], zf(b2, eb) - 0.62],
+        [b2[0], b2[1], zf(b2, eb) - 0.06], [a2[0], a2[1], zf(a2, eb) - 0.06], 0.22, M.fascia || M.timber || M.siding, 3);
     });
     // SUPPORTS · a pier under every exterior corner, carried to grade
     const piers = new Set();
@@ -22910,7 +22971,7 @@ resetDrive(); requestAnimationFrame(frame);
       A.pier(g, c0[0] * 0.62, c0[1] * 0.62, gradeAt(c0[0] * 0.62, c0[1] * 0.62), zf(c0) - 0.8, 0.5);              // downpipe
       A.mbox && g.add(A.mbox(-3.1, 3.1, -3.1, 3.1, gradeAt(0, 0) - 0.5, gradeAt(0, 0) + 0.85, M.masonry || M.concrete, 2));  // rain-garden kerb, ankle high
     } else {
-      const low = topBays.map((b) => b.quad.map((p) => [p, zf(p)])).flat().sort((a, b2) => a[1] - b2[1])[0];
+      const low = topBays.map((b) => b.quad.map((p) => [p, zf(p, b)])).flat().sort((a, b2) => a[1] - b2[1])[0];
       if (low) A.pier(g, low[0][0], low[0][1], gradeAt(low[0][0], low[0][1]), low[1] - 0.6, 0.5);
     }
     // ARRIVAL · a deck at the door and a derived stair when the floor is up
@@ -22934,7 +22995,7 @@ resetDrive(); requestAnimationFrame(frame);
     // FIRE · common company only, enforced structurally
     if (ir.systems && ir.systems.fireplace) {
       const fb = G.bays.find((b) => ['living', 'dining', 'study', 'hall'].includes(b.use));
-      if (fb) { const c = centroid(fb.quad); A.flue(g, c[0], c[1], gradeAt(c[0], c[1]), zf(c) + 2.6, 3.2); }
+      if (fb) { const c = centroid(fb.quad); A.flue(g, c[0], c[1], gradeAt(c[0], c[1]), zf(c, fb) + 2.6, 3.2); }
     }
     return { reached: seen.size, topology: topo, bays: G.bays.length, exterior: exterior.length, partitions: interior.length,
       doors: doored.size, openings: openingCount, voids: G.voids, levels: levels.length,
@@ -23350,27 +23411,57 @@ resetDrive(); requestAnimationFrame(frame);
     const list = [];
     if (wg.pending && wg.pending.length) wg.pending.forEach((sd) => { if (sd && sd.mesh) list.push(sd.mesh); });
     if (!list.length) wg.root.traverse((o) => { if (o.isMesh) list.push(o); });
+    // Read each volume as it really stands: its ORIENTED footprint, its own
+    // height, its own base. Reducing it to an upright box was where the
+    // massing's angles, towers and low wings were all being thrown away.
+    const hull2 = (pts) => {
+      const P = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+      const half = (src) => { const h = [];
+        for (const q of src) { while (h.length >= 2 && cross(h[h.length - 2], h[h.length - 1], q) <= 0) h.pop(); h.push(q); }
+        h.pop(); return h; };
+      return half(P).concat(half(P.slice().reverse()));
+    };
     const cells = [];
     list.forEach((mset) => {
       mset.updateMatrixWorld(true);
-      const b = new THREE.Box3().setFromObject(mset);
-      if (!Number.isFinite(b.min.x) || !Number.isFinite(b.max.x)) return;
-      const wft = (b.max.x - b.min.x) / FT, dft = (b.max.z - b.min.z) / FT, hft = (b.max.y - b.min.y) / FT;
-      if (!(wft > 0 && dft > 0)) return;
-      if (wft * dft < 70) return;                 // a room, not a rail, a finial or a tree
+      const geo = mset.geometry; if (!geo) return;
+      if (!geo.boundingBox) geo.computeBoundingBox();
+      const lb = geo.boundingBox; if (!lb || !Number.isFinite(lb.min.x)) return;
+      const corners = [];
+      for (let i = 0; i < 8; i++) corners.push(new THREE.Vector3(
+        i & 1 ? lb.max.x : lb.min.x, i & 2 ? lb.max.y : lb.min.y, i & 4 ? lb.max.z : lb.min.z)
+        .applyMatrix4(mset.matrixWorld));
+      if (!corners.every((q) => Number.isFinite(q.x) && Number.isFinite(q.y) && Number.isFinite(q.z))) return;
+      const yLo = Math.min.apply(null, corners.map((q) => q.y));
+      const yHi = Math.max.apply(null, corners.map((q) => q.y));
+      const hft = (yHi - yLo) / FT;
       if (hft < 4) return;                        // a volume, not a slab or a step
-      const x0 = (b.min.x - base.x) / FT, x1 = (b.max.x - base.x) / FT;
-      const y0 = -(b.max.z - base.z) / FT, y1 = -(b.min.z - base.z) / FT;   // W maps house y to -world z
-      if (![x0, x1, y0, y1].every(Number.isFinite)) return;
-      if (Math.max(Math.abs(x0), Math.abs(x1), Math.abs(y0), Math.abs(y1)) > 320) return;
-      cells.push({ area: wft * dft, poly: [[x0, y0], [x1, y0], [x1, y1], [x0, y1]],
-        level: Math.max(0, Math.min(3, Math.round(((b.min.y - base.y) / FT) / 9))) });
+      const plan = corners.map((q) => [(q.x - base.x) / FT, -(q.z - base.z) / FT]);
+      const uniq = [];
+      plan.forEach((q) => { if (!uniq.some((u) => Math.abs(u[0] - q[0]) < 0.4 && Math.abs(u[1] - q[1]) < 0.4)) uniq.push(q); });
+      let poly = uniq.length > 2 ? hull2(uniq) : uniq;
+      if (poly.length < 3) return;
+      if (poly.length > 4) {                      // a round or faceted volume: take its extent
+        const xs = poly.map((q) => q[0]), ys = poly.map((q) => q[1]);
+        const x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs);
+        const y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+        poly = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+      }
+      if (poly.length === 3) poly.push(poly[2].slice());
+      const area = Math.abs(signedArea(poly));
+      if (area < 70) return;                      // a room, not a rail, a finial or a tree
+      if (!poly.every((q) => Number.isFinite(q[0]) && Number.isFinite(q[1])
+        && Math.abs(q[0]) < 320 && Math.abs(q[1]) < 320)) return;
+      cells.push({ area, poly, h: Math.min(26, Math.max(7, hft)),
+        level: Math.max(0, Math.min(3, Math.round(((yLo - base.y) / FT) / 9))) });
     });
     if (cells.length < 2) throw new Error('the massing has no room-sized volumes to develop');
     cells.sort((a, b) => b.area - a.area);
     const keep = cells.slice(0, 40);
     const USES = ['living', 'kitchen', 'bath', 'bed', 'bed', 'study', 'dining', 'hall'];
     keep.forEach((c, i) => { c.use = USES[Math.min(i, USES.length - 1)]; c.id = 'm' + i; delete c.area; });
+    const hs = keep.map((c) => c.h).sort((a, b) => a - b);
     const nm = (String(promptText || 'massing').replace(/[^a-z0-9 ]/gi, '').trim().slice(0, 20).toUpperCase() || 'MASSING');
     return { language: 'HOUSE-WORLD-IR/1', program_id: 'DEVELOPED-MASSING', name: nm,
       intent: { analogy: 'developed massing', irreducible_invariants: ['the massing silhouette'] },
