@@ -457,6 +457,84 @@ less true and less interesting than the real finding.
 
 ---
 
+## 16. THE NEST IS THE MOVEMENT GRAPH — infrastructure is not decoration
+
+**Client, on the round-3 build:** *"they do not use the paths to dig and get to where they need
+to go they just go randomly wherever they want they have to use the infrastructure or dig it
+themselves… also it all happens very fast."*
+
+They are right, and this is the deepest note yet. Today the tunnels are drawn and then ignored:
+ants move in straight lines through packed soil. **This destroys the argument of the whole
+piece.** FORMICARY exists to say *you do not fix agents, you fix the space between them.* If an
+ant can pass through solid earth, **there is no space between them**, and every spatial failure
+in the table becomes bookkeeping that a paper tag has to assert in words — which is exactly why
+the tags keep describing things the picture does not show.
+
+### 16.1 The rule
+
+**The nest is a graph, and it is the only way to move.**
+
+- Nodes are **chambers** and **junctions**. Edges are **tunnels**. Everything else is solid soil.
+- An ant is always in exactly one of four states: `in a chamber`, `walking a tunnel`,
+  `digging at a face`, or `on the surface`. There is no fifth state, and **no ant is ever
+  inside solid soil**.
+- To reach somewhere the network does not connect, an ant must **DIG**. Digging takes real,
+  visible time, advances a tunnel face a little at a time, produces spoil, and permanently
+  extends the graph.
+- **Tunnels have capacity.** A narrow tunnel passes one ant at a time. Two ants meeting
+  head-on must yield or wait. A queue is a real queue of real bodies in a real passage.
+- **Chambers have capacity.** Overcrowding is visible as bodies packed in a space.
+- Pathfinding is over the graph. If there is no path, the ant digs one or does not go.
+
+### 16.2 What this makes physical, for free
+
+More than half the taxonomy stops needing a caption. This is the single largest win available
+to the Depiction Law, and it is why this section outranks polish work:
+
+| element | stops being a number, becomes |
+|---|---|
+| `Fl` flooding | a passage packed solid with bodies that cannot pass each other |
+| `Co` claimed twice | two ants arriving at one crumb from two different tunnels |
+| `Si` nobody knows | a chamber with **no tunnel to it**. Literally unreachable. |
+| `Dp` waiting on nothing | work behind an undug face nobody is digging |
+| `Lo` stuck claim | a body parked in the passage, and the queue behind it |
+| `Tw` both sitting on it | two rivals meeting head-on in a one-ant tunnel, neither yielding |
+| `Es` only each other | rivals repeatedly blocking each other's route |
+| `Cf` everyone follows | every ant using one tunnel while a dug alternative sits empty |
+| `Im` one body | the entire colony inside a single passage at once |
+| `In` no institution | a junction where three tunnels meet and nothing arbitrates who passes |
+| `Ow` one pair of hands | one ant holding chambers it cannot physically service |
+| `Mm` dark | you cannot see which tunnel an ant intends to take |
+
+A `CHARTER` placed at a junction becomes literally a meeting stone at a crossroads, and the
+queueing you see afterwards is the institution working. That is the whole game, depicted.
+
+### 16.3 Pace
+
+**Second client note: "it all happens very fast."** Partly a consequence of 16.1 — ants dart
+across the whole field in straight lines because nothing constrains them. Walking a real tunnel
+and digging a real face both take time, which is legibility for free.
+
+Beyond that, cut the base tempo hard. Targets:
+
+- A worker crossing the nest end to end should take **several seconds**, not a fraction of one.
+- Digging a tunnel segment should be a thing you can **watch happen**.
+- Re-tune the incident fuse against the NEW tempo. The fuse must still be short enough to be
+  urgent and long enough to be answerable, but it is now measured against a colony a person can
+  actually watch. Re-run the balance harness afterwards — the existing curve was tuned at the
+  old speed and no longer describes the game.
+- `SLOW` / the bell must still be meaningfully different from the new baseline. If the baseline
+  is already calm, the bell brakes from calm to *readable-under-pressure*, and machine speed
+  ramps from calm to frantic. The dynamic range moves; it does not collapse.
+
+### 16.4 Non-negotiable acceptance test
+
+Screenshot the nest at 390px and point at any ant. **It must be in a chamber, in a tunnel, at a
+dig face, or on the surface.** If a single ant is standing in undug soil, this section is not
+done, regardless of anything else that improved.
+
+---
+
 ## 13. HOW TO WORK
 
 1. `cd /home/user/terrarium && node formicary/build.js` — must print `BUILD OK`.
