@@ -22645,7 +22645,28 @@ resetDrive(); requestAnimationFrame(frame);
     // through to a plain bar. A monument is a rule: one tall centre, four
     // corner towers, flanking halls, and a portal on the axis — which the kit
     // can now say, because a cell may carry its own height.
-    let comp = null;
+    let comp = null, features = null, ridge = null;
+    // A creature cannot be said in plan, so it is said on the elevation: the
+    // gable becomes the face and the ears stand past the ridge. The plan
+    // underneath stays an ordinary, inhabitable cottage.
+    const CREATURE = { rabbit: { ear: 15, lean: 0.05, brow: 1 }, bunny: { ear: 15, lean: 0.05, brow: 1 },
+      hare: { ear: 17, lean: 0.09, brow: 1 }, cat: { ear: 5.5, lean: 0.03, brow: 0 },
+      fox: { ear: 6, lean: 0.04, brow: 0 }, owl: { ear: 3.4, lean: 0.02, brow: 1 },
+      bear: { ear: 3.6, lean: 0, brow: 0 }, mouse: { ear: 6.5, lean: 0.06, brow: 0 } };
+    const creature = Object.keys(CREATURE).find((k) => new RegExp('\\b' + k + '\\b', 'i').test(t));
+    if (creature) {
+      const C = CREATURE[creature];
+      analogy = creature; topology = 'bar';
+      features = [
+        { u: 0.34, v: 0.74, w: 2.6, h: 2.6, mat: 'dark' },   // eyes
+        { u: 0.66, v: 0.74, w: 2.6, h: 2.6, mat: 'dark' },
+        { u: 0.5, v: 0.6, w: 2.4, h: 1.5, mat: 'warm' },     // muzzle
+      ];
+      if (C.brow) features.push({ u: 0.34, v: 0.87, w: 2.4, h: 0.7, mat: 'warm' },
+        { u: 0.66, v: 0.87, w: 2.4, h: 0.7, mat: 'warm' });
+      ridge = [{ u: 0.36, w: 3.4, h: C.ear, lean: -C.ear * C.lean, inner: true },
+        { u: 0.64, w: 3.4, h: C.ear, lean: C.ear * C.lean, inner: true }];
+    }
     if (has('mahal|palace|temple|mosque|cathedral|basilica|capitol|monument|mausoleum|shrine|pagoda|duomo')) {
       analogy = 'monument'; topology = 'cells';
       const K = has('big|large|grand|great|vast|monumental') ? 1.3 : has('small|little|tiny') ? 0.8 : 1;
@@ -22705,7 +22726,7 @@ resetDrive(); requestAnimationFrame(frame);
         comp ? { cells: comp, roof: 'gable', rise: 5.5 } : {}),
         protected_voids: (topology === 'loop' || topology === 'court') ? ['court'] : [] },
       spaces: uses, systems: { water_path: water, fireplace: !has('no fire') && uses.includes('living') },
-      deck: !has('no deck'),
+      deck: !has('no deck'), features, ridge,
     };
   }
 
@@ -23108,6 +23129,60 @@ resetDrive(); requestAnimationFrame(frame);
         zTop: lk.zHi * tierH + FLOOR, zBot: lk.zLo * tierH + FLOOR,
         grade: lk.zLo * tierH + FLOOR, heading: 'N', width: 3.4 });
     });
+    // ── THE ELEVATION ────────────────────────────────────────────────────
+    // Everything above is said in PLAN. A rabbit is not a plan — its face is
+    // on the gable and its ears rise past the ridge, and neither can be
+    // spoken as a room. So the language gains a second surface to address:
+    // the entry elevation, in its own coordinates. u runs along the gable,
+    // v runs from floor to the roof over it. A feature is carried by the wall
+    // it is applied to, so it stands up under the same laws as everything else.
+    {
+      const EL = ELEN(entryEdge.a, entryEdge.b);
+      if (EL > 1) {
+        const ea = entryEdge.a, ux = (entryEdge.b[0] - ea[0]) / EL, uy = (entryEdge.b[1] - ea[1]) / EL;
+        const nx = outward[0], ny = outward[1];
+        const zFloor = (entryBay.level || 0) * tierH + FLOOR;
+        const pt = (u, off) => { const sU = u * EL;
+          return [ea[0] + ux * sU + nx * off, ea[1] + uy * sU + ny * off]; };
+        const zTop = (u) => zf(pt(u, 0), entryBay);
+        const quad = (uA, uB, zA0, zA1, zB0, zB1, off, dep, mt) => {
+          const pA = pt(uA, off), pB = pt(uB, off);
+          A.slab(g, [pA[0], pA[1], zA0], [pB[0], pB[1], zB0],
+            [pB[0], pB[1], zB1], [pA[0], pA[1], zA1], dep, mt, 2);
+        };
+        (ir.features || []).forEach((f) => {
+          const u = Math.min(0.94, Math.max(0.06, Number(f.u)));
+          const half = Math.min(0.45, Math.max(0.02, Number(f.w) / 2 / EL));
+          const base = zFloor, span = Math.max(1, zTop(u) - base);
+          const cz = base + Math.min(0.98, Math.max(0.04, Number(f.v))) * span;
+          const h = Math.max(0.3, Number(f.h) || 1.4);
+          if (![u, half, cz, h].every(Number.isFinite)) return;
+          const mt = f.mat === 'dark' ? (M.steel || M.frame || M.masonry)
+            : f.mat === 'warm' ? (M.timber || M.masonry) : (M.fascia || M.timber || M.siding);
+          quad(u - half, u + half, cz - h / 2, cz + h / 2, cz - h / 2, cz + h / 2, 0.55, 0.8, mt);
+        });
+        // and the things that stand ABOVE the roof: ears, horns, fins, masts
+        (ir.ridge || []).forEach((e) => {
+          const u = Math.min(0.94, Math.max(0.06, Number(e.u)));
+          const half = Math.min(0.4, Math.max(0.02, Number(e.w) / 2 / EL));
+          const zb = zTop(u) - 1.1, h = Math.max(1, Number(e.h) || 8);
+          const lean = Number(e.lean) || 0;
+          if (![u, half, zb, h].every(Number.isFinite)) return;
+          const pA0 = pt(u - half, 0.3), pB0 = pt(u + half, 0.3);
+          const pA1 = pt(u - half + lean, 0.3), pB1 = pt(u + half + lean, 0.3);
+          A.slab(g, [pA0[0], pA0[1], zb], [pB0[0], pB0[1], zb],
+            [pB1[0], pB1[1], zb + h], [pA1[0], pA1[1], zb + h], 0.9,
+            M.fascia || M.timber || M.siding, 2);
+          if (e.inner) {                                  // the pink of an ear, the pupil of an eye
+            const iA0 = pt(u - half * 0.5, 0.85), iB0 = pt(u + half * 0.5, 0.85);
+            const iA1 = pt(u - half * 0.5 + lean, 0.85), iB1 = pt(u + half * 0.5 + lean, 0.85);
+            A.slab(g, [iA0[0], iA0[1], zb + h * 0.16], [iB0[0], iB0[1], zb + h * 0.16],
+              [iB1[0], iB1[1], zb + h * 0.88], [iA1[0], iA1[1], zb + h * 0.88], 0.35,
+              M.masonry || M.timber, 2);
+          }
+        });
+      }
+    }
     // FIRE · common company only, enforced structurally
     if (ir.systems && ir.systems.fireplace) {
       const fb = G.bays.find((b) => ['living', 'dining', 'study', 'hall'].includes(b.use));
