@@ -26,6 +26,7 @@ let lastRequest = '';
 let lastDomain = '';
 let lastError = '';
 let timer = 0;
+let readyEventSent = false;
 
 function cleanText(v){
   return String(v == null ? '' : v).trim().slice(0, 12000);
@@ -78,13 +79,14 @@ function install(){
   if (!engine || !engine.domains || typeof engine.domain !== 'function') return false;
   const draft = wrapDomain('draft');
   const world = wrapDomain('world');
-  if (draft || world) {
+  const complete = draft && world;
+  if (complete && !readyEventSent) {
+    readyEventSent = true;
     global.dispatchEvent(new CustomEvent('terrarium:worldtext-ready', {
       detail: { version: VERSION, draft, world }
     }));
-    return true;
   }
-  return false;
+  return complete;
 }
 
 function arm(){
@@ -95,8 +97,8 @@ function arm(){
     if (install() || tries >= 80) {
       global.clearInterval(timer);
       timer = 0;
-      if (tries >= 80 && !global.HELLO_ENGINE) {
-        lastError = 'HELLO_ENGINE did not become available';
+      if (tries >= 80 && !readyEventSent) {
+        lastError = 'WORLD/DRAFT domains did not both become available';
         console.warn('[III WORLDTEXT] install timed out');
       }
     }
