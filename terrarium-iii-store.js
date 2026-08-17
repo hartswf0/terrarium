@@ -7,4 +7,5 @@ import('./terrarium-iii-worldtext.js')
   .then(() => import('./terrarium-iii-house-bind.js'))
   .then(() => import('./terrarium-iii-reference.js'))
   .then(() => import('./terrarium-iii-reference-guard.js'))
+  .then(() => import('./terrarium-iii-architecture-v3.js'))
   .catch(err => console.warn('[III COMPILER] optional sidecar unavailable', err));
