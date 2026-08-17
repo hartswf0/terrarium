@@ -1,5 +1,5 @@
 /* TERRARIUM III · HOUSE BIND / VISUAL CRITIC LOOP
- * PROVISIONAL v0.2
+ * PROVISIONAL v0.3
  *
  * A house is no longer considered finished because the source code looks
  * plausible. III compiles the current candidate in isolation, photographs the
@@ -8,16 +8,20 @@
  *
  * MAKE -> COMPILE -> SEE -> CRITIQUE+REPAIR -> REPEAT -> existing FORGE cert.
  *
+ * Architectural complexity and physics complexity are deliberately separate:
+ * rich visible construction may use hundreds of meshes; collision is a small
+ * proxy model of the walkable/supporting envelope.
+ *
  * No new permanent UI. Progress temporarily occupies the existing proposal
  * strip; the final standing draft/apply path remains authoritative.
  */
 (function installIIIHouseBind(global){
 'use strict';
 
-const VERSION = 'iii-house-bind-0.2-visual-loop';
+const VERSION = 'iii-house-bind-0.3-collision-split';
 const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-const MAX_PROMPT = 12000;
-const MAX_SOURCE = 42000;
+const MAX_PROMPT = 16000;
+const MAX_SOURCE = 48000;
 const HABITATION = /\b(house|home|dwelling|habitat|inhabitable|residence|residential|cabin|cottage|villa|lodge|hut|pavilion|building|architecture|architectural|castle|fortress|palace|temple|cathedral|mosque|mausoleum|shrine|pagoda|tower)\b/i;
 
 let installs = 0;
@@ -85,10 +89,27 @@ function stage(name,pass,total,detail){
   }
 }
 
+const COLLISION_CONTRACT = `PHYSICS / VISUAL CONTRACT:\n`+
+`- 120 is NOT a building-part limit. It is only the emergency ceiling for collision bodies.\n`+
+`- Build the VISIBLE architecture first. Hundreds of visible meshes are allowed; target <=480 visible meshes.\n`+
+`- Visible geometry is NON-COLLIDING by default. Never put WG.solid inside a generic visual add()/place() helper and never pass a true/solid flag on every repeated architectural part.\n`+
+`- Then build a SECOND, coarse collision pass. Target roughly 24-80 collision bodies; never exceed 120.\n`+
+`- Use WG.solid only for broad floor slabs, major wall runs, essential supports, stairs/landings and other bodily barriers. Roof tiles, fascia, rafters, rails, trim, panes, furniture, decorative panels, repeated cladding and small struts are visual-only unless collision is genuinely needed.\n`+
+`- WG.surface ALSO registers collision. Use it sparingly for actual walkable proxy surfaces, not to label every visible floor or roof piece.\n`+
+`- If using visual meshes made with WG.box/cyl/etc, put them under a visual THREE.Group and/or mark mesh.userData._wgVisual=true so the legacy harvest pass does not promote them into physics.\n`+
+`- A certificate collision failure must be repaired by COARSENING COLLISION ONLY. Preserve the visible architecture.\n`;
+
 function initialPrompt(raw){
   return `ORIGINAL REQUEST:\n${raw}\n\n`+
 `HOUSE LOOP · INITIAL BUILD\n`+
 `Build the requested structure as one coherent, inhabitable local WG construction. Do not match the noun to a known golden/template. Treat unfamiliar forms compositionally. The structure must preserve the request's governing morphology and negative spaces while also having believable human scale, a route from grade through a real opening, usable walking surfaces, support, enclosure/weather logic and coarse collision that does not seal passages.\n\n`+
+COLLISION_CONTRACT+`\n`+
+`GEOMETRY DISCIPLINE:\n`+
+`- Do not begin a house by dropping a generic WG.deck/platform under it. Floors and foundations must follow the requested topology.\n`+
+`- Do not add vehicle ramps, arena apparatus, beacons, glowing mascots, animated ornaments or gameplay machinery unless the request actually asks for them.\n`+
+`- A ring/court/oculus is a real negative space. WG.cyl creates a FILLED cylinder/disc; it cannot be used as an oculus rim or annular roof because it closes the hole. Use WG.torus, segmented ring geometry, or deterministic THREE.BufferGeometry for annular forms.\n`+
+`- Doors/windows are actual openings in wall geometry and collision, not dark rectangles pasted on a wall.\n`+
+`- Shared dimensions, loops and local helpers should generate repeated architecture so a complex building does not require hundreds of handwritten calls.\n\n`+
 `This is only the FIRST observable version. Prefer clear proportions and legible masses over decorative noise. Build near the local origin; the game sites the finished root later. Use compact helpers/data/loops and the installed WG productive verbs when useful.\n\n`+
 `Return exactly the complete executable build(w,WG,THREE) function required by the standing forge contract. No markdown or prose.`;
 }
@@ -99,16 +120,17 @@ function visualRepairPrompt(raw,code,metrics,pass,total,previousReview){
   return `ORIGINAL REQUEST:\n${raw}\n\n`+
 `HOUSE LOOP · VISUAL REVIEW ${pass}/${total}\n`+
 `You are looking at a CONTACT SHEET rendered from the CURRENT executable house below. The image is ground truth. Do not trust what the source intended when the render contradicts it.\n\n`+
-`CURRENT MEASUREMENTS (meters, approximate): width=${round(m.width)}, depth=${round(m.depth)}, height=${round(m.height)}, minY=${round(m.minY)}, maxY=${round(m.maxY)}, meshes=${m.meshes||0}, solids=${m.solids==null?'?':m.solids}. A 1.75m human datum and ground/grid are visible in the sheet.\n`+
+`CURRENT MEASUREMENTS (meters, approximate): width=${round(m.width)}, depth=${round(m.depth)}, height=${round(m.height)}, minY=${round(m.minY)}, maxY=${round(m.maxY)}, meshes=${m.meshes||0}, collisionBodies=${m.solids==null?'?':m.solids}. A 1.75m human datum and ground/grid are visible in the sheet.\n`+
 prior+
 `CURRENT SOURCE:\n---\n${clean(code,MAX_SOURCE)}\n---\n\n`+
+COLLISION_CONTRACT+`\n`+
 `LOOK FIRST. Privately compare the render to the ORIGINAL REQUEST. Find the single highest-leverage defect, then repair the SAME structure. Check in this order:\n`+
 `1 IDENTITY — would a viewer recognize the requested governing form without a label? Preserve or strengthen its topology/silhouette rather than replacing it with a generic house.\n`+
 `2 SCALE — does it read as inhabitable architecture relative to the human datum, not a toy/sculpture/monument at the wrong scale? Entrances, floors, stairs and clearances must make bodily sense.\n`+
-`3 MASS + VOID — are the important holes, courts, undercrofts, rings, branches or separations visually legible?\n`+
+`3 MASS + VOID — are the important holes, courts, undercrofts, rings, branches or separations visually legible? A named oculus/court must remain physically open; never fill it with a cylinder/disc.\n`+
 `4 ARRIVAL + CIRCULATION — can a person plausibly go grade -> landing/threshold -> real opening -> inhabited route?\n`+
 `5 SUPPORT + WEATHER — does the form visibly meet the ground and resolve upper/weather surfaces coherently?\n`+
-`6 COLLISION — appearance may be rich, but WG.solid decomposition must stay coarse and must not close intended doors/passages/voids.\n\n`+
+`6 COLLISION — collision bodies should be a coarse proxy model, not a second copy of every visible mesh. If collisionBodies approaches 80, simplify physics without simplifying appearance.\n\n`+
 `Do NOT start over. Do NOT change everything at once. Make the smallest structural edits that fix the worst visible problem while retaining good parts of the current design. Reuse its helpers, dimensions and topology where possible.\n\n`+
 `Inside the returned function, place one machine-readable comment near the top in exactly this form:\n`+
 `/*III_REVIEW:{"score":0-100,"accept":true-or-false,"worst":"short defect"}*/\n`+
@@ -117,11 +139,17 @@ prior+
 }
 
 function certificateRepairPrompt(raw,code,fix){
+  const failure=clean(fix&&(fix.err||fix),1000);
+  const collisionFailure=/solid|collision|ceiling|120/i.test(failure);
   return `ORIGINAL REQUEST:\n${raw}\n\n`+
 `HOUSE LOOP · CERTIFICATE REPAIR\n`+
 `The visually refined house below failed the standing III FORGE certificate. Repair THIS SAME design. Do not regenerate a different house and do not remove its important negative spaces merely to satisfy the checker.\n\n`+
-`CERTIFICATE FAILURE:\n${clean(fix&&(fix.err||fix),1000)}\n\n`+
+`CERTIFICATE FAILURE:\n${failure}\n\n`+
 `CURRENT SOURCE:\n---\n${clean(code,MAX_SOURCE)}\n---\n\n`+
+COLLISION_CONTRACT+`\n`+
+(collisionFailure?
+`THIS IS A COLLISION-BUDGET REPAIR. Keep the visible meshes, dimensions, silhouette, rooms, openings, roof and detail. Remove WG.solid/WG.surface registration from repeated visual pieces and replace them with a much smaller set of broad collision proxies. Do not delete architecture to get under the limit. Aim for <=80 collision bodies.\n\n`:
+`Repair only the concrete certificate defect. Do not redesign the building.\n\n`)+
 `Return exactly one complete corrected build(w,WG,THREE) function. Preserve the existing design identity and scale while fixing the concrete certificate failure.`;
 }
 
@@ -239,7 +267,7 @@ async function captureContactSheet(compiled){
   };
   ctx.fillStyle='rgba(0,0,0,.82)'; ctx.fillRect(0,972,1024,52);
   ctx.fillStyle='#fff'; ctx.font='700 15px IBM Plex Mono, monospace';
-  ctx.fillText(`BBOX ${round(metrics.width)} × ${round(metrics.depth)} × ${round(metrics.height)} m   HUMAN 1.75 m   MESH ${metrics.meshes}   SOLID ${metrics.solids==null?'?':metrics.solids}`,18,1003);
+  ctx.fillText(`BBOX ${round(metrics.width)} × ${round(metrics.depth)} × ${round(metrics.height)} m   HUMAN 1.75 m   MESH ${metrics.meshes}   COLLISION ${metrics.solids==null?'?':metrics.solids}`,18,1003);
   return {image:sheet.toDataURL('image/jpeg',.82),metrics};
 }
 
@@ -341,11 +369,18 @@ function wrapDraft(){
         stage('COMPLETE',0,loopPasses,'CERTIFIED REPAIR'); setProposalBusy(false);
         return lastCode;
       }
+      // New house request: never let stale source from a previous house become
+      // the emergency return value for this one.
+      lastCode='';
       return await visualLoop(raw,baseRequest,passThrough,image);
     }catch(err){
       lastError=errText(err); fallbacks++; stopTicker(); stage('FAULT',0,loopPasses,lastError.slice(0,48)); setProposalBusy(false);
-      console.warn('[III HOUSE LOOP] visual loop failed; falling back to standing draft request',err);
-      return await passThrough(raw,image,fix);
+      console.warn('[III HOUSE LOOP] visual loop failed; legacy/golden house fallback is blocked',err);
+      // If this request produced an observed candidate, preserve that SAME house
+      // for the standing certificate to evaluate. Never substitute a canned
+      // golden/arena structure. Otherwise surface the failure to the outer gate.
+      if(lastCode) return lastCode;
+      throw err;
     }finally{
       global.__lastDraftPrompt=raw.slice(0,20000);
     }
