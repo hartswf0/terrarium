@@ -22436,7 +22436,9 @@ resetDrive(); requestAnimationFrame(frame);
         const ch = c && Number(c.h);
         bays.push({ id: String((c && c.id) || 'cell' + i), use: c && c.use,
           level: Math.max(0, Math.min(4, (c && c.level) | 0)), quad: snap,
-          h: Number.isFinite(ch) ? Math.min(26, Math.max(7, ch)) : undefined });
+          // 26 ft capped every tower to the height of the hall beside it, which
+          // is precisely the distinction a monument is made of
+          h: Number.isFinite(ch) ? Math.min(70, Math.max(7, ch)) : undefined });
       });
       if (!bays.length) throw new Error('no usable cells — each needs 3 or 4 finite [x,y] corners and 30+ sq ft');
       // ── KNIT ── A designed plan whose rooms only touch at corners, or stand a
@@ -22639,7 +22641,25 @@ resetDrive(); requestAnimationFrame(frame);
       const w = mm[1].toUpperCase().split('').filter((ch) => GLYPHS[ch]);
       return w.length ? w : null;
     })();
-    if (figName) { topology = 'figure'; analogy = figName; mask = FIGURES[figName]; }
+    // A COMPOSITION, not a keyword. "taj mahal" had no grammar at all and fell
+    // through to a plain bar. A monument is a rule: one tall centre, four
+    // corner towers, flanking halls, and a portal on the axis — which the kit
+    // can now say, because a cell may carry its own height.
+    let comp = null;
+    if (has('mahal|palace|temple|mosque|cathedral|basilica|capitol|monument|mausoleum|shrine|pagoda|duomo')) {
+      analogy = 'monument'; topology = 'cells';
+      const K = has('big|large|grand|great|vast|monumental') ? 1.3 : has('small|little|tiny') ? 0.8 : 1;
+      const R2 = (x0, y0, x1, y1, use, id, h) => ({ id, use, level: 0, h: Math.round(h * K),
+        poly: [[x0 * K, y0 * K], [x1 * K, y0 * K], [x1 * K, y1 * K], [x0 * K, y1 * K]] });
+      comp = [
+        R2(-20, -20, 20, 20, 'living', 'hall', 26),        // the centre, and the tallest room
+        R2(16, 16, 27, 27, 'study', 'nw', 33), R2(-27, 16, -16, 27, 'study', 'ne', 33),
+        R2(16, -27, 27, -16, 'bed', 'sw', 33), R2(-27, -27, -16, -16, 'bed', 'se', 33),
+        R2(20, -9, 31, 9, 'kitchen', 'wing-e', 18), R2(-31, -9, -20, 9, 'bath', 'wing-w', 18),
+        R2(-8, -29, 8, -19, 'hall', 'portal', 20),         // the entrance, on the axis
+      ];
+    }
+    else if (figName) { topology = 'figure'; analogy = figName; mask = FIGURES[figName]; }
     else if (letters) {
       topology = 'figure'; analogy = 'letter ' + letters.join('');
       const H = GLYPHS[letters[0]].length;
@@ -22681,7 +22701,8 @@ resetDrive(); requestAnimationFrame(frame);
       intent: { analogy, irreducible_invariants: topology === 'loop' ? ['one closed inhabited annulus', 'one protected central void']
         : topology === 'court' ? ['one enclosing ring', 'one protected court'] : topology === 'stack' ? ['stacked tiers', 'tapering silhouette']
         : topology === 'hull' ? ['one lofted hull'] : ['one bar of rooms'] },
-      morphology: { topology, massing: Object.assign(m, mask ? { mask, cell: Math.round(11 * S) } : {}),
+      morphology: { topology, massing: Object.assign(m, mask ? { mask, cell: Math.round(11 * S) } : {},
+        comp ? { cells: comp, roof: 'gable', rise: 5.5 } : {}),
         protected_voids: (topology === 'loop' || topology === 'court') ? ['court'] : [] },
       spaces: uses, systems: { water_path: water, fireplace: !has('no fire') && uses.includes('living') },
       deck: !has('no deck'),
@@ -22918,6 +22939,20 @@ resetDrive(); requestAnimationFrame(frame);
       const fxs = b.quad.map((q) => q[0]), fys = b.quad.map((q) => q[1]);
       const bw = Math.max.apply(null, fxs) - Math.min.apply(null, fxs);
       const bd = Math.max.apply(null, fys) - Math.min.apply(null, fys);
+      // A bounding box is not a room. In a trapezoid, a ring sector or a turned
+      // room the box is bigger than the floor, so a bed sized from it pushes
+      // out through the wall — the white slabs sticking out from under the
+      // house. A fixture must sit inside the ROOM POLYGON, corners and all.
+      const seats = (cx0, cy0, w, d) => [[-w / 2, -d / 2], [w / 2, -d / 2], [w / 2, d / 2], [-w / 2, d / 2]]
+        .every(([px, py]) => ptInPoly([cx0 + px, cy0 + py], b.quad));
+      const place = (w, d, put) => {                       // try it, then smaller, then give up
+        for (const k of [1, 0.82, 0.66, 0.5]) {
+          const ww = w * k, dd = d * k;
+          if (ww < 2.4 || dd < 2.4) return false;
+          if (seats(c[0], c[1], ww + 1.1, dd + 1.1)) { put(ww, dd); return true; }
+        }
+        return false;
+      };
       const fits = (w, d) => bw >= w + 1.6 && bd >= d + 1.6;
       // Is this room square to the world? The kit's kitchen run is built along
       // x at a fixed y, so on a turned room it hangs in mid-air.
@@ -22956,11 +22991,12 @@ resetDrive(); requestAnimationFrame(frame);
         const bx0 = Math.min.apply(null, xs), bx1 = Math.max.apply(null, xs), by1 = Math.max.apply(null, ys);
         if (bx1 - bx0 >= 7.5 && bd >= 7) A.kitchen(g, bx0 + 1.2, Math.min(bx0 + 10.2, bx1 - 1.2), by1 - T * 0.5, z0 + FLOOR);
       }
-      else if (b.use === 'bath' && fits(5.5, 5.5)) A.bathset(g, c[0], c[1], z0 + FLOOR);
-      else if (b.use === 'bed' && fits(5, 6.6))
-        A.bed(g, c[0], c[1], z0 + FLOOR, Math.min(6.2, bw - 2.2), Math.min(6.8, bd - 2.2));
-      else if (b.use === 'living' && fits(5.5, 4)) A.sofa(g, c[0], c[1], z0 + FLOOR, Math.min(7, bw - 2.4));
-      else if (b.use === 'dining' && fits(8, 8)) A.dine(g, c[0], c[1], z0 + FLOOR);
+      else if (b.use === 'bath') place(5.2, 5.2, () => A.bathset(g, c[0], c[1], z0 + FLOOR));
+      else if (b.use === 'bed') place(Math.min(6.2, bw - 2.2), Math.min(6.8, bd - 2.2),
+        (w, d) => A.bed(g, c[0], c[1], z0 + FLOOR, w, d));
+      else if (b.use === 'living') place(Math.min(7, bw - 2.4), 3.4,
+        (w) => A.sofa(g, c[0], c[1], z0 + FLOOR, w));
+      else if (b.use === 'dining') place(7, 7, () => A.dine(g, c[0], c[1], z0 + FLOOR));
     });
     // THE WALL HEAD FOLLOWS THE ROOF IT CARRIES. A flat head leaves a gap
     // everywhere the roof field rises above the storey — the roof then floats,
@@ -23521,7 +23557,7 @@ resetDrive(); requestAnimationFrame(frame);
       if (area < 70) return;                      // a room, not a rail, a finial or a tree
       if (!poly.every((q) => Number.isFinite(q[0]) && Number.isFinite(q[1])
         && Math.abs(q[0]) < 320 && Math.abs(q[1]) < 320)) return;
-      cells.push({ area, poly, h: Math.min(26, Math.max(7, hft)),
+      cells.push({ area, poly, h: Math.min(70, Math.max(7, hft)),
         level: Math.max(0, Math.min(3, Math.round(((yLo - base.y) / FT) / 9))) });
     });
     if (cells.length < 2) throw new Error('the massing has no room-sized volumes to develop');
