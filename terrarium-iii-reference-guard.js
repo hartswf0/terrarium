@@ -1,5 +1,6 @@
 /* TERRARIUM III · REFERENCE COMMIT GUARD
  * Fail-closed reference cleanup must not disable ordinary non-reference drafts.
+ * This guard has no effect while a validated reference proposal owns COMMIT.
  */
 (function(global){
 'use strict';
