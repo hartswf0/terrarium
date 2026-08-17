@@ -22715,9 +22715,21 @@ resetDrive(); requestAnimationFrame(frame);
       if (ELEN(a, b) < 0.06 || z1 - z0 < 0.06) return;
       A.slab(g, [a[0], a[1], z0], [b[0], b[1], z0], [b[0], b[1], z1], [a[0], a[1], z1], T, mat || M.siding, 3);
     };
-    const edgeWall = (a, b, z0, z1, ops, mat) => {
+    // AN OPENING IS AN ASSEMBLY, NOT A HOLE. Leaving a gap in the wall is why
+    // the houses had no doors and no windows to look at — just dark voids. An
+    // opening now gets jambs, a head, a sill, and something IN it: glass for a
+    // window, a hung leaf and a threshold for a door.
+    const FRAME = M.fascia || M.timber || M.steel || M.siding;
+    const GLASS = M.glass || M.steel || M.siding;
+    const LEAF = M.timber || M.masonry || M.siding;
+    const edgeWall = (a, b, z0, z1, ops, mat, inner) => {
       const L = ELEN(a, b); if (L < 0.06) return;
       const ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L, P = (s) => [a[0] + ux * s, a[1] + uy * s];
+      const face = (s1, s2, za, zb, th, mt) => {
+        if (s2 - s1 < 0.04 || zb - za < 0.04) return;
+        const pa = P(s1), pb = P(s2);
+        A.slab(g, [pa[0], pa[1], za], [pb[0], pb[1], za], [pb[0], pb[1], zb], [pa[0], pa[1], zb], th, mt, 2);
+      };
       const hits = (ops || []).filter((o) => o[1] > o[0]).sort((p, q) => p[0] - q[0]);
       let cur = 0;
       for (const o of hits) {
@@ -22728,6 +22740,25 @@ resetDrive(); requestAnimationFrame(frame);
         cur = e;
       }
       wallSeg(P(cur), P(L), z0, z1, mat);
+      // now dress every opening that is wide and tall enough to be one
+      for (const o of hits) {
+        const s = Math.max(0, o[0]), e = Math.min(L, o[1]);
+        const isDoor = o[4] === 'd';
+        const lo = Math.max(z0, o[2]), hi = Math.min(z1, o[3]);
+        if (e - s < 1.4 || hi - lo < 1.6) continue;
+        const J = Math.min(0.3, (e - s) / 6);
+        face(s, s + J, lo, hi, T * 1.22, FRAME);            // jambs, proud of the wall
+        face(e - J, e, lo, hi, T * 1.22, FRAME);
+        face(s, e, hi - 0.24, hi + 0.1, T * 1.3, FRAME);    // head
+        if (inner) continue;                                // an interior doorway is cased, not glazed
+        if (isDoor) {
+          face(s + J, e - J, lo + 0.06, hi - 0.28, T * 0.42, LEAF);          // the leaf
+          face(s - 0.2, e + 0.2, lo - 0.3, lo + 0.12, T * 1.9, M.concrete || FRAME);  // threshold
+        } else {
+          face(s, e, lo - 0.18, lo + 0.14, T * 1.5, FRAME);                  // sill
+          face(s + J, e - J, lo + 0.16, hi - 0.3, T * 0.3, GLASS);           // glazing
+        }
+      }
     };
     const plate = (quad, z, th, mat) => A.slab(g,
       [quad[0][0], quad[0][1], z], [quad[1][0], quad[1][1], z],
@@ -22920,17 +22951,21 @@ resetDrive(); requestAnimationFrame(frame);
     exterior.forEach((e) => {
       const b = e.bays[0], z0 = (b.level || 0) * tierH, zHead = headAt(b, e.a, e.b);
       const L = ELEN(e.a, e.b), ops = [];
-      if (e === entryEdge && !entryDone) { ops.push([L / 2 - 1.8, L / 2 + 1.8, 0, 7.2, 'd']); entryDone = true; openingCount++; }
-      else if (L >= 6.5) {
-        const wLo = b.use === 'bath' ? 4.8 : 3.1, wHi = b.use === 'bath' ? 6.6 : 6.9;
-        ops.push([L / 2 - Math.min(3, L * 0.22), L / 2 + Math.min(3, L * 0.22), wLo, wHi]); openingCount++;
+      const F0 = z0 + FLOOR;
+      if (e === entryEdge && !entryDone) {
+        ops.push([L / 2 - 1.9, L / 2 + 1.9, F0, F0 + 7.2, 'd']); entryDone = true; openingCount++;
+      } else if (L >= 6.5) {
+        const wLo = b.use === 'bath' ? 4.6 : 2.9, wHi = b.use === 'bath' ? 6.5 : 6.9;
+        ops.push([L / 2 - Math.min(3, L * 0.22), L / 2 + Math.min(3, L * 0.22), F0 + wLo, F0 + wHi]);
+        openingCount++;
       }
       edgeWall(e.a, e.b, z0 + FLOOR, zHead, ops, M.siding);
     });
     interior.forEach((e) => {
       const b = e.bays[0], z0 = (b.level || 0) * tierH, L = ELEN(e.a, e.b);
-      const ops = doored.has(e) ? [[Math.max(0.4, L / 2 - 1.7), Math.min(L - 0.4, L / 2 + 1.7), 0, 7]] : [];
-      edgeWall(e.a, e.b, z0 + FLOOR, headAt(b, e.a, e.b), ops, M.siding);
+      const ops = doored.has(e)
+        ? [[Math.max(0.4, L / 2 - 1.7), Math.min(L - 0.4, L / 2 + 1.7), z0 + FLOOR, z0 + FLOOR + 7]] : [];
+      edgeWall(e.a, e.b, z0 + FLOOR, headAt(b, e.a, e.b), ops, M.siding, true);
     });
     // ROOF · one height field, so adjacent sectors share their seam endpoints
     const topBays = G.stacked ? G.bays.filter((b) => (b.level || 0) === levels[levels.length - 1]) : G.bays;
