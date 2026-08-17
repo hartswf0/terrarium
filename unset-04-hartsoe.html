@@ -22462,6 +22462,7 @@ resetDrive(); requestAnimationFrame(frame);
     // angle, any arrangement. The named generators below are now exemplars of
     // quality, not a menu of what may be asked for.
     cells(m) {
+      let FIT_SCALE = 1;
       const src = Array.isArray(m.cells) ? m.cells : [];
       const bays = [];
       src.slice(0, 160).forEach((c, i) => {
@@ -22481,6 +22482,25 @@ resetDrive(); requestAnimationFrame(frame);
           h: Number.isFinite(ch) ? Math.min(70, Math.max(7, ch)) : undefined });
       });
       if (!bays.length) throw new Error('no usable cells — each needs 3 or 4 finite [x,y] corners and 30+ sq ft');
+      // ── FIT ── Nothing in the grammar knew how big a house is. A design with
+      // arms 190 ft long compiled to a 383 ft flat starfish, certified, and lay
+      // across the whole tile — every certificate passed because they measure
+      // soundness, not habitable SIZE. Rejecting it would throw the design
+      // away; scaling it keeps every arm and every relation and simply makes
+      // it a building. The octopus stays an octopus, at 180 ft instead of 383.
+      {
+        let fx0 = 1e9, fx1 = -1e9, fy0 = 1e9, fy1 = -1e9;
+        bays.forEach((bth) => bth.quad.forEach((pt) => {
+          fx0 = Math.min(fx0, pt[0]); fx1 = Math.max(fx1, pt[0]);
+          fy0 = Math.min(fy0, pt[1]); fy1 = Math.max(fy1, pt[1]); }));
+        const span = Math.max(fx1 - fx0, fy1 - fy0), MAXSPAN = 180;
+        if (Number.isFinite(span) && span > MAXSPAN) {
+          const k = MAXSPAN / span, cx = (fx0 + fx1) / 2, cy = (fy0 + fy1) / 2;
+          bays.forEach((bth) => { bth.quad = bth.quad.map((pt) =>
+            [cx + (pt[0] - cx) * k, cy + (pt[1] - cy) * k]); });
+          FIT_SCALE = k;
+        }
+      }
       // ── KNIT ── A designed plan whose rooms only touch at corners, or stand a
       // few feet apart, is not a house — no doorway can be cut and most of it
       // is unreachable. Rather than refuse the design, join it: components that
@@ -22616,7 +22636,8 @@ resetDrive(); requestAnimationFrame(frame);
       }
       const lvAll = bays.map((b) => b.level || 0);
       return { bays, voids: [], roofField: first || (() => m.wallZ + m.rise), roofLow: 'eave',
-        grade: 0, stacked: Math.max.apply(null, lvAll) > 0, tierH: m.wallZ, masses: mn };
+        grade: 0, stacked: Math.max.apply(null, lvAll) > 0, tierH: m.wallZ, masses: mn,
+        fitScale: FIT_SCALE };
     },
     // any plan mask at all — letters, words, monograms, arbitrary figures
     figure(m) {
@@ -23258,7 +23279,7 @@ resetDrive(); requestAnimationFrame(frame);
       });
       if (carried) info_carried = carried;
     }
-    return { carried: info_carried, reached: seen.size, topology: topo, bays: G.bays.length, exterior: exterior.length, partitions: interior.length,
+    return { fitScale: G.fitScale || 1, carried: info_carried, reached: seen.size, topology: topo, bays: G.bays.length, exterior: exterior.length, partitions: interior.length,
       doors: doored.size, openings: openingCount, voids: G.voids, levels: levels.length,
       entry: { at: ec, bay: entryBay.id }, roofField: G.roofField, grade: G.grade, gradeAt, massing: m };
   }
@@ -23318,6 +23339,16 @@ resetDrive(); requestAnimationFrame(frame);
     put('EgressCert', info.openings > 0 && info.entry, 'entry at bay ' + (info.entry && info.entry.bay));
     put('EnvelopeCert', info.exterior > 0 && info.bays > 0, info.exterior + ' exterior runs over ' + info.bays + ' bays');
     put('WaterCert', !!(ir.systems && ir.systems.water_path), 'low edge drains to ' + (ir.systems && ir.systems.water_path));
+    { // SIZE is now a stated fact — a house that sprawls across the tile was
+      // passing every check because no check ever looked at how big it was.
+      let sx0 = 1e9, sx1 = -1e9, sz0 = 1e9, sz1 = -1e9;
+      boxes.forEach((bx) => { sx0 = Math.min(sx0, bx.min.x); sx1 = Math.max(sx1, bx.max.x);
+        sz0 = Math.min(sz0, bx.min.z); sz1 = Math.max(sz1, bx.max.z); });
+      const wFt = sx1 - sx0, dFt = sz1 - sz0;
+      put('SizeCert', Math.max(wFt, dFt) <= 260,
+        Math.round(wFt) + ' by ' + Math.round(dFt) + ' ft'
+        + ((info.fitScale && info.fitScale < 1) ? ' (scaled to fit by ' + Math.round(info.fitScale * 100) + '%)' : ''));
+    }
     put('WalkCert', info.reached === info.bays, info.reached + ' of ' + info.bays
       + ' bays reachable from the entry on foot');
     const inv = (ir.intent && ir.intent.irreducible_invariants) || [];
