@@ -22191,6 +22191,21 @@ resetDrive(); requestAnimationFrame(frame);
     '  "roof":"gable|shed|flat", "rise":5, "wallZ":9,',
     '  "water":"cistern|rain-garden|grade", "fireplace":true }',
     '',
+    'A cell may also carry "h", its own wall height in feet — that is how a tower stands',
+    'beside a low wing. Cells that touch AND share a height become one mass and take one',
+    'roof, so heights are how you separate one volume from another.',
+    '',
+    'THE ELEVATION. Everything above is said in PLAN, but some things are not plans — a face,',
+    'a clock, a rose window, a sign, ears, horns, fins, a weather vane. Those are said on the',
+    'ENTRY ELEVATION, in its own coordinates: u runs 0..1 along the entry gable, v runs 0..1',
+    'from the floor to the roof above that point.',
+    '  "features":[{"u":0.34,"v":0.74,"w":2.6,"h":2.6,"mat":"dark|warm|light"}]  applied to the face',
+    '  "ridge":[{"u":0.36,"w":3.4,"h":15,"lean":-0.8,"inner":true}]   standing PAST the roof',
+    'A feature is carried by the wall it is applied to; a ridge element rises above the roof',
+    'and may lean, and "inner" gives it an inset of its own — the pink of an ear, the face of',
+    'a clock, the glazing of a lantern. Use them whenever the request\'s identity lives on the',
+    'elevation rather than in the plan.',
+    '',
     'uses: living kitchen dining bed bath study hall. level 0 is the ground floor; a cell',
     'on level 1 sits above and gets a stair. Between 4 and 60 cells. Every number finite.',
     '',
@@ -22241,6 +22256,31 @@ resetDrive(); requestAnimationFrame(frame);
       if (u.length) out.spaces = [...new Set(u)];
     }
     if (Array.isArray(r.spaces)) { const u = r.spaces.filter((x) => IR_USES.includes(x)); if (u.length) out.spaces = u.slice(0, 12); }
+    // The elevation words were reachable only from a hardcoded creature table,
+    // so the most expressive part of the grammar was closed to the model. A
+    // probe of ten requests came back as the same four-bay box eight times —
+    // not because the compiler could not build them, but because nothing could
+    // ask it to. These are the channels; they are open now.
+    const num = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : null; };
+    if (Array.isArray(r.features)) {
+      const fs = r.features.map((f) => {
+        if (!f) return null;
+        const u = num(f.u, 0.04, 0.96), v = num(f.v, 0.04, 0.98);
+        const w = num(f.w, 0.4, 24), h = num(f.h, 0.3, 20);
+        if ([u, v, w, h].some((x) => x === null)) return null;
+        return { u, v, w, h, mat: ['dark', 'warm', 'light'].includes(f.mat) ? f.mat : 'light' };
+      }).filter(Boolean).slice(0, 16);
+      if (fs.length) out.features = fs;
+    }
+    if (Array.isArray(r.ridge)) {
+      const rs = r.ridge.map((e) => {
+        if (!e) return null;
+        const u = num(e.u, 0.04, 0.96), w = num(e.w, 0.6, 20), h = num(e.h, 1, 40);
+        if ([u, w, h].some((x) => x === null)) return null;
+        return { u, w, h, lean: num(e.lean, -12, 12) || 0, inner: !!e.inner };
+      }).filter(Boolean).slice(0, 10);
+      if (rs.length) out.ridge = rs;
+    }
     if (['cistern', 'rain-garden', 'grade'].includes(r.water)) out.systems.water_path = r.water;
     if (typeof r.fireplace === 'boolean') out.systems.fireplace = r.fireplace;
     if (out.morphology.massing.outerR <= out.morphology.massing.innerR + 8)
