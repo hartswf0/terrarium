@@ -3,4 +3,6 @@
  * Optional compiler/presentation sidecars must never block persistence.
  */
 import './terrarium-iii-store-core.js';
-import('./terrarium-iii-worldtext.js').catch(err => console.warn('[III WORLDTEXT] sidecar unavailable', err));
+import('./terrarium-iii-worldtext.js')
+  .then(() => import('./terrarium-iii-house-bind.js'))
+  .catch(err => console.warn('[III COMPILER] optional sidecar unavailable', err));
