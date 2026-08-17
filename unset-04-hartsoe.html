@@ -23439,6 +23439,84 @@ resetDrive(); requestAnimationFrame(frame);
       console.info('full trace on window.__houseTrace — .sent.system, .sent.user and .reply are the exact bytes');
     } catch (_) {}
   }
+  // ── THE SYSTEM LOOKS AT WHAT IT MADE ─────────────────────────────────────
+  // One shot cannot converge, because nothing ever sees the result. Working by
+  // hand you build, look, say what is wrong, and correct — five passes and it
+  // is good. The game never once looked. This renders the compiled house to an
+  // image and hands that image back to the model with the request beside it.
+  let __rtRenderer = null;
+  function renderHouseThumb(group, view) {
+    try {
+      if (!__rtRenderer) {
+        __rtRenderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+        __rtRenderer.setSize(720, 540);
+        __rtRenderer.setPixelRatio(1);
+        __rtRenderer.outputColorSpace = THREE.SRGBColorSpace;
+        __rtRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+        __rtRenderer.toneMappingExposure = 1.6;
+      }
+      const sc = new THREE.Scene();
+      sc.background = new THREE.Color(0x93a9bb);
+      sc.add(new THREE.HemisphereLight(0xdcefff, 0x6a7560, 1.9));
+      const sun = new THREE.DirectionalLight(0xfff4df, 2.9);
+      sun.position.set(-40, 70, 50); sc.add(sun);
+      const fill = new THREE.DirectionalLight(0xbfd6ea, 0.9);
+      fill.position.set(50, 30, -40); sc.add(fill);
+      // Frame from the MESHES only. setFromObject swallows the room-label
+      // sprites too, and their bounds threw the camera so far back that the
+      // house rendered as a speck on an empty field.
+      const bb = new THREE.Box3();
+      group.updateMatrixWorld(true);
+      group.traverse((o) => { if (o.isMesh && o.geometry) {
+        o.geometry.computeBoundingBox();
+        bb.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld)); } });
+      if (!Number.isFinite(bb.min.x) || bb.isEmpty()) return null;
+      const c = bb.getCenter(new THREE.Vector3()), sz = bb.getSize(new THREE.Vector3());
+      const gp = new THREE.Mesh(new THREE.PlaneGeometry(Math.max(sz.x, sz.z) * 40, Math.max(sz.x, sz.z) * 40),
+        new THREE.MeshStandardMaterial({ color: 0x8b9179, roughness: 1 }));
+      gp.rotation.x = -Math.PI / 2; gp.position.set(c.x, bb.min.y - 0.02, c.z); sc.add(gp);
+      const parent = group.parent;
+      sc.add(group);
+      const FOV = 36;
+      const cam = new THREE.PerspectiveCamera(FOV, 720 / 540, 0.5, 6000);
+      const rad = Math.max(1, bb.getBoundingSphere(new THREE.Sphere()).radius);
+      // A bounding SPHERE leaves a house sitting small in the middle of the
+      // frame. Fit the box instead, and stand at eye level rather than level
+      // with the ridge — an architectural photograph, not a satellite pass.
+      const fit = Math.max(sz.x, sz.z, sz.y * 1.35) * 0.62;
+      const R2 = Math.max(fit / Math.tan(FOV * Math.PI / 360), rad * 0.9);
+      if (view === 'front') cam.position.set(c.x, bb.min.y + sz.y * 0.62, c.z - R2);
+      else if (view === 'plan') cam.position.set(c.x + 0.01, c.y + R2 * 1.2, c.z + 0.01);
+      else cam.position.set(c.x + R2 * 0.58, bb.min.y + sz.y * 1.05, c.z - R2 * 0.62);
+      cam.lookAt(c.x, view === 'plan' ? c.y : bb.min.y + sz.y * 0.45, c.z);
+      __rtRenderer.render(sc, cam);
+      const url = __rtRenderer.domElement.toDataURL('image/jpeg', 0.82);
+      if (parent) parent.add(group); else sc.remove(group);
+      return url;
+    } catch (e) { return null; }
+  }
+  window.__renderHouseThumb = renderHouseThumb;
+  // What the model is asked when it is shown the render.
+  const REVIEW_CONTRACT = [
+    'You are an architect looking at a RENDER of the building that was just compiled',
+    'from the request below. Judge it by eye, the way you would judge a photograph.',
+    '',
+    'Say what is architecturally WRONG with it — proportion, scale, silhouette, roof,',
+    'whether it reads as the thing that was asked for at all — and then correct it.',
+    '',
+    'Reply with ONE JSON object and nothing else:',
+    '{ "critique": "the single worst thing about it, in one sentence",',
+    '  "fix": { …any fields of the plan you want changed… } }',
+    '',
+    'The fix takes exactly the same fields you used to design it: name, cells (quads in',
+    'feet, each with optional h and use), roof, rise, wallZ, features, ridge, water,',
+    'fireplace. Send the WHOLE cells array when you change the plan, not a fragment.',
+    'Change as little as will fix the worst fault. If it is already right, reply with',
+    '{"critique":"nothing significant","fix":{}} and it will be left alone.',
+  ].join('\n');
+  // how many times the system looks at what it made and corrects it
+  let REVISE_PASSES = 3;
+  window.__setRevisePasses = (n) => { REVISE_PASSES = Math.max(0, Math.min(6, n | 0)); return REVISE_PASSES; };
   async function generateHouse(promptText, presetIR) {
     let mod;
     try { mod = await depotModule(); } catch (e) { try { notify('DEPOT UNREACHABLE — ' + e.message.slice(0, 40)); } catch (_) {} return null; }
@@ -23543,7 +23621,7 @@ resetDrive(); requestAnimationFrame(frame);
     let info = null, c = null, why = '';
     for (let attempt = 0; attempt < 4; attempt++) {
       kit.setCUR(ir.name || 'GENERATED');
-      const g = new THREE.Group();
+      let g = new THREE.Group();
       houseStage(3, attempt ? 'ATTEMPT ' + (attempt + 1) : ir.morphology.topology.toUpperCase());
       try { info = compileHouseIR(ir, kit, g, site); }
       catch (e) { why = e.message; ir = repairIR(ir, why); continue; }
@@ -23551,6 +23629,48 @@ resetDrive(); requestAnimationFrame(frame);
       c = certifyHouse(ir, g, info);
       window.__lastHouse = { ir, info, cert: c, attempt };
       if (c.pass) {
+        // ── LOOK AT IT ────────────────────────────────────────────────────
+        // A certified house is a SOUND house, not a good one. Before it is set
+        // on the land it is rendered and shown to the model, which says what is
+        // wrong and corrects it — the same build, look, correct that works by
+        // hand. Each pass must keep certifying, so criticism can never make it
+        // unsound; if a revision fails its checks the previous one stands.
+        if (usable && !presetIR && REVISE_PASSES > 0) {
+          let bestG = g, bestC = c, bestInfo = info, bestIR = ir;
+          window.__housePasses = [];
+          for (let pass = 0; pass < REVISE_PASSES; pass++) {
+            const shot = renderHouseThumb(bestG, pass % 2 ? 'front' : 'hero');
+            if (!shot) break;
+            houseStage(5, 'LOOKING AT IT · PASS ' + (pass + 1));
+            let critique = '', fix = null;
+            try {
+              const raw2 = await callConfiguredLLM(
+                'The request was: ' + promptText + '\n\nThe plan it was built from:\n'
+                  + JSON.stringify({ cells: bestIR.morphology.massing.cells
+                      || bestIR.morphology.massing.mask || bestIR.morphology.topology,
+                    features: bestIR.features || [], ridge: bestIR.ridge || [] }).slice(0, 6000),
+                REVIEW_CONTRACT, cfg, shot, 6000);
+              const tx = String(raw2 || ''), a2 = tx.indexOf('{'), b3 = tx.lastIndexOf('}');
+              if (a2 > -1 && b3 > a2) {
+                const j = JSON.parse(tx.slice(a2, b3 + 1).replace(/,\s*([}\]])/g, '$1'));
+                critique = String(j.critique || ''); fix = j.fix;
+              }
+            } catch (e) { critique = 'review failed: ' + (e && e.message); }
+            window.__housePasses.push({ pass: pass + 1, image: shot, critique });
+            if (!fix || !Object.keys(fix).length) break;         // it says it is right
+            const tryIR = mergeIR(bestIR, fix);
+            const g3 = new THREE.Group();
+            kit.setCUR(tryIR.name || 'REVISED');
+            let info3 = null;
+            try { info3 = compileHouseIR(tryIR, kit, g3); } catch (_) { break; }
+            const c3 = certifyHouse(tryIR, g3, info3);
+            if (!c3.pass) { window.__housePasses[window.__housePasses.length - 1].rejected = c3.fail[0]; break; }
+            bestG = g3; bestC = c3; bestInfo = info3; bestIR = tryIR;
+          }
+          g = bestG; c = bestC; info = bestInfo; ir = bestIR;
+          trace.revisions = window.__housePasses.map((x) => x.critique);
+          window.__housePasses.push({ final: true, image: renderHouseThumb(g, 'hero') });
+        }
         houseStage(5, Object.keys(c.cert).length + '/' + Object.keys(c.cert).length + ' CERTIFICATES');
         // The pad is drawn from the footprint that was actually compiled — but
         // it MUST be measured before installing, because installing reparents
