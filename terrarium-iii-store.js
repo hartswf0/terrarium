@@ -18,7 +18,7 @@ optional('./terrarium-iii-collision-budget.js?v=0.2', 'COLLISION');
 // V3 + its shared-entry gate always get a chance to install.
 (async () => {
   await optional('./terrarium-iii-worldtext.js', 'WORLDTEXT');
-  await optional('./terrarium-iii-house-bind.js', 'HOUSE BIND');
+  await optional('./terrarium-iii-house-bind.js?v=0.3', 'HOUSE BIND');
   await optional('./terrarium-iii-reference.js', 'REFERENCE');
   await optional('./terrarium-iii-reference-guard.js', 'REFERENCE GUARD');
   await optional('./terrarium-iii-architecture-v3.js?v=3.0.2', 'ARCHITECTURE V3');
