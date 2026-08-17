@@ -655,12 +655,21 @@ FZ.table = (function () {
 
   /* ---- where the mark sits: bottom-right of whatever the colony currently owns,
      so it never lands on a band another piece put underneath. Between episodes it
-     goes to the top-right, above the episode card. ---- */
+     goes to the top-right, above the episode card.
+
+     The top-right corner belongs to the crown (CONTRACT §12) and is only ceded once
+     the episode card is actually covering it — 10-style.css hides #crown on
+     `#app:has(#gate.on)` and nothing else. Keying this off the phase instead would
+     move the mark a whole SETTLE beat early: chapters flip to 'result' and then hold
+     the colony on screen for 600ms before raising the gate, and for that beat the
+     crown is still up, so the mark would sit on top of #aboutBtn on every single
+     chapter transition. Follow the same signal the stylesheet follows. ---- */
   function place() {
     if (!mark) return;
-    var ph = (FZ.chapters && FZ.chapters.phase) ? FZ.chapters.phase() : 'play';
+    var gt = document.getElementById('gate');
+    var covered = !!gt && gt.classList.contains('on');
     var W = window.innerWidth, H = window.innerHeight, S = 46, pad = 9;
-    if (ph !== 'play') {
+    if (covered) {
       mark.style.left = (W - S - pad) + 'px';
       mark.style.top = (pad + 6) + 'px';
       return;

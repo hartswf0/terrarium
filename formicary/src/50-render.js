@@ -49,10 +49,11 @@ FZ.render = (function () {
   var beats = [];
   var bodies = new Map();             /* per-ant render memory: heading, gait, wobble */
   var agentIx = new Map(), jobIx = new Map();
+  var drawn = new Map();              /* id -> where the body is really standing */
   var peak = new Map(), hurtAt = new Map(), doneAt = new Map();
   var gimg = new Map();
   var stamped = new Set();            /* charters already carved into the nest */
-  var lastTick = -1, floodMark = 0, spursMade = false;
+  var lastTick = -1, floodMark = 0, spursMade = false, lastDial = null;
 
   /* ---------------------------------------------------------- tiny helpers */
   function A(a) { ctx.globalAlpha = a < 0 ? 0 : a > 1 ? 1 : a; }
@@ -91,6 +92,9 @@ FZ.render = (function () {
     if (!e || typeof e.has !== 'function') return true;
     return e.has(sym);
   }
+  /* where a body is drawn — its place in the nest, not its abstract coordinate */
+  function AX(a) { var d = a ? drawn.get(a.id) : null; return d ? d.x : a ? X(a.x) : 0; }
+  function AY(a) { var d = a ? drawn.get(a.id) : null; return d ? d.y : a ? Y(a.y) : 0; }
   function idsOf(v) {
     if (!v) return [];
     if (Array.isArray(v)) return v;
@@ -105,7 +109,7 @@ FZ.render = (function () {
   }
   /* an irregular hand-drawn blob — nothing in the colony is a perfect circle */
   function blobPath(g, x, y, r, seed, wob) {
-    var n = clamp(Math.round(r / 2.6), 11, 30);
+    var n = clamp(Math.round(r / 1.7), 14, 40);
     g.beginPath();
     for (var i = 0; i <= n; i++) {
       var an = (i / n) * TAU;
@@ -237,132 +241,386 @@ FZ.render = (function () {
     dx.globalCompositeOperation = 'source-over';
     dx.globalAlpha = 1; dx.fillStyle = '#ffffff';
     dx.save(); dx.scale(DS, DS);
-    blobPath(dx, x, y, r, seed, 0.13); dx.fill();
+    blobPath(dx, x, y, r, seed, 0.2); dx.fill();
     dx.restore();
     nestDirty = true;
   }
-  function carveTunnel(x1, y1, x2, y2, w, seed) {
+
+  /* ==================================================== THE MOVEMENT GRAPH
+     CONTRACT §16. SIM publishes the nest as `S.nest` — chambers, junctions and
+     tunnels, with occupancy, queues, dig progress and wear on every one of them
+     — and writes every body's x,y from it. There is no fifth state and no soil
+     position, so FIELD's only job here is to DRAW THAT TRUTH and never invent a
+     second geometry beside it. A tunnel is the straight run between two node
+     centres, because that is exactly the line the bodies walk down.
+
+     What used to be here was a private layout of the renderer's own, which is
+     precisely how the round-3 build ended up with a beautiful drawn network the
+     ants ignored. Nothing in this file may describe the nest except S.nest. */
+
+  function nestOf(S) { return (S && S.nest && S.nest.nodes && S.nest.nodes.length) ? S.nest : null; }
+  function layoutSig(S) {
+    var N = nestOf(S);
+    return W + 'x' + H + '|' + (N ? N.ver + '|' + N.nodes.length + '|' + N.edges.length : 'none');
+  }
+  /* the width of a passage is the width of what has to get down it: a lateral
+     passes one body, the spine and the shaft pass two */
+  function edgeW(e) { return e.cap > 1 ? 15 : 11; }
+  /* a chamber is a ROOM. It is drawn wider than the packing radius SIM uses,
+     because a room a body only just fits in is a pipe, and the difference
+     between a pipe and a room is the whole of "this place is crowded". */
+  function nodeR(n) {
+    var k = n.kind;
+    return n.r * (k === 'queen' ? 1.75 : k === 'chamber' || k === 'store' ? 1.6 : 1.3);
+  }
+  /* how far a face has come, in field px from the end it is being cut from */
+  function digFrom(e, S) {
+    var A = S.agents || [];
+    for (var i = 0; i < A.length; i++) {
+      if (A[i].digE === e.id && A[i].digFrom != null) return A[i].digFrom;
+    }
+    return e.a;
+  }
+  function carveEdge(le, t0, t1) {
+    if (t1 <= t0 + 0.001) return;
+    var a = le.A, b = le.B;
     dx.globalCompositeOperation = 'source-over';
-    dx.globalAlpha = 1; dx.strokeStyle = '#ffffff';
+    dx.globalAlpha = 1; dx.strokeStyle = '#ffffff'; dx.fillStyle = '#ffffff';
     dx.lineCap = 'round'; dx.lineJoin = 'round';
     dx.save(); dx.scale(DS, DS);
-    var nxv = -(y2 - y1), nyv = (x2 - x1), nl = Math.sqrt(nxv * nxv + nyv * nyv) || 1;
-    nxv /= nl; nyv /= nl;
-    /* a gallery is dug around what the earth allows, so it wanders */
-    var steps = clamp(Math.round(nl / 13), 6, 30);
-    var amp = Math.min(52, nl * 0.3);
-    var px = x1, py = y1;
-    for (var i = 1; i <= steps; i++) {
-      var t = i / steps;
-      var off = Math.sin(t * Math.PI) * (Math.sin(t * 2.4 + seed) * 0.5) * amp
-        + Math.sin(t * 5.1 + seed * 1.7) * amp * 0.2;
-      var qx = x1 + (x2 - x1) * t + nxv * off;
-      var qy = y1 + (y2 - y1) * t + nyv * off;
-      dx.lineWidth = w * (0.72 + hash(seed * 2 + i) * 0.62);
-      dx.beginPath(); dx.moveTo(px, py); dx.lineTo(qx, qy); dx.stroke();
-      px = qx; py = qy;
+    /* the centreline is exactly the line the bodies walk; only the walls are
+       rough, because earth is rough and a drawn straight edge is a corridor */
+    var vx = b.x - a.x, vy = b.y - a.y, vl = Math.sqrt(vx * vx + vy * vy) || 1;
+    var px2 = -vy / vl, py2 = vx / vl;
+    var steps = clamp(Math.round(le.len * (t1 - t0) / 9), 1, 40);
+    for (var i = 0; i < steps; i++) {
+      var u0 = t0 + (t1 - t0) * (i / steps), u1 = t0 + (t1 - t0) * ((i + 1) / steps);
+      dx.lineWidth = le.w * (0.9 + hash(le.id * 5.7 + i) * 0.3);
+      dx.beginPath();
+      dx.moveTo(a.x + vx * u0, a.y + vy * u0);
+      dx.lineTo(a.x + vx * u1, a.y + vy * u1);
+      dx.stroke();
+      /* earth does not cut straight. The centreline is exactly the walked line,
+         but the walls are bitten out either side of it. */
+      var off = (hash(le.id * 2.9 + i * 1.7) - 0.5) * le.w * 0.8;
+      dx.beginPath();
+      dx.arc(a.x + vx * u1 + px2 * off, a.y + vy * u1 + py2 * off,
+        le.w * (0.26 + hash(le.id + i * 3.1) * 0.2), 0, TAU);
+      dx.fill();
     }
     dx.restore();
     nestDirty = true;
   }
-
-  /* ------------------------------------------------------------- the layout
-     Chambers sit on the jobs, on the queen, on the store. Tunnels are the
-     minimum spanning tree between them plus the shaft to the surface. A
-     dependency's tunnel is NOT dug: the path to a blocked job physically does
-     not exist yet, which is the whole of "this is waiting on another one". */
-  function layoutSig(S) {
-    var s = W + 'x' + H + '|' + (S.id || '') + '|';
-    var jb = S.jobs || [];
-    for (var i = 0; i < jb.length; i++) s += jb[i].id + ',';
-    return s;
+  /* whatever the graph says exists and the earth does not yet show, cut it now.
+     This is what makes digging watchable: the face moves a little each frame
+     and the tunnel behind it is permanently longer than it was. */
+  function carveOpen(le, S) {
+    var e = le.ref;
+    var want = e.dug ? 1 : clamp(e.prog || 0, 0, 1) * 0.96;
+    if (want > le.cut + 0.004) {
+      var from = e.dug ? le.from : digFrom(e, S);
+      le.from = from;
+      if (from === e.b) carveEdge(le, 1 - want, 1 - le.cut);
+      else carveEdge(le, le.cut, want);
+      le.cut = want;
+    }
+    /* WEAR IS ARCHITECTURE, NOT AN OVERLAY. The road the whole colony chooses
+       gets physically wider and smoother, and the ones beside it stay narrow.
+       One bright road with cold ones next to it is Cf and Im, drawn in earth. */
+    if (!e.dug) return;
+    var wr = clamp(e.wear || 0, 0, 1);
+    var step = Math.floor(wr * 4);
+    if (step > (le.worn || 0)) {
+      le.worn = step;
+      var keep = le.w;
+      le.w = keep * (1 + step * 0.1);
+      carveEdge(le, 0, 1);
+      le.w = keep;
+    }
   }
   function buildLayout(S) {
+    var N = nestOf(S);
     var seed = (S.seed || 1) % 997;
-    var oldSpurs = (L && L.spurs) ? L.spurs : [];
-    var nodes = [];
-    var entry = { x: W * (0.26 + hash(seed) * 0.46), y: 9, r: 10, kind: 'entry' };
-    nodes.push(entry);
-    var queen = { x: W * (0.34 + hash(seed + 4) * 0.32), y: H * 0.9, r: Math.min(34, W * 0.13), kind: 'queen' };
-    var store = { x: W * (0.16 + hash(seed + 8) * 0.16), y: H * 0.73, r: Math.min(28, W * 0.11), kind: 'store' };
-    nodes.push(queen, store);
-    var jb = S.jobs || [];
-    for (var i = 0; i < jb.length; i++) {
-      nodes.push({
-        x: X(jb[i].x), y: Y(jb[i].y), r: 17 + Math.min(13, (jb[i].value || 1) * 2.1),
-        kind: 'job', id: jb[i].id
-      });
+    var i, n, e;
+    var oldCut = {};
+    if (L) for (i = 0; i < L.edges.length; i++) oldCut[L.edges[i].id] = L.edges[i].cut;
+
+    var nodes = [], edges = [];
+    var entry = null, queen = null, store = null;
+    if (N) {
+      for (i = 0; i < N.nodes.length; i++) {
+        n = N.nodes[i];
+        var ln = {
+          x: X(n.x), y: Y(n.y), r: Math.max(9, n.r * sx),
+          rr: Math.max(11, nodeR(n) * sx), kind: n.kind, id: n.id, ref: n
+        };
+        nodes.push(ln);
+        if (n.kind === 'surface' && !entry) entry = ln;
+        if (n.kind === 'queen' && !queen) queen = ln;
+        if (n.kind === 'store' && !store) store = ln;
+      }
+      for (i = 0; i < N.edges.length; i++) {
+        e = N.edges[i];
+        var A2 = nodes[e.a], B2 = nodes[e.b];
+        if (!A2 || !B2) continue;
+        edges.push({
+          id: e.id, A: A2, B: B2, a: e.a, b: e.b, ref: e, w: edgeW(e),
+          len: Math.sqrt((A2.x - B2.x) * (A2.x - B2.x) + (A2.y - B2.y) * (A2.y - B2.y)) || 1,
+          cut: oldCut[e.id] || 0, from: e.a
+        });
+      }
     }
-    /* minimum spanning tree, so the nest is one connected excavation */
-    var edges = [], inT = [0], out = [];
-    for (var k = 1; k < nodes.length; k++) out.push(k);
-    while (out.length) {
-      var bi = -1, bj = -1, bd = Infinity;
-      for (var p = 0; p < inT.length; p++) {
-        for (var q = 0; q < out.length; q++) {
-          var a = nodes[inT[p]], b = nodes[out[q]];
-          var d = (a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y);
-          if (d < bd) { bd = d; bi = p; bj = q; }
+    if (!entry) entry = nodes[0] || { x: W * 0.5, y: 12, r: 11, kind: 'surface' };
+    if (!queen) queen = nodes[nodes.length - 1] || entry;
+    if (!store) store = queen;
+
+    L = { nodes: nodes, edges: edges, entry: entry, queen: queen, store: store, seed: seed, sig: layoutSig(S), spurs: [] };
+
+    for (i = 0; i < nodes.length; i++) {
+      if (nodes[i].kind === 'surface') continue;
+      carveChamber(nodes[i].x, nodes[i].y, nodes[i].rr, seed + i * 3);
+    }
+    /* the shaft head breaks the crust */
+    carveEdge({ A: { x: entry.x, y: -10 }, B: { x: entry.x, y: entry.y + 4 }, len: entry.y + 14, w: 16, id: 909 }, 0, 1);
+    for (i = 0; i < edges.length; i++) carveOpen(edges[i], S);
+  }
+  function refreshNest(S) {
+    if (!L) return;
+    var i;
+    for (i = 0; i < L.edges.length; i++) carveOpen(L.edges[i], S);
+    /* A ROOM THAT KEEPS BEING OVERFULL GETS DUG OUT BIGGER. Density is the
+       workload meter, so the chamber has to be able to show density — and a
+       chamber that was once packed stays enlarged, which is the colony's own
+       record of where the pressure was. */
+    for (i = 0; i < L.nodes.length; i++) {
+      var n = L.nodes[i], ref = n.ref;
+      if (!ref || ref.kind === 'surface') continue;
+      var over = (ref.occ ? ref.occ.length : 0) - (ref.cap || 4);
+      if (over <= 0) continue;
+      var step = Math.min(4, over);
+      if (step <= (n.grown || 0)) continue;
+      n.grown = step;
+      n.rr = Math.max(n.rr, Math.max(11, nodeR(ref) * sx) * (1 + step * 0.15));
+      carveChamber(n.x, n.y, n.rr, L.seed + i * 3 + step);
+    }
+  }
+
+  /* ------------------------------------------------------- reading the nest */
+  function edgePt(le, t) {
+    return { x: le.A.x + (le.B.x - le.A.x) * t, y: le.A.y + (le.B.y - le.A.y) * t };
+  }
+  /* the nearest place in the nest to a point, used only to pull a body that
+     crowding has nudged at a wall back inside the passage it is really in */
+  function snapIn(x, y) {
+    if (!L || !L.nodes.length) return { x: x, y: y };
+    var i, n, d;
+    for (i = 0; i < L.nodes.length; i++) {
+      n = L.nodes[i];
+      d = (n.x - x) * (n.x - x) + (n.y - y) * (n.y - y);
+      if (d < n.rr * n.rr * 0.86) return { x: x, y: y };
+    }
+    var bx = x, by = y, bd = Infinity, hw = 5;
+    for (i = 0; i < L.edges.length; i++) {
+      var le = L.edges[i];
+      if (!le.ref.dug) continue;
+      var vx = le.B.x - le.A.x, vy = le.B.y - le.A.y, l2 = vx * vx + vy * vy || 1;
+      var t = clamp(((x - le.A.x) * vx + (y - le.A.y) * vy) / l2, 0, 1);
+      var qx = le.A.x + vx * t, qy = le.A.y + vy * t;
+      d = (qx - x) * (qx - x) + (qy - y) * (qy - y);
+      if (d < bd) { bd = d; bx = qx; by = qy; hw = le.w * 0.3; }
+    }
+    var dl = Math.sqrt(bd);
+    if (dl <= hw) return { x: x, y: y };
+    if (dl < 0.001) return { x: bx, y: by };
+    return { x: bx + (x - bx) / dl * hw, y: by + (y - by) / dl * hw };
+  }
+  /* no two bodies on top of each other. Sixteen CSS px of daylight is the whole
+     difference between a crowd a player can count and one black clot. */
+  var SEP = 17;
+  function spread(list, sc, burn) {
+    var mind = SEP * clamp(sc, 0.82, 1.15), i, j, k;
+    for (k = 0; k < 7; k++) {
+      for (i = 0; i < list.length; i++) {
+        for (j = i + 1; j < list.length; j++) {
+          var P = list[i], Q = list[j];
+          var ddx = Q.x - P.x, ddy = Q.y - P.y;
+          var d2 = ddx * ddx + ddy * ddy;
+          var lim = (burn && (burn.has(P.id) || burn.has(Q.id))) ? mind * 1.12 : mind;
+          if (d2 > lim * lim) continue;
+          var d = Math.sqrt(d2);
+          if (d < 0.05) { ddx = Math.cos(P.id * 2.3); ddy = Math.sin(P.id * 2.3); d = 1; }
+          var pushd = (lim - d) * 0.5;
+          P.x -= ddx / d * pushd; P.y -= ddy / d * pushd;
+          Q.x += ddx / d * pushd; Q.y += ddy / d * pushd;
         }
       }
-      if (bi < 0) break;
-      edges.push({ a: inT[bi], b: out[bj], seed: edges.length * 13 + seed });
-      inT.push(out[bj]); out.splice(bj, 1);
-    }
-    var first = !spursMade;
-    L = {
-      nodes: nodes, edges: edges, entry: entry, queen: queen, store: store,
-      seed: seed, sig: layoutSig(S), spurs: oldSpurs
-    };
-
-    /* NOTHING is wiped here. A finished job's chamber stays as a gallery, the
-       tunnels the ants wore stay worn, and an institution's hall outlives the
-       job it was built for. The nest only ever accumulates inside a run. */
-    for (var c = 0; c < nodes.length; c++) {
-      if (nodes[c].kind === 'entry') continue;
-      carveChamber(nodes[c].x, nodes[c].y, nodes[c].r, seed + c * 3);
-    }
-    if (first) carveTunnel(entry.x, -6, entry.x, entry.y + 22, 16, seed + 91);
-    for (var e = 0; e < edges.length; e++) edges[e].dug = false;
-    stampReadyEdges(S);
-    if (!first) return;
-
-    /* side galleries and dead ends, dug once: a colony excavates more than it
-       needs, and a quiet chapter must still look like somewhere ants live */
-    spursMade = true;
-    L.spurs = [];
-    for (var g = 0; g < 7; g++) {
-      var from = nodes[1 + Math.floor(hash(seed + g * 5.5) * (nodes.length - 1))];
-      var an = hash(seed + g * 2.7) * TAU;
-      var len = 34 + hash(seed + g * 9.1) * 62;
-      var ex2 = clamp(from.x + Math.cos(an) * len, 14, W - 14);
-      var ey2 = clamp(from.y + Math.sin(an) * len, 26, H - 14);
-      carveTunnel(from.x, from.y, ex2, ey2, 9, seed + g * 31);
-      carveChamber(ex2, ey2, 8 + hash(g) * 7, seed + g * 17);
-      L.spurs.push({ x: ex2, y: ey2, r: 8 + hash(g) * 7, s: g });
+      /* put everybody back inside the nest between passes, so the next pass
+         resolves the crowd in the space that actually exists rather than in
+         open air that then collapses back into a clot */
+      for (i = 0; i < list.length; i++) {
+        var it = list[i];
+        var ex = it.x - it.ox, ey = it.y - it.oy;
+        var dm = Math.sqrt(ex * ex + ey * ey);
+        if (dm > 28) { it.x = it.ox + ex / dm * 28; it.y = it.oy + ey / dm * 28; }
+        if (dm > 0.4) { var sn = snapIn(it.x, it.y); it.x = sn.x; it.y = sn.y; }
+      }
     }
   }
-  function edgeBlocked(e, S) {
-    var na = L.nodes[e.a], nb = L.nodes[e.b];
-    var n = na.kind === 'job' ? na : nb.kind === 'job' ? nb : null;
-    if (!n) return false;
-    var j = jobIx.get(n.id);
-    if (!j || j.prereq === undefined || j.prereq === null || j.prereq === false) return false;
-    if (!taught('Dp')) return false;
-    var pj = jobIx.get(j.prereq);
-    if (!pj) return false;
-    return (pj.progress || 0) < (pj.need || 1);
-  }
-  function stampReadyEdges(S) {
+
+  /* ---------------------------------------------------------- the dig faces
+     A face is watchable. The earth ahead is freshly broken, the spoil piles at
+     the mouth behind, and the tunnel is longer every time you look. A face with
+     nobody on it is a plan the colony has stopped paying for. */
+  function drawFaces(S) {
+    if (!L) return;
     for (var i = 0; i < L.edges.length; i++) {
-      var e = L.edges[i];
+      var le = L.edges[i], e = le.ref;
       if (e.dug) continue;
-      if (edgeBlocked(e, S)) continue;
-      var a = L.nodes[e.a], b = L.nodes[e.b];
-      carveTunnel(a.x, a.y, b.x, b.y, 13, e.seed);
-      e.dug = true;
+      var pr = clamp(e.prog || 0, 0, 1) * 0.96;
+      var from = le.from;
+      var t = from === e.b ? 1 - pr : pr;
+      var f = edgePt(le, t);
+      var mouth = edgePt(le, from === e.b ? 1 : 0);
+      var ang = Math.atan2(le.B.y - le.A.y, le.B.x - le.A.x) + (from === e.b ? Math.PI : 0);
+      var live = e.diggers && e.diggers.length;
+      var hw = le.w * 0.78;
+      /* THE NEW GROUND. The last stretch behind the face was earth a moment ago
+         and is still pale with it, so the tunnel is visibly longer every time
+         the player looks back at it. */
+      if (pr > 0.02) {
+        var back = clamp(26 / le.len, 0.02, 1);
+        var t0 = from === e.b ? t : Math.max(0, t - back);
+        var t1 = from === e.b ? Math.min(1, t + back) : t;
+        A(live ? 0.5 : 0.22); ctx.strokeStyle = MAT.sand;
+        ctx.lineWidth = le.w * 0.72; ctx.lineCap = 'round';
+        var p0 = edgePt(le, t0), p1 = edgePt(le, t1);
+        ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
+        ctx.lineCap = 'butt';
+      }
+      ctx.save();
+      ctx.translate(f.x, f.y); ctx.rotate(ang);
+      /* THE FACE. A wall of broken earth across the whole passage, wider than
+         the passage, so it reads as the end of the world rather than a smudge.
+         It advances every second somebody is cutting at it. */
+      A(0.97); ctx.fillStyle = MAT.soil3;
+      ctx.beginPath();
+      ctx.moveTo(-2, -hw);
+      for (var q = -1; q <= 1.001; q += 0.2) {
+        ctx.lineTo(2 + hash(le.id * 3.3 + q * 5 + Math.floor(pr * 18)) * 7, q * hw);
+      }
+      ctx.lineTo(-2, hw); ctx.closePath(); ctx.fill();
+      /* the freshly cut lip: earth opened a moment ago is bright */
+      A(live ? 0.8 : 0.35); ctx.strokeStyle = MAT.sand2; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-2, -hw * 0.86); ctx.lineTo(-2, hw * 0.86); ctx.stroke();
+      /* pick marks: the tool at work, or the stillness of a face nobody pays for */
+      A(live ? 0.7 : 0.25); ctx.strokeStyle = MAT.ink; ctx.lineWidth = 1.1;
+      for (var m = -1; m <= 1; m++) {
+        var jit = live ? Math.sin(now * 0.02 + m * 2 + le.id) * 2.2 : 0;
+        ctx.beginPath();
+        ctx.moveTo(1.5 + jit, m * hw * 0.45); ctx.lineTo(5.5 + jit, m * hw * 0.45 + (m ? 1.4 : -1.4));
+        ctx.stroke();
+      }
+      /* earth coming off the face right now */
+      if (live) {
+        A(0.85); ctx.fillStyle = MAT.sand2;
+        for (var c2 = 0; c2 < 4; c2++) {
+          var ph2 = ((now * 0.004 + c2 * 0.25 + le.id * 0.13) % 1);
+          ctx.beginPath();
+          ctx.ellipse(-2 - ph2 * 16, (hash(le.id + c2) - 0.5) * hw * 1.2 + ph2 * 3,
+            1.8 * (1 - ph2 * 0.5), 1.4, 0, 0, TAU);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+      /* THE SPOIL. What has come out is heaped at the mouth and it stays there:
+         a tunnel you can see was dug, by somebody, at a cost. */
+      var heap = clamp(pr * 1.4 + (e.spoil || 0), 0.06, 1);
+      var mo = Math.atan2(f.y - mouth.y, f.x - mouth.x);
+      ctx.save();
+      ctx.translate(mouth.x + Math.cos(mo) * 5, mouth.y + Math.sin(mo) * 5);
+      ctx.rotate(mo);
+      A(0.9); ctx.fillStyle = MAT.sand2;
+      ctx.beginPath();
+      ctx.moveTo(-6, hw * 0.9);
+      ctx.quadraticCurveTo(0, hw * 0.9 - 5 - heap * 9, 7 + heap * 5, hw * 0.9);
+      ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-6, -hw * 0.9);
+      ctx.quadraticCurveTo(0, -hw * 0.9 + 5 + heap * 9, 7 + heap * 5, -hw * 0.9);
+      ctx.closePath(); ctx.fill();
+      A(0.5); ctx.fillStyle = MAT.soil3;
+      for (var g = 0; g < Math.round(heap * 8) + 2; g++) {
+        var gx2 = -4 + hash(le.id + g * 3.7) * 12;
+        var gy2 = (g % 2 ? 1 : -1) * (hw * 0.9 - 1 - hash(g + le.id) * heap * 8);
+        ctx.beginPath(); ctx.ellipse(gx2, gy2, 1.5, 1.2, 0, 0, TAU); ctx.fill();
+      }
+      ctx.restore();
     }
   }
+
+  /* ------------------------------------------------------- drawn intentions */
+  function edgeById(id) {
+    if (!L) return null;
+    for (var i = 0; i < L.edges.length; i++) if (L.edges[i].id === id) return L.edges[i];
+    return null;
+  }
+  function drawIntent(S, agents) {
+    ctx.setLineDash([2, 4]); ctx.lineWidth = 1.3; ctx.strokeStyle = SIG.blue;
+    for (var i = 0; i < agents.length; i++) {
+      var a = agents[i], r = a.route;
+      if (!r || !r.length) continue;
+      var cur = a.at;
+      if (cur == null && a.edge != null) {
+        var e0 = edgeById(a.edge);
+        if (e0) cur = a.dir > 0 ? e0.b : e0.a;
+      }
+      if (cur == null) continue;
+      A(0.7);
+      ctx.beginPath();
+      ctx.moveTo(AX(a), AY(a));
+      var n0 = L.nodes[cur];
+      if (n0) ctx.lineTo(n0.x, n0.y);
+      for (var k = 0; k < r.length && k < 9; k++) {
+        var le = edgeById(r[k]);
+        if (!le) break;
+        var nxt = (le.a === cur) ? le.b : le.a;
+        var nn = L.nodes[nxt];
+        if (!nn) break;
+        ctx.lineTo(nn.x, nn.y);
+        cur = nxt;
+      }
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+  }
+
+  /* ------------------------------------------------ what the passages are like
+     Wear is a road the colony has chosen; a jam is a road it cannot get down.
+     Both are drawn on the floor, in earth, and neither has a number. */
+  function drawRoads(S) {
+    if (!L) return;
+    for (var i = 0; i < L.edges.length; i++) {
+      var le = L.edges[i], e = le.ref;
+      if (!e.dug) continue;
+      /* A JAMMED PASSAGE NEEDS NO OVERLAY. The bodies wedged in it, shoulder to
+         shoulder and not moving, are the jam — AESTHETIC §0. What used to be
+         drawn here was a dashed band across the tunnel that read as rungs on a
+         ladder, a second explanation of something the picture already showed. */
+    }
+    /* a chamber no tunnel reaches. Nobody is coming, and you can see why. */
+    for (i = 0; i < L.nodes.length; i++) {
+      var n = L.nodes[i];
+      if (!n.ref || n.ref.comp === undefined) continue;
+      var cut = L.edges.length && n.ref.comp !== (S.nest ? S.nest.main : n.ref.comp);
+      if (!cut) continue;
+      A(0.5); ctx.strokeStyle = MAT.ink; ctx.lineWidth = 1.2;
+      ctx.setLineDash([2, 4]);
+      ctx.beginPath(); ctx.arc(n.x, n.y, n.r + 4, 0, TAU); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
 
   /* -------------------------------------------------------------- the earth */
   function rebuildNest() {
@@ -392,6 +650,21 @@ FZ.render = (function () {
     mxx.drawImage(dig, 0, 0, W, H);
     mxx.drawImage(dig, 0, 0, W, H);
     g.drawImage(mix, 0, 0);
+
+    /* the wall casts a shadow onto its own floor, which is what makes a chamber
+       read as a room you are looking into rather than a hole punched in a page */
+    mxx.globalCompositeOperation = 'source-over';
+    mxx.clearRect(0, 0, W, H);
+    mxx.fillStyle = MAT.soil3; mxx.fillRect(0, 0, W, H);
+    mxx.globalCompositeOperation = 'destination-in';
+    try { mxx.filter = 'blur(3px)'; } catch (e3) { }
+    mxx.drawImage(dig, 0, 0, W, H);
+    try { mxx.filter = 'none'; } catch (e4) { }
+    mxx.globalCompositeOperation = 'destination-out';
+    mxx.drawImage(dig, 0, 0, W, H);
+    mxx.drawImage(dig, 0, 0, W, H);
+    mxx.drawImage(dig, 0, 0, W, H);
+    g.globalAlpha = 0.55; g.drawImage(mix, 0, 0); g.globalAlpha = 1;
 
     /* spoil heaps and pebbles in the dead ends nobody uses */
     if (L && L.spurs) {
@@ -575,27 +848,60 @@ FZ.render = (function () {
   }
   function antScale(n) { return clamp(Math.sqrt((W * H) / (370 * 560)) * (n > 26 ? 0.82 : n > 16 ? 0.92 : 1), 0.72, 1.28); }
 
-  function drawAnt(a, S, sc, dim) {
-    var x = X(a.x), y = Y(a.y);
+  /* THE POSTURE VOCABULARY. SIM chooses one word per worker per tick and the
+     word is the whole drawing: how the legs are set, where the antennae are,
+     how the body leans. During a burning incident the posture is FROZEN, so
+     the bodies stop being animation and become a diagram of the failure you
+     are being asked to name — a line of waiting workers, two braced against
+     each other, five wedged in a doorway. */
+  var POSE = {
+    carry: { gait: 0, brace: -0.4, droop: 0.2, lean: 0.5, splay: 0, work: 1 },
+    haul: { gait: 1, brace: 0, droop: 0.3, lean: 0.3, splay: 0, work: 1 },
+    tug: { gait: 0, brace: -1.5, droop: 0.1, lean: -1.6, splay: 1.5, work: 1 },
+    jam: { gait: 0.25, brace: 1.4, droop: 2.6, lean: 0, splay: 2.2, work: 0 },
+    wait: { gait: 0, brace: -0.2, droop: 1.9, lean: 0, splay: 0.2, work: 0 },
+    guard: { gait: 0, brace: -0.9, droop: 0.1, lean: 0.8, splay: 1.6, work: 0 },
+    march: { gait: 1.2, brace: 0, droop: 0, lean: 0.4, splay: 0, work: 0 },
+    chase: { gait: 1.4, brace: 0.3, droop: 0, lean: 1.2, splay: 0, work: 0 },
+    dig: { gait: 0.3, brace: -1.2, droop: 0.4, lean: 1.4, splay: 1.1, work: 2 },
+    wander: { gait: 0.7, brace: 0, droop: 1.6, lean: 0, splay: 0, work: 0 },
+    idle: { gait: 0, brace: -0.4, droop: 2.7, lean: -0.4, splay: 0.6, work: 0 },
+    down: { gait: 0, brace: 1.1, droop: 3, lean: 0, splay: 2.4, work: 0 }
+  };
+
+  function drawAnt(a, S, sc, dim, frozen) {
+    var x = AX(a), y = AY(a);
     var b = bodyOf(a.id);
-    var vx = a.vx || 0, vy = a.vy || 0, spd = Math.sqrt(vx * vx + vy * vy);
     var held = (a.hold && a.hold.length) ? a.hold.length : 0;
-    var idle = held === 0;
     var stunned = (a.stun || 0) > 0;
     var gave = !!a.gaveUp;
     var own = (a.terr || 0) > 0.5;
 
-    if (spd > 0.04) { b.ang = angLerp(b.ang, Math.atan2(vy, vx), 0.22); b.mov = b.mov * 0.86 + 0.14; }
-    else b.mov *= 0.9;
-    /* an ant with nothing to do casts about; a loaded one holds its line */
-    if (idle && !stunned) b.ang += Math.sin(now * 0.0016 + b.k * 21) * 0.055;
-    b.ph += spd * (0.5 + (S.tempo || 1) * 0.22) + (stunned ? 0 : 0.02);
+    /* heading and gait come from where the body actually went in the nest */
+    var mx2 = b.px === undefined ? 0 : x - b.px, my2 = b.py === undefined ? 0 : y - b.py;
+    var spd = Math.sqrt(mx2 * mx2 + my2 * my2);
+    b.px = x; b.py = y;
+    if (spd > 0.25) { b.ang = angLerp(b.ang, Math.atan2(my2, mx2), 0.3); b.mov = b.mov * 0.84 + 0.16; }
+    else b.mov *= 0.88;
+
+    /* the nest says what it is doing before the taxonomy does: cutting a face,
+       standing in a queue that will not move, or pressed into a full passage */
+    var pose = a.posture;
+    if (stunned) pose = 'down';
+    else if (a.place === 'dig' || a.digE != null) pose = 'dig';
+    else if ((a.blockT || 0) > 26) pose = a.headOn ? 'tug' : 'wait';
+    else if (!pose) pose = held ? 'haul' : 'wander';
+    var P = POSE[pose] || POSE.wander;
+    var idle = P.droop > 1.4;
+
+    if (idle && !stunned && !frozen) b.ang += Math.sin(now * 0.0016 + b.k * 21) * 0.055;
+    if (!frozen) b.ph += spd * 0.34 * P.gait + (stunned ? 0 : 0.015 * P.gait);
 
     var job = held ? jobIx.get(a.hold[0]) : null;
-    var atWork = false;
-    if (job) {
-      var ddx = job.x - a.x, ddy = job.y - a.y;
-      atWork = (ddx * ddx + ddy * ddy) < 26 * 26;
+    var atWork = P.work > 0 && !stunned;
+    if (P.work === 1 && job) {
+      var ddx = X(job.x) - x, ddy = Y(job.y) - y;
+      atWork = (ddx * ddx + ddy * ddy) < 30 * 30;
     }
 
     ctx.save();
@@ -620,24 +926,24 @@ FZ.render = (function () {
       }
     }
 
-    /* --- legs: tripod gait, frozen and braced at work, curled when down --- */
+    /* --- legs: tripod gait, braced when pulling, splayed when wedged --- */
     A(0.85 * al); ctx.strokeStyle = MAT.ink; ctx.lineWidth = 0.8;
     ctx.lineCap = 'round';
     var bases = [1.7, 0.2, -1.3];
     for (var s = -1; s <= 1; s += 2) {
       for (var i = 0; i < 3; i++) {
         var ph = b.ph + i * 2.0 + (s > 0 ? 0 : Math.PI);
-        var sw = stunned ? 1.1 : gave ? -0.5 : atWork ? -0.35 : Math.sin(ph) * 0.9 * (0.35 + b.mov);
+        var sw = P.brace + Math.sin(ph) * 0.9 * P.gait * (0.35 + b.mov);
         var bx = bases[i];
-        var kx = bx + 1.2 + sw * 0.9, ky = s * (2.4 + (stunned ? -1 : 0));
-        var fx = bx + 2 + sw * 1.9, fy = s * (3.9 + (stunned ? -2.6 : gave ? -1.2 : 0));
+        var kx = bx + 1.2 + sw * 0.9, ky = s * (2.4 + P.splay * 0.7 + (stunned ? -1 : 0));
+        var fx = bx + 2 + sw * 1.9, fy = s * (3.9 + P.splay * 1.5 + (stunned ? -2.6 : gave ? -1.2 : 0));
         ctx.beginPath(); ctx.moveTo(bx, s * 1); ctx.lineTo(kx, ky); ctx.lineTo(fx, fy); ctx.stroke();
       }
     }
 
     /* --- antennae: up and probing when working, down when idle, flat when spent --- */
-    var wig = Math.sin(now * 0.009 + b.k * 13) * (idle ? 0.4 : 1.1);
-    var droop = gave ? 2.8 : idle ? 2.1 : 0.3;
+    var wig = frozen ? 0 : Math.sin(now * 0.009 + b.k * 13) * (idle ? 0.4 : 1.1);
+    var droop = P.droop + (gave ? 0.8 : 0) + (a.hesitate || 0) * 0.9;
     var reach = a.myopic ? 1.8 : 3.2;
     A(0.9 * al); ctx.strokeStyle = MAT.ink; ctx.lineWidth = 0.8;
     for (var t = -1; t <= 1; t += 2) {
@@ -809,7 +1115,7 @@ FZ.render = (function () {
     ctx.beginPath(); ctx.ellipse(jx + 1.4, jy + 2, r * 0.95, r * 0.72, 0.4, 0, TAU); ctx.fill();
     ctx.save();
     ctx.translate(jx, jy); ctx.rotate(hash(j.id * 1.7) * TAU);
-    A(0.98 * a); ctx.fillStyle = MAT.sand2;
+    A(0.98 * a); ctx.fillStyle = MAT.soil2;
     ctx.beginPath();
     ctx.moveTo(r, 0);
     ctx.quadraticCurveTo(r * 0.45, r * 0.86, -r * 0.55, r * 0.7);
@@ -850,23 +1156,28 @@ FZ.render = (function () {
     }
     /* what the lens shows: how much this one is actually worth */
     if (S.lensOn) {
+      /* counted ON the crumb, never floating in the earth above it */
       var n = clamp(Math.round(j.value || 1), 1, 6);
-      A(0.8 * a); ctx.fillStyle = SIG.blue;
-      for (var v = 0; v < n; v++) ctx.fillRect(jx - n * 2.2 + v * 4.4, jy - r - 7, 2.6, 3);
+      A(0.92 * a); ctx.fillStyle = SIG.blue;
+      for (var v = 0; v < n; v++) ctx.fillRect(jx - n * 1.9 + v * 3.8, jy + r * 0.12, 2.4, 3);
     }
-    /* everybody hauling on one crumb, pulling in different directions */
+    /* everybody hauling on one crumb, pulling in different directions. A short
+       taut stub, not a ray across the nest: it is a grip, and it only reads as
+       a grip if it stops at the mandibles. */
     if (nclaim > 1 && taught('Co')) {
       var cl = idsOf(j.claims);
       for (var c = 0; c < cl.length; c++) {
         var ca = agentIx.get(cl[c]);
         if (!ca) continue;
-        var ax = X(ca.x), ay = Y(ca.y);
+        var ax = AX(ca), ay = AY(ca);
         var d = Math.sqrt((ax - jx) * (ax - jx) + (ay - jy) * (ay - jy)) || 1;
-        if (d > 90) continue;
-        A(0.5 * dim); ctx.strokeStyle = MAT.ink; ctx.lineWidth = 1.1;
+        if (d > 46) continue;
+        var stub = Math.min(d - 5, 15);
+        if (stub < 2) continue;
+        A(0.62 * dim); ctx.strokeStyle = MAT.ink; ctx.lineWidth = 1.4;
         ctx.beginPath();
-        ctx.moveTo(jx + (ax - jx) / d * r, jy + (ay - jy) / d * r);
-        ctx.lineTo(ax - (ax - jx) / d * 6, ay - (ay - jy) / d * 6);
+        ctx.moveTo(jx + (ax - jx) / d * (r - 1), jy + (ay - jy) / d * (r - 1));
+        ctx.lineTo(jx + (ax - jx) / d * (r - 1 + stub), jy + (ay - jy) / d * (r - 1 + stub));
         ctx.stroke();
       }
     }
@@ -876,19 +1187,6 @@ FZ.render = (function () {
     var pj = jobIx.get(j.prereq);
     if (!pj) return true;
     return (pj.progress || 0) >= (pj.need || 1);
-  }
-  /* a dependency is a tunnel nobody has dug yet */
-  function plannedTunnels(S) {
-    if (!L) return;
-    for (var i = 0; i < L.edges.length; i++) {
-      var e = L.edges[i];
-      if (e.dug) continue;
-      var a = L.nodes[e.a], b = L.nodes[e.b];
-      A(0.45); ctx.strokeStyle = MAT.ink; ctx.lineWidth = 1.4;
-      ctx.setLineDash([3, 5]); ctx.lineDashOffset = -now * 0.006;
-      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-      ctx.setLineDash([]); ctx.lineDashOffset = 0;
-    }
   }
 
   /* ============================================================ institutions
@@ -993,11 +1291,11 @@ FZ.render = (function () {
       for (var j = i + 1; j < n; j++) {
         var b = ag[j];
         if ((b.stun || 0) > 0) continue;
-        var ddx = X(b.x) - X(a.x), ddy = Y(b.y) - Y(a.y);
+        var ddx = AX(b) - AX(a), ddy = AY(b) - AY(a);
         var d2 = ddx * ddx + ddy * ddy;
         if (d2 > l2 || d2 < 0.01) continue;
         var k = 1 - Math.sqrt(d2) / lim;
-        var mxp = (X(a.x) + X(b.x)) / 2, myp = (Y(a.y) + Y(b.y)) / 2;
+        var mxp = (AX(a) + AX(b)) / 2, myp = (AY(a) + AY(b)) / 2;
         var an = Math.atan2(ddy, ddx);
         A(0.55 * k); ctx.strokeStyle = MAT.ink; ctx.lineWidth = 1.1;
         for (var s = -1; s <= 1; s += 2) {
@@ -1037,9 +1335,11 @@ FZ.render = (function () {
     var tw = 0;
     for (var i = 0; i < ls.length; i++) tw = Math.max(tw, ctx.measureText(ls[i]).width);
     var bw = tw + 20, bh = 13 + ls.length * 15;
-    var bx = clamp(cx - bw / 2, 6, W - bw - 6);
+    var bx = clamp(cx - bw / 2, 6, Math.max(6, W - bw - 6));
     var by = above ? cy - bh : cy;
-    by = clamp(by, 16, H - bh - 6);
+    var ar = actRect();
+    var floor = ar ? Math.min(H - bh - 6, ar.top - bh - 4) : H - bh - 6;
+    by = clamp(by, 16, Math.max(16, floor));
     A(0.2); ctx.fillStyle = MAT.ink; ctx.fillRect(bx + 2, by + 3, bw, bh);
     A(0.97); ctx.fillStyle = MAT.paper; ctx.fillRect(bx, by, bw, bh);
     A(0.5); ctx.strokeStyle = MAT.ink2; ctx.lineWidth = 1;
@@ -1068,6 +1368,52 @@ FZ.render = (function () {
     }
     return best ? { o: best, left: bl } : null;
   }
+  /* the workers the burning incident is about. Their posture freezes, and they
+     are held further apart than usual, because these are the bodies the player
+     has to read and count in the two seconds they have. */
+  function burningWho(S) {
+    var top = urgent(S);
+    if (!top) return null;
+    var el = (window.FZ && FZ.ELBY && top.o.sym) ? FZ.ELBY[top.o.sym] : null;
+    var ids = el ? idsOf(el.who) : [];
+    if (!ids.length && top.o.who) ids = idsOf(top.o.who);
+    return ids.length ? new Set(ids) : null;
+  }
+  /* Where the answer dial may be drawn: never clipped by an edge, never under
+     the action bar that is telling the player to tap it. It is displaced only
+     as far as the answer radius allows, so what you tap is still an answer. */
+  function actRect() {
+    if (!cv) return null;
+    var el = document.getElementById('act');
+    if (!el || !el.firstChild) return null;
+    var r = el.getBoundingClientRect(), c = cv.getBoundingClientRect();
+    if (!r.height) return null;
+    return { top: r.top - c.top - 12, bottom: r.bottom - c.top + 12 };
+  }
+  function safeSpot(x, y, r) {
+    var fr = clamp(r * 0.5, 24, 44);
+    var pad = Math.min(90, W * 0.24, H * 0.2);
+    var ar = actRect();
+    var lo = pad, hi = H - pad;
+    if (ar && ar.top < hi) hi = Math.max(pad, Math.min(hi, ar.top));
+    var tx2 = clamp(x, pad, Math.max(pad, W - pad));
+    var ty2 = clamp(y, lo, Math.max(lo, hi));
+    var dx2 = tx2 - x, dy2 = ty2 - y;
+    var d = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+    var cap = r * 0.74;
+    if (d > cap && d > 0) { tx2 = x + dx2 / d * cap; ty2 = y + dy2 / d * cap; d = cap; }
+    /* the dial shrinks rather than reaching outside the ground it belongs to */
+    fr = Math.min(fr, Math.max(15, r - d - 5));
+    tx2 = clamp(tx2, fr + 11, Math.max(fr + 11, W - fr - 11));
+    ty2 = clamp(ty2, fr + 11, Math.max(fr + 11, H - fr - 11));
+    if (ar && ty2 + fr + 8 > ar.top && ty2 - fr - 8 < ar.bottom) {
+      ty2 = Math.max(fr + 11, ar.top - fr - 8);
+    }
+    dx2 = tx2 - x; dy2 = ty2 - y;
+    d = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+    fr = Math.min(fr, Math.max(15, r - d - 5));
+    return { x: tx2, y: ty2, fr: fr, off: d };
+  }
   function outbreakGround(S) {
     var O = live();
     if (!O) return;
@@ -1087,6 +1433,7 @@ FZ.render = (function () {
   /* The fuse is the boundary itself draining away. It cannot come adrift from
      the place it belongs to, and it needs no numerals to be read. */
   function outbreakInstrument(S) {
+    lastDial = null;
     var O = live();
     if (!O) return;
     var top = urgent(S);
@@ -1106,23 +1453,33 @@ FZ.render = (function () {
       ctx.setLineDash([3, 5]);
       ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.stroke();
       ctx.setLineDash([]);
-      /* the time left, on a compact dial at the spot — the wide dashed ring is
-         how far an answer may land, the dial is how long it has */
-      var fr = clamp(r * 0.5, 25, 44);
+      /* the time left, on a compact dial — the wide dashed ring is how far an
+         answer may land, the dial is how long it has. The dial is nudged clear
+         of the screen edge and of the action bar, never further than the ring
+         allows, so the thing you are told to tap is always tappable. */
+      var sp = safeSpot(x, y, r);
+      var fr = sp.fr;
+      if (sp.off > 3) { A(0.3 * q); line(x, y, sp.x, sp.y, col, 1.2, 0.3 * q); }
       A(0.18 * q); ctx.strokeStyle = MAT.ink; ctx.lineWidth = lead ? 4 : 2.5;
-      ctx.beginPath(); ctx.arc(x, y, fr, 0, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.arc(sp.x, sp.y, fr, 0, TAU); ctx.stroke();
       A(0.95 * q * bl); ctx.strokeStyle = col; ctx.lineWidth = lead ? 4 : 2.5;
       ctx.lineCap = 'butt';
       ctx.beginPath();
-      ctx.arc(x, y, fr, -Math.PI / 2, -Math.PI / 2 + left * TAU);
+      ctx.arc(sp.x, sp.y, fr, -Math.PI / 2, -Math.PI / 2 + left * TAU);
       ctx.stroke();
-      if (lead) brackets(ctx, x, y, fr + 8, 8, col, 2.2, 0.8 * bl);
+      if (lead) brackets(ctx, sp.x, sp.y, fr + 8, 8, col, 2.2, 0.8 * bl);
       ctx.globalAlpha = 1;
+      if (lead) {
+        top.sx = sp.x; top.sy = sp.y; top.sr = fr;
+        lastDial = { x: sp.x, y: sp.y, fr: fr, off: sp.off, r: r };
+      }
     }
     if (!top || domSpeaking()) return;
     /* one note, near the thing, only when nothing else on the page is speaking */
-    var o2 = top.o, bx = X(o2.x), by = Y(o2.y);
-    var br = clamp(clamp((o2.r || 60) * sx, 30, Math.min(W, H) * 0.33) * 0.5, 25, 44) + 10;
+    var o2 = top.o;
+    var bx = top.sx === undefined ? X(o2.x) : top.sx;
+    var by = top.sy === undefined ? Y(o2.y) : top.sy;
+    var br = (top.sr === undefined ? 30 : top.sr) + 10;
     var above = by - br - 62 > 18;
     var txt = o2.say || ((FZ.copy && FZ.copy.fire) ? FZ.copy.fire[o2.sym] : '');
     var tag = paperTag(txt, bx, above ? by - br - 8 : by + br + 8, above);
@@ -1177,6 +1534,17 @@ FZ.render = (function () {
       A((1 - k) * 0.7); ctx.strokeStyle = SIG.red; ctx.lineWidth = 1.6;
       ctx.beginPath(); ctx.moveTo(x - 5, y - 5); ctx.lineTo(x + 5, y + 5);
       ctx.moveTo(x + 5, y - 5); ctx.lineTo(x - 5, y + 5); ctx.stroke();
+      return true;
+    }
+    if (b.k === 'holed') {
+      /* the two faces meet and the passage is a passage: dust, and it is done */
+      A((1 - k) * 0.6); ctx.fillStyle = MAT.sand2;
+      for (var hh = 0; hh < 9; hh++) {
+        var ha2 = hash(b.t + hh) * TAU, hd2 = 3 + e * 20;
+        ctx.beginPath();
+        ctx.ellipse(x + Math.cos(ha2) * hd2, y + Math.sin(ha2) * hd2 + e * e * 8, 2, 1.5, ha2, 0, TAU);
+        ctx.fill();
+      }
       return true;
     }
     if (b.k === 'hurt') {
@@ -1255,8 +1623,8 @@ FZ.render = (function () {
       ctx.setLineDash([]);
       var ags = S.agents || [];
       for (var i = 0; i < ags.length; i++) {
-        var ddx = X(ags[i].x) - x, ddy = Y(ags[i].y) - y;
-        if (ddx * ddx + ddy * ddy < vr * vr) ring(X(ags[i].x), Y(ags[i].y), 12, SIG.teal, 1.6, 0.8);
+        var ddx = AX(ags[i]) - x, ddy = AY(ags[i]) - y;
+        if (ddx * ddx + ddy * ddy < vr * vr) ring(AX(ags[i]), AY(ags[i]), 12, SIG.teal, 1.6, 0.8);
       }
       return;
     }
@@ -1264,11 +1632,11 @@ FZ.render = (function () {
       var best = null, bd = 46 * 46;
       var as = S.agents || [];
       for (var k = 0; k < as.length; k++) {
-        var ex = X(as[k].x) - x, ey = Y(as[k].y) - y, d2 = ex * ex + ey * ey;
+        var ex = AX(as[k]) - x, ey = AY(as[k]) - y, d2 = ex * ex + ey * ey;
         if (d2 < bd) { bd = d2; best = as[k]; }
       }
       if (best) {
-        brackets(ctx, X(best.x), Y(best.y), 17, 7, SIG.red, 2.4, pulse + 0.2);
+        brackets(ctx, AX(best), AY(best), 17, 7, SIG.red, 2.4, pulse + 0.2);
         ctx.globalAlpha = 1;
       } else { brackets(ctx, x, y, 16, 6, MAT.ink, 2, 0.4); ctx.globalAlpha = 1; }
       return;
@@ -1312,23 +1680,39 @@ FZ.render = (function () {
     if (peak.size > 90) { peak.clear(); }
 
     if (!L || L.sig !== layoutSig(S)) buildLayout(S);
-    else stampReadyEdges(S);
+    else refreshNest(S);
 
-    /* every worker excavates as it walks, and lays scent as it goes */
+    /* ============ WHERE EVERY BODY IS. CONTRACT §16, and the whole piece.
+       SIM has already put every worker in a chamber, in a tunnel, at a dig face
+       or on the surface — never in soil — so the position IS the truth and gets
+       drawn as given. The only correction is crowding: bodies packed tighter
+       than sixteen px are eased apart so a queue of eight is eight countable
+       bodies, and anything the easing pushes at a wall is put back inside. */
+    var sc = antScale(agents.length);
+    var burnSet = burningWho(S);
+    var spots = [];
+    for (i = 0; i < agents.length; i++) {
+      var ax0 = X(agents[i].x), ay0 = Y(agents[i].y);
+      spots.push({ id: agents[i].id, x: ax0, y: ay0, ox: ax0, oy: ay0 });
+    }
+    spread(spots, sc, burnSet);
+    drawn.clear();
+    for (i = 0; i < spots.length; i++) drawn.set(spots[i].id, spots[i]);
+
+    /* a worn floor: the routes the colony actually uses smooth out over time */
     var moved = false;
     for (i = 0; i < agents.length; i++) {
-      var a = agents[i];
-      if ((a.stun || 0) > 0) continue;
-      /* one pass leaves a scuff; a route used over and over becomes a tunnel */
-      carve(X(a.x), Y(a.y), 6.5, 0.022);
+      var a3 = agents[i];
+      if ((a3.stun || 0) > 0) continue;
+      carve(AX(a3), AY(a3), 5, 0.02);
       moved = true;
       /* scent is a line laid by feet, not a puddle, and only a worker that
          knows where it is going lays any */
-      var bd = bodyOf(a.id);
-      var px = X(a.x) * DS, py = Y(a.y) * DS;
-      if (a.hold && a.hold.length && !a.chaseRumor && bd.lx !== undefined) {
+      var bd = bodyOf(a3.id);
+      var px = AX(a3) * DS, py = AY(a3) * DS;
+      if (a3.hold && a3.hold.length && !a3.chaseRumor && bd.lx !== undefined) {
         var seg = (px - bd.lx) * (px - bd.lx) + (py - bd.ly) * (py - bd.ly);
-        if (seg > 0.04 && seg < 900) {
+        if (seg > 0.04 && seg < 110) {
           tx.globalCompositeOperation = 'source-over';
           tx.globalAlpha = 0.075; tx.strokeStyle = SIG.blue;
           tx.lineWidth = 2.4; tx.lineCap = 'round';
@@ -1354,17 +1738,24 @@ FZ.render = (function () {
       carveChamber(X(chs[i].x), Y(chs[i].y), Math.max(26, (chs[i].r || 60) * sx * 0.92), 700 + stamped.size);
     }
 
-    if (nestDirty || frames < 3) rebuildNest();
+    /* the earth is a composite of several full-canvas passes, and a live dig
+       face dirties it every single frame. Rebuild at a third of frame rate:
+       a tunnel growing half a pixel is not a thing anyone can see faster. */
+    if ((nestDirty && (frames % 3) === 0) || frames < 3) rebuildNest();
 
     /* ---- the earth ---- */
     ctx.globalAlpha = 1;
     ctx.drawImage(nest, 0, 0, W, H);
 
-    /* ---- what is known: scent, invisible unless somebody lit a lantern ---- */
-    var lit = S.lensOn ? 1 : clamp(0.15 - (S.blind || 0) * 0.12, 0, 0.15);
-    if (lit > 0.03) { A(lit); ctx.drawImage(trail, 0, 0, W, H); ctx.globalAlpha = 1; }
+    /* ---- what is known: scent, and you cannot see it without a lantern.
+       It used to be washed in at fifteen percent all the time, which drew long
+       pale rays across solid earth wherever a body changed rooms and read as a
+       rendering fault. Scent is knowledge; knowledge is blue; blue only appears
+       when somebody has lit the lamp. Traffic itself is told by wear, in earth. */
+    if (S.lensOn) { A(1); ctx.drawImage(trail, 0, 0, W, H); ctx.globalAlpha = 1; }
 
-    plannedTunnels(S);
+    drawRoads(S);
+    drawFaces(S);
     drawFlood(S);
 
     for (i = 0; i < chs.length; i++) drawCharter(chs[i]);
@@ -1394,23 +1785,17 @@ FZ.render = (function () {
 
     for (i = 0; i < jobs.length; i++) drawCrumb(jobs[i], S, dimBase);
 
-    /* intention lines, only where the lantern is lit */
-    if (S.lensOn) {
-      for (i = 0; i < agents.length; i++) {
-        var ag = agents[i];
-        var tj = (ag.hold && ag.hold.length) ? jobIx.get(ag.hold[0]) : null;
-        if (!tj) continue;
-        A(0.75); ctx.strokeStyle = SIG.blue; ctx.lineWidth = 1.3;
-        ctx.setLineDash([2, 4]);
-        ctx.beginPath(); ctx.moveTo(X(ag.x), Y(ag.y)); ctx.lineTo(X(tj.x), Y(tj.y)); ctx.stroke();
-        ctx.setLineDash([]);
-      }
-    }
+    /* WHICH TUNNEL IT MEANS TO TAKE. With the lantern lit, every worker's route
+       is drawn along the passages it will actually walk — not a straight line
+       through solid earth, which would be a picture of something impossible.
+       The one body with no line drawn is the one with no honest destination,
+       and that is the puzzle: the lamp does not accuse anybody, it just shows
+       intention, and one intention is missing. */
+    if (S.lensOn && L) drawIntent(S, agents);
 
-    var sc = antScale(agents.length);
     for (i = 0; i < agents.length; i++) {
       var a2 = agents[i];
-      drawAnt(a2, S, sc, (fset && !fset.has(a2.id)) ? dimBase : 1);
+      drawAnt(a2, S, sc, (fset && !fset.has(a2.id)) ? dimBase : 1, burnSet ? burnSet.has(a2.id) : false);
     }
     drawJostle(S, sc);
 
@@ -1418,7 +1803,7 @@ FZ.render = (function () {
       var wob = 0.55 + Math.sin(now * 0.007) * 0.35;
       for (i = 0; i < fwho.length; i++) {
         var fa = agentIx.get(fwho[i]);
-        if (fa) ring(X(fa.x), Y(fa.y), 14 * sc, MAT.paper, 2, wob);
+        if (fa) ring(AX(fa), AY(fa), 14 * sc, MAT.paper, 2, wob);
       }
     }
 
@@ -1430,10 +1815,20 @@ FZ.render = (function () {
       var twho = tel ? idsOf(tel.who) : [];
       var tc = top.left < 0.34 ? SIG.red : SIG.amber;
       var tp = 0.4 + Math.abs(Math.sin(now * 0.008)) * 0.4;
-      for (i = 0; i < twho.length && i < 8; i++) {
+      /* only the bodies AT the incident. A colony-wide element can implicate
+         thirteen workers, and thirteen rings scattered over the whole nest is
+         not a causal beat, it is confetti. The ones inside the ground that is
+         burning are the ones the player is being asked to look at. */
+      var ox = X(top.o.x), oy = Y(top.o.y);
+      var orr = clamp((top.o.r || 60) * sx, 30, Math.min(W, H) * 0.33) * 1.15;
+      var marked = 0;
+      for (i = 0; i < twho.length && marked < 8; i++) {
         var ta = agentIx.get(twho[i]);
         if (!ta) continue;
-        ring(X(ta.x), Y(ta.y), 11 * sc, tc, 1.6, tp);
+        var tx3 = AX(ta), ty3 = AY(ta);
+        if ((tx3 - ox) * (tx3 - ox) + (ty3 - oy) * (ty3 - oy) > orr * orr) continue;
+        ring(tx3, ty3, 9 * sc, tc, 1.7, tp);
+        marked++;
       }
     }
 
@@ -1464,6 +1859,9 @@ FZ.render = (function () {
       wire(); warm();
       this.resize(cv.clientWidth || W, cv.clientHeight || H);
     },
+    /* test hooks — read-only, for the placement/legibility harness */
+    __drawn: function () { return drawn; },
+    __dial: function () { return lastDial; },
     resize: function (w, h) {
       W = Math.max(1, Math.round(w)); H = Math.max(1, Math.round(h));
       if (!cv) return;

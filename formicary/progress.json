@@ -1,7 +1,7 @@
 {
-  "round": 4,
-  "updated": "2026-08-16 23:53 UTC",
-  "note": "ROUND 4 \u2014 THE NEST BECOMES REAL. Client, on the round-3 build: 'they do not use the paths to dig and get to where they need to go they just go randomly wherever they want they have to use the infrastructure or dig it themselves... also it all happens very fast.' The deepest note so far. The tunnels were drawn and then ignored \u2014 ants moved in straight lines through packed soil. That destroys the argument of the whole piece: FORMICARY exists to say you do not fix agents, you fix the space between them, and if an ant can walk through solid earth then THERE IS NO SPACE BETWEEN THEM. Every spatial failure becomes bookkeeping a paper tag has to assert in words, which is exactly why the tags kept describing things the picture did not show. CONTRACT section 16: the nest is a graph of chambers and tunnels and it is the only way to move. An ant is always in a chamber, in a tunnel, at a dig face, or on the surface \u2014 never inside soil. To reach what the network does not connect, it must dig, visibly, over time. Tunnels and chambers have capacity, so a queue is a real queue of real bodies. This makes twelve of the twenty-eight physical for free: siloing becomes a chamber with no tunnel to it, flooding becomes a packed passage, a turf war becomes two rivals meeting head-on in a one-ant tunnel, and a charter at a junction becomes literally a meeting stone at a crossroads.",
+  "round": 5,
+  "updated": "2026-08-17 02:58 UTC",
+  "note": "ROUND 4 RESULT: THE NEST IS REAL, VERIFIED STRUCTURALLY. An independent geometric test \u2014 4720 samples, all ten chapters \u2014 found zero ants in solid soil, worst case 12.6px from a corridor centreline in corridors 14 to 16px wide. Digging is watchable and permanent: a face advances, spoil accumulates, a dashed unreachable chamber becomes solid when the tunnel arrives. Queues are real countable bodies in real passages. THE HONEST COST: fixing pace one way broke it the other. Ants walk watchably now, but the incident clock was left at 19 seconds and chapter 4 yields ONE decision in 27 seconds \u2014 a player can look away and lose nothing. AND ALL THREE CRITICS INDEPENDENTLY FOUND THE SAME REMAINING BUG: the incident ring anchors to an edge midpoint rather than to the bodies that constitute the failure, so a ring reading THE JAMMED TUNNEL sits on empty corridor while the real queue sits outside it. The graph is real; the marker still points at the wrong place.",
   "pieces": [
     {
       "id": "N",
@@ -35,6 +35,27 @@
             "r3N-c9-b.png",
             "r3N-c9-c.png"
           ]
+        },
+        {
+          "n": 4,
+          "verdict": "close",
+          "score": 82,
+          "laws": {
+            "L1": 8,
+            "L2": 8,
+            "L3": 6,
+            "L4": 8,
+            "L5": 8,
+            "L6": 7,
+            "L7": 7,
+            "L8": 8,
+            "L9": 8,
+            "L10": 8,
+            "L11": 7
+          },
+          "built": "The nest draws the truth now: ants walking corridors, queueing nose to tail, kneeling at dig faces with spoil, resting in chambers. Unreachable chambers are drawn with a dashed outline that becomes solid the moment a tunnel arrives.",
+          "gap": "The action bar OVERLAYS the nest instead of making room for it, so the bodies that ARE the incident get hidden exactly when the player is being asked to read them. The world should scale to the available height rather than being covered. Also at collapse the field carries two huge expanding shockwave rings, five small rings, two amber brackets, two scars and a paper tag at once \u2014 the exact depiction-law failure signature.",
+          "shots": []
         }
       ]
     },
@@ -71,6 +92,27 @@
             "r3I-wrong-a.png",
             "r3I-wrong-b.png"
           ]
+        },
+        {
+          "n": 4,
+          "verdict": "close",
+          "score": 85,
+          "laws": {
+            "L1": 8,
+            "L2": 8,
+            "L3": 6,
+            "L4": 9,
+            "L5": 8,
+            "L6": 7,
+            "L7": 8,
+            "L8": 7,
+            "L9": 8,
+            "L10": 7,
+            "L11": 6
+          },
+          "built": "Incidents can now anchor on physical situations, and the field is tappable as the answer gesture: arm the meeting stone, then place it at a junction.",
+          "gap": "ALL THREE CRITICS INDEPENDENTLY FOUND THE SAME THING. The incident ring is anchored to an edge midpoint rather than to the bodies that constitute the failure, and the body is only held until the tag is hung rather than for the whole fuse. So a ring reading THE JAMMED TUNNEL sits on a stretch of corridor containing ZERO ants while an obvious queue of four sits 200px outside it. The graph is real and the crowds are real, but the marker keeps pointing at the wrong place, so the picture still contradicts the sentence.",
+          "shots": []
         }
       ]
     },
@@ -169,6 +211,32 @@
           "built": "Misses now cost, and the difficulty curve is real and measured THROUGH the live loop: answering 100 percent survives 4/4 with strain 0-7; 85 percent survives with strain to 47; 70 percent survives with strain to 89; 50 percent LOSES half its runs; 30 and 0 percent lose everything. Ungoverned collapses inside 12k ticks. All six trade-offs re-verified with numbers, including truce only becoming reachable under a charter, and speed raising throughput and aggression together.",
           "gap": "The ledger/lens trade-off is the most interesting idea in the simulation and it is still a paragraph rather than something played. Stage it as an A/B passage on an identical seed: one run with only the tally, where the liar is answered but the lone dissenter is then disbelieved, and one with only the lantern, where the dissenter is heard but the rumour spreads.",
           "shots": []
+        },
+        {
+          "n": 4,
+          "verdict": "close",
+          "score": 76,
+          "laws": {
+            "L1": 7,
+            "L2": 8,
+            "L3": 6,
+            "L4": 8,
+            "L5": 7,
+            "L6": 6,
+            "L7": 8,
+            "L8": 5,
+            "L9": 8,
+            "L10": 6,
+            "L11": 7
+          },
+          "built": "THE NEST IS REAL, and it passes structurally rather than cosmetically. An independent geometric test that ignores the sim's own flags measured every body's distance to the nearest dug tunnel or chamber: 4720 samples across all ten chapters, worst case 12.6px from a centreline in corridors drawn 14 to 16px wide, zero ants marooned in soil in any screenshot. A single function is the only place an ant's coordinates are ever written, and it derives them from graph geometry, so it is a structural guarantee. Digging is the best thing in the build: an ant at a jagged face with spoil spraying, a tunnel stub reaching toward a chamber drawn with a dashed outline because nothing connects to it, and five seconds later the tunnel arrives, the dashes become solid, and the spoil heap stays as a permanent mark. That is siloing, depicted, with zero words. Queues are real bodies: five ants nose to tail in a one-ant tunnel.",
+          "gap": "Pace overshot one way and was never tuned the other. Ants now walk watchably, answering the speed note, but the incident clock was left at a flat 900 ticks \u2014 about 19 seconds \u2014 for chapters 2 through 8. Chapter 4 produced exactly ONE decision in a 27-second run. A player can look away for twenty seconds and lose nothing, which is the precise failure the core-loop law exists to catch. Chapter 10 is correctly tuned at one decision every 3 seconds and is the proof the rest should be tuned toward it.",
+          "shots": [
+            "r4W-queue.png",
+            "r4W-digwatch-0.png",
+            "r4W-digwatch-2.png",
+            "r4W-tour-ch3.png"
+          ]
         }
       ]
     },

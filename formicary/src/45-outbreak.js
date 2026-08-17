@@ -27,6 +27,41 @@
    round-one correctness bug: expelling an honest worker who happened to be standing inside a
    burning sabotage ring banked an ANSWERED and a refund while the real saboteur kept
    draining. See culprit() below.
+
+   ------------------------------------------------------------------------------
+   THIS ROUND: THE INCIDENT OPENS ON A PHYSICAL SITUATION, NOT ON A COORDINATE
+   ------------------------------------------------------------------------------
+   The verdict was exact: THE EMPTY GROUND opened over two ants standing near a chamber,
+   and "no institution" existed only in the sentence. That is the Depiction Law failing at
+   the one place it is least affordable — the first tag a player ever meets.
+
+   The nest is now a real movement graph (CONTRACT §16), so every one of those sentences
+   has somewhere to point. anchor() below is the whole answer: before an incident is drawn
+   it is RESOLVED ONTO A SITE — a junction, a passage, a sealed chamber, a dig face, a knot
+   of implicated bodies — and the ring is sized to hold that site and nothing more.
+
+       In  the crossroads where three tunnels meet and nobody keeps the line
+       Si  the chamber with no tunnel to it at all
+       Fl  the room packed to its walls, or the passage standing solid
+       Lo  the body parked in the passage and the line behind it
+       Tw  the two rivals nose to nose where only one fits
+       Dp  the dig face nobody is cutting, with the work stuck behind it
+       Co  the crumb two workers walked in on by two different tunnels
+       Cf  the one road worn bright, with the cold one beside it
+       Ow  the room of the worker holding more rooms than it can stand in
+
+   Two rules underneath all of them:
+
+     AN INCIDENT NEVER OPENS ON EMPTY EARTH. If the chosen site holds no body and no
+     structural fact, the incident moves to the nearest knot of ants it is about, and if
+     even that fails it does not open. holds(), nearestKnot().
+
+     AN INCIDENT WAITS FOR ITS BODY. On the first pass the anchor is STRICT: a failure
+     with a situation of its own will not open until the colony is actually in that
+     situation. It goes to the waiting room, is retried every tick, and only after
+     WAIT_BODY ticks will it settle for the bodies the detector named. The same waiting
+     room re-times the clusters — the colony fails three at a time and then goes quiet,
+     and the overflow used to be thrown away.
    ============================================================ */
 window.FZ = window.FZ || {};
 
@@ -121,20 +156,52 @@ FZ.outbreak = (function () {
 
   /* ticks. The rAF loop steps once per frame, so ~60 ticks is a second.
      The fuse shortens with machine speed: that is how Sp becomes the difficulty
-     curve rather than a caption. */
-  var FUSE = 400, FUSE_MIN = 168, FUSE_MAX = 620;
-  var FIRST_GRACE = 1.5;          /* the first one you ever see waits for you */
-  var TAG_DELAY = 40;             /* beat 1 before beat 2: the body arrives before the name */
-  var COOL_OK = 210, COOL_MISS = 160;
-  var KEEP = 130;                 /* how long a resolved outbreak stays inspectable */
-  var BURN_DRAIN = 0.05;          /* progress lost per tick inside a burning ring */
-  var LAND_STRAIN = 6, ANSWER_RELIEF = 4;
+     curve rather than a caption.
+
+     RE-TUNED AGAINST THE NEW TEMPO (CONTRACT §16.3). The old curve was chosen for a
+     colony that crossed the whole field in a fraction of a second; ants now WALK, and
+     the nest is the only way through. Measured on the shipped nest: a lateral passage
+     is about two seconds, a normal room-to-room errand about five, the spine end to end
+     about eleven. An incident has to live on the scale of an errand, or the body never
+     finishes happening before the fuse asks about it.
+
+       FUSE 620      ten and a half seconds — long enough to watch the queue form,
+                     short enough that ignoring it is a decision you feel.
+       FUSE_MIN 280  at machine speed the same incident is under five seconds. Sp is
+                     still the difficulty curve; it just starts from a colony you can see.
+       TAG_DELAY 80  a second and a third of BODY before any word. At the old pace this
+                     was 40 ticks, which is a blink; now it is a beat you can use.
+       COOL_*        the same failure does not re-open on top of itself for four or five
+                     seconds — one situation at a time, at a pace a person reads at. */
+  var FUSE = 620, FUSE_MIN = 280, FUSE_MAX = 900;
+  var FIRST_GRACE = 1.6;          /* the first one you ever see waits for you */
+  var TAG_DELAY = 80;             /* beat 1 before beat 2: the body arrives before the name */
+  var COOL_OK = 300, COOL_MISS = 200;
+  var KEEP = 170;                 /* how long a resolved outbreak stays inspectable */
+  /* a longer fuse must not mean a bigger hole: the drain per incident is held where it
+     was by cutting the per-tick rate in the same proportion the fuse grew. */
+  var BURN_DRAIN = 0.032;         /* progress lost per tick inside a burning ring */
+  var LAND_STRAIN = 6, ANSWER_RELIEF = 6;
   var STORE = 'formicary.mastery';
 
   var list = [];
   var mastery = {};
   var cap = 1;
   var cool = {};
+  /* THE WAITING ROOM. Measured in the sandbox: the colony does not fail at a steady
+     rate, it fails in clusters — three detectors trip inside a second and then nothing
+     trips for half a minute. Everything over the cap used to be thrown away, so the
+     player spent half the sandbox with no decision on the table at all, then got three
+     at once. Overflow now WAITS a few seconds for a slot, and is only let in if the
+     element is still genuinely hot when the slot opens. Nothing is invented and nothing
+     is invented late: the queue only re-times trouble the colony really is in, and drops
+     it entirely if the colony cools. Measured in the shipped sandbox with this in place:
+     a decision is on the table 97% of the ticks the game is actually in play, and the
+     colony no longer alternates between three at once and nothing at all. */
+  var waiting = [];
+  var WAIT_KEEP = 1200;           /* how long an unserved fire stays worth serving (~20s) */
+  var WAIT_HOT = 0.14;            /* and how hot its element must still be */
+  var WAIT_BODY = 110;            /* how long an incident waits for its own situation */
   var pend = null;                /* an answer awaiting the sim's verdict on the spend */
   var seen = 0;                   /* outbreaks opened this run */
   var seq = 0;                    /* outbreak ids, so a tag can stay attached to one thing */
@@ -200,6 +267,453 @@ FZ.outbreak = (function () {
 
   function radius(st) { return clamp(Math.min(st.w, st.h) * 0.22, 56, 92); }
 
+  /* ============================================================================
+     THE SITE — where the incident physically IS.
+
+     Every function below returns a site or null, and null means "I could not find
+     this situation in the nest right now", never "put it anywhere". The ring is sized
+     to hold the site: a junction ring holds the junction and the mouths of the tunnels
+     meeting at it; a passage ring holds the passage. A ring wider than its situation is
+     the old bug in a smaller font — it points at a region instead of a thing.
+     ============================================================================ */
+  function nodesOf(st) { return (st.nest && st.nest.nodes) || []; }
+  function edgesOf(st) { return (st.nest && st.nest.edges) || []; }
+  function agentOf(st, id) {
+    var A = st.agents;
+    for (var i = 0; i < A.length; i++) if (A[i].id === id) return A[i];
+    return null;
+  }
+  function edgeLoad(e) { return e.occ.length + e.qa.length + e.qb.length; }
+  function dist(ax, ay, bx, by) { var dx = ax - bx, dy = ay - by; return Math.sqrt(dx * dx + dy * dy); }
+  function bodiesNear(st, x, y, r) {
+    var n = 0, r2 = r * r;
+    for (var i = 0; i < st.agents.length; i++) {
+      var a = st.agents[i], dx = a.x - x, dy = a.y - y;
+      if (dx * dx + dy * dy <= r2) n++;
+    }
+    return n;
+  }
+  function idsNear(st, x, y, r) {
+    var out = [], r2 = r * r;
+    for (var i = 0; i < st.agents.length; i++) {
+      var a = st.agents[i], dx = a.x - x, dy = a.y - y;
+      if (dx * dx + dy * dy <= r2) out.push(a.id);
+    }
+    return out;
+  }
+
+  /* a room or a crossroads. pad is how far past its wall the ring reaches — for a
+     junction that is how much of each tunnel you can see meeting there. */
+  function atNode(st, n, pad) {
+    if (!n) return null;
+    return { kind: 'node', id: n.id, x: n.x, y: n.y, r: clamp(n.r + (pad == null ? 34 : pad), 46, 92) };
+  }
+  /* a passage, held whole, or held around one point in it (a parked body, a dig face) */
+  function atEdge(st, e, cx, cy) {
+    var N = nodesOf(st), A = N[e.a], B = N[e.b];
+    if (!A || !B) return null;
+    var mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2;
+    var x = (cx == null) ? mx : cx, y = (cy == null) ? my : cy;
+    var half = dist(A.x, A.y, B.x, B.y) / 2;
+    var reach = Math.max(half + 18, dist(x, y, mx, my) + 34);
+    return {
+      kind: 'edge', id: e.id, x: x, y: y, r: clamp(reach, 46, 92),
+      ax: A.x, ay: A.y, bx: B.x, by: B.y, dug: !!e.dug,
+    };
+  }
+  /* a knot of the bodies this failure is actually about — the TIGHTEST knot, not their
+     average, because the average of two ants in two tunnels is a wall. */
+  function atBodies(st, ids) {
+    var pts = [], i, k;
+    for (i = 0; i < (ids || []).length; i++) { var a = agentOf(st, ids[i]); if (a) pts.push(a); }
+    if (!pts.length) return null;
+    var seed = pts[0], bn = -1;
+    for (i = 0; i < pts.length; i++) {
+      var n = 0;
+      for (k = 0; k < pts.length; k++) if (dist(pts[i].x, pts[i].y, pts[k].x, pts[k].y) < 96) n++;
+      if (n > bn) { bn = n; seed = pts[i]; }
+    }
+    var sx = 0, sy = 0, m = 0;
+    for (i = 0; i < pts.length; i++) {
+      if (dist(seed.x, seed.y, pts[i].x, pts[i].y) > 96) continue;
+      sx += pts[i].x; sy += pts[i].y; m++;
+    }
+    var x = sx / m, y = sy / m, far = 0;
+    for (i = 0; i < pts.length; i++) {
+      var d = dist(x, y, pts[i].x, pts[i].y);
+      if (d <= 96 && d > far) far = d;
+    }
+    /* A KNOT OF BODIES IS STILL A KNOT ON THE NETWORK. Bodies walk; the room and the
+       passage they are in do not. So the ring is centred on the structure they occupy —
+       otherwise it marks where they were a second and a half ago, which is the same
+       failure as marking bare earth, only harder to spot. */
+    var g = snapTo(st, x, y);
+    if (g && dist(x, y, g.x, g.y) < 46) {
+      return { kind: 'crowd', id: g.id, x: g.x, y: g.y, r: clamp(Math.max(far + 30, g.r), 46, 92) };
+    }
+    return { kind: 'crowd', id: 0, x: x, y: y, r: clamp(far + 30, 46, 92) };
+  }
+
+  /* nearest point on a segment — used to put a stray coordinate back on the network */
+  function nearPt(x, y, ax, ay, bx, by) {
+    var vx = bx - ax, vy = by - ay, L = vx * vx + vy * vy;
+    if (!L) return { x: ax, y: ay };
+    var t = clamp(((x - ax) * vx + (y - ay) * vy) / L, 0, 1);
+    return { x: ax + vx * t, y: ay + vy * t };
+  }
+  /* NO INCIDENT IS EVER CENTRED IN SOLID EARTH. A coordinate from a detector that has no
+     situation of its own still lands on the network: the room or the passage nearest it. */
+  function snapTo(st, x, y) {
+    var N = nodesOf(st), E = edgesOf(st), i;
+    var bn = null, bnd = Infinity;
+    for (i = 0; i < N.length; i++) {
+      var d = dist(x, y, N[i].x, N[i].y) - N[i].r;
+      if (d < bnd) { bnd = d; bn = N[i]; }
+    }
+    var be = null, bed = Infinity, bp = null;
+    for (i = 0; i < E.length; i++) {
+      var e = E[i];
+      if (!e.dug) continue;
+      var A = N[e.a], B = N[e.b];
+      if (!A || !B) continue;
+      var p = nearPt(x, y, A.x, A.y, B.x, B.y), q = dist(x, y, p.x, p.y);
+      if (q < bed) { bed = q; be = e; bp = p; }
+    }
+    if (bn && bnd <= bed) return atNode(st, bn, 34);
+    if (be) return atEdge(st, be, bp.x, bp.y);
+    return bn ? atNode(st, bn, 34) : { kind: 'ground', id: 0, x: x, y: y, r: 60 };
+  }
+
+  /* ---- the situations, one per body in the §16.2 table ---- */
+
+  /* a crossroads with nobody keeping it: three ways meet, bodies are waiting, no arch.
+     `bare` prefers the UNGOVERNED one, which is the whole of In. */
+  function siteCross(st, bare) {
+    var N = nodesOf(st), E = edgesOf(st), best = null, bs = 0;
+    for (var i = 0; i < N.length; i++) {
+      var n = N[i];
+      if (n.kind === 'surface') continue;
+      var ways = 0, waiting = n.occ.length, k;
+      for (k = 0; k < n.edges.length; k++) {
+        var e = E[n.edges[k]];
+        if (!e || !e.dug) continue;
+        ways++;
+        waiting += (e.a === n.id ? e.qa : e.qb).length;
+      }
+      if (ways < 3) continue;
+      /* bodies already in the passages that meet here are bodies about to be here: by the
+         time the tag is hung, the crossroads the ring chose is the one they arrive at. */
+      var conv = 0;
+      for (k = 0; k < n.edges.length; k++) {
+        var ce = E[n.edges[k]];
+        if (ce && ce.dug) conv += ce.occ.length;
+      }
+      /* BODIES DECIDE WHICH CROSSROADS. Every junction is a junction; the one worth
+         pointing at is the one workers are actually contending for, so presence outweighs
+         geometry and a crossroads with nobody at it is not the incident at all. */
+      var near = bodiesNear(st, n.x, n.y, 78);
+      if (!near && !waiting && !conv) continue;
+      var s = ways * 0.5 + waiting * 4 + near * 3 + conv * 2 + (bare ? (n.gov ? -8 : 2) : 0);
+      if (s > bs) { bs = s; best = n; }
+    }
+    return best ? atNode(st, best, 38) : null;
+  }
+
+  /* a chamber with no tunnel to it at all — Si with a wall instead of a number */
+  function siteSealed(st) {
+    var N = nodesOf(st), E = edgesOf(st), main = st.nest ? st.nest.main : 0, i, k;
+    var best = null, bs = -1;
+    for (i = 0; i < st.jobs.length; i++) {
+      var j = st.jobs[i];
+      if (j.done || !j.sealed) continue;
+      var n = N[j.node];
+      if (!n) continue;
+      var s = 4 + (j.dark || 0) * 3;
+      if (s > bs) { bs = s; best = n; }
+    }
+    /* and if nothing is walled off this instant, the crumb the fewest of them have ever
+       heard of — which is still a crumb sitting in a room, not a patch of floor */
+    if (!best) {
+      var bd = 0.35;
+      for (i = 0; i < st.jobs.length; i++) {
+        var jb = st.jobs[i];
+        if (jb.done || !((jb.dark || 0) > bd)) continue;
+        var nn = N[jb.node];
+        if (nn) { bd = jb.dark; best = nn; }
+      }
+    }
+    if (!best) {
+      for (i = 0; i < N.length; i++) {
+        var nd = N[i];
+        if (nd.kind === 'junction' || nd.kind === 'surface') continue;
+        var dug = 0;
+        for (k = 0; k < nd.edges.length; k++) { var e = E[nd.edges[k]]; if (e && e.dug) dug++; }
+        if (!dug || nd.comp !== main) { best = nd; break; }
+      }
+    }
+    return best ? atNode(st, best, 42) : null;
+  }
+
+  /* a passage standing solid, or worn to a shine while its neighbour stays cold */
+  function siteJam(st, wear) {
+    var E = edgesOf(st), best = null, bs = 0;
+    for (var i = 0; i < E.length; i++) {
+      var e = E[i];
+      if (!e.dug) continue;
+      var s = edgeLoad(e) * 2 + (e.jam || 0) * 3 + (wear ? (e.wear || 0) * wear : 0);
+      if (s > bs) { bs = s; best = e; }
+    }
+    return (best && bs >= 2) ? atEdge(st, best) : null;
+  }
+  /* a room packed to its walls, before the passage that feeds it */
+  function siteCrowd(st) {
+    var N = nodesOf(st), best = null, bs = 2;
+    for (var i = 0; i < N.length; i++) {
+      var n = N[i];
+      if (n.kind === 'surface') continue;
+      if (n.occ.length > bs) { bs = n.occ.length; best = n; }
+    }
+    /* the fuller the room, the further the crowd spills into the doorway and the passage
+       behind it — the ring has to hold the queue as well as the room */
+    return best ? atNode(st, best, 26 + bs * 4) : siteJam(st, 0);
+  }
+
+  /* a body parked in the passage, and the line behind it */
+  function siteParked(st, ids) {
+    var E = edgesOf(st), N = nodesOf(st), i, k, a;
+    for (i = 0; i < E.length; i++) {
+      var e = E[i];
+      if (!e.dug || !e.occ.length || edgeLoad(e) < 2) continue;
+      for (k = 0; k < e.occ.length; k++) {
+        a = agentOf(st, e.occ[k]);
+        if (!a) continue;
+        if (a.blockT > 30 || a.locker || a.posture === 'guard') return atEdge(st, e, a.x, a.y);
+      }
+    }
+    /* THE BODY, NOT THE CRUMB. A stale claim with nobody visible in the ring is the
+       failure the critic caught: the ring must hold the worker that is sitting on it. */
+    for (i = 0; i < st.jobs.length; i++) {
+      var j = st.jobs[i];
+      if (j.done || !j.locked) continue;
+      a = agentOf(st, j.locked);
+      if (a) return atBodies(st, [a.id]);
+    }
+    for (i = 0; i < st.agents.length; i++) {
+      a = st.agents[i];
+      if (a.locker || a.churner || (a.posture === 'guard' && a.holdN)) return atBodies(st, [a.id]);
+    }
+    for (i = 0; i < st.jobs.length; i++) {
+      var jb = st.jobs[i];
+      if (jb.done) continue;
+      if (!(jb.queue && jb.queue.length)) continue;
+      var n = N[jb.node];
+      if (n) return atNode(st, n, 34);
+    }
+    return atBodies(st, ids);
+  }
+
+  /* two of them nose to nose in a passage that fits one */
+  function siteHeadOn(st) {
+    var E = edgesOf(st);
+    for (var i = 0; i < E.length; i++) {
+      var e = E[i];
+      if (!e.dug || e.occ.length < 2) continue;
+      var pair = (FZ.elh && FZ.elh.headOn) ? FZ.elh.headOn(st, e) : null;
+      if (pair) return atEdge(st, e, (pair[0].x + pair[1].x) / 2, (pair[0].y + pair[1].y) / 2);
+    }
+    return null;
+  }
+  /* and if they are not in a passage, the crumb they are both sitting on */
+  function siteFrozen(st) {
+    var N = nodesOf(st);
+    for (var i = 0; i < st.jobs.length; i++) {
+      var j = st.jobs[i];
+      if (j.done) continue;
+      if (!(j.frozen > st.tick) && !(j.claims && j.claims.size > 1)) continue;
+      var n = N[j.node];
+      if (n) return atNode(st, n, 32);
+    }
+    return null;
+  }
+
+  /* work behind an undug face nobody is cutting */
+  function siteDig(st) {
+    var E = edgesOf(st), N = nodesOf(st), best = null, bs = 0;
+    for (var i = 0; i < E.length; i++) {
+      var e = E[i];
+      if (e.dug || !(e.prog > 0.02)) continue;
+      var s = (e.diggers.length ? 0.5 : 2) + e.prog;
+      if (s > bs) { bs = s; best = e; }
+    }
+    if (best) {
+      var A = N[best.a], B = N[best.b], t = clamp(best.prog, 0.1, 0.9);
+      return atEdge(st, best, A.x + (B.x - A.x) * t, A.y + (B.y - A.y) * t);
+    }
+    return null;
+  }
+  /* the crumb standing still behind it, with its queue */
+  function siteBlocked(st) {
+    var N = nodesOf(st), i;
+    for (i = 0; i < st.jobs.length; i++) {
+      var j = st.jobs[i];
+      if (j.done || !j.prereq) continue;
+      var n = N[j.node];
+      if (n && (j.queue && j.queue.length || n.occ.length)) return atNode(st, n, 34);
+    }
+    return siteDig(st);
+  }
+
+  /* the crumb two workers walked in on by two different tunnels */
+  function siteTug(st, split) {
+    var best = null, bs = 1.5;
+    for (var i = 0; i < st.jobs.length; i++) {
+      var j = st.jobs[i];
+      if (j.done) continue;
+      var cl = j.claims ? (j.claims.size || j.claims.length || 0) : 0;
+      var tug = j.tug ? j.tug.length : 0;
+      var s = cl * 2 + tug * 2 + (split && j.split > st.tick ? 6 : 0) + (j.crowd || 0);
+      if (s > bs) { bs = s; best = j; }
+    }
+    if (!best) return null;
+    var n = nodesOf(st)[best.node];
+    return n ? atNode(st, n, 32) : null;
+  }
+
+  /* the room a crumb is in, picked by whatever makes it the story: the big one nobody
+     walks to, the one everybody turned away from, the one coming apart, the one only a
+     single worker has ever heard of. A crumb sitting untouched in a lit room IS the
+     failure; it does not need an ant standing next to it to be visible. */
+  function siteJob(st, score) {
+    var best = null, bs = 0;
+    for (var i = 0; i < st.jobs.length; i++) {
+      var j = st.jobs[i];
+      if (j.done) continue;
+      var s = score(j, st);
+      if (s > bs) { bs = s; best = j; }
+    }
+    if (!best) return null;
+    var n = nodesOf(st)[best.node];
+    return n ? atNode(st, n, 34) : { kind: 'ground', id: 0, x: best.x, y: best.y, r: 56 };
+  }
+  /* the confident march to a chamber with nothing in it: the ring goes on the ROOM they
+     are marching to, because that is where the emptiness is and where they arrive. */
+  function siteRumour(st) {
+    if (!st.rumor) return null;
+    var N = nodesOf(st), best = null, bd = Infinity;
+    for (var i = 0; i < N.length; i++) {
+      if (N[i].kind === 'surface') continue;
+      var d = dist(st.rumor.x, st.rumor.y, N[i].x, N[i].y);
+      if (d < bd) { bd = d; best = N[i]; }
+    }
+    return best ? atNode(st, best, 38) : null;
+  }
+  /* one body, named: the liar, the one that knows and says nothing, the one that walks
+     through whatever you put down. */
+  function siteOne(st, pick) {
+    for (var i = 0; i < st.agents.length; i++) if (pick(st.agents[i], st)) return atBodies(st, [st.agents[i].id]);
+    return null;
+  }
+
+  /* one worker holding more rooms than one body can stand in */
+  function siteHold(st, ids) {
+    var A = st.agents, best = null, bn = 1;
+    for (var i = 0; i < A.length; i++) if ((A[i].holdN | 0) > bn) { bn = A[i].holdN | 0; best = A[i]; }
+    if (!best) return atBodies(st, ids);
+    var n = (best.at != null) ? nodesOf(st)[best.at] : null;
+    return n ? atNode(st, n, 32) : atBodies(st, [best.id]);
+  }
+
+  /* sym -> its situation. Everything not named here falls to the bodies the detector
+     implicated, and then to the nearest thing on the network. */
+  var SITE = {
+    In: function (st) { return siteCross(st, true) || siteTug(st); },
+    Mm: function (st) { return siteCross(st, false); },
+    Si: siteSealed,
+    Dp: siteBlocked,
+    Fl: siteCrowd,
+    Im: function (st) { return siteJam(st, 0); },
+    Cf: function (st) { return siteJam(st, 5); },
+    Lo: siteParked,
+    Cl: siteParked,
+    Tw: function (st) { return siteHeadOn(st) || siteFrozen(st); },
+    Es: function (st) { return siteHeadOn(st) || siteFrozen(st); },
+    Co: function (st) { return siteTug(st, false); },
+    Mc: function (st) { return siteTug(st, true); },
+    Ow: siteHold,
+    /* the crumbs, and the rooms they are sitting in */
+    Pt: function (st) { return siteJob(st, function (j) { return (j.value || 0) * (1 + (j.rot || 0) * 2) * (j.progress > 0 ? 0.4 : 1); }); },
+    My: function (st) { return siteJob(st, function (j, s) { return j.id === s.bigJob ? 9 : (j.value || 0) * 0.5; }); },
+    Cs: function (st) { return siteJob(st, function (j) { return (j.shun || 0) * 2 + (j.rot || 0); }); },
+    Di: function (st) { return siteJob(st, function (j) { return (j.lone ? 6 : 0) + (j.dark || 0) * 3; }); },
+    Sa: function (st) { return siteJob(st, function (j) { return (j.unmake || 0) * 6 + (j.undone ? 5 : 0); }); },
+    Hi: function (st) { return siteJob(st, function (j) { return j.hazard ? 6 : 0; }) || siteOne(st, function (a) { return a.knows && a.knows.length; }); },
+    /* the rumour, and the bodies that carry one */
+    Gu: siteRumour,
+    Tc: function (st) { return siteOne(st, function (a) { return a.liar; }) || siteRumour(st); },
+    Rp: function (st) { return siteOne(st, function (a) { return a.liar && a.lies > 1; }) || siteRumour(st); },
+    Cr: function (st) { return siteOne(st, function (a, s) { return !a.corrigible && a.defiant > s.tick - 300; }) || siteOne(st, function (a) { return !a.corrigible; }); },
+    /* the whole colony moving too fast to read: the passage carrying the most of it */
+    Sp: function (st) { return siteJam(st, 2); },
+  };
+
+  /* is there anything in this ring to look at? A body counts. A crumb counts. A passage
+     or a dig face counts — they are things, and their state is the failure. An empty
+     patch of chamber floor does not, and that is the case this whole layer exists for. */
+  function holds(st, site) {
+    if (!site) return false;
+    if (bodiesNear(st, site.x, site.y, site.r) > 0) return true;
+    if (site.kind === 'edge') return true;
+    if (site.kind === 'node') {
+      var n = nodesOf(st)[site.id];
+      if (n && n.job) return true;
+      if (n && n.kind !== 'junction') {
+        for (var i = 0; i < st.jobs.length; i++) {
+          var j = st.jobs[i];
+          if (!j.done && j.node === n.id) return true;
+        }
+      }
+    }
+    return false;
+  }
+  /* the last resort, and it still lands on bodies: the nearest ant to where we were
+     looking, and everyone standing with it. */
+  function nearestKnot(st, x, y) {
+    var best = null, bd = Infinity;
+    for (var i = 0; i < st.agents.length; i++) {
+      var a = st.agents[i], d = dist(x, y, a.x, a.y);
+      if (d < bd) { bd = d; best = a; }
+    }
+    if (!best) return null;
+    return atBodies(st, idsNear(st, best.x, best.y, 90));
+  }
+
+  /* THE WHOLE POINT: an incident is resolved onto a situation before it is drawn.
+
+     `strict` is the first pass, and it is the difference between a tag that means
+     something and one that does not: if this failure has a situation of its own and the
+     colony is not in that situation YET — the crossroads nobody has reached, the passage
+     nobody has jammed — the incident is not opened. It goes to the waiting room and tries
+     again next tick. THE INCIDENT WAITS FOR ITS BODY, up to a few seconds, and only then
+     settles for the bodies the detector named. */
+  function anchor(sym, d, st, strict) {
+    var site = null;
+    if (st.nest && st.nest.nodes && st.nest.nodes.length) {
+      try { if (SITE[sym]) site = SITE[sym](st, (d.who || [])); } catch (e) { site = null; }
+      if (strict && SITE[sym] && (!site || !holds(st, site))) return null;
+      if (!site && d.who && d.who.length) site = atBodies(st, d.who);
+      if (!site && d.at) site = snapTo(st, d.at.x, d.at.y);
+      if (!site) site = nearestKnot(st, st.w / 2, st.h / 2);
+      if (!holds(st, site)) {
+        var alt = (d.who && d.who.length) ? atBodies(st, d.who) : null;
+        if (!alt || !holds(st, alt)) alt = nearestKnot(st, site ? site.x : st.w / 2, site ? site.y : st.h / 2);
+        if (alt) site = alt;
+      }
+    }
+    if (site) return site;
+    var at = d.at || { x: st.w / 2, y: st.h / 2 };
+    return { kind: 'ground', id: 0, x: at.x, y: at.y, r: radius(st) };
+  }
+
   function burningCount() {
     var n = 0;
     for (var i = 0; i < list.length; i++) if (list[i].state === 'burning') n++;
@@ -215,20 +729,28 @@ FZ.outbreak = (function () {
   }
 
   /* -------------------------------------------------------------------- open */
-  function open(d) {
+  function open(d, soft) {
     var st = S();
     if (!st || !d || !d.sym || st.gameOver) return;
     if (cap <= 0) return;
     if (FZ.chapters && FZ.chapters.phase && FZ.chapters.phase() !== 'play') return;
     if (!answerable(d.sym, st)) return;
     if (findBurning(d.sym)) return;
-    if (cool[d.sym] > st.tick) return;
-    if (burningCount() >= cap) return;
+    /* a cooldown means "not on top of itself", not "throw this away": if the colony is
+       still in this trouble when the cooldown lifts, it comes back. */
+    if (cool[d.sym] > st.tick) { hold(d, st); return; }
+    if (burningCount() >= cap) { hold(d, st); return; }
 
-    var at = d.at || { x: st.w / 2, y: st.h / 2 };
-    var r = radius(st);
+    /* BEFORE ANYTHING ELSE: find the situation. The detector hands us a coordinate; the
+       nest tells us what is physically there, and that is what the ring holds. If the
+       situation is not on the field yet, this waits for it rather than drawing a ring
+       around nothing. */
+    var site = anchor(d.sym, d, st, !soft);
+    if (!site) { hold(d, st); return; }
+    var at = { x: site.x, y: site.y };
+    var r = site.r;
     var fuse = Math.round(clamp(FUSE / Math.max(1, st.speedMul || 1), FUSE_MIN, FUSE_MAX));
-    if (seen === 0) fuse = Math.round(fuse * FIRST_GRACE);
+    if (seen === 0) fuse = Math.round(clamp(fuse * FIRST_GRACE, FUSE_MIN, FUSE_MAX));
     seen++;
 
     var p = phen(d.sym);
@@ -252,6 +774,17 @@ FZ.outbreak = (function () {
       say: d.say || fireLine(d.sym),
       answers: answersFor(d.sym).slice(),
       who: (d.who || []).slice(),
+      /* the fire that opened it, kept so the incident can keep finding its own body for
+         the beat before it is named (see update). */
+      seed: d,
+      /* the situation itself, for FIELD: 'node' (a room or a crossroads), 'edge' (a
+         passage, with both mouths), 'crowd' (a knot of bodies) or 'ground'. Drawing the
+         passage or the crossroads the incident is ABOUT is the last mile of this work. */
+      site: site,
+      /* the bodies standing in it. Kept apart from `who` on purpose: `who` is the
+         detector's list of the implicated and an expulsion is judged against it, so a
+         bystander must never leak into it. */
+      bodies: idsNear(st, site.x, site.y, site.r),
       state: 'burning',
       endAt: 0,
     };
@@ -259,7 +792,36 @@ FZ.outbreak = (function () {
     /* the player is looking at whatever most recently caught fire, unless she has
        deliberately pointed at something else that is still burning */
     if (!current(true)) focusId = o.id;
-    emit('outbreak:open', { sym: o.sym, x: o.x, y: o.y, fuse: o.fuse, r: o.r });
+    emit('outbreak:open', { sym: o.sym, x: o.x, y: o.y, fuse: o.fuse, r: o.r, site: o.site });
+  }
+
+  /* the cap is full: keep this one, briefly, in case a slot frees while it is still true */
+  function hold(d, st) {
+    for (var i = 0; i < waiting.length; i++) {
+      if (waiting[i].sym !== d.sym) continue;
+      waiting[i].d = d; waiting[i].until = st.tick + WAIT_KEEP;
+      return;
+    }
+    if (waiting.length > 5) waiting.shift();
+    /* it may wait WAIT_BODY ticks for its own situation to appear on the field; after
+       that it opens on the bodies the detector named, because a failure the player is
+       never told about is worse than one anchored roughly. */
+    waiting.push({ sym: d.sym, d: d, until: st.tick + WAIT_KEEP, ready: st.tick + WAIT_BODY });
+  }
+  /* a slot freed: let in the one that is still burning hardest in the colony itself */
+  function serve(st) {
+    if (!waiting.length || burningCount() >= cap) return;
+    var best = null, bh = WAIT_HOT;
+    for (var i = waiting.length - 1; i >= 0; i--) {
+      var w = waiting[i];
+      if (w.until < st.tick || findBurning(w.sym) || cool[w.sym] > st.tick) { waiting.splice(i, 1); continue; }
+      var e = el(w.sym);
+      var h = e ? e.heat : 0;
+      if (h > bh) { bh = h; best = w; }
+    }
+    if (!best) return;
+    waiting.splice(waiting.indexOf(best), 1);
+    open(best.d, st.tick >= best.ready);
   }
 
   /* ------------------------------------------------------------------- damage */
@@ -473,13 +1035,35 @@ FZ.outbreak = (function () {
        the incidents have to move with it or they point at nothing. */
     if (lastW && lastH && (lastW !== st.w || lastH !== st.h)) {
       var kx = st.w / lastW, ky = st.h / lastH;
-      for (var q = 0; q < list.length; q++) { list[q].x *= kx; list[q].y *= ky; }
+      for (var q = 0; q < list.length; q++) {
+        var oo = list[q];
+        oo.x *= kx; oo.y *= ky;
+        var s = oo.site;
+        if (!s) continue;
+        s.x *= kx; s.y *= ky;
+        if (s.ax != null) { s.ax *= kx; s.bx *= kx; s.ay *= ky; s.by *= ky; }
+      }
     }
     lastW = st.w; lastH = st.h;
 
     for (var i = list.length - 1; i >= 0; i--) {
       var o = list[i];
       if (o.state === 'burning') {
+        /* BEAT ONE IS STILL SETTLING. A crumb can be carried off and a queue can clear in
+           the second and a third before the tag is hung, and a ring holding nothing is
+           the exact failure this layer exists to end — so while the incident is still
+           wordless it is allowed to follow its body. Once the name is up it stays put:
+           a tag that wanders is worse than a tag that is slightly late. */
+        if (st.tick < o.tagAt && (st.tick - o.born) % 15 === 0) {
+          var cur = bodiesNear(st, o.x, o.y, o.r), ok = holds(st, o.site);
+          /* strict: while it settles it may only move onto its OWN kind of situation —
+             a crossroads for In, a packed passage for Fl — never onto a passing ant. */
+          var moved = anchor(o.sym, o.seed, st, true);
+          if (moved && holds(st, moved) && (!ok || bodiesNear(st, moved.x, moved.y, moved.r) > cur + 1)) {
+            o.site = moved; o.x = moved.x; o.y = moved.y; o.r = moved.r;
+          }
+          o.bodies = idsNear(st, o.x, o.y, o.r);
+        }
         var e = el(o.sym);
         if (e && e.countered && e.heat < 0.1 && st.tick - o.born > 45) defuse(o, st);
         else if (st.tick - o.born >= o.fuse) land(o, st);
@@ -489,6 +1073,7 @@ FZ.outbreak = (function () {
         list.splice(i, 1);
       }
     }
+    serve(st);
   }
 
   function wire() {
@@ -496,8 +1081,8 @@ FZ.outbreak = (function () {
     wired = true;
     FZ.bus.on('fire', open);
     FZ.bus.on('intervene', settle);
-    FZ.bus.on('lose', function () { list.length = 0; pend = null; focusId = 0; });
-    FZ.bus.on('goal', function () { list.length = 0; pend = null; focusId = 0; });
+    FZ.bus.on('lose', function () { list.length = 0; waiting.length = 0; pend = null; focusId = 0; });
+    FZ.bus.on('goal', function () { list.length = 0; waiting.length = 0; pend = null; focusId = 0; });
   }
 
   load();
@@ -511,6 +1096,7 @@ FZ.outbreak = (function () {
 
     reset: function (scenario) {
       list.length = 0;
+      waiting.length = 0;
       pend = null;
       cool = {};
       seen = 0;

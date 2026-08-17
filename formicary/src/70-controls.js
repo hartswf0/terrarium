@@ -20,11 +20,15 @@
      - the toast strip (#toast). Everything it said now arrives in the one tag region or
        is deleted; FZ.ui.toast is kept as a shim so nothing else breaks, and it writes
        into that same single region.
-     - the arm-then-aim dance for CHARTER and VARY. An institution answering a located
-       incident goes where the incident is. One tap. EJECT alone still asks for a body,
-       because naming the body IS the decision — see 45-outbreak.js culprit().
-     - opening the taxonomy card on a field tap. A field tap now moves the tag to the
-       incident you pointed at. Theory is the reward for comprehension, not a popup.
+     - opening the taxonomy card on a field tap. A field tap with nothing in hand moves
+       the tag to the incident you pointed at. Theory is the reward, not a popup.
+
+   PUT BACK THIS ROUND, and it is the point of the round: THE NEST IS TAPPABLE. Arming
+   an instrument and placing it on the colony is the answer gesture for every instrument
+   that occupies ground — CHARTER, VARY and EJECT. A meeting stone is placed AT A
+   CROSSROADS; a seed is placed ON A CROWD; a threshold is placed ON A BODY. snapAim()
+   lands each one on the real feature nearest the thumb, so an ordinary tap is an exact
+   placement and the preview shows where it will actually go.
 
    THE SIX INSTITUTIONS ARE FOLK TECHNOLOGY (AESTHETIC.md §5). Each is drawn as the thing
    an ant colony would build, and the silhouette teaches the function: an arch over a
@@ -92,11 +96,17 @@ FZ.controls = (function () {
     lens: 'LANTERN', ledger: 'TALLY', eject: 'GATE',
   };
 
-  /* EJECT is the only instrument the PLAYER has to aim, because naming the body is the
-     decision. CHARTER and VARY still need a coordinate — the sim raises them somewhere —
-     but that somewhere is not a question: an institution answering a located incident goes
-     where the incident is. One tap. */
-  var TARGETED = { eject: 1 };
+  /* THE COLONY IS THE ANSWER SURFACE.
+     Last round CHARTER and VARY auto-placed themselves at the focused incident, which
+     meant the nest — eighty-five per cent of the screen — was inert to touch while the
+     episode card was telling the player to put the stone where the trouble is. Every
+     instrument that needs a coordinate is now ARMED, then PLACED with a tap on the nest,
+     exactly as EJECT already worked.
+
+     This is only meaningful because the nest is a movement graph (CONTRACT §16): a
+     meeting stone goes AT A JUNCTION, and snapAim() below puts it on one, so the gesture
+     the player makes is "this crossroads" and not "these coordinates". */
+  var TARGETED = { eject: 1, charter: 1, vary: 1 };
   var NEEDS_XY = { eject: 1, charter: 1, vary: 1 };
   var LABELS_UNTIL = 6;               /* after this many answered, the shape is enough */
   var NOTE_MS = 2400;                 /* how long a correction owns the one message region */
@@ -119,6 +129,10 @@ FZ.controls = (function () {
     if (tight && (c.folkShort || FOLK_TIGHT[k])) return c.folkShort || FOLK_TIGHT[k];
     return c.folk || FOLK[k] || k.toUpperCase();
   }
+  /* the one line an armed instrument says, and it is an instruction to touch the colony:
+     "Put it where the trouble is." / "Point at a worker." Both already exist in FZ.copy,
+     which is where every word in this build comes from. */
+  function aimLine(kind) { return ui(kind === 'eject' ? 'tapAgent' : 'tapField'); }
   function S() { return FZ.sim ? FZ.sim.state : null; }
   function ob() { return FZ.outbreak || null; }
   function now() { return Date.now(); }
@@ -249,15 +263,25 @@ FZ.controls = (function () {
     if (TARGETED[kind]) {
       if (api.armed === kind) { disarm(); return; }
       api.armed = kind;
-      api.aim = null;
       note = null;                            /* the instrument in hand outranks old news */
+      /* the instrument comes up already resting on the trouble, so the player can see
+         what placing it would cover before touching anything — and can carry it
+         somewhere else, which is the decision. */
+      api.aim = null;
+      var o = burning();
+      if (o) {
+        var p = snapAim(kind, o.x, o.y);
+        if (kind !== 'eject' || p.x !== o.x || p.y !== o.y) api.aim = { kind: kind, x: p.x, y: p.y };
+      }
       paint(st);
       return;
     }
+    /* the bell, the lantern and the tally are rung, lit and kept for the WHOLE colony —
+       there is nowhere to put them, so they need no gesture but the press. */
     disarm();
-    var o = burning();
-    if (!o && NEEDS_XY[kind]) return;         /* nowhere to put it and nothing to answer */
-    commit(kind, o ? o.x : null, o ? o.y : null);
+    var cur = burning();
+    if (!cur && NEEDS_XY[kind]) return;       /* nowhere to put it and nothing to answer */
+    commit(kind, cur ? cur.x : null, cur ? cur.y : null);
   }
 
   function disarm() {
@@ -288,6 +312,86 @@ FZ.controls = (function () {
     paint(st);
   }
 
+  /* ------------------------------------------------------------ where it lands
+     A thumb is nine millimetres wide and the thing it is pointing at is a crossroads
+     twelve pixels across. So the tap names a FEATURE, not a coordinate: the instrument
+     is carried to the nearest thing it can actually be built on, and the preview is
+     drawn there, so what the player sees before committing is what happens.
+
+     This is forgiveness, not automation — the player still chooses WHICH crossroads,
+     which crowd, which body, and choosing wrong is still wrong. */
+  var SNAP_NODE = 62, SNAP_BODY = 74;
+
+  function nearestNode(st, x, y, junctionBonus) {
+    var N = (st.nest && st.nest.nodes) || [], E = (st.nest && st.nest.edges) || [];
+    var best = null, bd = SNAP_NODE;
+    for (var i = 0; i < N.length; i++) {
+      var n = N[i];
+      if (n.kind === 'surface') continue;
+      var dx = n.x - x, dy = n.y - y, d = Math.sqrt(dx * dx + dy * dy);
+      if (junctionBonus) {
+        var ways = 0;
+        for (var k = 0; k < n.edges.length; k++) { var e = E[n.edges[k]]; if (e && e.dug) ways++; }
+        if (ways >= 3) d -= junctionBonus;
+      }
+      if (d < bd) { bd = d; best = n; }
+    }
+    return best;
+  }
+  function nearestBody(st, x, y, reach) {
+    var best = null, bd = reach;
+    for (var i = 0; i < st.agents.length; i++) {
+      var a = st.agents[i], dx = a.x - x, dy = a.y - y, d = Math.sqrt(dx * dx + dy * dy);
+      if (d < bd) { bd = d; best = a; }
+    }
+    return best;
+  }
+  /* a tap inside a burning ring is an ANSWER, and nothing may carry it back out of the
+     ring it was aimed at. Snapping is allowed to move the instrument to a feature; it is
+     never allowed to turn a correct answer into a miss. */
+  function inside(o, x, y) {
+    if (!o) return false;
+    var dx = o.x - x, dy = o.y - y;
+    return dx * dx + dy * dy <= o.r * o.r;
+  }
+  function snapAim(kind, x, y) {
+    var st = S();
+    if (!st || x == null) return { x: x, y: y };
+    var o = burning(), keep = inside(o, x, y), i, a, q;
+    if (kind === 'charter') {
+      /* the stone belongs on the ground it governs, and that ground is a crossroads */
+      var n = nearestNode(st, x, y, 26);
+      if (!n) return { x: x, y: y };
+      if (keep && !inside(o, n.x, n.y)) return { x: x, y: y };
+      return { x: n.x, y: n.y };
+    }
+    if (kind === 'vary') {
+      /* a seed does nothing where there is nobody to take a different route */
+      var R = (FZ.sim && FZ.sim.varyR) || 95, hit = false;
+      for (i = 0; i < st.agents.length; i++) {
+        a = st.agents[i];
+        if (!a.corrigible) continue;
+        var dx = a.x - x, dy = a.y - y;
+        if (dx * dx + dy * dy < R * R * 0.81) { hit = true; break; }
+      }
+      if (hit) return { x: x, y: y };
+      var best = null, bd = 170;
+      for (i = 0; i < st.agents.length; i++) {
+        a = st.agents[i];
+        if (!a.corrigible) continue;
+        if (keep && !inside(o, a.x, a.y)) continue;
+        q = Math.sqrt((a.x - x) * (a.x - x) + (a.y - y) * (a.y - y));
+        if (q < bd) { bd = q; best = a; }
+      }
+      return best ? { x: best.x, y: best.y } : { x: x, y: y };
+    }
+    if (kind === 'eject') {
+      var b = nearestBody(st, x, y, SNAP_BODY);
+      return b ? { x: b.x, y: b.y } : { x: x, y: y };
+    }
+    return { x: x, y: y };
+  }
+
   /* --------------------------------------------------------------- the field */
   function toWorld(ev) {
     var st = S();
@@ -311,13 +415,13 @@ FZ.controls = (function () {
       down = true;
       try { field.setPointerCapture(ev.pointerId); } catch (e) { }
       var p = toWorld(ev);
-      if (p && api.armed) api.aim = { kind: api.armed, x: p.x, y: p.y };
+      if (p && api.armed) { p = snapAim(api.armed, p.x, p.y); api.aim = { kind: api.armed, x: p.x, y: p.y }; }
     });
     field.addEventListener('pointermove', function (ev) {
       if (!down || !api.armed) return;
       ev.preventDefault();
       var p = toWorld(ev);
-      if (p) api.aim = { kind: api.armed, x: p.x, y: p.y };
+      if (p) { p = snapAim(api.armed, p.x, p.y); api.aim = { kind: api.armed, x: p.x, y: p.y }; }
     });
     function up(ev) {
       if (!down) return;
@@ -327,7 +431,7 @@ FZ.controls = (function () {
       var kind = api.armed;
       disarm();
       if (!p) return;
-      if (kind) { commit(kind, p.x, p.y); return; }
+      if (kind) { var q = snapAim(kind, p.x, p.y); commit(kind, q.x, q.y); return; }
       /* no instrument in hand: the tap is a look. If two incidents are live, this is how
          the player chooses which one the tag is about. Nothing opens, nothing pops. */
       if (ob() && ob().focusAt) { try { ob().focusAt(p.x, p.y); } catch (e) { } }
@@ -464,8 +568,7 @@ FZ.controls = (function () {
          4. nothing at all */
     var name = '', line = '', tone = '';
     if (note) { name = ''; line = note.text; tone = 'note'; }
-    else if (api.armed && o) { name = o.name || ''; line = copyTool(api.armed).hint || ''; }
-    else if (api.armed) { name = ''; line = copyTool(api.armed).hint || ''; }
+    else if (api.armed) { name = o ? (o.name || '') : ''; line = aimLine(api.armed); }
     else if (o) { name = o.name || ''; line = o.line || ''; }
 
     if (!name && !line) { hideTag(); lastKey = ''; return; }

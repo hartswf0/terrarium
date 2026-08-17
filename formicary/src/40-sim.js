@@ -2,6 +2,71 @@
    40-sim.js — the colony.  OWNER: SIM.
    Touches no DOM, no canvas. Deterministic per seed. Never calls Math.random.
 
+   ============================================================================
+   THE NEST IS THE MOVEMENT GRAPH  (CONTRACT §16) — READ THIS FIRST
+   ============================================================================
+   The nest is a graph and it is THE ONLY WAY TO MOVE. Nodes are chambers and
+   junctions; edges are tunnels; everything else is solid earth. An ant is always
+   in exactly one of four states and NEVER inside soil:
+
+       a.place === 'chamber'   standing in a chamber or junction  (a.at is the node)
+       a.place === 'tunnel'    walking a tunnel                   (a.edge, a.es, a.dir)
+       a.place === 'dig'       at a dig face                      (a.digE)
+       a.place === 'surface'   on the surface at the shaft head   (a.at is the surface node)
+
+   a.x / a.y are DERIVED from that state once per tick by place(). Nothing else
+   writes them. To reach what the network does not connect an ant must DIG: it
+   walks to the nearest reachable node, opens a face, and the face advances a
+   little each tick until the tunnel exists and the graph permanently changes.
+
+   ---------------------------------------------------------------- WHAT IS EXPOSED
+   S.nest = {
+     ver,                    bumped whenever the graph changes (a tunnel completes)
+     nodes: [ {
+        id,                  index into nodes, stable for the life of a scenario
+        kind,                'surface' | 'junction' | 'chamber' | 'store' | 'queen'
+        x, y, r,             centre and radius in field px
+        cap,                 how many bodies fit inside
+        occ: [agentId…],     who is inside RIGHT NOW, in packing order
+        edges: [edgeId…],    every tunnel that meets here (dug or not)
+        job,                 id of the job that lives in this chamber, else 0
+        spoil,               0..1 how much dug earth is heaped at this mouth
+        comp,                connected-component index over DUG edges only
+        gov,                 true while a charter covers it — a junction with an arbiter
+     } … ],
+     edges: [ {
+        id, a, b,            the two node ids it joins
+        cap,                 1 = one ant at a time (a lateral). 2 = the spine/shaft.
+        len,                 length in px
+        dug,                 true if it is a tunnel; false if it is still solid earth
+        prog,                0..1 how far the dig face has advanced into the earth
+        diggers: [agentId…], who is cutting it right now
+        occ: [agentId…],     who is inside the passage right now
+        qa: [agentId…],      queued at end a, in order, waiting to enter
+        qb: [agentId…],      queued at end b, in order
+        wear,                0..1 how heavily travelled — one bright road, cold ones beside it
+        jam,                 0..1 how long it has been standing still with bodies in it
+        spoil,               0..1 heap of cut earth at the mouth of an unfinished face
+     } … ],
+     main,                   the component index most of the colony is in
+     dug, undug,             tunnel counts, for anyone wanting a census
+   }
+
+   On a worker, in addition to the four states above:
+     a.at      node id, when in a chamber/junction/surface, else null
+     a.edge    edge id, when walking, else null
+     a.es      0..1 position along that edge, ALWAYS in a-to-b parameterisation
+     a.dir     +1 walking a-to-b, -1 walking b-to-a
+     a.digE    edge id of the face it is cutting, else null
+     a.goal    the node it is trying to reach
+     a.route   [edgeId…] the rest of its planned path — this is its INTENT
+     a.blockT  ticks it has been unable to advance: the body of a queue
+     a.headOn  id of the ant it is nose to nose with in a one-ant tunnel, else 0
+     a.slot    its index inside its node's packing, so bodies do not overlap
+
+   FIELD may read every one of these and must write none.
+   ============================================================================
+
    ------------------------------------------------------------
    THE `force` VOCABULARY  (read this before writing a scenario)
    ------------------------------------------------------------
@@ -90,12 +155,14 @@
    bodies(), after the detectors have had their say.
 
    ON A WORKER
-     a.posture   one word, the whole vocabulary, chosen fresh every tick:
-                   'carry'  standing on its claim, doing the work (carrying posture)
-                   'haul'   walking to a job it has claimed, purposeful
+     a.posture   one word, the whole vocabulary, chosen fresh every tick. It is read off
+                 the NEST now — where the body is and whether it can move:
+                   'carry'  in the room with its claim, doing the work
+                   'haul'   walking a tunnel toward work it has claimed, purposeful
+                   'dig'    at a face, cutting a new passage into solid earth
                    'tug'    at a contested claim, pulling against somebody — Co
-                   'jam'    one of five or more wedged into the same doorway — Fl
-                   'wait'   queued at work it is not allowed to touch — Lo, Dp, Cl
+                   'jam'    in a chamber packed to its walls — Fl
+                   'wait'   stopped: queued at a mouth, or behind a body in a passage
                    'guard'  sitting on a claim or a hoard and not working it — Lo, Ow, Tw
                    'march'  following the crowd or the rumour, confident — Gu, Im, Cf
                    'chase'  has stopped working and only follows its rival — Es
@@ -118,12 +185,18 @@
      a.lockedOut a.gaveUp  how a rival episode ended for it (§15.3).
 
    ON A JOB
-     j.crowd     workers physically on it right now. Six is a jam in one doorway. Fl.
+     j.node      THE ROOM IT IS IN. A crumb is not a point in the earth; it is what is in
+                 a chamber, and j.x/j.y are that chamber's centre. Reaching it means
+                 walking there, and if no tunnel goes there it means digging.
+     j.sealed    true when there is NO DUG TUNNEL to its room, or its room is cut off from
+                 the rest of the nest. This is Si with a wall instead of a number.
+     j.crowd     workers physically in the room with it right now. Fl.
      j.queue     [ids] workers standing off it, waiting for it, doing nothing. Lo, Dp, Cl.
-     j.tug       [{id, ang}] the bearing each active claimant came in on. Two entries
-                 180 degrees apart is Co: they arrived from opposite tunnels and both pull.
-     j.trail     0..1 how heavily travelled the road to it is. One bright trail with cold
-                 ones beside it is Cf and Im; a trail of 0 on known-to-nobody work is Si.
+     j.tug       [{id, ang, via}] the bearing each active claimant came in on, and the
+                 EDGE ID it walked in by. Two entries with different `via` is Co: they
+                 arrived down two different passages and both pull.
+     j.trail     0..1 the wear on the most-travelled passage into its room, read straight
+                 off the nest. One bright road with cold ones beside it is Cf.
      j.dark      0..1 share of the colony that has never heard of it. Si, Di.
      j.rot       0..1 how far this crumb has gone soft while nobody came. Pt, Cs, My.
      j.unmake    0..1 work actively coming apart right now — negative progress. Sa.
@@ -234,24 +307,42 @@ FZ.sim = (function () {
     _g: null, _silent: false, _said: null,
   };
   function freshStat() {
-    return { done: 0, force: 0, passivity: 0, truce: 0, unsettled: 0,
+    return { lost: {}, done: 0, force: 0, passivity: 0, truce: 0, unsettled: 0,
              lockouts: 0, sabotage: 0, esc: 0, shunned: 0, duped: 0,
              missed: 0, answered: 0 };
   }
   S.stat = freshStat();
 
+  /* ---- THE PACE (CONTRACT §16.3) ----------------------------------------------
+     Client, round 3: "it all happens very fast." WALK is most of the answer, and the
+     nest is the rest. Measured on a 390x808 phone field: the spine runs 786 px, so a
+     worker walking the whole nest top to bottom takes about ELEVEN SECONDS at 1.15 px
+     a tick; a lateral is 129 px, about two seconds; a normal room-to-room errand is
+     five. It is walking a passage the whole way rather than crossing packed earth in a
+     straight line, which is where most of the legibility came from. DIG_PX is set so
+     one worker opens a lateral face in about four seconds and three of them in under
+     two: digging is a thing you watch happen. SLOW halves the tempo on top of all this,
+     so the bell still brakes from calm to readable and machine speed still ramps from
+     calm to frantic. The dynamic range moved; it did not collapse.
+     One number scales the whole incident curve: HEAT_PACE, near the bottom of this file.
+     Change either and re-run `node formicary/tools/balance.js`. */
+  const WALK = 1.15,        /* px per tick at tempo 1 */
+        BODY = 9.5,         /* how much of a passage one body takes up */
+        DIG_PX = 0.55,      /* how fast one digger advances a face, px per tick */
+        YIELD_T = 70,       /* how long a polite ant stands nose-to-nose before backing out */
+        JAM_T = 700,        /* the hard escape: nothing may be stuck forever */
+        MAX_EDGES = 60;
+
   const CHARTER_R = 82, VARY_R = 95, EJECT_R = 44;
   /* fewest workers a colony is allowed to be reduced to by expulsion */
   const EJECT_FLOOR = 4;
-  /* how far off the crumb a claimant stands. WORK_R is 18, so RIM keeps both hands on the
-     work while putting them on OPPOSITE SIDES of it — that is what makes Co a tug and not
-     an overlap. QUEUE_R is outside the work radius on purpose: a queue is not working. */
-  const RIM = 10, QUEUE_R = 27, QUEUE_MAX = 2, WAIT_TICKS = 190;
+  /* how long a worker will stand in a line before giving up on that work entirely */
+  const WAIT_TICKS = 260;
   /* ---- what a miss costs (see WHAT A MISS COSTS at the top) ---- */
-  const CARRY = 0.30,         /* the share of live failure a colony carries without harm */
+  const CARRY = 0.33,         /* the share of live failure a colony carries without harm */
         RISE = 0.036,         /* strain per unit of pressure ABOVE what it can carry */
         EASE = 0.013,         /* and how slowly a quiet colony knits itself back up */
-        SCAR_ADD = 7.5,       /* a landed incident leaves this much floor behind */
+        SCAR_ADD = 5.9,       /* a landed incident leaves this much floor behind */
         SCAR_HEAL = 0.6,      /* answering one files a little of the floor away */
         /* The floor fades in PROPORTION to itself, not by a fixed amount per second. That
            is what makes misses compound instead of queueing: a flat decay is a debt the
@@ -278,6 +369,510 @@ FZ.sim = (function () {
   function agentById(id) { const A = S.agents; for (let i = 0; i < A.length; i++) if (A[i].id === id) return A[i]; return null; }
   function jobById(id) { const J = S.jobs; for (let i = 0; i < J.length; i++) if (J[i].id === id) return J[i]; return null; }
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  const TAU = Math.PI * 2;
+
+  /* ============================================================
+     THE NEST — nodes, edges, and the only way to move (CONTRACT §16)
+     Everything in this block is the space between the agents. The argument of the
+     whole piece is that you do not fix agents, you fix that space — so it has to
+     BE something. Solid earth is solid. A tunnel is one ant wide. A queue is a
+     queue of bodies. To get somewhere new, somebody has to dig.
+     ============================================================ */
+  const NEST = { ver: 0, nodes: [], edges: [], main: 0, dug: 0, undug: 0 };
+  S.nest = NEST;
+
+  function nodeById(id) { return id == null ? null : NEST.nodes[id] || null; }
+  function other(e, id) { return e.a === id ? e.b : e.a; }
+
+  function nestNode(kind, x, y, r, cap) {
+    const n = { id: NEST.nodes.length, kind: kind, x: x, y: y, r: r, cap: cap,
+                occ: [], edges: [], job: 0, spoil: 0, comp: 0, gov: false };
+    NEST.nodes.push(n);
+    return n;
+  }
+  function nestEdge(a, b, cap, dug) {
+    if (NEST.edges.length >= MAX_EDGES) return null;
+    const A = NEST.nodes[a], B = NEST.nodes[b];
+    const dx = A.x - B.x, dy = A.y - B.y;
+    const e = { id: NEST.edges.length, a: a, b: b, cap: cap,
+                len: Math.max(20, Math.sqrt(dx * dx + dy * dy)),
+                dug: !!dug, prog: dug ? 1 : 0, diggers: [], occ: [], qa: [], qb: [],
+                wear: dug ? 0.10 : 0, jam: 0, spoil: 0 };
+    NEST.edges.push(e);
+    A.edges.push(e.id); B.edges.push(e.id);
+    return e;
+  }
+  function edgeMid(e) {
+    const A = NEST.nodes[e.a], B = NEST.nodes[e.b];
+    return { x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 };
+  }
+
+  /* A shaft from the surface, a spine of junctions, chambers hung off it left and
+     right down one-ant laterals, and a second way round for half of them. One or
+     two chambers are left with NO TUNNEL AT ALL — that is Si, and it is not a
+     number, it is a room you cannot get into. */
+  /* A NEST THE SIZE OF ITS COLONY. Five workers rattling around eleven chambers is not a
+     colony, it is a diagram — so the number of rows comes from how many bodies will live
+     here, and two ants meeting in a passage stays the normal case rather than a fluke.
+     (Not the chapter index: the teaching chapters all declare chapter 0 so their enabled
+     set stays teach-only, so the index says nothing about how big the colony is.) */
+  function buildNest(rows) {
+    NEST.nodes.length = 0; NEST.edges.length = 0; NEST.ver++;
+    const w = S.w, h = S.h;
+    const jit = k => (rnd() - 0.5) * k;
+    const surf = nestNode('surface', w * (0.34 + rnd() * 0.30), 8, 13, 99);
+    const R = rows;
+    const J = [], Lc = [], Rc = [];
+    for (let i = 0; i < R; i++) {
+      const y = h * (0.175 + i * (0.652 / Math.max(1, R - 1))) + jit(h * 0.028);
+      J.push(nestNode('junction', w * 0.5 + jit(w * 0.10), y, 12, 3));
+      Lc.push(nestNode(i === 1 ? 'store' : 'chamber', w * 0.175 + jit(w * 0.05), y + jit(h * 0.030), 16 + rnd() * 4, 4));
+      Rc.push(nestNode('chamber', w * 0.825 + jit(w * 0.05), y + jit(h * 0.030), 16 + rnd() * 4, 4));
+    }
+    const queen = nestNode('queen', w * 0.5 + jit(w * 0.07), h * 0.955, 20, 6);
+    /* the shaft and the spine take two abreast; everything else is single file */
+    nestEdge(surf.id, J[0].id, 2, true);
+    for (let i = 0; i + 1 < R; i++) nestEdge(J[i].id, J[i + 1].id, 2, true);
+    nestEdge(J[R - 1].id, queen.id, 2, true);
+    for (let i = 0; i < R; i++) {
+      nestEdge(J[i].id, Lc[i].id, 1, true);
+      nestEdge(J[i].id, Rc[i].id, 1, true);
+    }
+    /* THE SIDE ROADS. A nest is a network, not a tree: nearly every chamber has two ways
+       in, which is what lets two workers arrive at one crumb from two different passages
+       (Co) and what gives the colony an alternative to the road it is all using (Cf).
+       One on each side is left as solid earth, so there is always something to dig. */
+    const skipL = Math.floor(rnd() * Math.max(1, R - 1)), skipR = Math.floor(rnd() * Math.max(1, R - 1));
+    for (let i = 0; i + 1 < R; i++) {
+      nestEdge(Lc[i].id, Lc[i + 1].id, 1, i !== skipL);
+      nestEdge(Rc[i].id, Rc[i + 1].id, 1, i !== skipR);
+    }
+    /* AND ONE OR TWO ROOMS WITH NO WAY IN AT ALL. Not a lateral missing — every passage
+       that would reach them is still solid earth. Put work in one of those and the colony
+       has to walk to the end of the tunnel and dig. That is Si, and there is nothing to
+       write beside it: you can see there is no way in. */
+    const seal = 1 + (rnd() < 0.55 ? 1 : 0);
+    for (let k = 0; k < seal; k++) {
+      const row = 1 + Math.floor(rnd() * Math.max(1, R - 1));
+      const nd = (rnd() < 0.5 ? Lc : Rc)[Math.min(R - 1, row)];
+      if (!nd || nd.kind === 'store') continue;
+      for (let m = 0; m < nd.edges.length; m++) {
+        const e = NEST.edges[nd.edges[m]];
+        if (e) { e.dug = false; e.prog = 0; e.wear = 0; }
+      }
+    }
+    components();
+  }
+
+  /* which nodes can reach which, over DUG edges only */
+  function components() {
+    const N = NEST.nodes, E = NEST.edges;
+    for (let i = 0; i < N.length; i++) N[i].comp = -1;
+    let c = 0, best = 0, bestN = 0;
+    for (let i = 0; i < N.length; i++) {
+      if (N[i].comp >= 0) continue;
+      const st = [i]; N[i].comp = c;
+      let k = 0;
+      while (st.length) {
+        const u = st.pop(); k++;
+        const ad = N[u].edges;
+        for (let m = 0; m < ad.length; m++) {
+          const e = E[ad[m]];
+          if (!e.dug) continue;
+          const v = other(e, u);
+          if (N[v].comp < 0) { N[v].comp = c; st.push(v); }
+        }
+      }
+      if (k > bestN) { bestN = k; best = c; }
+      c++;
+    }
+    NEST.main = best;
+    let d = 0, u2 = 0;
+    for (let i = 0; i < E.length; i++) { if (E[i].dug) d++; else u2++; }
+    NEST.dug = d; NEST.undug = u2;
+  }
+
+  /* ---------------- routing over the graph ---------------- */
+  const _dist = [], _prev = [], _prevE = [], _seen = [];
+  /* pref  +1 follow the road everyone else wears (copying is cheap)
+           -1 take a road nobody is on (what VARY buys, physically)
+            0 shortest, avoiding whatever is already full */
+  function route(from, goal, a) {
+    const N = NEST.nodes, E = NEST.edges, n = N.length;
+    if (from === goal) return [];
+    if (N[from].comp !== N[goal].comp) return null;
+    let pref = 0;
+    if (S.tick < S.varyUntil) pref = -1;
+    else if (a && (a.copied || S.copyBias > 0.5)) pref = 1;
+    const avoid = (a && S.tick < (a.avoidUntil || 0)) ? a.avoidE : -1;
+    for (let i = 0; i < n; i++) { _dist[i] = Infinity; _prev[i] = -1; _prevE[i] = -1; _seen[i] = 0; }
+    _dist[from] = 0;
+    for (let it = 0; it < n; it++) {
+      let u = -1, bd = Infinity;
+      for (let i = 0; i < n; i++) if (!_seen[i] && _dist[i] < bd) { bd = _dist[i]; u = i; }
+      if (u < 0 || u === goal) break;
+      _seen[u] = 1;
+      const ad = N[u].edges;
+      for (let k = 0; k < ad.length; k++) {
+        const e = E[ad[k]];
+        if (!e.dug || e.id === avoid) continue;
+        const v = other(e, u);
+        if (_seen[v]) continue;
+        let c = e.len * (1 + 0.9 * (e.occ.length / e.cap));
+        if (pref > 0) c *= 1 - 0.42 * e.wear;
+        else if (pref < 0) c *= 1 + 0.65 * e.wear;
+        const nd = _dist[u] + c;
+        if (nd < _dist[v]) { _dist[v] = nd; _prev[v] = u; _prevE[v] = e.id; }
+      }
+    }
+    if (_dist[goal] === Infinity) return null;
+    const out = []; let cur = goal, guard = 0;
+    while (cur !== from && guard++ < 64) { out.push(_prevE[cur]); cur = _prev[cur]; if (cur < 0) return null; }
+    out.reverse();
+    return out;
+  }
+  /* the closest place the network actually reaches to somewhere it does not */
+  function nearestReach(from, goal) {
+    const N = NEST.nodes, g = N[goal], c = N[from].comp;
+    let best = null, bd = Infinity;
+    for (let i = 0; i < N.length; i++) {
+      if (N[i].comp !== c) continue;
+      const q = d2(N[i].x, N[i].y, g.x, g.y);
+      if (q < bd) { bd = q; best = i; }
+    }
+    return best;
+  }
+  /* which face to open from here, to get nearer to somewhere unreachable */
+  function digTarget(from, goal) {
+    const N = NEST.nodes[from], g = NEST.nodes[goal];
+    let best = null, bd = Infinity;
+    for (let i = 0; i < N.edges.length; i++) {
+      const e = NEST.edges[N.edges[i]];
+      if (e.dug) continue;
+      const v = NEST.nodes[other(e, from)];
+      const q = d2(v.x, v.y, g.x, g.y);
+      if (q < bd) { bd = q; best = e; }
+    }
+    return best || nestEdge(from, goal, 1, false);
+  }
+
+  /* ---------------- occupancy ---------------- */
+  function putIn(a, nid) {
+    const n = NEST.nodes[nid];
+    if (!n) return;
+    leaveEdge(a); unqueue(a);
+    a.at = nid; a.digE = null; a.es = 0; a.dir = 0;
+    a.place = n.kind === 'surface' ? 'surface' : 'chamber';
+    if (n.occ.indexOf(a.id) < 0) n.occ.push(a.id);
+  }
+  function takeOut(a) {
+    if (a.at == null) return;
+    const n = NEST.nodes[a.at];
+    if (n) { const k = n.occ.indexOf(a.id); if (k > -1) n.occ.splice(k, 1); }
+    a.at = null;
+  }
+  function leaveEdge(a) {
+    if (a.edge == null) return;
+    const e = NEST.edges[a.edge];
+    if (e) { const k = e.occ.indexOf(a.id); if (k > -1) e.occ.splice(k, 1); }
+    a.edge = null;
+  }
+  function unqueue(a) {
+    if (a.qE == null) return;
+    const e = NEST.edges[a.qE];
+    if (e) {
+      let k = e.qa.indexOf(a.id); if (k > -1) e.qa.splice(k, 1);
+      k = e.qb.indexOf(a.id); if (k > -1) e.qb.splice(k, 1);
+    }
+    a.qE = null;
+  }
+  function unnest(a) {                    /* an expelled body leaves no ghost behind */
+    takeOut(a); leaveEdge(a); unqueue(a);
+    if (a.digE != null) {
+      const e = NEST.edges[a.digE];
+      if (e) { const k = e.diggers.indexOf(a.id); if (k > -1) e.diggers.splice(k, 1); }
+      a.digE = null;
+    }
+  }
+
+  /* who barges. An institution at the mouth means an orderly queue; without one
+     the strong simply go first, and two who both go first meet in the middle. */
+  function pushy(a, e) {
+    if (!a.corrigible) return true;
+    if (a.rival != null) {
+      for (let i = 0; i < e.occ.length; i++) if (e.occ[i] === a.rival) return true;
+      if (a.chase != null) return true;
+    }
+    if (a.chaseRumor) return rnd() < 0.35;
+    return rnd() < 0.04 + 0.30 * S.aggro;
+  }
+
+  function tryEnter(a, eid) {
+    const e = NEST.edges[eid];
+    if (!e || !e.dug || a.at == null) return false;
+    const dir = e.a === a.at ? 1 : -1;
+    const n = NEST.nodes[a.at];
+    const q = dir > 0 ? e.qa : e.qb;
+    if (q.indexOf(a.id) < 0) q.push(a.id);
+    a.qE = eid;
+    /* a junction with an arbiter passes them one at a time, in the order they
+       arrived. A junction without one is a scramble. That difference IS In. */
+    if (n.gov && q[0] !== a.id) { a.blockT++; return false; }
+    const ent = dir > 0 ? 0 : 1, gap = BODY / e.len;
+    let opp = 0, near = false;
+    for (let i = 0; i < e.occ.length; i++) {
+      const o = agentById(e.occ[i]);
+      if (!o) continue;
+      if (o.dir !== dir) opp++;
+      if (Math.abs(o.es - ent) < gap) near = true;
+    }
+    const push = !n.gov && pushy(a, e);
+    if (near) { a.blockT++; return false; }
+    if ((e.occ.length >= e.cap || opp > 0) && !push) { a.blockT++; return false; }
+    takeOut(a); unqueue(a);
+    a.edge = eid; a.dir = dir; a.es = ent; a.place = 'tunnel'; a.blockT = 0; a.headOn = 0;
+    e.occ.push(a.id);
+    e.wear = Math.min(1, e.wear + 0.03);
+    return true;
+  }
+
+  function yieldOrWait(a, e) {
+    const o = a.headOn ? agentById(a.headOn) : null;
+    const locked = !!(o && o.rival === a.id && a.rival === o.id);
+    const mid = edgeMid(e);
+    const gov = !!FZ.elh.cover(S, mid.x, mid.y);
+    const wait = gov ? YIELD_T * 0.35 : (locked ? JAM_T : YIELD_T);
+    if (a.blockT < wait) return;
+    /* it backs out the way it came and goes round. Waiting was the cost. */
+    a.dir = -a.dir; a.blockT = 0; a.headOn = 0;
+    a.avoidE = e.id; a.avoidUntil = S.tick + 300;
+    a.route = null;
+  }
+
+  function walkEdge(a, step) {
+    const e = NEST.edges[a.edge];
+    if (!e) { a.edge = null; return; }
+    /* THE BODY IN THE DOORWAY. A worker that has claimed work and will not do it does
+       not sit tidily on the crumb — it stops halfway down the only passage into that
+       room and stays there. Everything behind it is a queue, and the queue is Lo. */
+    if (a.locker && a.hold.length) {
+      const lj = jobById(a.hold[0]);
+      if (lj && !lj.done && (e.a === lj.node || e.b === lj.node) &&
+          a.es > 0.28 && a.es < 0.72 && !FZ.elh.cover(S, a.x, a.y)) {
+        a.blockT++;
+        e.jam = Math.min(1, e.jam + 0.025);
+        return;
+      }
+    }
+    const gap = BODY / e.len;
+    let room = Infinity, head = 0;
+    for (let i = 0; i < e.occ.length; i++) {
+      const id = e.occ[i];
+      if (id === a.id) continue;
+      const o = agentById(id);
+      if (!o || o.edge !== a.edge) continue;
+      const rel = (o.es - a.es) * a.dir;
+      if (rel <= 0) continue;
+      const free = rel - (o.dir === a.dir ? gap : gap * 1.2);
+      if (free < room) { room = free; head = o.dir === a.dir ? 0 : o.id; }
+    }
+    const endId = a.dir > 0 ? e.b : e.a, endNode = NEST.nodes[endId];
+    const toEnd = a.dir > 0 ? 1 - a.es : a.es;
+    if (endNode.occ.length >= endNode.cap) room = Math.min(room, Math.max(0, toEnd - gap * 0.3));
+    let ds = step / e.len;
+    if (ds > room) ds = room > 0 ? room : 0;
+    if (ds <= 0.0002) {
+      a.blockT++; a.headOn = head;
+      e.jam = Math.min(1, e.jam + 0.02);
+      /* the hard escape. Nothing may be stuck forever; eventually they shuffle past. */
+      if (a.blockT > JAM_T * 1.6) { putIn(a, a.dir > 0 ? e.a : e.b); a.blockT = 0; a.route = null; return; }
+      yieldOrWait(a, e);
+      return;
+    }
+    a.blockT = 0; a.headOn = 0;
+    e.jam = Math.max(0, e.jam - 0.012);
+    e.wear = Math.min(1, e.wear + 0.0035);
+    a.es += ds * a.dir;
+    if (a.dir > 0 ? a.es >= 0.9998 : a.es <= 0.0002) {
+      if (endNode.occ.length < endNode.cap) {
+        const came = a.edge;
+        leaveEdge(a); putIn(a, endId);
+        /* WHICH TUNNEL IT CAME IN BY. Two claimants who arrived by different
+           passages, both pulling, is Co — and it is a picture, not a proxy. */
+        a.via = came;
+      } else { a.es = a.dir > 0 ? 1 : 0; a.blockT++; }
+    }
+  }
+
+  /* DIGGING IS REAL, VISIBLE AND PERMANENT. The face advances a little at a time,
+     it heaps spoil at the mouth, and when it breaks through the graph has changed
+     for the rest of the run. */
+  function digStep(a, T) {
+    const e = NEST.edges[a.digE];
+    if (!e || e.dug) { a.digE = null; a.route = null; putIn(a, a.digFrom == null ? 0 : a.digFrom); return; }
+    if (e.diggers.indexOf(a.id) < 0) e.diggers.push(a.id);
+    a.place = 'dig';
+    e.prog = Math.min(1, e.prog + DIG_PX * T / e.len);
+    e.spoil = Math.min(1, e.spoil + 0.003 * T);
+    const from = NEST.nodes[a.digFrom];
+    if (from) from.spoil = Math.min(1, from.spoil + 0.0012 * T);
+    if (e.prog >= 1) {
+      e.dug = true; e.wear = 0.05; e.spoil = Math.min(1, e.spoil);
+      const ds = e.diggers.slice();
+      e.diggers.length = 0;
+      for (let i = 0; i < ds.length; i++) {
+        const d = agentById(ds[i]);
+        if (d) { d.digE = null; d.route = null; putIn(d, d.digFrom == null ? e.a : d.digFrom); }
+      }
+      NEST.ver++; components();
+    }
+  }
+  function startDig(a, from, goal) {
+    const e = digTarget(from, goal);
+    if (!e) return false;
+    takeOut(a); leaveEdge(a); unqueue(a);
+    a.digFrom = from; a.digE = e.id; a.place = 'dig'; a.blockT = 0;
+    if (e.diggers.indexOf(a.id) < 0) e.diggers.push(a.id);
+    return true;
+  }
+
+  /* ---------------- the per-worker move ---------------- */
+  function nestMove(a, T) {
+    if (a.digE != null) { digStep(a, T); return; }
+    const step = WALK * T * (a.chase != null ? 1.35 : 1);
+    if (a.edge != null) { walkEdge(a, step); return; }
+    if (a.at == null) { putIn(a, 0); return; }
+    const n = NEST.nodes[a.at];
+    a.place = n.kind === 'surface' ? 'surface' : 'chamber';
+    const goal = a.goal;
+    if (goal == null || goal === a.at || !NEST.nodes[goal]) { a.route = null; unqueue(a); a.blockT = 0; return; }
+    if (!a.route || !a.route.length || a.routeVer !== NEST.ver ||
+        a.routeFrom !== a.at || a.routeGoal !== goal) {
+      a.route = route(a.at, goal, a);
+      a.routeVer = NEST.ver; a.routeFrom = a.at; a.routeGoal = goal;
+    }
+    if (!a.route) {
+      /* THE NETWORK DOES NOT GO THERE. Walk as close as it reaches, then cut. */
+      const near = nearestReach(a.at, goal);
+      if (near == null) { a.blockT++; return; }
+      if (near === a.at) { startDig(a, a.at, goal); return; }
+      a.route = route(a.at, near, a);
+      a.routeGoal = goal; a.routeFrom = a.at; a.routeVer = NEST.ver;
+      a.digWant = goal;
+      if (!a.route) { a.blockT++; return; }
+    }
+    if (!a.route.length) { a.route = null; return; }
+    if (tryEnter(a, a.route[0])) { a.route.shift(); return; }
+    /* STOOD IN A LINE LONG ENOUGH, IT CUTS A NEW WAY ROUND. This is the whole argument
+       in one behaviour: the colony's answer to a jammed passage is more infrastructure,
+       and the player watches it appear. */
+    if (a.blockT > 240 && a.corrigible && rnd() < 0.02) startDig(a, a.at, goal);
+  }
+
+  /* ---------------- bodies get put where the graph says they are ----------------
+     THE ONLY PLACE a.x / a.y ARE WRITTEN. Four states, no fifth, no soil. */
+  function place() {
+    const N = NEST.nodes, E = NEST.edges, A = S.agents;
+    for (let i = 0; i < N.length; i++) {
+      const n = N[i];
+      for (let k = n.occ.length - 1; k >= 0; k--) if (!agentById(n.occ[k])) n.occ.splice(k, 1);
+      n.gov = !!FZ.elh.cover(S, n.x, n.y);
+      const m = n.occ.length;
+      for (let k = 0; k < m; k++) {
+        const a = agentById(n.occ[k]);
+        a.slot = k;
+        if (m === 1) { a.x = n.x; a.y = n.y; continue; }
+        const inner = k < 5, cnt = inner ? Math.min(m, 5) : m - 5, idx = inner ? k : k - 5;
+        const rr = n.r * (inner ? 0.48 : 0.82);
+        const ang = (idx / Math.max(1, cnt)) * TAU + n.id * 0.7 + (inner ? 0 : 0.5);
+        a.x = n.x + Math.cos(ang) * rr;
+        a.y = n.y + Math.sin(ang) * rr * 0.86;
+      }
+    }
+    for (let i = 0; i < E.length; i++) {
+      const e = E[i];
+      for (let k = e.occ.length - 1; k >= 0; k--) {
+        const o = agentById(e.occ[k]);
+        if (!o || o.edge !== e.id) e.occ.splice(k, 1);
+      }
+      for (let k = e.diggers.length - 1; k >= 0; k--) {
+        const o = agentById(e.diggers[k]);
+        if (!o || o.digE !== e.id) e.diggers.splice(k, 1);
+      }
+      for (let k = e.qa.length - 1; k >= 0; k--) { const o = agentById(e.qa[k]); if (!o || o.qE !== e.id) e.qa.splice(k, 1); }
+      for (let k = e.qb.length - 1; k >= 0; k--) { const o = agentById(e.qb[k]); if (!o || o.qE !== e.id) e.qb.splice(k, 1); }
+    }
+    for (let i = 0; i < A.length; i++) {
+      const a = A[i], px = a.x, py = a.y;
+      if (a.edge != null) {
+        const e = E[a.edge];
+        if (e) {
+          const P = N[e.a], Q = N[e.b];
+          const dx = Q.x - P.x, dy = Q.y - P.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
+          /* two abreast in the shaft, and far enough apart to read as two bodies passing
+             rather than one smudge — the wide passages are the only place that happens */
+          const off = e.cap > 1 ? (a.dir > 0 ? 4.2 : -4.2) : 0;
+          a.x = P.x + dx * a.es - dy / d * off;
+          a.y = P.y + dy * a.es + dx / d * off;
+          a.place = 'tunnel';
+        }
+      } else if (a.digE != null) {
+        const e = E[a.digE];
+        if (e) {
+          const P = N[a.digFrom == null ? e.a : a.digFrom], Q = N[other(e, P.id)];
+          const dx = Q.x - P.x, dy = Q.y - P.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
+          const k = Math.max(0, e.diggers.indexOf(a.id));
+          const t = clamp(0.10 + e.prog * 0.86 - k * (BODY * 0.6 / d), 0.04, 0.97);
+          const off = k % 2 ? 2.2 : -2.2;
+          a.x = P.x + dx * t - dy / d * off;
+          a.y = P.y + dy * t + dx / d * off;
+          a.place = 'dig';
+        }
+      }
+      a.vx = a.x - px; a.vy = a.y - py;
+    }
+  }
+
+  /* ---------------- where a worker keeps its things ---------------- */
+  function chamberNodes() {
+    const out = [];
+    for (let i = 0; i < NEST.nodes.length; i++) {
+      const k = NEST.nodes[i].kind;
+      if (k === 'chamber' || k === 'store' || k === 'queen') out.push(NEST.nodes[i]);
+    }
+    return out;
+  }
+  function freeChamber(nearX, nearY) {
+    const C = chamberNodes(), open = [];
+    for (let i = 0; i < C.length; i++) if (!C[i].job) open.push(C[i]);
+    const pool = open.length ? open : C;
+    if (!pool.length) return null;
+    /* SOMETIMES THE WORK IS SOMEWHERE THEY CANNOT GET TO. A third of new crumbs turn up
+       in a room the network does not reach, so somebody has to walk to the end of the
+       tunnel and cut. That is what keeps digging a normal part of a colony's day rather
+       than a one-off at the start, and it is the physical body of Si. */
+    if (nearX == null) {
+      const walled = [];
+      for (let i = 0; i < pool.length; i++) if (pool[i].comp !== NEST.main) walled.push(pool[i]);
+      if (walled.length && rnd() < 0.35) return walled[Math.floor(rnd() * walled.length)];
+    }
+    if (nearX != null) {
+      let best = pool[0], bd = Infinity;
+      for (let i = 0; i < pool.length; i++) {
+        const q = d2(pool[i].x, pool[i].y, nearX, nearY);
+        if (q < bd) { bd = q; best = pool[i]; }
+      }
+      return best;
+    }
+    return pool[Math.floor(rnd() * pool.length)];
+  }
+  /* the node a worker is at, or the one it is walking into */
+  function whereIs(a) {
+    if (a.at != null) return a.at;
+    if (a.edge != null) { const e = NEST.edges[a.edge]; return e ? (a.dir > 0 ? e.b : e.a) : 0; }
+    if (a.digE != null) return a.digFrom == null ? 0 : a.digFrom;
+    return 0;
+  }
 
   /* ---------------- claims ---------------- */
   /* §15.2 A FILE WITH AN OWNER IS NOT AVAILABLE. This is the whole ownership answer to
@@ -304,21 +899,20 @@ FZ.sim = (function () {
     const cap = (S.force.overload && a.greedy) ? 4 : (a.terr > 0.5 ? 3 : 1);
     while (a.hold.length >= cap) drop(a, a.hold[0]);
     a.hold.push(j.id); a.job = a.hold[0];
-    a.cfx = a.x; a.cfy = a.y;              /* where this claim was made from */
     j.claims.add(a.id);
     /* §15.2 an owner takes over anything nobody is actually working, and the absent
        claimants lose it. Very high per-agent ownership is exactly how the newer models
        "solved" merge conflict: by hardly working together at all. */
     if (a.terr > 0.5 && j.claims.size > 1) {
+      /* EXCLUSIVITY IS THE WHOLE MECHANISM. "The median agent maintained very high
+         ownership of each of its files, reducing the potential for conflict." An owner
+         does not share a room with anyone, whether or not they were mid-job — and that
+         is why merge conflict falls and why nothing is ever learned or handed over. */
       const gone = [];
-      j.claims.forEach(id => {
-        if (id === a.id) return;
-        const o = agentById(id);
-        if (o && (o.stun > 0 || d2(o.x, o.y, j.x, j.y) >= 18 * 18)) gone.push(o);
-      });
+      j.claims.forEach(id => { if (id !== a.id) { const o = agentById(id); if (o) gone.push(o); } });
       for (let i = 0; i < gone.length; i++) drop(gone[i], j.id);
     }
-    if (S.tick - j.churnAt > 200) { j.churn = 0; j.churnAt = S.tick; }
+    if (S.tick - j.churnAt > 330) { j.churn = 0; j.churnAt = S.tick; }
     /* an owner staking out its patch is not two workers ping-ponging one claim, so it must
        not read as livelock (Cl) — otherwise the ownership regime cancels itself out */
     if (!(a.terr > 0.5)) j.churn++;
@@ -350,6 +944,10 @@ FZ.sim = (function () {
     j.claims.forEach(id => { const a = agentById(id); if (a) drop(a, j.id); });
     j.claims.clear();
     S.collapse += 1.2;
+    /* what this colony has actually LOST, and to what. The trade-off harness needs a
+       consequence it can count; heat that sits saturated at one cannot show a failure
+       getting worse, but work that fell on the floor can. */
+    S.stat.lost[why] = (S.stat.lost[why] || 0) + 1;
     emit('job:lost', { x: j.x, y: j.y, why: why });
   }
   function poison(a, j) {
@@ -372,8 +970,7 @@ FZ.sim = (function () {
   function unmake(x, y) {
     if (S.jobsDone <= 0) return null;
     S.jobsDone--;
-    const j = makeJob({ value: 4 });
-    j.x = clamp(x, 34, S.w - 34); j.y = clamp(y, 34, S.h - 34);
+    const j = makeJob({ value: 4 }, x, y);
     j.progress = j.need * 0.75; j.seenProg = j.progress;
     j.undone = true; j.unmake = 1; j.trail = 0.45;
     S.jobs.push(j);
@@ -383,19 +980,30 @@ FZ.sim = (function () {
     }
     return j;
   }
+  /* A PHANTOM IS A ROOM WITH NOTHING IN IT. The lie has to name somewhere they can
+     actually walk to, or the confident march to an empty chamber is not a march. */
   function spawnRumor(liar) {
-    const x = 30 + rnd() * (S.w - 60), y = 30 + rnd() * (S.h - 60);
-    S.rumor = { x: x, y: y, until: S.tick + 620, by: liar ? liar.id : 0, rid: ++S.rumorSeq };
+    const C = chamberNodes(), empty = [];
+    for (let i = 0; i < C.length; i++) if (!C[i].job) empty.push(C[i]);
+    const pool = empty.length ? empty : C;
+    const n = pool.length ? pool[Math.floor(rnd() * pool.length)] : null;
+    const x = n ? n.x : S.w / 2, y = n ? n.y : S.h / 2;
+    S.rumor = { x: x, y: y, node: n ? n.id : 0, born: S.tick, until: S.tick + 620, by: liar ? liar.id : 0, rid: ++S.rumorSeq };
     if (liar) liar.lies++;
     S.agents.forEach(a => { a.chaseRumor = false; });
   }
 
   /* ---------------- world construction ---------------- */
-  function makeJob(cfg) {
+  /* WORK LIVES IN A ROOM. A crumb is not a point in the earth; it is what is in a
+     chamber, and to get at it you have to be in that chamber. Some chambers have no
+     tunnel to them yet, which is why some work has to be dug to before it can start. */
+  function makeJob(cfg, nearX, nearY) {
     const v = 1 + Math.floor(rnd() * (cfg.value || 5));
+    const home = freeChamber(nearX, nearY);
     const j = {
       id: S.nextJob++,
-      x: 34 + rnd() * (S.w - 68), y: 34 + rnd() * (S.h - 68),
+      node: home ? home.id : 0,
+      x: home ? home.x : S.w / 2, y: home ? home.y : S.h / 2,
       value: v, progress: 0, need: 40 + v * 22,
       claims: new Set(), poison: false, revealed: false, victimHue: -1,
       prereq: null, locked: false, flash: 0,
@@ -407,8 +1015,16 @@ FZ.sim = (function () {
       unmake: 0, undone: false, split: 0, hazard: false, lone: false,
       seenProg: 0,
     };
+    if (home) home.job = j.id;
     return j;
   }
+  /* the room empties when the work in it is finished or lost */
+  function clearRoom(j) {
+    const n = nodeById(j.node);
+    if (n && n.job === j.id) n.job = 0;
+  }
+  /* is this worker physically in the room the work is in? */
+  function atWork(a, j) { return !!a && !!j && a.place === 'chamber' && a.at === j.node; }
 
   function reset(cfg) {
     cfg = cfg || {};
@@ -424,7 +1040,7 @@ FZ.sim = (function () {
     S.lensUntil = 0; S.ledgerUntil = 0; S.slowUntil = 0; S.varyUntil = 0;
     S.lensOn = false; S.ledgerOn = false;
     S.noArb = 0; S.exploreBlock = 0; S.imRun = 0;
-    S.copyN = 0; S.choiceN = 0; S.pickLow = 0; S.pickN = 0;
+    S.copyN = 0; S.choiceN = 0; S.pickLow = 0; S.pickN = 0; S.myCool = 0;
     S.varMul = 1; S.monoMul = 1; S.blind = 0;
     S.trustBias = 0; S.ownership = 0; S.aggro = 0;
     S.conflicts = []; S.stat = freshStat(); S._said = {};
@@ -461,7 +1077,11 @@ FZ.sim = (function () {
     S.ownEnabled = cfg.noOwn ? false
       : (cfg.own === true || (en.has('Mc') && en.has('Si') && en.has('Ow')));
 
-    /* --- jobs --- */
+    /* --- THE NEST, before anything that has to live in it --- */
+    const nAg = (cfg.agents && cfg.agents.n != null) ? cfg.agents.n : 10;
+    buildNest(nAg <= 8 ? 3 : nAg <= 13 ? 4 : 5);
+
+    /* --- jobs: each one lives in a chamber --- */
     const jc = cfg.jobs || {};
     S.maxJobs = jc.max || 5;
     S.spawnEvery = jc.spawnEvery || 0;
@@ -478,8 +1098,12 @@ FZ.sim = (function () {
     for (let i = 0; i < an; i++) {
       S.agents.push({
         id: i + 1,
-        x: 20 + rnd() * (S.w - 40), y: 20 + rnd() * (S.h - 40),
+        x: 0, y: 0,
         vx: 0, vy: 0, hue: hues[i % hues.length],
+        /* ---- WHERE IT IS IN THE NEST. Four states, never soil (CONTRACT §16) ---- */
+        place: 'chamber', at: null, edge: null, es: 0, dir: 0, digE: null, digFrom: null,
+        goal: null, route: null, routeVer: -1, routeFrom: -1, routeGoal: -1,
+        blockT: 0, headOn: 0, slot: 0, qE: null, avoidE: -1, avoidUntil: 0, digWant: -1,
         job: null, hold: [], stun: 0, flash: 0, known: new Set(),
         corrigible: true, adversary: false, rival: null, locker: false,
         colluder: false, myopic: !!F.myopia, esc: 0, greedy: false,
@@ -489,7 +1113,10 @@ FZ.sim = (function () {
         /* ---- THE BODIES: what this worker is visibly doing, every tick ---- */
         posture: 'wander', tx: 0, ty: 0, hesitate: 0, load: 0, holdN: 0,
         follow: 0, trust: 1, marks: 0, knows: [], defiant: 0,
-        waitFor: null, waitUntil: 0, rimx: 0, rimy: 0,
+        waitFor: null, waitUntil: 0,
+        /* which passage it last walked in by, so a crumb can tell whether its two
+           claimants arrived down the same tunnel or two different ones (Co) */
+        via: null,
         /* §15.2 how far this worker has retreated into owning its own patch */
         terr: 0,
         /* §15.3 how a rival episode is going, and how it ended for this worker */
@@ -522,6 +1149,16 @@ FZ.sim = (function () {
     if (F.overload) for (let i = 0; i < A.length; i++) if (i % 3 === 0) A[i].greedy = true;
     if (F.churn) { if (A[4]) A[4].churner = true; if (A[5]) A[5].churner = true; }
     if (F.rumor) { const a = A[A.length - 1]; if (a) { a.liar = true; S.trust[a.id] = 1; spawnRumor(null); } }
+
+    /* --- every body starts INSIDE the nest, in a room, on the network --- */
+    const home = [];
+    for (let i = 0; i < NEST.nodes.length; i++) {
+      const nd = NEST.nodes[i];
+      if (nd.comp === NEST.main && nd.kind !== 'surface') home.push(nd.id);
+    }
+    if (!home.length) home.push(0);
+    for (let i = 0; i < A.length; i++) putIn(A[i], home[i % home.length]);
+    place();
 
     /* --- poison --- */
     const pn = F.poison ? (F.poisonN || 1) : (jc.poison || 0);
@@ -602,21 +1239,22 @@ FZ.sim = (function () {
       j.knownBy = 0;
       for (let k = 0; k < A.length; k++) if (A[k].known.has(j.id)) j.knownBy++;
       if (j.claims.size) {
-        const ids = [], hues = {};
-        let hn = 0, work = 0, riv = false, minx = 1e9, maxx = -1e9, miny = 1e9, maxy = -1e9;
+        const ids = [], hues = {}, vias = {};
+        let hn = 0, work = 0, riv = false, vn = 0;
         j.claims.forEach(id => {
           const a = agentById(id); if (!a) return;
           ids.push(id);
           if (!hues[a.hue]) { hues[a.hue] = 1; hn++; }
-          if (a.stun <= 0 && !a.locker && d2(a.x, a.y, j.x, j.y) < 18 * 18) work++;
-          const cx = a.cfx == null ? a.x : a.cfx, cy = a.cfy == null ? a.y : a.cfy;
-          if (cx < minx) minx = cx; if (cx > maxx) maxx = cx;
-          if (cy < miny) miny = cy; if (cy > maxy) maxy = cy;
+          if (a.stun <= 0 && !a.locker && atWork(a, j)) {
+            work++;
+            /* two ants arriving at one crumb FROM TWO DIFFERENT TUNNELS (§16.2) */
+            const v = a.via == null ? -1 : a.via;
+            if (!vias[v]) { vias[v] = 1; vn++; }
+          }
           if (a.rival != null && j.claims.has(a.rival)) riv = true;
           G.workedVsum += j.value; G.workedN++;
         });
-        const spread = ids.length > 1 ? Math.sqrt((maxx - minx) * (maxx - minx) + (maxy - miny) * (maxy - miny)) : 0;
-        G.clList.push({ j: j, ids: ids, n: ids.length, hues: hues, hn: hn, work: work, riv: riv, far: spread > 130 });
+        G.clList.push({ j: j, ids: ids, n: ids.length, hues: hues, hn: hn, work: work, riv: riv, far: vn > 1 });
         G.claimTotal += ids.length;
         const c = (tgt[j.id] = (tgt[j.id] || 0) + ids.length);
         (tids[j.id] || (tids[j.id] = [])).push.apply(tids[j.id], ids);
@@ -696,7 +1334,7 @@ FZ.sim = (function () {
         let worked = false;
         j.claims.forEach(id => {
           const o = agentById(id);
-          if (o && o.stun <= 0 && d2(o.x, o.y, j.x, j.y) < 18 * 18) worked = true;
+          if (o && o.stun <= 0 && atWork(o, j)) worked = true;
         });
         if (worked) continue;
       }
@@ -742,22 +1380,16 @@ FZ.sim = (function () {
     if (best) claim(a, best);
   }
 
-  /* stand off the crumb, on the side you came in from, and do nothing. QUEUE_R is outside
-     the working radius: a queue that could reach the work would not be a queue. */
+  /* A QUEUE IS A QUEUE OF BODIES IN A PASSAGE. Turned away from work it wanted, a
+     worker does not silently pick something on the far side of the nest: it walks to
+     the room the work is in and stands there. Whether that line ends up in the
+     chamber or backed up down the lateral is decided by the nest, not by us. */
   function queueUp(a, j) {
     if (!j || S.tick < (a.waitCool || 0)) return;
-    /* A QUEUE IS A SIGN, NOT A STATE OF THE WORLD. Three ants stopped behind one stuck
-       claim is a failure you can read across the room; nine is a colony that has simply
-       stopped, and the eye cannot tell which crumb is the problem. So the colony will
-       never spend more than a third of itself standing in line. */
-    if (S.waiting >= Math.max(1, S.agents.length * 0.3)) return;
-    if (j.queue.length >= QUEUE_MAX && j.queue.indexOf(a.id) < 0) return;
-    const dx = a.x - j.x, dy = a.y - j.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
+    if (S.waiting >= Math.max(1, S.agents.length * 0.45)) return;
     a.waitFor = j.id;
     a.waitUntil = S.tick + WAIT_TICKS;
     S.waiting++;
-    a.rimx = j.x + dx / d * QUEUE_R;
-    a.rimy = j.y + dy / d * QUEUE_R;
     a.hesitate = Math.min(1, a.hesitate + 0.3);
   }
 
@@ -767,13 +1399,31 @@ FZ.sim = (function () {
     const F = S.force;
     S.tick++;
 
-    /* boot may size the field after reset, or the phone may rotate: rescale the world */
+    /* boot may size the field after reset, or the phone may rotate: rescale the world.
+       The nest is the world, so the nest is what gets rescaled; the bodies follow it. */
     if (S._lw && (S._lw !== S.w || S._lh !== S.h)) {
       const kx = S.w / S._lw, ky = S.h / S._lh;
-      for (let i = 0; i < S.agents.length; i++) { S.agents[i].x *= kx; S.agents[i].y *= ky; }
-      for (let i = 0; i < S.jobs.length; i++) { S.jobs[i].x *= kx; S.jobs[i].y *= ky; }
+      const k = Math.min(kx, ky);
+      for (let i = 0; i < NEST.nodes.length; i++) {
+        const nd = NEST.nodes[i];
+        nd.x *= kx; nd.y *= ky; nd.r *= k;
+      }
+      for (let i = 0; i < NEST.edges.length; i++) {
+        const e = NEST.edges[i], A2 = NEST.nodes[e.a], B2 = NEST.nodes[e.b];
+        e.len = Math.max(20, Math.sqrt(d2(A2.x, A2.y, B2.x, B2.y)));
+      }
+      for (let i = 0; i < S.jobs.length; i++) {
+        const nd = nodeById(S.jobs[i].node);
+        if (nd) { S.jobs[i].x = nd.x; S.jobs[i].y = nd.y; }
+        else { S.jobs[i].x *= kx; S.jobs[i].y *= ky; }
+      }
       for (let i = 0; i < S.charters.length; i++) { S.charters[i].x *= kx; S.charters[i].y *= ky; }
-      if (S.rumor) { S.rumor.x *= kx; S.rumor.y *= ky; }
+      if (S.rumor) {
+        const nd = nodeById(S.rumor.node);
+        if (nd) { S.rumor.x = nd.x; S.rumor.y = nd.y; }
+        else { S.rumor.x *= kx; S.rumor.y *= ky; }
+      }
+      place();
     }
     S._lw = S.w; S._lh = S.h;
 
@@ -824,7 +1474,13 @@ FZ.sim = (function () {
     if (F.rumor) {
       const L = S._g && S._g.liar;
       if (S.rumor && S.tick > S.rumor.until) { S.rumor = null; S.agents.forEach(a => a.chaseRumor = false); }
-      if (!S.rumor && L && S.tick % (F.lieEvery || 620) === 0) spawnRumor(L);
+      /* A LIAR WITH NOTHING TO LOSE KEEPS LYING. Tc extends a live phantom's life every
+         tick it burns, and at the new tempo it burns for a long time — which used to mean
+         the liar never got to tell a SECOND lie, so the colony never had two to remember
+         and Rp (no reputation) could not fire at all. It tells the next one on schedule
+         and the old phantom is simply replaced. */
+      const stale = S.rumor && S.tick - (S.rumor.born || 0) > (F.lieEvery || 620);
+      if ((!S.rumor || stale) && L && S.tick % (F.lieEvery || 620) === 0) spawnRumor(L);
       if (S.ledgerOn && L && L.lies > 0) S.trust[L.id] = 0.06;
     }
 
@@ -870,15 +1526,20 @@ FZ.sim = (function () {
       /* §15.2 ownership is contagious. Once most of the colony works alone, working alone
          is simply how work is done here — and the ones still trying to collaborate are
          squeezed onto whatever is left. The paper's colony converged on this; so does ours. */
-      if (S.ownEnabled && S.ownership > 0.62 && a.terr <= 0.5 && !FZ.elh.cover(S, a.x, a.y)) {
-        a.terr = Math.min(1, a.terr + 0.006 * T);
+      /* The threshold used to be two thirds of the colony, which the colony never
+         reached, so ownership stayed a minority habit — and a minority of owners is the
+         WORST case for merge conflict: they hoard rooms and everybody else piles onto
+         what is left. The paper's colony converged; at a third, so does ours, and then
+         collisions genuinely stop because nobody is working with anybody. */
+      if (S.ownEnabled && S.ownership > 0.32 && a.terr <= 0.5 && !FZ.elh.cover(S, a.x, a.y)) {
+        a.terr = Math.min(1, a.terr + 0.009 * T);
       }
       /* §15.2 territory decays on its own, and TWELVE TIMES faster inside an institution:
          a worker whose claims are arbitrated has no reason to hoard. That is the escape. */
       if (a.terr > 0) {
         /* below the line it fades; above it, ownership is a regime and it sticks. Only an
            institution dissolves it, and that is the whole reason to pay three for a charter. */
-        const fade = FZ.elh.cover(S, a.x, a.y) ? 0.022 : (a.terr > 0.5 ? 0.0003 : 0.0012);
+        const fade = FZ.elh.cover(S, a.x, a.y) ? 0.022 : (a.terr > 0.5 ? 0.0003 : 0.0007);
         a.terr = Math.max(0, a.terr - fade * T);
       }
       if (a.lockerUntil && S.tick > a.lockerUntil) { a.locker = false; a.lockerUntil = 0; }
@@ -887,9 +1548,10 @@ FZ.sim = (function () {
          economy for a long while. It drifts. It does not claim and it does not work. */
       if (S.tick < a.idleUntil) {
         while (a.hold.length) drop(a, a.hold[0]);
-        a.x = clamp(a.x + (rnd() - 0.5) * 0.7 * T, 8, S.w - 8);
-        a.y = clamp(a.y + (rnd() - 0.5) * 0.7 * T, 8, S.h - 8);
-        a.vx = a.vy = 0;
+        /* it sits down where it is. A body out of the economy is still a body in a
+           room, and it is still in somebody else's way. */
+        a.goal = null; a.route = null;
+        if (a.edge != null) nestMove(a, T);          /* it will not stop in a doorway */
         continue;
       }
       if (a.lockedOut) a.lockedOut = false;
@@ -934,11 +1596,35 @@ FZ.sim = (function () {
       /* §15.2 an owner stops tracking the rest of the colony's work entirely. It keeps its
          own files and forgets everything outside its patch, so nobody can be told about
          a job it can no longer see. This is the siloing bill, and it is what Si reads. */
-      if (a.terr > 0.5 && S.tick % 60 === 0 && a.known.size > 1) {
+      if (a.terr > 0.5 && S.tick % 45 === 0 && a.known.size > 1) {
         const far = [];
+        /* its patch is the room it is in and the rooms next door. Anything further down
+           the nest is not its business any more, and nobody it might have told is
+           listening either. That is the siloing bill, and it is what Si reads. */
         a.known.forEach(id => {
           const j = jobById(id);
-          if (!j || d2(a.x, a.y, j.x, j.y) > 132 * 132) far.push(id);
+          if (!j) { far.push(id); return; }
+          const here = nodeById(a.at == null ? whereIs(a) : a.at);
+          /* two passages out. Tighter than that and an owner knows so little that it
+             piles onto whatever is next door WITH everybody else, which would make merge
+             conflict worse — and the whole claim of §15.2 is that ownership makes it
+             better and bills you elsewhere for it. */
+          let close = false;
+          if (here) {
+            if (j.node === here.id) close = true;
+            for (let m = 0; m < here.edges.length && !close; m++) {
+              const e = NEST.edges[here.edges[m]];
+              if (!e || !e.dug) continue;
+              const v = other(e, here.id);
+              if (v === j.node) { close = true; break; }
+              const vn = NEST.nodes[v];
+              for (let q = 0; q < vn.edges.length; q++) {
+                const e2 = NEST.edges[vn.edges[q]];
+                if (e2 && e2.dug && other(e2, v) === j.node) { close = true; break; }
+              }
+            }
+          }
+          if (!close) far.push(id);
         });
         for (let k = 0; k < far.length; k++) if (a.hold.indexOf(far[k]) < 0) a.known.delete(far[k]);
       }
@@ -953,6 +1639,9 @@ FZ.sim = (function () {
           if (j.done || a.hold.indexOf(j.id) > -1) continue;
           if (j.locked !== false && j.locked !== a.id) continue;
           if (ownedByOther(j, a)) continue;
+          /* it annexes EMPTY rooms. Piling onto somebody else's crumb is the opposite of
+             working alone, and it would make merge conflict worse rather than better. */
+          if (j.claims.size) continue;
           if (a.avoid && a.avoid.has(j.id)) continue;
           const q = d2(a.x, a.y, j.x, j.y);
           if (q < bd) { bd = q; best = j; }
@@ -970,65 +1659,81 @@ FZ.sim = (function () {
         if (S.lensOn) for (let k = 0; k < S.jobs.length; k++) if (!S.jobs[k].done) a.known.add(S.jobs[k].id);
       }
 
-      /* target */
-      let tx = a.x, ty = a.y, chasing = false;
-      if (a.chaseRumor && S.rumor) { tx = S.rumor.x; ty = S.rumor.y; }
+      /* ---- WHERE IT WANTS TO BE. Always a ROOM, never a point in the earth ---- */
+      let goal = a.at == null ? whereIs(a) : a.at;
+      if (a.chaseRumor && S.rumor) goal = S.rumor.node;
       else if (a.chase != null) {
         const t = agentById(a.chase);
-        if (t) { tx = t.x; ty = t.y; chasing = true; } else a.chase = null;
+        if (t) goal = whereIs(t); else a.chase = null;
+      } else if (a.rival != null && a.esc > 0 && S.tick >= (a.truceUntil || 0)) {
+        /* §16.2 IT GETS IN THE WAY ON PURPOSE. Its rival is halfway down a one-ant
+           passage; it walks to the far end of that same passage and comes in against it.
+           "All of the models we tested quickly assumed that others were purposefully
+           impeding their work" — this is the ant that actually is. */
+        const r = agentById(a.rival);
+        if (r && r.edge != null) {
+          const e = NEST.edges[r.edge];
+          if (e && e.cap === 1) goal = r.dir > 0 ? e.b : e.a;
+        } else if (r && a.hold.length === 0) goal = whereIs(r);
       } else if (a.adversary) {
-        let bj = null, bp = -1;
-        for (let k = 0; k < S.jobs.length; k++) { const j = S.jobs[k]; if (!j.done && j.progress > bp) { bp = j.progress; bj = j; } }
-        if (bj) { tx = bj.x; ty = bj.y; }
+        /* it has to WALK to what it means to unmake, so it must not change its mind every
+           tick as the leader board shuffles — it would spend the whole run in transit. */
+        let mark = a.mark != null ? jobById(a.mark) : null;
+        if (!mark || mark.done || S.tick > (a.markT || 0)) {
+          let bj = null, bp = -1;
+          for (let k = 0; k < S.jobs.length; k++) { const j = S.jobs[k]; if (!j.done && j.progress > bp) { bp = j.progress; bj = j; } }
+          mark = bj; a.mark = bj ? bj.id : null; a.markT = S.tick + 300;
+        }
+        if (mark) goal = mark.node;
       } else if (a.waitFor != null) {
-        tx = a.rimx; ty = a.rimy;                    /* stand in the queue and do nothing */
+        const wj = jobById(a.waitFor);
+        if (wj) goal = wj.node;                       /* stand in the line and do nothing */
       } else if (a.hold.length) {
         const j = jobById(a.hold[0]);
-        if (j && !j.done) {
-          tx = j.x; ty = j.y;
-          /* TWO ANTS, ONE CRUMB, OPPOSITE TUNNELS. A contested claim is not an overlap:
-             each claimant stands on the side it arrived from and pulls the crumb its own
-             way. RIM is inside the working radius, so both are genuinely working it — and
-             that is exactly why the work does not add up. This is the body of Co. */
-          if (j.claims.size > 1) {
-            const ox = (a.cfx == null ? a.x : a.cfx) - j.x, oy = (a.cfy == null ? a.y : a.cfy) - j.y;
-            const od = Math.sqrt(ox * ox + oy * oy) || 1;
-            /* a crowd stands wider than a pair, so eight on one crumb reads as bodies
-               wedged all round one doorway and not as a single black blot */
-            const rr = j.claims.size >= 5 ? RIM + 4.5 : RIM;
-            tx = j.x + ox / od * rr; ty = j.y + oy / od * rr;
-          }
-        } else drop(a, a.hold[0]);
+        if (j && !j.done) goal = j.node;
+        else drop(a, a.hold[0]);
       } else {
-        /* A worker with nothing to do PATROLS. It used to jitter in place, which meant a
-           colony that had lost track of every job could sit still forever while the player
-           watched nothing happen — the worst possible first thirty seconds. Now it walks a
-           real line across the field, so work gets found and there is always motion to read. */
-        if (a.wx == null || d2(a.x, a.y, a.wx, a.wy) < 26 * 26 || S.tick > (a.wt || 0)) {
-          a.wx = 24 + rnd() * (S.w - 48); a.wy = 24 + rnd() * (S.h - 48);
-          a.wt = S.tick + 420;
+        /* NOTHING TO DO IS A PLACE TOO. It patrols the nest — and if it passes a face
+           somebody has started and abandoned, it picks up and digs. A colony excavates
+           more than it strictly needs, and an idle body is still a body in a passage. */
+        if (a.wn == null || a.wn === a.at || S.tick > (a.wt || 0)) {
+          a.wn = NEST.nodes.length ? Math.floor(rnd() * NEST.nodes.length) : 0;
+          a.wt = S.tick + 520;
+          if (a.digE == null && rnd() < 0.25) {
+            let f = null;
+            for (let k = 0; k < NEST.edges.length; k++) {
+              const e = NEST.edges[k];
+              if (!e.dug && e.prog > 0.02 && e.diggers.length < 3) { f = e; break; }
+            }
+            if (f) a.wn = f.a;
+          }
         }
-        tx = a.wx; ty = a.wy;
+        goal = a.wn;
       }
+      a.goal = goal;
+      /* where this worker INTENDS to go, and which passage it means to take. Drawn as an
+         intention trail only under the LENS; its absence in the dark is the body of Mm. */
+      const gn = nodeById(goal);
+      if (gn) { a.tx = gn.x; a.ty = gn.y; }
 
-      /* where this worker INTENDS to go. Drawn as an intention trail only under the LENS;
-         its absence in the dark is the whole body of Mm. */
-      a.tx = tx; a.ty = ty;
-      const dx = tx - a.x, dy = ty - a.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
-      const sp = 2.1 * T * (chasing ? 1.8 : 1);
-      if (d > 3) { a.vx = dx / d * sp; a.vy = dy / d * sp; a.x += a.vx; a.y += a.vy; }
-      else { a.vx = a.vy = 0; }
-      a.x = clamp(a.x, 8, S.w - 8); a.y = clamp(a.y, 8, S.h - 8);
+      /* ---- AND THEN IT HAS TO GET THERE, THROUGH THE NEST ---- */
+      nestMove(a, T);
 
-      /* adversaries drain the most finished thing they can reach */
-      if (a.adversary) {
-        const j = nearestOpen(a.x, a.y);
-        if (j && d2(a.x, a.y, j.x, j.y) < 20 * 20 && j.progress > 0) {
-          const amt = Math.min(j.progress, 1.7 * T);
+      /* adversaries drain the most finished thing in the room they are standing in */
+      if (a.adversary && a.place === 'chamber') {
+        const n2 = nodeById(a.at);
+        const j = n2 && n2.job ? jobById(n2.job) : null;
+        if (j && !j.done && j.progress > 0) {
+          /* it has to WALK to the work now, so once it is standing in the room it takes
+             the work apart faster. A saboteur that spends its whole life in transit is
+             not a saboteur, it is a commuter. */
+          const amt = Math.min(j.progress, 2.7 * T);
           j.progress -= amt; a.drained = (a.drained || 0) + amt;
         }
       }
     }
+    /* every body is put where the graph says it is, and nowhere else */
+    place();
 
     /* knowledge spreads between neighbours, unless siloed — or unless the teller has
        decided, after one merge conflict too many, that it works alone now (§15.2). */
@@ -1098,7 +1803,8 @@ FZ.sim = (function () {
       j.claims.forEach(id => {
         const a = agentById(id);
         if (!a || a.stun > 0 || a.locker) return;
-        if (d2(a.x, a.y, j.x, j.y) > 18 * 18) return;
+        /* YOU HAVE TO BE IN THE ROOM. Not near it, not pointed at it — in it. */
+        if (!atWork(a, j)) return;
         workers++;
         if (j.poison && !j.revealed && a.hue === j.victimHue) (victims || (victims = [])).push(a);
       });
@@ -1141,7 +1847,7 @@ FZ.sim = (function () {
       emit('job:done', { x: j.x, y: j.y, value: j.value });
     }
     /* ---- respawn ---- */
-    for (let i = S.jobs.length - 1; i >= 0; i--) if (S.jobs[i].done) S.jobs.splice(i, 1);
+    for (let i = S.jobs.length - 1; i >= 0; i--) if (S.jobs[i].done) { clearRoom(S.jobs[i]); S.jobs.splice(i, 1); }
     if (S.spawnEvery && S.tick >= S.spawnAt && S.jobs.length < S.maxJobs) {
       S.spawnAt = S.tick + S.spawnEvery;
       const nj = makeJob({ value: 5 });
@@ -1192,8 +1898,22 @@ FZ.sim = (function () {
       j.dark = clamp(1 - j.knownBy / n, 0, 1);
       j.hazard = !!(j.poison && !j.revealed);
       j.lone = j.knownBy <= 1 && j.value >= 3;
-      /* a road nobody walks fades. A road everybody walks is the only road there is. */
-      j.trail = clamp(j.trail - 0.0024 * T, 0, 1);
+      /* A ROAD NOBODY WALKS FADES. This is no longer a counter kept per crumb; it is the
+         wear on the actual passages that lead to its room. One bright road with cold ones
+         beside it is a fact about the nest, and the nest is where it is now read from. */
+      const rn = nodeById(j.node);
+      let tr = 0, reach = false;
+      if (rn) {
+        for (let k = 0; k < rn.edges.length; k++) {
+          const e = NEST.edges[rn.edges[k]];
+          if (!e.dug) continue;
+          reach = true;
+          if (e.wear > tr) tr = e.wear;
+        }
+      }
+      j.trail = tr;
+      /* NO TUNNEL TO IT. Not "nobody has heard of it" — you cannot get in. That is Si. */
+      j.sealed = !reach || !rn || rn.comp !== NEST.main;
       if (!j.done && j.value > bigV) { bigV = j.value; bigId = j.id; }
     }
     S.bigJob = bigId;
@@ -1218,35 +1938,52 @@ FZ.sim = (function () {
       const held = a.hold.length ? jobById(a.hold[0]) : null;
       a.load = held ? clamp(held.progress / Math.max(1, held.need), 0, 1) : 0;
 
+      /* POSTURE IS READ OFF THE NEST NOW. Where a body is, and whether it can move,
+         is a fact about the space it is in — not a flag somebody set. */
+      const inRoom = a.place === 'chamber' || a.place === 'surface';
+      const stuck = a.blockT > 20;
       let p = 'wander';
       if (a.stun > 0) p = 'down';
       else if (S.tick < a.idleUntil) p = 'idle';
+      else if (a.place === 'dig') p = 'dig';
+      else if (stuck) p = 'wait';
       else if (a.chase != null) p = 'chase';
       else if (a.chaseRumor) p = 'march';
-      else if (a.waitFor != null) {
-        p = 'wait'; S.waiting++;
-        const wj = jobById(a.waitFor);
-        if (wj) { if (wj.queue.length < 8) wj.queue.push(a.id); wj.trail = clamp(wj.trail + 0.004 * T, 0, 1); }
-      } else if (held) {
-        const near = d2(a.x, a.y, held.x, held.y) < 21 * 21;
-        if (!near) p = 'haul';
-        else if (a.locker || held.locked === a.id || S.tick < held.frozen) p = 'guard';
+      else if (!inRoom) p = held ? 'haul' : (a.follow ? 'march' : 'wander');
+      else if (held && atWork(a, held)) {
+        if (a.locker || held.locked === a.id || S.tick < held.frozen) p = 'guard';
         else if (a.holdN >= 3) p = 'guard';
-        /* five on one crumb is not two ants pulling opposite ways, it is a doorway with a
-           crowd wedged in it, and it should not be drawn the same way. Fl, not Co. */
-        else if (held.claims.size >= 5) p = 'jam';
+        /* a chamber packed to its walls is not two ants pulling opposite ways, it is a
+           room with a crowd wedged in it, and it must not be drawn the same way. */
+        else if (nodeById(a.at) && nodeById(a.at).occ.length >= nodeById(a.at).cap) p = 'jam';
         else if (held.claims.size > 1) p = 'tug';
         else p = 'carry';
-        if (near) {
-          held.crowd++;
-          if (held.crowd > crowdMax) crowdMax = held.crowd;
-          /* the bearing it came in on. Two of these pointing opposite ways IS Co. */
-          const ox = (a.cfx == null ? a.x : a.cfx) - held.x, oy = (a.cfy == null ? a.y : a.cfy) - held.y;
-          held.tug.push({ id: a.id, ang: Math.atan2(oy, ox) });
-        }
-        held.trail = clamp(held.trail + 0.006 * T, 0, 1);
-      } else if (a.follow) p = 'march';
+      } else if (held) p = 'haul';
+      else if (a.waitFor != null) p = 'wait';
+      else if (a.follow) p = 'march';
       a.posture = p;
+
+      /* THE QUEUE IS THE BODIES THAT CANNOT GET IN. Whoever is stopped, and whatever
+         room they are stopped on the way to, is the line for the work in that room. */
+      if (p === 'wait') {
+        S.waiting++;
+        const want = a.waitFor != null ? jobById(a.waitFor)
+          : (nodeById(a.goal) && nodeById(a.goal).job ? jobById(nodeById(a.goal).job) : null);
+        if (want && want.queue.length < 12 && want.queue.indexOf(a.id) < 0) want.queue.push(a.id);
+      }
+      if (held && atWork(a, held) && p !== 'wait') {
+        held.crowd++;
+        if (held.crowd > crowdMax) crowdMax = held.crowd;
+        /* WHICH TUNNEL IT CAME IN BY. Two of these from two different passages, both
+           pulling, is Co — the bearing is the bearing of the tunnel it walked. */
+        const via = a.via != null ? NEST.edges[a.via] : null;
+        let ang = 0;
+        if (via) {
+          const oth = NEST.nodes[other(via, a.at)];
+          if (oth) ang = Math.atan2(oth.y - held.y, oth.x - held.x);
+        } else ang = Math.atan2(a.y - held.y, a.x - held.x);
+        held.tug.push({ id: a.id, ang: ang, via: a.via == null ? -1 : a.via });
+      }
     }
 
     /* ---- the colony ---- */
@@ -1411,10 +2148,17 @@ FZ.sim = (function () {
       if (e.on && e.heat < 0.12) e.on = false;
     }
   }
+  /* THE INCIDENT RATE, AGAINST THE NEW TEMPO (§16.3). Walking a real passage takes real
+     time, so a failure now persists for many more ticks than it used to — a jam lasts
+     until the jam clears. Left alone that turned into a named incident every two seconds,
+     which is faster than a person can watch, let alone answer. HEAT_PACE is the one place
+     the whole curve is scaled, so re-tuning the game is a single number and a rerun of
+     `node formicary/tools/balance.js`. */
+  const HEAT_PACE = 0.74;
   function mkHeat(e) {
     return function (amount, o) {
       o = o || {};
-      const scale = (e.countered ? 0.18 : 1) * (S.tempo || 1);
+      const scale = (e.countered ? 0.18 : 1) * (S.tempo || 1) * HEAT_PACE;
       e.heat = Math.min(1, e.heat + amount * scale);
       if (o.who) e.who = o.who;
       if (o.at) e.at = o.at;      /* where this failure is happening, for whoever draws it */
@@ -1469,7 +2213,29 @@ FZ.sim = (function () {
     if (c > S.collapseMax) c = S.collapseMax;
     S.collapse = c;
   }
-  /* an incident landed. It leaves a floor behind, and a mark on the ground where it was. */
+  /* AN INCIDENT LANDED, AND THE NEST IS WORSE FOR IT. It leaves a floor under the strain,
+     a mark on the ground where it happened — and it brings a passage down. A tunnel you
+     lost is the most legible cost there is: the colony has to walk the long way round
+     until somebody goes and digs it out again. Never the spine (that would cut the nest
+     in half), never an occupied passage (nobody is buried alive), and never below a
+     roughly half-dug nest, so a bad run degrades instead of collapsing. */
+  function collapseNear(x, y) {
+    if (NEST.dug <= Math.max(4, NEST.edges.length * 0.55)) return null;
+    let best = null, bd = Infinity;
+    for (let i = 0; i < NEST.edges.length; i++) {
+      const e = NEST.edges[i];
+      if (!e.dug || e.cap > 1 || e.occ.length || e.diggers.length) continue;
+      const m = edgeMid(e);
+      const q = d2(m.x, m.y, x, y);
+      if (q < bd) { bd = q; best = e; }
+    }
+    if (!best || bd > 190 * 190) return null;
+    best.dug = false; best.prog = 0.35; best.wear = 0; best.jam = 0;
+    best.spoil = Math.min(1, best.spoil + 0.5);
+    best.qa.length = 0; best.qb.length = 0;
+    NEST.ver++; components();
+    return best;
+  }
   function scarUp(d) {
     S.stat.missed++;
     if (S.collapseMax === Infinity) return;
@@ -1477,6 +2243,7 @@ FZ.sim = (function () {
     if (d && d.x != null) {
       S.scars.push({ x: d.x, y: d.y, sym: d.sym || '', tick: S.tick });
       if (S.scars.length > 14) S.scars.shift();
+      collapseNear(d.x, d.y);
     }
   }
   /* an incident was answered in time. Some of the residue is filed away — never all of it. */
@@ -1548,6 +2315,7 @@ FZ.sim = (function () {
       }
       if (!best) return fail(kind, x, y, (FZ.copy.ui || {}).tapAgent || '');
       while (best.hold.length) drop(best, best.hold[0]);
+      unnest(best);                       /* out of the nest, not merely out of the array */
       S.agents.splice(S.agents.indexOf(best), 1);
       if (!best.adversary && best.corrigible) S.collapse += 6;   /* expelling an honest worker costs you */
     }
@@ -1580,6 +2348,8 @@ FZ.sim = (function () {
   return {
     state: S, reset: reset, step: step, apply: apply, cost: cost,
     enabled: new Set(),
+    /* THE NEST, for whoever draws it. Read only. Shape documented at the top of this file. */
+    nest: NEST,
     /* targeting radii, so FIELD can draw the affordance without guessing */
     charterR: CHARTER_R, varyR: VARY_R, ejectR: EJECT_R, workR: 18,
     aggregate: aggregate,
@@ -1656,6 +2426,39 @@ FZ.sim.defaults = [
     return FZ.sim.defaults[FZ.sim.defaults.length - 1];
   }
 
+  /* THE ACCEPTANCE TEST, AS A NUMBER (CONTRACT §16.4). Every worker is in a chamber,
+     in a tunnel, at a dig face or on the surface. `soil` must be zero, always, in
+     every scenario, at every tick. If it is not, this section is not done. */
+  function nestCensus() {
+    const N = S.nest, A = S.agents;
+    const P = { chamber: 0, tunnel: 0, dig: 0, surface: 0, soil: 0 };
+    let queued = 0, headOn = 0, digging = 0;
+    for (let i = 0; i < A.length; i++) {
+      const a = A[i];
+      const ok = (a.place === 'chamber' && a.at != null && N.nodes[a.at]) ||
+                 (a.place === 'tunnel' && a.edge != null && N.edges[a.edge]) ||
+                 (a.place === 'dig' && a.digE != null && N.edges[a.digE]) ||
+                 (a.place === 'surface' && a.at != null && N.nodes[a.at]);
+      if (!ok) P.soil++; else P[a.place]++;
+      if (a.blockT > 20) queued++;
+      if (a.headOn) headOn++;
+      if (a.digE != null) digging++;
+    }
+    let faces = 0, jam = 0, wear = 0, sealed = 0;
+    for (let i = 0; i < N.edges.length; i++) {
+      const e = N.edges[i];
+      if (!e.dug && e.prog > 0.01) faces++;
+      if (e.jam > 0.3) jam++;
+      if (e.wear > wear) wear = e.wear;
+    }
+    for (let i = 0; i < S.jobs.length; i++) if (S.jobs[i].sealed) sealed++;
+    return {
+      where: P, nodes: N.nodes.length, tunnels: N.dug, undug: N.undug,
+      faces: faces, digging: digging, queued: queued, headOn: headOn,
+      jammed: jam, wear: +wear.toFixed(2), sealedJobs: sealed,
+    };
+  }
+
   function bodyCensus() {
     const P = {}, J = S.jobs, A = S.agents;
     let queued = 0, tugging = 0, jam = 0, trail = 0, dark = 0, rot = 0, unmake = 0, hazard = 0;
@@ -1702,6 +2505,8 @@ FZ.sim.defaults = [
       /* THE BODIES, as a census: proof the failures are things happening on the field and
          not numbers in a table. If `queued` is zero while Lo is hot, the body is missing. */
       bodies: bodyCensus(),
+      /* the nest, and the proof that nobody is standing in solid earth */
+      nest: nestCensus(),
       enabled: Array.from(FZ.sim.enabled),
       tools: S.tools.slice(),
       gameOver: S.gameOver, won: S.won,
@@ -1719,7 +2524,10 @@ FZ.sim.defaults = [
   function forceCounter(tool) {
     if (tool === 'charter') {
       S.charters.length = 0;
-      for (let x = 0; x <= S.w; x += 120) for (let y = 0; y <= S.h; y += 120) S.charters.push({ x: x, y: y, r: 200 });
+      /* measurement charters are built oversized ON PURPOSE. Institutions decay in play,
+         and a leg that runs six thousand ticks would otherwise be measuring a regime that
+         quietly develops holes in it halfway through. */
+      for (let x = 0; x <= S.w; x += 120) for (let y = 0; y <= S.h; y += 120) S.charters.push({ x: x, y: y, r: 340 });
     } else if (tool === 'lens') { S.lensUntil = 1e9; S.lensOn = true; S.bl = {}; S.jobs.forEach(j => { j.revealed = true; j.shun = 0; }); }
     else if (tool === 'ledger') { S.ledgerUntil = 1e9; S.ledgerOn = true; }
     else if (tool === 'slow') { S.slowUntil = 1e9; }
@@ -1806,7 +2614,11 @@ FZ.sim.defaults = [
     if (opts.chapter != null && FZ.chapters && FZ.chapters.list && FZ.chapters.list[opts.chapter]) {
       base = FZ.chapters.list[opts.chapter].cfg;
     }
-    const cfg = opts.chapter != null ? base : Object.assign({}, base, { goal: { jobs: 1e9 } });
+    /* normally the goal is lifted, because what is being measured is how long a colony
+       lives, not whether it reaches a number. keepGoal puts the real win condition back,
+       which is how "is the sandbox actually winnable by a good player" gets an answer. */
+    const cfg = (opts.chapter != null || opts.keepGoal) ? base
+      : Object.assign({}, base, { goal: { jobs: 1e9 } });
     const OB = FZ.outbreak;
     if (!OB) return [{ note: 'no outbreak layer' }];
 
@@ -1980,17 +2792,25 @@ FZ.sim.defaults = [
         sum.own += ownSum / RUNT;
         sum.silo = (sum.silo || 0) + siloSum / RUNT;
         sum.aggr += S.stat.force + S.stat.lockouts + S.stat.sabotage + S.stat.esc;
+        sum.siLost = (sum.siLost || 0) + (S.stat.lost.Si || 0);
+        sum.duped = (sum.duped || 0) + S.stat.duped;
         syms.forEach(s => fires[s] += FZ.ELBY[s].fires);
       }
       const n = SEEDS.length;
       const out = {
         done: +(sum.done / n).toFixed(1), aggr: +(sum.aggr / n).toFixed(1),
         own: +(sum.own / n).toFixed(3), silo: +((sum.silo || 0) / n).toFixed(3), fires: fires,
+        siLost: +((sum.siLost || 0) / n).toFixed(2),
+        duped: +((sum.duped || 0) / n).toFixed(2),
       };
       syms.forEach(s => out[s] = +(acc[s] / (RUNT * n)).toFixed(4));
       return out;
     }
-    function claim(name, instrument, offConf, offArm, onConf, onArm, down, up, seeds, ticks) {
+    /* upStat: for an amplification whose HEAT is already pinned at one in the baseline.
+       A dial that makes a saturated failure worse cannot show it in the heat — there is
+       no room above one — so the claim is measured on a consequence that still has
+       headroom. Which consequence, and why, is stated at the call site. */
+    function claim(name, instrument, offConf, offArm, onConf, onArm, down, up, seeds, ticks, upStat) {
       const syms = down.concat(up);
       const off = measure(offConf, offArm, syms, seeds, ticks);
       const on = measure(onConf, onArm, syms, seeds, ticks);
@@ -2012,6 +2832,11 @@ FZ.sim.defaults = [
         const ok = on[s] > off[s] * 1.1;
         if (!ok) pass = false;
         rows.push({ sym: s, want: 'up', off: off[s], on: on[s], ok: ok });
+      });
+      (upStat || []).forEach(u => {
+        const ok = on[u.key] > off[u.key] * 1.1;
+        if (!ok) pass = false;
+        rows.push({ sym: u.label, want: 'up', off: off[u.key], on: on[u.key], ok: ok });
       });
       return { claim: name, instrument: instrument, pass: pass, rows: rows, offDone: off.done, onDone: on.done };
     }
@@ -2039,8 +2864,14 @@ FZ.sim.defaults = [
     out.push(claim('15.1 LEDGER suppresses Gu, amplifies Di and Cs', 'ledger',
       epis, null, epis, () => forceCounter('ledger'), ['Gu'], ['Di', 'Cs'], SEED8));
     /* 15.1b LENS: suppresses the dark, and broadcasts the rumour with everything else. */
-    out.push(claim('15.1 LENS suppresses Di Cs Mm, amplifies Gu', 'lens',
-      epis, null, epis, () => forceCounter('lens'), ['Di', 'Cs', 'Mm'], ['Gu'], SEED8));
+    /* Gu's heat sits pinned near one in this world with the lens off — a liar who keeps
+       lying and a phantom chamber the colony can physically walk to leave it nowhere to
+       rise. So the receptivity bill is measured on the thing it actually costs: HOW MANY
+       WORKERS FELL FOR THE RUMOUR. A colony that broadcasts everything broadcasts it to
+       more of itself, and that number has room to move. */
+    out.push(claim('15.1 LENS suppresses Di Cs Mm, amplifies the rumour', 'lens',
+      epis, null, epis, () => forceCounter('lens'), ['Di', 'Cs', 'Mm'], [], SEED8, null,
+      [{ label: 'workers duped', key: 'duped' }]));
     /* 15.2 the ownership response: Mc falls, and it is paid for in Si and Ow. */
     const owOff = measure(Object.assign({}, merge, { noOwn: true }), null, ['Mc', 'Si', 'Ow'], SEED8, LONG);
     const owOn = measure(merge, null, ['Mc', 'Si', 'Ow'], SEED8, LONG);
@@ -2048,7 +2879,11 @@ FZ.sim.defaults = [
       { sym: 'Mc', want: 'down', off: owOff.Mc, on: owOn.Mc, ok: owOn.Mc < owOff.Mc * 0.9 },
       { sym: 'Mc fires', want: 'down', off: owOff.fires.Mc, on: owOn.fires.Mc, ok: owOn.fires.Mc < owOff.fires.Mc },
       { sym: 'Si trigger', want: 'up', off: owOff.silo, on: owOn.silo, ok: owOn.silo > owOff.silo * 1.1 },
-      { sym: 'Si fires', want: 'up', off: owOff.fires.Si, on: owOn.fires.Si, ok: owOn.fires.Si >= owOff.fires.Si },
+      /* NOT Si's fire count, and not its heat either. A worse silo is not more episodes
+         of siloing, it is one episode that never ends: the heat saturates at one and the
+         rising edges stop, so both read a deeper failure as a smaller one. The honest
+         number is the work that actually rotted in a room nobody came to. */
+      { sym: 'work lost to Si', want: 'up', off: owOff.siLost, on: owOn.siLost, ok: owOn.siLost > owOff.siLost * 1.1 },
       { sym: 'Ow', want: 'up', off: owOff.Ow, on: owOn.Ow, ok: owOn.Ow > owOff.Ow * 1.1 + 0.02 },
       { sym: 'ownership', want: 'up', off: owOff.own, on: owOn.own, ok: owOn.own > 0.1 },
     ];
@@ -2072,14 +2907,22 @@ FZ.sim.defaults = [
       ], offDone: chOff.done, onDone: chOn.done,
     });
     /* 15.3 conflicts terminate in the four named ways, and truce needs a charter. */
+    /* ONLY THE EPISODES THAT ENDED UNDER THE REGIME BEING MEASURED COUNT. Rivals now meet
+       head-on in one-ant tunnels, so an episode can start and finish inside the warm-up,
+       before the charter exists — and counting those would credit the institution with
+       endings it had nothing to do with. The tally is taken from the moment it is armed. */
     function modes(arm) {
       const t = { force: 0, passivity: 0, truce: 0, unsettled: 0 };
-      for (let k = 0; k < SEED3.length; k++) {
-        FZ.sim.reset(Object.assign({}, plain, { seed: SEED3[k] }));
+      /* a rate needs a sample. Turf wars are episodes, not ticks, so this leg runs the
+         widest seed set and the longest window of any claim in this file. */
+      for (let k = 0; k < SEED8.length; k++) {
+        FZ.sim.reset(Object.assign({}, plain, { seed: SEED8[k] }));
         for (let i = 0; i < WARM; i++) FZ.sim.step();
         if (arm) arm();
-        for (let i = 0; i < RUN * 2; i++) FZ.sim.step();
-        for (const m in t) t[m] += S.stat[m];
+        const base = {};
+        for (const m in t) base[m] = S.stat[m];
+        for (let i = 0; i < RUN * 3; i++) FZ.sim.step();
+        for (const m in t) t[m] += S.stat[m] - base[m];
       }
       return t;
     }
@@ -2222,7 +3065,13 @@ FZ.sim.defaults = [
       return { lost: lost, won: won, jobs: Math.round(jobs / 2) };
     }
     const idle = ch9(false, 12000);
-    const played = ch9(true, 55000);
+    /* "Well played" has to mean PLAYED, through the shipped loop: incidents open, a
+       player reads them and answers with one committed instrument each, and the real
+       117-crumb goal is in place. The old measure poked tools at whatever was hottest
+       every sixty ticks with the incident layer switched off, which is not the game. */
+    const playedRows = opts.balance === false ? []
+      : balance({ ps: [0.9], seeds: [5150, 6127], ticks: 46000, keepGoal: true });
+    const played = playedRows[0] || { won: 0, lost: 0, jobs: 0, of: 2 };
 
     S._silent = false;
 
@@ -2246,7 +3095,7 @@ FZ.sim.defaults = [
         tradeoffsFailed: tradeFail.length ? tradeFail : 'none',
         balance: bal.length ? balanceLines(bal) : 'skipped',
         ch9Ungoverned: idle.lost + '/2 collapsed inside 12k ticks, ' + idle.jobs + ' jobs banked',
-        ch9WellPlayed: played.won + '/2 reached the 117-job goal inside 55k ticks (' + played.lost + ' collapsed), ' + played.jobs + ' jobs banked',
+        ch9WellPlayed: played.won + '/' + (played.of || 2) + ' reached the 117-crumb goal inside 46k ticks of the REAL loop at 90% accuracy (' + played.lost + ' collapsed), ' + played.jobs + ' crumbs banked',
         method: 'fires/peak from the ch9 sandbox with auto-played interventions; counterWorks from the same seed run twice, counter forced on at tick ' + WARM + ' (best of up to three seeds), comparing mean heat over the following ' + RUN + ' ticks (works = 20% or better reduction). null means the element never got hot enough in the measurement window to compare honestly.',
       },
     };
