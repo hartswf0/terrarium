@@ -6,9 +6,9 @@
  */
 (function installIIIArchitectureCollisionBudget(global){
 'use strict';
-const VERSION='iii-architecture-collision-budget-0.1';
+const VERSION='iii-architecture-collision-budget-0.2';
 const HARD=120;
-const HOUSE_TARGET=72;
+const HOUSE_TARGET=80;
 const HOUSE_RE=/\b(house|home|dwelling|habitat|building|architecture|castle|fortress|palace|temple|cathedral|mosque|mausoleum|shrine|pagoda|tower|cabin|cottage|villa|lodge|hut|pavilion|donut)\b/i;
 let installed=false,timer=0,demotions=0,last=null;
 const n=v=>Math.max(0,Number(v)||0);
