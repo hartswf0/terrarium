@@ -11,7 +11,7 @@ const optional = async (src, label) => {
 };
 
 // Runtime physics policy is independent and should arm as early as possible.
-optional('./terrarium-iii-collision-budget.js?v=0.1.1', 'COLLISION');
+optional('./terrarium-iii-collision-budget.js?v=0.2', 'COLLISION');
 
 // Keep dependency order where useful, but swallow each failure individually so
 // V3 + its shared-entry gate always get a chance to install.
