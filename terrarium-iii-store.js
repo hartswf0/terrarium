@@ -11,7 +11,7 @@ const optional = async (src, label) => {
 };
 
 // Runtime physics policy is independent and should arm as early as possible.
-optional('./terrarium-iii-collision-budget.js?v=0.1', 'COLLISION');
+optional('./terrarium-iii-collision-budget.js?v=0.1.1', 'COLLISION');
 
 // Keep dependency order where useful, but swallow each failure individually so
 // V3 + its shared-entry gate always get a chance to install.
@@ -20,6 +20,6 @@ optional('./terrarium-iii-collision-budget.js?v=0.1', 'COLLISION');
   await optional('./terrarium-iii-house-bind.js', 'HOUSE BIND');
   await optional('./terrarium-iii-reference.js', 'REFERENCE');
   await optional('./terrarium-iii-reference-guard.js', 'REFERENCE GUARD');
-  await optional('./terrarium-iii-architecture-v3.js?v=3.0.1', 'ARCHITECTURE V3');
-  await optional('./terrarium-iii-v3-gate.js?v=0.1', 'V3 GATE');
+  await optional('./terrarium-iii-architecture-v3.js?v=3.0.2', 'ARCHITECTURE V3');
+  await optional('./terrarium-iii-v3-gate.js?v=0.2', 'V3 GATE');
 })();
