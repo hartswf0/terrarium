@@ -301,6 +301,30 @@ FZ.controls = (function () {
     if (ob() && ob().tryAnswer) {
       try { ans = ob().tryAnswer(kind, x, y); } catch (e) { ans = null; }
     }
+
+    /* ------------------------------------------------------------------------------
+       A THUMB ERROR MUST NOT END A CHAPTER.
+
+       Measured on the shipped build: a critic armed the meeting stone, put it down three
+       hundred and forty pixels from the incident, went from four food to one, and was
+       then REFUSED the correct placement for lack of food. The chapter was over because
+       a finger landed in the wrong place — and this is a phone, where a thumb is nine
+       millimetres wide and the nest is three hundred and ninety.
+
+       So a placement that lands inside no incident is not charged and not applied. It is
+       not even a mistake: the instrument stays IN HAND, the one message region says where
+       it belongs, and the player simply puts it down again. Being wrong about WHICH
+       failure this is still costs — that is the lesson and it is priced. Missing with
+       your thumb is not a diagnosis, so it is priced at nothing.
+       ------------------------------------------------------------------------------ */
+    if (NEEDS_XY[kind] && (!ans || !ans.hit)) {
+      say((ans && ans.msg) || loop('tooFar') || aimLine(kind), 'bad');
+      api.armed = kind;                        /* still in hand — try again, free */
+      api.aim = null;
+      paint(st);
+      return;
+    }
+
     var out = FZ.sim.apply(kind, NEEDS_XY[kind] ? x : undefined, NEEDS_XY[kind] ? y : undefined);
 
     /* nothing was spent -> say why, and never claim an answer that did not happen.

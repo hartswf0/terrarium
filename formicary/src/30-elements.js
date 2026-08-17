@@ -149,6 +149,9 @@ FZ.elh = {
 /* Attaches runtime fields and lazy copy getters, then registers the element. */
 function fzElDef(o) {
   o.heat = 0; o.fires = 0; o.peak = 0; o.who = []; o.countered = false; o.on = false;
+  /* the tick this element last spoke, so a failure that never stops does not go silent
+     after one rising edge (see REANNOUNCE in 40-sim.js) */
+  o.fireAt = 0;
   /* where the last fire happened, so anything drawing this element knows where to look */
   o.at = null;
   /* the observable phenomenon that IS this failure (see the table at the top) */

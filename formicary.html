@@ -961,6 +961,9 @@ FZ.elh = {
 /* Attaches runtime fields and lazy copy getters, then registers the element. */
 function fzElDef(o) {
   o.heat = 0; o.fires = 0; o.peak = 0; o.who = []; o.countered = false; o.on = false;
+  /* the tick this element last spoke, so a failure that never stops does not go silent
+     after one rising edge (see REANNOUNCE in 40-sim.js) */
+  o.fireAt = 0;
   /* where the last fire happened, so anything drawing this element knows where to look */
   o.at = null;
   /* the observable phenomenon that IS this failure (see the table at the top) */
@@ -2141,6 +2144,8 @@ FZ.sim = (function () {
     /* ---- the trade-off dials (§15) ---- */
     trustBias: 0, ownership: 0, aggro: 0, ownEnabled: true,
     conflicts: [], stat: null, waiting: 0,
+    /* ---- THE PACER (§16.3, L10.1): how overdue this colony is for trouble ---- */
+    calm: 0, urge: 0, stirAt: 0, _due: {},
     /* ---- what a miss costs: the residual floor strain cannot fall below ---- */
     scar: 0, scars: [], works: [], budgetMax: 14,
     /* ---- THE BODIES: colony-wide observables, rebuilt each tick in bodies() ---- */
@@ -2684,6 +2689,18 @@ FZ.sim = (function () {
     }
     return out;
   }
+  /* MAY WORK TURN UP WHERE THE NETWORK DOES NOT REACH? Only where the passage has a name
+     for it. A room with no tunnel to it is Si's picture and it is the best one in the
+     world model — but in a passage that has never met Si it is four workers digging for
+     two hundred ticks while the only live detector has nothing to read, which is exactly
+     where the round-five walkthrough lost its player. The opening passage, which enables
+     no detectors at all and asks nothing of anybody, keeps it: there is nothing there to
+     starve, and watching them cut is the whole point of that thirty seconds. */
+  function sealOK() {
+    const en = FZ.sim.enabled;
+    if (!en) return true;
+    return en.has('Si') || en.size === 0;
+  }
   function freeChamber(nearX, nearY) {
     const C = chamberNodes(), open = [];
     for (let i = 0; i < C.length; i++) if (!C[i].job) open.push(C[i]);
@@ -2692,8 +2709,16 @@ FZ.sim = (function () {
     /* SOMETIMES THE WORK IS SOMEWHERE THEY CANNOT GET TO. A third of new crumbs turn up
        in a room the network does not reach, so somebody has to walk to the end of the
        tunnel and cut. That is what keeps digging a normal part of a colony's day rather
-       than a one-off at the start, and it is the physical body of Si. */
-    if (nearX == null) {
+       than a one-off at the start, and it is the physical body of Si.
+
+       ONLY WHERE THE PASSAGE HAS A NAME FOR IT. Measured on the round-five build: passage
+       two enabled exactly one element — Co — and then put a third of its crumbs behind
+       solid earth, so four workers spent two hundred ticks digging while the only live
+       detector had nothing to read and the player had nothing to answer. That is where
+       the fifteen quiet seconds in the walkthrough came from. Unreachable work is a
+       superb picture, but it is Si's picture; a passage that has not met Si yet gets
+       work it can walk to. */
+    if (nearX == null && sealOK()) {
       const walled = [];
       for (let i = 0; i < pool.length; i++) if (pool[i].comp !== NEST.main) walled.push(pool[i]);
       if (walled.length && rnd() < 0.35) return walled[Math.floor(rnd() * walled.length)];
@@ -2706,7 +2731,15 @@ FZ.sim = (function () {
       }
       return best;
     }
-    return pool[Math.floor(rnd() * pool.length)];
+    /* and when this passage has no name for an unreachable room, the crumb goes somewhere
+       the colony can actually walk to */
+    let ok = pool;
+    if (!sealOK()) {
+      const reach = [];
+      for (let i = 0; i < pool.length; i++) if (pool[i].comp === NEST.main) reach.push(pool[i]);
+      if (reach.length) ok = reach;
+    }
+    return ok[Math.floor(rnd() * ok.length)];
   }
   /* the node a worker is at, or the one it is walking into */
   function whereIs(a) {
@@ -2886,6 +2919,7 @@ FZ.sim = (function () {
     S.varMul = 1; S.monoMul = 1; S.blind = 0;
     S.trustBias = 0; S.ownership = 0; S.aggro = 0;
     S.conflicts = []; S.stat = freshStat(); S._said = {};
+    S.calm = 0; S.urge = 0; S.stirAt = 0; S._due = {};
     S.scar = 0; S.scars = []; S.works = []; S.waiting = 0;
     S.column = null; S.lineage = []; S.fell = null; S.bigJob = 0; S.arb = false;
     S.weather = { frantic: 0, dark: 0, crowd: 0, scarce: 0 };
@@ -2952,6 +2986,8 @@ FZ.sim = (function () {
         liar: false, lies: 0, chase: null, chaseRumor: false, churner: false,
         pk: null, drained: 0, idleRun: 0, pcool: 0, avoid: null, heardRumor: 0, lockAt: 0,
         wx: null, wy: null, wt: 0,          /* where an idle worker is patrolling to */
+        /* an errand that survives the walk: see the re-decide guard in step() */
+        commit: 0,
         /* ---- THE BODIES: what this worker is visibly doing, every tick ---- */
         posture: 'wander', tx: 0, ty: 0, hesitate: 0, load: 0, holdN: 0,
         follow: 0, trust: 1, marks: 0, knows: [], defiant: 0,
@@ -3029,7 +3065,7 @@ FZ.sim = (function () {
     });
 
     /* --- elements --- */
-    FZ.EL.forEach(e => { e.heat = 0; e.fires = 0; e.peak = 0; e.on = false; e.countered = false; e.who = []; });
+    FZ.EL.forEach(e => { e.heat = 0; e.fires = 0; e.peak = 0; e.on = false; e.fireAt = 0; e.countered = false; e.who = []; });
 
     S._lw = S.w; S._lh = S.h;
     aggregate();
@@ -3235,6 +3271,423 @@ FZ.sim = (function () {
     a.hesitate = Math.min(1, a.hesitate + 0.3);
   }
 
+  /* ============================================================
+     THE PACER — a decision every few seconds, in EVERY passage (L10.1)
+     ------------------------------------------------------------
+     ROUND-FIVE VERDICT: "chapter four produced exactly ONE decision in its entire
+     twenty-seven-second run… a player can look away for twenty seconds and lose
+     nothing." Measured, the cause was in this file, not in the clock on top of it. The
+     guarantee layer fired on a fixed modulus, and the coordination guarantee looked for
+     a crumb with NO claimant on it — which, in a passage with three crumbs and seven
+     workers, stops existing about ten seconds in. From then on the guarantee silently
+     did nothing and the colony went quiet with the player still holding an instrument.
+
+     So the guarantee layer is now DRIVEN by how long the colony has been quiet.
+
+       S.calm   ticks since anything the player could be asked about was burning
+       S.urge   0..1 — how overdue this colony is for trouble. It is ZERO while a failure
+                is live, so the pacer never piles onto a decision the player is already
+                making, and it is FULL after about two and a half seconds of nothing.
+
+     Urge does two things and nothing else:
+       1. It pulls this scenario's own scheduled guarantees forward (see `due`): a colony
+          nobody is troubling is handed overlapping work sooner.
+       2. At full urge it STIRS — runs one provocation drawn from THIS scenario's own
+          `force` set, aimed at whichever taught failure has been coldest, preferring one
+          the player is actually holding an instrument for. A decision nobody can answer
+          is not a decision.
+
+     NOTHING IS INVENTED. Every provocation below is a guarantee the scenario already
+     declared in `force`; the pacer only decides WHEN. The instant anything catches,
+     calm resets, urge collapses to zero and the pacer goes silent again — so a player
+     who is answering never meets it, and a player who is watching always does.
+
+     The sandbox needs none of this: it is already measured at a decision every three
+     seconds and never goes quiet long enough for urge to reach one. The pacer is a
+     FLOOR under the incident rate, not a term added to it.
+     ============================================================ */
+  const QUIET_FREE = 40,      /* ~0.7s of earned quiet after a failure stops burning */
+        QUIET_RAMP = 105,     /* and full urge about two and a half seconds in */
+        URGE_PULL = 0.74,     /* how far urge collapses a scheduled guarantee's interval */
+        /* A PROVOCATION IS A WALK, NOT A SWITCH. Measured the hard way: stirring every
+           sixty ticks re-assigned workers faster than any of them could cross a passage,
+           so five bodies queued for one room and none of them ever arrived. A stir that
+           took hold is given time to arrive; a stir that found nothing to do is retried
+           straight away, because that costs the colony nothing. */
+        STIR_SETTLE = 165,    /* ~3s: long enough to walk in and meet somebody */
+        STIR_RETRY = 55,
+        COMMIT = 300,         /* and how long a body sent somewhere keeps going there */
+        /* A FAILURE THAT NEVER STOPS MUST NOT GO SILENT. `fire` is a rising edge, so a
+           condition that saturates and stays saturated speaks once and then never again,
+           and the player is left watching a colony that is visibly falling apart with
+           nothing on the table. Longer than one fuse plus its cooldown, so it can only
+           ever land in the gap AFTER an incident closed, never on top of one. */
+        REANNOUNCE = 470;
+
+  function pace() {
+    let live = false;
+    const els = FZ.EL, en = FZ.sim.enabled;
+    for (let i = 0; i < els.length; i++) {
+      const e = els[i];
+      if (!en.has(e.sym)) continue;
+      if (e.on || e.heat > 0.22) { live = true; break; }
+    }
+    S.calm = live ? 0 : S.calm + 1;
+    S.urge = clamp((S.calm - QUIET_FREE) / QUIET_RAMP, 0, 1);
+  }
+  /* a scheduled guarantee, pulled forward by how quiet it has been */
+  function due(key, every, first) {
+    const d = S._due;
+    if (d[key] == null) d[key] = (first == null ? 0 : first) - every;
+    const want = Math.max(26, Math.round(every * (1 - URGE_PULL * S.urge)));
+    if (S.tick - d[key] < want) return false;
+    d[key] = S.tick;
+    return true;
+  }
+
+  /* ---------------- the provocations ----------------
+     Each one is this scenario's own declared guarantee, run now instead of on the hour.
+     Each returns whether it actually changed anything, so the stir can try the next.
+
+     THE COLONY IS BIGGER THAN YOUR STONE. Every provocation prefers ground the player's
+     institutions do NOT cover. This is not a way of cheating the counter — it is the
+     counter's boundary, and it is a fact about institutions the game should teach rather
+     than assert. Measured: passage two used to hand over one meeting stone, the stone
+     covered all three crumbs, and the passage then ran eighteen seconds with nothing on
+     the table at all, because the only failure it had enabled could no longer happen
+     anywhere. An institution holds the ground it is standing on. */
+  /* work the colony could actually get a second body to. A crumb in a room with no tunnel
+     to it is a real situation and it has its own element (Si) — but it is not somewhere a
+     collision can be staged, because nobody can walk in. */
+  function takeable(j) {
+    if (!j || j.done || j.locked !== false) return false;
+    const nd = nodeById(j.node);
+    return !nd || nd.comp === NEST.main;
+  }
+  function bare(j) { return !FZ.elh.cover(S, j.x, j.y); }
+  /* the open work, the ground nobody is keeping first */
+  function outside(list) {
+    const a = [], b = [];
+    for (let i = 0; i < list.length; i++) (bare(list[i]) ? a : b).push(list[i]);
+    return a.length ? a : b;
+  }
+  function pick(list) { return list.length ? list[Math.floor(rnd() * list.length)] : null; }
+
+  /* TWO WORKERS WALK INTO ONE CRUMB BY TWO DIFFERENT TUNNELS.
+     The old version demanded a crumb nobody had claimed — which is exactly why the
+     guarantee evaporated. A second body walking in on work somebody is already doing is
+     the SAME picture and it is the common case, so it is the fallback. */
+  function stirPair() {
+    if (S.ownership >= 0.5) return false;      /* §15.2 an owner is not handed shared work */
+    const free = [];
+    for (let i = 0; i < S.agents.length; i++) {
+      const a = S.agents[i];
+      if (a.stun > 0 || a.adversary || a.locker || a.liar) continue;
+      if (a.terr > 0.5 || S.tick < a.idleUntil) continue;
+      free.push(a);
+    }
+    if (free.length < 2) return false;
+    const cand = [];
+    for (let i = 0; i < S.jobs.length; i++) if (takeable(S.jobs[i])) cand.push(S.jobs[i]);
+    if (!cand.length) return false;
+
+    /* THE CRUMB SOMEBODY IS ALREADY STANDING ON, on ground no institution covers. A
+       collision is two bodies in one room, so the cheapest way to make one is to walk a
+       second body into a room that already has one. */
+    const outs = outside(cand);
+    let j = null;
+    for (let i = 0; i < outs.length; i++) if (workersAt(outs[i]) === 1) { j = outs[i]; break; }
+    if (!j) for (let i = 0; i < outs.length; i++) if (!outs[i].claims.size) { j = outs[i]; break; }
+    if (!j) j = pick(outs);
+    if (!j) return false;
+    const nd = nodeById(j.node);
+    if (!nd) return false;
+
+    /* THE TWO WAYS IN. Every chamber in this nest has two, and which one a body came in
+       by is exactly what Co reads. So the pair is drawn from the MOUTHS: the worker
+       standing in the room next door, one passage out, arrives in a second or two — and
+       it arrives by a passage nobody in that room used. Picking the worker furthest away
+       instead, which is what this did before, sends a body on a ten-second walk that the
+       router has usually changed its mind about by the time it gets there. That is why a
+       passage with a guaranteed collision every two seconds produced one in twenty. */
+    const inRoom = {}, camein = {};
+    let have = 0;
+    j.claims.forEach(id => {
+      const a = agentById(id);
+      if (!atWork(a, j)) return;
+      inRoom[a.id] = 1; have++;
+      if (a.via != null) camein[a.via] = 1;
+      a.commit = S.tick + COMMIT;
+    });
+    if (have >= 2) return false;              /* it is already happening */
+
+    /* the mouths, the ones nobody arrived by first */
+    const mouths = [];
+    for (let k = 0; k < nd.edges.length; k++) {
+      const e = NEST.edges[nd.edges[k]];
+      if (!e || !e.dug) continue;
+      mouths.push({ eid: e.id, nid: other(e, nd.id), fresh: camein[e.id] ? 0 : 1 });
+    }
+    mouths.sort((p, q) => q.fresh - p.fresh);
+    if (!mouths.length) return false;
+
+    let sent = 0;
+    for (let m = 0; m < mouths.length && have + sent < 2; m++) {
+      const mo = nodeById(mouths[m].nid), eid = mouths[m].eid;
+      if (!mo) continue;
+      /* SOMEBODY WHO IS ALREADY THERE. Standing in the room next door, or already in the
+         passage between — a body one step out is a body that arrives, and a body on the
+         far side of the nest is a body the router changes its mind about. Scored, so the
+         one that is nearest to walking in is the one that is sent. */
+      let best = null, bs = Infinity;
+      for (let i = 0; i < free.length; i++) {
+        const a = free[i];
+        if (inRoom[a.id] || a.at === j.node) continue;
+        let sc;
+        if (a.at === mo.id) sc = 0;
+        else if (a.edge === eid) sc = 1;
+        else sc = 2 + d2(a.x, a.y, mo.x, mo.y) / 40000;
+        if (sc < bs) { bs = sc; best = a; }
+      }
+      if (!best || bs > 4) continue;            /* ~200px of the mouth, and no further */
+      if (!claim(best, j)) continue;
+      best.commit = S.tick + COMMIT;
+      inRoom[best.id] = 1;
+      sent++;
+    }
+    return sent > 0;
+  }
+  /* how many of a crumb's claimants are physically standing in the room with it */
+  function workersAt(j) {
+    let n = 0;
+    j.claims.forEach(id => { const a = agentById(id); if (atWork(a, j)) n++; });
+    return n;
+  }
+
+  /* EVERY ROAD BUT ONE GOES COLD. The copying term goes back up and the free bodies are
+     pointed at whatever the colony is already on: the column, the worn passage and the
+     room packed to its walls. That is Cf and Fl, and it is one picture. */
+  function stirHerd() {
+    const G = S._g;
+    S.copyBias = Math.min(0.92, Math.max(S.copyBias, 0.85));
+    let t = G && G.targetTop ? jobById(G.targetTop) : null;
+    if (!takeable(t) || !bare(t)) {
+      const cand = [];
+      for (let i = 0; i < S.jobs.length; i++) if (takeable(S.jobs[i])) cand.push(S.jobs[i]);
+      if (!cand.length) return false;
+      const out = outside(cand);
+      let bk = -1; t = null;
+      for (let i = 0; i < out.length; i++) if (out[i].knownBy > bk) { bk = out[i].knownBy; t = out[i]; }
+    }
+    if (!t) return false;
+    let n = 0;
+    for (let i = 0; i < S.agents.length && n < 6; i++) {
+      const a = S.agents[i];
+      if (a.stun > 0 || a.adversary || a.locker || a.liar || S.tick < a.idleUntil) continue;
+      if (a.hold.indexOf(t.id) > -1) { n++; a.commit = S.tick + COMMIT; continue; }
+      a.known.add(t.id);
+      if (claim(a, t)) { a.commit = S.tick + COMMIT; n++; }
+    }
+    return n >= 3;
+  }
+
+  /* A BODY PARKED IN THE PASSAGE, AND THE LINE BEHIND IT. A locker whose crumb got
+     finished is holding nothing to lock and stops being a lockout at all. Give it work. */
+  function stirLock() {
+    for (let i = 0; i < S.agents.length; i++) {
+      const a = S.agents[i];
+      if (!a.locker || a.stun > 0 || a.hold.length || S.tick < a.idleUntil) continue;
+      /* a lock inside a charter is broken the moment it is made (see Lo), so the body
+         parks in a passage the stone does not reach */
+      const cand = [];
+      for (let k = 0; k < S.jobs.length; k++) if (takeable(S.jobs[k])) cand.push(S.jobs[k]);
+      if (!cand.length) return false;
+      const j = pick(outside(cand));
+      if (j && claim(a, j)) { a.idleRun = 0; return true; }
+    }
+    return false;
+  }
+
+  /* A CLAIM PASSED BACK AND FORTH AND NEVER WORKED. */
+  function stirChurn() {
+    let n = 0;
+    for (let i = 0; i < S.agents.length && n < 2; i++) {
+      const a = S.agents[i];
+      if (!a.churner || a.stun > 0 || S.tick < a.idleUntil) continue;
+      if (a.hold.length) drop(a, a.hold[0]);
+      const j = nearestOpen(a.x, a.y);
+      if (j && j.locked === false && claim(a, j)) n++;
+    }
+    return n > 0;
+  }
+
+  /* THE NEXT LIE, NOW. A liar with nothing to lose does not wait for the hour. */
+  function stirLie() {
+    const L = S._g && S._g.liar;
+    if (!L || L.stun > 0) return false;
+    spawnRumor(L);
+    return true;
+  }
+
+  /* FINISHED WORK COMES APART: the saboteur is pointed at the fullest crumb again. */
+  function stirSabotage() {
+    const G = S._g;
+    if (!G || !G.adv.length) return false;
+    let bj = null, bp = -1;
+    for (let i = 0; i < S.jobs.length; i++) {
+      const j = S.jobs[i];
+      if (!j.done && j.progress > bp) { bp = j.progress; bj = j; }
+    }
+    if (!bj) return false;
+    let n = 0;
+    for (let i = 0; i < G.adv.length; i++) {
+      const a = G.adv[i];
+      if (a.stun > 0) continue;
+      a.mark = bj.id; a.markT = S.tick + 300; n++;
+    }
+    return n > 0;
+  }
+
+  /* THE RIVALS WANT THE SAME CRUMB AGAIN. §15.3 is respected: a worker that already lost
+     its turf war by force or gave it up stays out of the economy. Passivity is a real
+     ending, not a lull the pacer is allowed to undo. */
+  function stirRivals() {
+    let n = 0;
+    for (let i = 0; i < S.agents.length && n < 2; i++) {
+      const a = S.agents[i];
+      if (a.rival == null || a.stun > 0 || S.tick < a.idleUntil) continue;
+      const r = agentById(a.rival);
+      if (!r || r.stun > 0 || S.tick < r.idleUntil) continue;
+      if (S.tick < (a.truceUntil || 0)) continue;    /* a truce is what the player bought */
+      const j = r.hold.length ? jobById(r.hold[0]) : nearestOpen(a.x, a.y);
+      if (!j || j.done || j.locked !== false) continue;
+      a.known.add(j.id);
+      if (claim(a, j)) { a.esc = Math.max(a.esc || 0, 1); n++; }
+    }
+    return n > 0;
+  }
+
+  /* ONE PAIR OF HANDS, TOO MANY ROOMS. */
+  function stirPile() {
+    for (let i = 0; i < S.agents.length; i++) {
+      const a = S.agents[i];
+      if (!a.greedy || a.stun > 0 || S.tick < a.idleUntil) continue;
+      let n = 0;
+      for (let k = 0; k < S.jobs.length && a.hold.length < 4; k++) {
+        const j = S.jobs[k];
+        if (j.done || j.locked !== false || a.hold.indexOf(j.id) > -1) continue;
+        a.known.add(j.id);
+        if (claim(a, j)) n++;
+      }
+      if (n) return true;
+    }
+    return false;
+  }
+
+  /* WORK IN A ROOM WITH NO TUNNEL TO IT. Literally unreachable: somebody has to walk to
+     the end of the network and cut. This is the body of Si, and it is the one situation
+     in the whole world model that no passage is built around yet. */
+  function stirSeal() {
+    if (S.jobs.length >= S.maxJobs) return false;
+    const C = chamberNodes(), walled = [];
+    for (let i = 0; i < C.length; i++) if (!C[i].job && C[i].comp !== NEST.main) walled.push(C[i]);
+    if (!walled.length) return false;
+    const n = walled[Math.floor(rnd() * walled.length)];
+    const j = makeJob({ value: 5 }, n.x, n.y);
+    if (j.node !== n.id) { clearRoom(j); return false; }
+    S.jobs.push(j);
+    /* somebody has to have heard of it, or nobody ever goes and digs */
+    for (let i = 0; i < S.agents.length && i < 3; i++) S.agents[i].known.add(j.id);
+    return true;
+  }
+
+  /* THE WORK MOVES TO NEW GROUND. This is the one provocation that belongs to no force
+     key, because it is the answer to a situation every passage can reach: every crumb
+     the colony has is inside the institution the player built, so nothing can go wrong
+     anywhere and the passage goes quiet with the player holding a working instrument.
+     A colony does not stop finding crumbs because you put a stone down. The next one
+     turns up on ground nobody is keeping — which is the lesson, not a loophole. */
+  function stirGround() {
+    if (S.jobs.length >= S.maxJobs) return false;
+    const C = chamberNodes(), out = [];
+    for (let i = 0; i < C.length; i++) {
+      const nd = C[i];
+      if (nd.job || nd.comp !== NEST.main) continue;
+      if (FZ.elh.cover(S, nd.x, nd.y)) continue;
+      out.push(nd);
+    }
+    if (!out.length) return false;
+    const nd = out[Math.floor(rnd() * out.length)];
+    const j = makeJob({ value: 5 }, nd.x, nd.y);
+    if (j.node !== nd.id) { clearRoom(j); return false; }
+    S.jobs.push(j);
+    const aw = S.force.silo ? 90 : 150;
+    for (let i = 0; i < S.agents.length; i++) {
+      const a = S.agents[i];
+      if (d2(a.x, a.y, j.x, j.y) < aw * aw) a.known.add(j.id);
+    }
+    if (!S.force.silo) for (let i = 0; i < S.agents.length && i < 3; i++) S.agents[i].known.add(j.id);
+    if (S.spawnEvery) S.spawnAt = S.tick + S.spawnEvery;   /* it IS this passage's spawn, early */
+    return true;
+  }
+
+  /* WORK BEHIND A FACE NOBODY IS CUTTING. */
+  function stirDep() {
+    const open = [];
+    for (let i = 0; i < S.jobs.length; i++) {
+      const j = S.jobs[i];
+      if (j.done) continue;
+      if (j.prereq) { const p = jobById(j.prereq); if (p && !p.done) return false; }
+      open.push(j);
+    }
+    if (open.length < 2) return false;
+    const k = Math.floor(rnd() * open.length), j = open[k];
+    const p = open[(k + 1) % open.length];
+    if (p === j || p.progress > j.progress) return false;
+    j.prereq = p.id;
+    return true;
+  }
+
+  /* the provocation each force key guarantees, and the element it is the body of */
+  const STIRS = [
+    { sym: 'Co', key: 'coordination', run: stirPair },
+    { sym: 'Cf', key: 'stampede', run: stirHerd },
+    { sym: 'Fl', key: 'stampede', run: stirHerd },
+    { sym: 'Lo', key: 'lock', run: stirLock },
+    { sym: 'Cl', key: 'churn', run: stirChurn },
+    { sym: 'Gu', key: 'rumor', run: stirLie },
+    { sym: 'Sa', key: 'saboteur', run: stirSabotage },
+    { sym: 'Tw', key: 'rivals', run: stirRivals },
+    { sym: 'Ow', key: 'overload', run: stirPile },
+    { sym: 'Si', key: 'silo', run: stirSeal },
+    { sym: 'Dp', key: 'dependency', run: stirDep },
+  ];
+  function stir() {
+    /* GROUND FIRST. If every crumb the colony has is inside an institution, none of the
+       provocations below has anywhere to happen — so the colony finds a crumb somewhere
+       else before it finds trouble. Measured: passage two used to die exactly here. */
+    let bareN = 0;
+    for (let i = 0; i < S.jobs.length; i++) if (takeable(S.jobs[i]) && bare(S.jobs[i])) bareN++;
+    if (!bareN && stirGround()) return true;
+
+    const F = S.force, en = FZ.sim.enabled, tools = S.tools, pool = [];
+    for (let i = 0; i < STIRS.length; i++) {
+      const s = STIRS[i];
+      if (!F[s.key] || !en.has(s.sym)) continue;
+      const e = FZ.ELBY[s.sym];
+      if (!e || e.on) continue;
+      let armed = 0;
+      const ans = e.answers || [];
+      for (let k = 0; k < ans.length; k++) if (tools.indexOf(ans[k]) > -1) { armed = 1; break; }
+      pool.push({ run: s.run, armed: armed, heat: e.heat });
+    }
+    if (!pool.length) return false;
+    /* the coldest failure the player can actually answer goes first */
+    pool.sort((p, q) => (q.armed - p.armed) || (p.heat - q.heat));
+    for (let i = 0; i < pool.length; i++) if (pool[i].run()) return true;
+    return false;
+  }
+
   /* ---------------- one tick ---------------- */
   function step() {
     if (S.gameOver) return;
@@ -3326,23 +3779,19 @@ FZ.sim = (function () {
       if (S.ledgerOn && L && L.lies > 0) S.trust[L.id] = 0.06;
     }
 
-    /* forced coordination pairs: the guarantee behind chapter 1.
-       §15.2: a colony that has retreated into file ownership is not handed overlapping work
-       at all any more — the work is pre-partitioned, which is exactly how ownership makes
-       merge conflict go away, and exactly why nothing is shared or learned either. */
-    if (F.coordination && S.tick % (F.pairEvery || 200) === 40 && S.ownership < 0.5) {
-      const open = S.jobs.filter(j => !j.done && !j.claims.size);
-      if (open.length) {
-        const j = open[Math.floor(rnd() * open.length)];
-        /* §15.2 a worker that has retreated into owning its own files cannot be handed
-           somebody else's work any more. That is how the ownership answer suppresses Mc. */
-        const A = S.agents.filter(a => a.stun <= 0 && !a.adversary && !a.locker && a.terr <= 0.5);
-        if (A.length >= 2) {
-          A.sort((p, q) => (p.x + p.y) - (q.x + q.y));
-          claim(A[0], j); claim(A[A.length - 1], j);
-        }
-      }
-    }
+    /* ---- THE PACER. How long has this colony had nothing to say for itself? ---- */
+    pace();
+
+    /* forced coordination pairs: the guarantee behind chapter 1, now on the pacer's
+       clock rather than a fixed modulus, and no longer dependent on an unclaimed crumb.
+       §15.2: a colony that has retreated into file ownership is not handed overlapping
+       work at all any more — the work is pre-partitioned, which is exactly how ownership
+       makes merge conflict go away, and exactly why nothing is shared or learned either. */
+    if (F.coordination && due('pair', F.pairEvery || 200, 40)) stirPair();
+
+    /* ---- AND IF IT STILL HAS NOTHING TO SAY, GIVE IT SOMETHING. One provocation from
+       this passage's own force set, every ~1.1s, until something catches. ---- */
+    if (S.urge >= 1 && S.tick >= S.stirAt) S.stirAt = S.tick + (stir() ? STIR_SETTLE : STIR_RETRY);
     /* lineage drift: the sandbox slides back into monoculture if you stop paying for variance */
     if (F.drift && S.tick % 2600 === 0 && S._g) {
       const top = S._g.topHue;
@@ -3419,7 +3868,13 @@ FZ.sim = (function () {
       }
 
       if (!a.hold.length && !a.chaseRumor && a.chase == null && a.waitFor == null) decide(a);
-      else if (a.waitFor == null && rnd() < 0.004 * T) decide(a);
+      /* A WORKER SENT SOMEWHERE DOES NOT CHANGE ITS MIND HALFWAY DOWN THE TUNNEL. Walking
+         a real passage takes seconds, and a one-in-two-hundred-and-fifty chance of
+         re-deciding, every tick, dissolves an errand before the body arrives — which is
+         why two workers handed the same crumb were never both in the room to collide
+         over it. `commit` is the same idea the saboteur's mark and the chaser's tether
+         already use: an intention that survives the walk. */
+      else if (a.waitFor == null && S.tick > (a.commit || 0) && rnd() < 0.004 * T) decide(a);
 
       /* §15.2 an owner enforces its ownership: whatever it holds, it holds alone. Nobody
          else's copy of that work is ever integrated, so two lineages can no longer finish
@@ -4004,8 +4459,14 @@ FZ.sim = (function () {
       e.heat = Math.min(1, e.heat + amount * scale);
       if (o.who) e.who = o.who;
       if (o.at) e.at = o.at;      /* where this failure is happening, for whoever draws it */
-      if (!e.on && e.heat >= 0.35) {
-        e.on = true; e.fires++;
+      /* A FAILURE THAT NEVER STOPS MUST NOT GO SILENT. `fire` is a rising edge, so a
+         condition that saturates and stays saturated used to speak exactly once and then
+         never again — the colony visibly coming apart with nothing on the table, which
+         is the round-five verdict in one sentence. If it is still saturated a whole fuse
+         and cooldown later, it is still happening, and it says so again. */
+      const chronic = e.on && e.heat >= 0.5 && S.tick - (e.fireAt || 0) > REANNOUNCE;
+      if (chronic || (!e.on && e.heat >= 0.35)) {
+        e.on = true; e.fires++; e.fireAt = S.tick; S.calm = 0; S.urge = 0;
         emit('fire', {
           sym: e.sym,
           at: o.at || { x: S.w / 2, y: S.h / 2 },
@@ -4130,7 +4591,14 @@ FZ.sim = (function () {
         if (d2(a.x, a.y, x, y) < CHARTER_R * CHARTER_R) a.terr = 0;
       }
     } else if (kind === 'slow') {
-      S.slowUntil = S.tick + 900;
+      /* THE BELL RINGS FOR EIGHT SECONDS, NOT SIXTEEN (§16.3). This number was set when
+         the fuse was six hundred and twenty ticks and a tick covered more ground; against
+         the re-cut clock it was longer than half a passage. SLOW is the only instrument
+         that counters six elements at once, so while it is ringing a two-element passage
+         has nothing left that can happen — measured at eighteen seconds of a thirty-second
+         passage with no decision on the table at all. It brakes for a little longer than
+         one fuse, which is what a brake is for; it does not buy the rest of the chapter. */
+      S.slowUntil = S.tick + 480;
     } else if (kind === 'lens') {
       S.lensUntil = S.tick + 1500; S.lensOn = true;
       S.jobs.forEach(j => { j.revealed = true; j.shun = 0; });
@@ -4343,6 +4811,9 @@ FZ.sim.defaults = [
       /* the three trade-off dials, for tooling and for FIELD */
       trustBias: +S.trustBias.toFixed(2), ownership: +S.ownership.toFixed(2),
       aggro: +S.aggro.toFixed(2), speedMul: +S.speedMul.toFixed(2),
+      /* THE PACER, for whoever measures the incident rate next: how long this colony has
+         had nothing to say, and how overdue it is. urge=1 means the pacer is stirring. */
+      calm: S.calm, urge: +S.urge.toFixed(2),
       conflict: { force: S.stat.force, passivity: S.stat.passivity, truce: S.stat.truce, unsettled: S.stat.unsettled },
       /* THE BODIES, as a census: proof the failures are things happening on the field and
          not numbers in a table. If `queued` is zero while Lo is hot, the body is missing. */
@@ -5020,6 +5491,43 @@ FZ.sim.defaults = [
      WAIT_BODY ticks will it settle for the bodies the detector named. The same waiting
      room re-times the clusters — the colony fails three at a time and then goes quiet,
      and the overflow used to be thrown away.
+
+   ------------------------------------------------------------------------------
+   THIS ROUND: THE RING IS THE BODIES, AND IT STAYS ON THEM FOR THE WHOLE FUSE
+   ------------------------------------------------------------------------------
+   Three critics independently found the same thing and they were right. Measured on the
+   shipped build, chapter four: a ring reading THE JAMMED TUNNEL drawn over a stretch of
+   corridor holding ZERO ants for its entire life, with four of them nose to tail two
+   hundred pixels outside it. Chapter eight: an In ring on a four-way junction holding one
+   solitary worker while the tag said "Nothing here settles anything."
+
+   Two causes, both fixed here.
+
+     THE EDGE PASS WAS UNCONDITIONAL. holds() used to accept ANY passage on the grounds
+     that a passage is a thing. A passage is not an incident; THE ANTS IN IT ARE. holds()
+     now counts bodies, and the count it demands depends on what the sentence claims: a
+     failure whose meaning is a crowd (In Cf Dp Fl Im Sp Co Mc Tw Es Cl Mm) needs two of
+     them inside the ring or it does not open at all; a failure about one worker or one
+     untouched crumb needs that one worker or that crumb. siteJam() likewise now weighs
+     LIVE LOAD twenty times above tunnel wear and refuses any passage with fewer than two
+     bodies standing in it, so THE JAMMED TUNNEL lands on the passage the queue is in
+     rather than on the shiniest corridor in the nest.
+
+     THE PIN WAS SET ONCE. The ring was anchored at open() and then held still while the
+     colony walked out from under it, so by the time the tag was hung it named an empty
+     corridor. repin(), called from burn() every tick, re-reads the situation and follows
+     the implicated bodies for the whole fuse: if the crossroads being contended is now a
+     different crossroads, the ring moves; if the knot walks down a tunnel, the ring rides
+     with it.
+
+   AND: THE CLOCK IS CUT TO THE COLONY'S NEW TEMPO. WORLD slowed the nest to something a
+   person can watch and the incident clock was never re-cut against it — a flat 900-tick
+   fuse and a whole passage that produced ONE decision in twenty-seven seconds. The fuse
+   is now ~330 ticks (about six seconds at the measured 56 ticks/second), and pull() puts
+   a decision back on the table within about four seconds of the last one closing, because
+   a detector only speaks on a RISING edge and a colony can sit in obvious, unanswered
+   trouble in complete silence. The sandbox was measured correct at one decision every
+   three seconds and is left exactly as it was.
    ============================================================ */
 window.FZ = window.FZ || {};
 
@@ -5112,39 +5620,58 @@ FZ.outbreak = (function () {
      FZ.copy.loop.wrongBody. */
   var WRONG_BODY = 'That one was working. Whatever is doing this is still in here.';
 
-  /* ticks. The rAF loop steps once per frame, so ~60 ticks is a second.
+  /* ticks. MEASURED, not assumed: the shipped build runs 56 ticks a second on a 390px
+     phone, so a second is about 56 and the numbers below are quoted in both.
      The fuse shortens with machine speed: that is how Sp becomes the difficulty
      curve rather than a caption.
 
-     RE-TUNED AGAINST THE NEW TEMPO (CONTRACT §16.3). The old curve was chosen for a
-     colony that crossed the whole field in a fraction of a second; ants now WALK, and
-     the nest is the only way through. Measured on the shipped nest: a lateral passage
-     is about two seconds, a normal room-to-room errand about five, the spine end to end
-     about eleven. An incident has to live on the scale of an errand, or the body never
-     finishes happening before the fuse asks about it.
+     RE-CUT AGAINST THE NEW TEMPO, ROUND TWO. The previous pass slowed the fuse to match
+     a colony you can watch and overshot badly: ten and a half seconds of fuse plus a cap
+     of one meant chapter four spent twenty-seven seconds producing a single decision. A
+     chapter that yields one decision must yield five or six. The colony's pace was right;
+     the clock on top of it was not.
 
-       FUSE 620      ten and a half seconds — long enough to watch the queue form,
-                     short enough that ignoring it is a decision you feel.
-       FUSE_MIN 280  at machine speed the same incident is under five seconds. Sp is
-                     still the difficulty curve; it just starts from a colony you can see.
-       TAG_DELAY 80  a second and a third of BODY before any word. At the old pace this
-                     was 40 ticks, which is a blink; now it is a beat you can use.
-       COOL_*        the same failure does not re-open on top of itself for four or five
-                     seconds — one situation at a time, at a pace a person reads at. */
-  var FUSE = 620, FUSE_MIN = 280, FUSE_MAX = 900;
-  var FIRST_GRACE = 1.6;          /* the first one you ever see waits for you */
-  var TAG_DELAY = 80;             /* beat 1 before beat 2: the body arrives before the name */
-  var COOL_OK = 300, COOL_MISS = 200;
+       FUSE 330       about six seconds. Long enough to read the queue, watch it grow and
+                      choose; short enough that a passage is a run of decisions and not
+                      one decision with waiting either side of it.
+       FUSE_SANDBOX   the last chapter was measured at one decision every three seconds
+                      and is CORRECT. It keeps the number it had. Everything else is
+                      tuned toward it, not away from it.
+       FUSE_MIN 165   at machine speed the same incident is under three seconds. Sp is
+                      still the difficulty curve; it now starts from a colony you can see.
+       TAG_DELAY 45   eight tenths of a second of BODY before any word — a beat the eye
+                      can use, and no longer a quarter of the whole fuse.
+       COOL_*         the same failure does not re-open on top of itself, but it may come
+                      back inside three seconds, because it is still happening. */
+  var FUSE = 330, FUSE_SANDBOX = 620, FUSE_MIN = 165, FUSE_MAX = 900;
+  var FIRST_GRACE = 1.7;          /* the first one you ever see waits for you */
+  var TAG_DELAY = 45;             /* beat 1 before beat 2: the body arrives before the name */
+  var COOL_OK = 190, COOL_MISS = 130;
+  /* THE GAP. A detector only emits `fire` on a RISING edge, so a failure that is already
+     hot and stays hot never speaks twice, and the player can be left with nothing on the
+     table while the colony is visibly falling apart. When nothing has burned for this
+     long, the hottest live element the player holds an instrument for is put back on the
+     table directly. Nothing is invented — heat is the detector's own reading of the live
+     sim, and the site still has to pass the body test below. */
+  var GAP = 230;                  /* ~4.1s after you answered one: the beat you earned */
+  var GAP_HARD = 160;             /* ~2.9s after one landed: trouble compounds, it does
+                                     not buy quiet. The player who answers gets the room
+                                     to breathe; the player who watches gets the colony. */
+  var GAP_RETRY = 45;             /* if the colony had no body to point at, try again soon */
+  var PULL_HOT = 0.10;
   var KEEP = 170;                 /* how long a resolved outbreak stays inspectable */
-  /* a longer fuse must not mean a bigger hole: the drain per incident is held where it
-     was by cutting the per-tick rate in the same proportion the fuse grew. */
-  var BURN_DRAIN = 0.032;         /* progress lost per tick inside a burning ring */
+  /* the fuse is the exposure: a shorter one must not mean a cheaper miss, so the
+     per-tick rate rises in the same proportion the fuse fell. Ignoring an incident costs
+     what it always cost; it now costs it faster. */
+  var BURN_DRAIN = 0.06;          /* progress lost per tick inside a burning ring */
   var LAND_STRAIN = 6, ANSWER_RELIEF = 6;
   var STORE = 'formicary.mastery';
 
   var list = [];
   var mastery = {};
   var cap = 1;
+  var baseFuse = FUSE;
+  var quietSince = 0, quietGap = GAP;
   var cool = {};
   /* THE WAITING ROOM. Measured in the sandbox: the colony does not fail at a steady
      rate, it fails in clusters — three detectors trip inside a second and then nothing
@@ -5198,6 +5725,13 @@ FZ.outbreak = (function () {
   function save() {
     try { if (window.localStorage) window.localStorage.setItem(STORE, JSON.stringify(mastery)); }
     catch (e) { }
+  }
+  /* has this person ever answered anything, anywhere? Mastery persists across sessions,
+     so this is a real question about the human and not about the current chapter. */
+  function firstTimer() {
+    var n = 0;
+    for (var k in mastery) if (mastery[k]) n += (mastery[k].answered | 0) + (mastery[k].missed | 0);
+    return n < 3;
   }
   function mark(sym, key) {
     var m = mastery[sym] || (mastery[sym] = { answered: 0, missed: 0 });
@@ -5370,7 +5904,10 @@ FZ.outbreak = (function () {
          pointing at is the one workers are actually contending for, so presence outweighs
          geometry and a crossroads with nobody at it is not the incident at all. */
       var near = bodiesNear(st, n.x, n.y, 78);
-      if (!near && !waiting && !conv) continue;
+      /* TWO BODIES OR IT IS NOT A CONTEST. An In ring was measured sitting on a four-way
+         junction holding one solitary worker while the tag read "Nothing here settles
+         anything" — nothing was being settled because nothing was being disputed. */
+      if (near + waiting + conv < 2) continue;
       var s = ways * 0.5 + waiting * 4 + near * 3 + conv * 2 + (bare ? (n.gov ? -8 : 2) : 0);
       if (s > bs) { bs = s; best = n; }
     }
@@ -5412,16 +5949,42 @@ FZ.outbreak = (function () {
     return best ? atNode(st, best, 42) : null;
   }
 
-  /* a passage standing solid, or worn to a shine while its neighbour stays cold */
+  /* the bodies standing in a passage — inside it, and queued at either mouth waiting to
+     get in. These are the queue the sentence is about. */
+  function edgeBodies(st, e) {
+    var ids = e.occ.concat(e.qa, e.qb), pts = [], i;
+    for (i = 0; i < ids.length; i++) { var a = agentOf(st, ids[i]); if (a) pts.push(a); }
+    return pts;
+  }
+  /* a passage standing solid, or worn to a shine while its neighbour stays cold.
+
+     LIVE LOAD DECIDES, AND NOTHING ELSE COMES CLOSE. Wear is a memory of traffic and jam
+     is a memory of stalling; both persist on a corridor long after the last ant has left
+     it, and weighting them anywhere near load is exactly how THE JAMMED TUNNEL was drawn
+     over an empty stretch of tunnel with the real queue outside the ring. Load is worth
+     twenty; a passage with fewer than two bodies in it is not a jam at any wear at all,
+     and is refused outright. Wear only ever breaks a tie between two passages that are
+     BOTH carrying somebody — which is what Cf actually means: of the roads in use, this
+     is the one they have all worn bright. */
   function siteJam(st, wear) {
-    var E = edgesOf(st), best = null, bs = 0;
-    for (var i = 0; i < E.length; i++) {
+    var E = edgesOf(st), best = null, bs = 0, i;
+    for (i = 0; i < E.length; i++) {
       var e = E[i];
       if (!e.dug) continue;
-      var s = edgeLoad(e) * 2 + (e.jam || 0) * 3 + (wear ? (e.wear || 0) * wear : 0);
+      var load = edgeLoad(e);
+      if (load < 2) continue;                 /* one worker walking a tunnel is a commute */
+      var s = load * 20 + (e.jam || 0) * 8 + (wear ? (e.wear || 0) * wear : 0);
       if (s > bs) { bs = s; best = e; }
     }
-    return (best && bs >= 2) ? atEdge(st, best) : null;
+    if (!best) return null;
+    /* and the ring is centred on the bodies IN the passage, not on the passage's
+       midpoint: a tunnel runs to a hundred and forty pixels and the queue is at one end
+       of it. Centring on the midpoint is how a marker ends up beside its own subject. */
+    var pts = edgeBodies(st, best);
+    if (!pts.length) return null;
+    var sx = 0, sy = 0;
+    for (i = 0; i < pts.length; i++) { sx += pts[i].x; sy += pts[i].y; }
+    return atEdge(st, best, sx / pts.length, sy / pts.length);
   }
   /* a room packed to its walls, before the passage that feeds it */
   function siteCrowd(st) {
@@ -5614,35 +6177,78 @@ FZ.outbreak = (function () {
     Sp: function (st) { return siteJam(st, 2); },
   };
 
-  /* is there anything in this ring to look at? A body counts. A crumb counts. A passage
-     or a dig face counts — they are things, and their state is the failure. An empty
-     patch of chamber floor does not, and that is the case this whole layer exists for. */
-  function holds(st, site) {
+  /* ============================================================================
+     THE BODY TEST — the fix the whole round turns on.
+
+     THE FAILURES WHOSE MEANING IS A CROWD. Every sentence on this list claims, in
+     words, that several workers are doing something to each other: everyone taking one
+     road, two claiming one crumb, the colony packed into one passage, a crossroads
+     nobody is keeping. A ring around one ant, or none, makes the picture contradict the
+     sentence, which is the one thing the Depiction Law forbids outright. These do not
+     open until the ring encloses TWO BODIES, and they are re-checked every tick.
+
+     THE LINE IS DRAWN BY THE SENTENCE, NOT BY TASTE. "Two of them started it from
+     opposite ends" is two bodies or it is a lie. But "Someone claimed it and stopped"
+     and "One worker is holding three jobs" name exactly ONE body, and forcing a second
+     into those rings would shove the marker off the very worker the sentence is about —
+     and, for Lo, off the worker an expulsion has to be aimed at. Lo and Ow are singular
+     on purpose, and are named here so the next reader does not "fix" it. */
+  var CROWD = {
+    In: 1, Cf: 1, Dp: 1, Fl: 1, Im: 1, Sp: 1,
+    Co: 1, Mc: 1, Tw: 1, Es: 1, Cl: 1, Mm: 1,
+  };
+  function needBodies(sym) { return CROWD[sym] ? 2 : 1; }
+
+  /* is the failure this sentence names actually INSIDE this ring?
+
+     A body counts. A crumb standing untouched counts, but only for the failures that
+     ARE an untouched crumb — the big one nobody walks to, the one written off, the one
+     in the chamber with no tunnel to it. A passage counts for NOTHING on its own: that
+     unconditional edge pass is precisely how THE JAMMED TUNNEL came to be drawn over an
+     empty corridor with the queue two hundred pixels outside the ring. */
+  function holds(st, site, sym) {
     if (!site) return false;
-    if (bodiesNear(st, site.x, site.y, site.r) > 0) return true;
-    if (site.kind === 'edge') return true;
+    var need = needBodies(sym);
+    var n = bodiesNear(st, site.x, site.y, site.r);
+    if (site.kind === 'edge') {
+      /* a tunnel is only an incident when there are bodies in it. Two, always — every
+         failure that resolves onto a passage is a failure about traffic. */
+      if (n >= 2) return true;
+      /* the one exception, and it is structural rather than social: an unfinished dig
+         face IS the failure for Dp — uncut earth with the work stranded behind it — and
+         a face is a visible thing whether or not anyone is standing at it. */
+      if (site.dug === false && (n >= 1 || sym === 'Dp')) return true;
+      return false;
+    }
+    if (n >= need) return true;
+    if (need > 1) return false;             /* a crowd sentence needs a crowd, full stop */
     if (site.kind === 'node') {
-      var n = nodesOf(st)[site.id];
-      if (n && n.job) return true;
-      if (n && n.kind !== 'junction') {
+      var nd = nodesOf(st)[site.id];
+      if (nd && nd.job) return true;
+      if (nd && nd.kind !== 'junction') {
         for (var i = 0; i < st.jobs.length; i++) {
           var j = st.jobs[i];
-          if (!j.done && j.node === n.id) return true;
+          if (!j.done && j.node === nd.id) return true;
         }
       }
     }
     return false;
   }
-  /* the last resort, and it still lands on bodies: the nearest ant to where we were
-     looking, and everyone standing with it. */
-  function nearestKnot(st, x, y) {
-    var best = null, bd = Infinity;
+  /* the last resort, and it still lands on bodies: the tightest knot of at least `need`
+     of them, nearest to where we were looking. A crowd failure with no crowd anywhere in
+     the colony returns null and does NOT open — it is not true yet, so it waits. */
+  function nearestKnot(st, x, y, need) {
+    need = need || 1;
+    var best = null, bs = -Infinity;
     for (var i = 0; i < st.agents.length; i++) {
-      var a = st.agents[i], d = dist(x, y, a.x, a.y);
-      if (d < bd) { bd = d; best = a; }
+      var a = st.agents[i], n = bodiesNear(st, a.x, a.y, 92);
+      if (n < need) continue;
+      /* size first, nearness second: the point is to find the crowd, not the closest ant */
+      var s = n * 44 - dist(x, y, a.x, a.y);
+      if (s > bs) { bs = s; best = a; }
     }
     if (!best) return null;
-    return atBodies(st, idsNear(st, best.x, best.y, 90));
+    return atBodies(st, idsNear(st, best.x, best.y, 92));
   }
 
   /* THE WHOLE POINT: an incident is resolved onto a situation before it is drawn.
@@ -5654,22 +6260,37 @@ FZ.outbreak = (function () {
      again next tick. THE INCIDENT WAITS FOR ITS BODY, up to a few seconds, and only then
      settles for the bodies the detector named. */
   function anchor(sym, d, st, strict) {
-    var site = null;
+    var site = null, need = needBodies(sym);
     if (st.nest && st.nest.nodes && st.nest.nodes.length) {
       try { if (SITE[sym]) site = SITE[sym](st, (d.who || [])); } catch (e) { site = null; }
-      if (strict && SITE[sym] && (!site || !holds(st, site))) return null;
+      if (strict && SITE[sym] && (!site || !holds(st, site, sym))) return null;
       if (!site && d.who && d.who.length) site = atBodies(st, d.who);
       if (!site && d.at) site = snapTo(st, d.at.x, d.at.y);
-      if (!site) site = nearestKnot(st, st.w / 2, st.h / 2);
-      if (!holds(st, site)) {
+      if (!site) site = nearestKnot(st, st.w / 2, st.h / 2, need);
+      /* LAST GATE, AND IT IS NOT NEGOTIABLE. Whatever route got us here, the ring about
+         to be drawn must contain the bodies the sentence claims. If it does not, we go to
+         the ones the detector named; if those have scattered, to the nearest real knot;
+         and if the colony contains no such knot at all, the incident does not open. */
+      if (!holds(st, site, sym)) {
         var alt = (d.who && d.who.length) ? atBodies(st, d.who) : null;
-        if (!alt || !holds(st, alt)) alt = nearestKnot(st, site ? site.x : st.w / 2, site ? site.y : st.h / 2);
-        if (alt) site = alt;
+        if (!alt || !holds(st, alt, sym)) {
+          alt = nearestKnot(st, site ? site.x : st.w / 2, site ? site.y : st.h / 2, need);
+        }
+        site = (alt && holds(st, alt, sym)) ? alt : null;
       }
     }
     if (site) return site;
     var at = d.at || { x: st.w / 2, y: st.h / 2 };
-    return { kind: 'ground', id: 0, x: at.x, y: at.y, r: radius(st) };
+    /* no nest at all (a headless harness, a scenario before the graph exists): there is
+       nothing to point at and nothing to get wrong, so the coordinate stands. */
+    if (!(st.nest && st.nest.nodes && st.nest.nodes.length)) {
+      return { kind: 'ground', id: 0, x: at.x, y: at.y, r: radius(st) };
+    }
+    /* a failure whose whole meaning is several bodies is never drawn on bare ground.
+       Waiting for it to become true is the honest move; asserting it is the old bug. */
+    if (CROWD[sym]) return null;
+    var g = snapTo(st, at.x, at.y);
+    return (g && holds(st, g, sym)) ? g : null;
   }
 
   function burningCount() {
@@ -5707,8 +6328,12 @@ FZ.outbreak = (function () {
     if (!site) { hold(d, st); return; }
     var at = { x: site.x, y: site.y };
     var r = site.r;
-    var fuse = Math.round(clamp(FUSE / Math.max(1, st.speedMul || 1), FUSE_MIN, FUSE_MAX));
-    if (seen === 0) fuse = Math.round(clamp(fuse * FIRST_GRACE, FUSE_MIN, FUSE_MAX));
+    var fuse = Math.round(clamp(baseFuse / Math.max(1, st.speedMul || 1), FUSE_MIN, FUSE_MAX));
+    /* THE GRACE IS FOR THE FIRST INCIDENT A PERSON EVER SEES, not for the first incident
+       of every chapter. Measured: giving it to all ten cost four seconds off the top of
+       each one — in a thirty-second passage that is a whole decision spent being polite
+       to somebody who stopped needing it eight chapters ago. */
+    if (seen === 0 && firstTimer()) fuse = Math.round(clamp(fuse * FIRST_GRACE, FUSE_MIN, FUSE_MAX));
     seen++;
 
     var p = phen(d.sym);
@@ -5785,8 +6410,81 @@ FZ.outbreak = (function () {
   /* ------------------------------------------------------------------- damage */
   function el(sym) { return FZ.ELBY ? FZ.ELBY[sym] : null; }
 
+  /* ------------------------------------------------------------------ the pin
+     THE RING FOLLOWS THE BODIES, FOR THE WHOLE FUSE.
+
+     The old code pinned the site once and then let it go: it re-anchored only in the
+     three-quarters of a second before the tag was hung, and after that the ring sat
+     still while the colony walked out from under it. Six seconds later the player reads
+     THE JAMMED TUNNEL over an empty corridor. An incident IS its bodies; bodies move;
+     so the pin moves. Called from burn(), every tick, until it lands or closes. */
+  var REPIN_EVERY = 10;          /* how often the SITUATION is re-read (structure) */
+  var FOLLOW = 0.3;              /* how fast the ring slides onto a new centre */
+
+  /* the bodies that constitute this failure, still alive, in order of authority: the
+     ones the detector implicated first, then the ones standing in the ring when it
+     opened. An expulsion is judged against `who` alone, so nothing here leaks into it. */
+  function tracked(o, st) {
+    var out = [], i;
+    for (i = 0; i < o.who.length; i++) if (agentOf(st, o.who[i])) out.push(o.who[i]);
+    for (i = 0; i < o.bodies.length; i++) {
+      if (out.indexOf(o.bodies[i]) > -1) continue;
+      if (agentOf(st, o.bodies[i])) out.push(o.bodies[i]);
+    }
+    return out;
+  }
+  /* slide the ring onto a site. Structure is where the failure lives, so the site object
+     (which FIELD may draw: the passage, the crossroads) is replaced outright; the drawn
+     centre eases across so the marker is seen to FOLLOW rather than to teleport, which
+     is the difference between a marker that tracks a queue and one that blinks. */
+  function setSite(o, site, k, st) {
+    if (!site || !st) return;
+    o.site = site;
+    o.r = o.r + (site.r - o.r) * k;
+    o.x = clamp(o.x + (site.x - o.x) * k, 22, st.w - 22);
+    o.y = clamp(o.y + (site.y - o.y) * k, 26, st.h - 22);
+  }
+  function repin(o, st) {
+    var need = needBodies(o.sym);
+    var here = bodiesNear(st, o.x, o.y, o.r);
+
+    /* the situation itself, re-read on a slow beat: if the crossroads being contended,
+       or the passage standing solid, is now a DIFFERENT one, the incident goes there. */
+    if ((st.tick - o.born) % REPIN_EVERY === 0 && SITE[o.sym]) {
+      var s2 = null;
+      try { s2 = SITE[o.sym](st, o.who); } catch (e) { s2 = null; }
+      if (s2 && holds(st, s2, o.sym)) {
+        var same = o.site && s2.kind === o.site.kind && s2.id === o.site.id;
+        var n2 = bodiesNear(st, s2.x, s2.y, s2.r);
+        if (same || here < need || n2 > here) {
+          setSite(o, s2, here < need ? 1 : FOLLOW, st);
+          o.bodies = idsNear(st, o.x, o.y, o.r);
+          return;
+        }
+      }
+    }
+    /* it still holds them. A knot of bodies is a moving thing, so ride with it; a room
+       or a passage is not, so leave it where it is and let the bodies come and go. */
+    if (here >= need) {
+      if (o.site && o.site.kind === 'crowd') {
+        var k = atBodies(st, tracked(o, st));
+        if (k && holds(st, k, o.sym)) setSite(o, k, FOLLOW, st);
+      }
+      o.bodies = idsNear(st, o.x, o.y, o.r);
+      return;
+    }
+    /* it has emptied out under the words. Go where they went. */
+    var t = atBodies(st, tracked(o, st));
+    if (!t || !holds(st, t, o.sym)) t = nearestKnot(st, o.x, o.y, need);
+    if (t && holds(st, t, o.sym)) {
+      setSite(o, t, 1, st);
+      o.bodies = idsNear(st, o.x, o.y, o.r);
+    }
+  }
+
   /* it burns: work inside the ring goes backwards while the player decides */
   function burn(o, st) {
+    repin(o, st);
     var d = BURN_DRAIN * (st.tempo || 1), r2 = o.r * o.r;
     for (var i = 0; i < st.jobs.length; i++) {
       var j = st.jobs[i];
@@ -5802,6 +6500,7 @@ FZ.outbreak = (function () {
     o.state = 'landed';
     o.endAt = st.tick + KEEP;
     cool[o.sym] = st.tick + COOL_MISS;
+    quietGap = GAP_HARD;                     /* it landed. The next one comes sooner. */
 
     var r2 = (o.r * 1.15) * (o.r * 1.15), i;
     for (i = 0; i < st.jobs.length; i++) {
@@ -5838,6 +6537,7 @@ FZ.outbreak = (function () {
     o.state = 'answered';
     o.endAt = st.tick + KEEP;
     cool[o.sym] = st.tick + COOL_OK;
+    quietGap = GAP;                          /* you answered it. Take the beat. */
 
     var back = (FZ.sim && FZ.sim.cost) ? FZ.sim.cost(kind) : 2;
     st.budget = Math.min(14, st.budget + back + 1);
@@ -6007,21 +6707,8 @@ FZ.outbreak = (function () {
     for (var i = list.length - 1; i >= 0; i--) {
       var o = list[i];
       if (o.state === 'burning') {
-        /* BEAT ONE IS STILL SETTLING. A crumb can be carried off and a queue can clear in
-           the second and a third before the tag is hung, and a ring holding nothing is
-           the exact failure this layer exists to end — so while the incident is still
-           wordless it is allowed to follow its body. Once the name is up it stays put:
-           a tag that wanders is worse than a tag that is slightly late. */
-        if (st.tick < o.tagAt && (st.tick - o.born) % 15 === 0) {
-          var cur = bodiesNear(st, o.x, o.y, o.r), ok = holds(st, o.site);
-          /* strict: while it settles it may only move onto its OWN kind of situation —
-             a crossroads for In, a packed passage for Fl — never onto a passing ant. */
-          var moved = anchor(o.sym, o.seed, st, true);
-          if (moved && holds(st, moved) && (!ok || bodiesNear(st, moved.x, moved.y, moved.r) > cur + 1)) {
-            o.site = moved; o.x = moved.x; o.y = moved.y; o.r = moved.r;
-          }
-          o.bodies = idsNear(st, o.x, o.y, o.r);
-        }
+        /* the pin is no longer set once and abandoned: burn() re-reads the situation and
+           follows the implicated bodies every tick, for the whole fuse. See repin(). */
         var e = el(o.sym);
         if (e && e.countered && e.heat < 0.1 && st.tick - o.born > 45) defuse(o, st);
         else if (st.tick - o.born >= o.fuse) land(o, st);
@@ -6032,6 +6719,39 @@ FZ.outbreak = (function () {
       }
     }
     serve(st);
+    pull(st);
+  }
+
+  /* ------------------------------------------------------------------- the gap
+     NO CHAPTER MAY GO QUIET. Measured on the shipped build: chapter four produced ONE
+     decision in twenty-seven seconds, because a detector emits `fire` only on a RISING
+     edge — a failure that is already hot and stays hot never speaks again, so the colony
+     can stampede in complete silence with nothing at all on the table.
+
+     So when nothing has burned for GAP ticks, the hottest live failure the player is
+     actually holding an instrument for is put back on the table. This invents nothing:
+     `heat` is the detector's own continuous reading of the live simulation, the element
+     has to still be genuinely hot, and the incident still has to find bodies to sit on
+     or it does not open. It is the same trouble, asked about again. */
+  function pull(st) {
+    if (cap <= 0 || burningCount() > 0) { quietSince = st.tick; return; }
+    if (FZ.chapters && FZ.chapters.phase && FZ.chapters.phase() !== 'play') { quietSince = st.tick; return; }
+    if (st.tick - quietSince < quietGap) return;
+    var E = FZ.EL || [], en = FZ.sim ? FZ.sim.enabled : null, best = null, bh = PULL_HOT;
+    for (var i = 0; i < E.length; i++) {
+      var e = E[i];
+      if (!e || (en && en.has && !en.has(e.sym))) continue;
+      if (e.countered || cool[e.sym] > st.tick || findBurning(e.sym)) continue;
+      if (!answerable(e.sym, st)) continue;
+      if (e.heat > bh) { bh = e.heat; best = e; }
+    }
+    if (!best) { quietSince = st.tick - quietGap + GAP_RETRY; return; }
+    var n = list.length;
+    open({ sym: best.sym, at: { x: st.w / 2, y: st.h / 2 }, who: (best.who || []).slice(),
+           say: fireLine(best.sym) }, true);
+    /* if the colony had no body to point at, this was not a decision — try again in
+       under a second rather than burning the whole gap on it. */
+    quietSince = (list.length > n) ? st.tick : st.tick - quietGap + GAP_RETRY;
   }
 
   function wire() {
@@ -6061,7 +6781,13 @@ FZ.outbreak = (function () {
       focusId = 0;
       var st = S();
       lastW = st ? st.w : 0; lastH = st ? st.h : 0;
+      quietSince = st ? st.tick : 0; quietGap = GAP;
       cap = (scenario && scenario.outbreakCap != null) ? scenario.outbreakCap : 1;
+      /* THE SANDBOX KEEPS ITS CLOCK. It was measured at one decision every three seconds
+         and that is the target the rest of the game is being tuned toward; re-cutting it
+         would be tuning away from the one chapter that is already right. CHAPTERS may
+         override per scenario with `fuse`; nothing else in the build sets it today. */
+      baseFuse = (scenario && scenario.fuse) || (scenario && scenario.all ? FUSE_SANDBOX : FUSE);
       api.cap = cap;
       wire();
     },
@@ -6169,7 +6895,8 @@ FZ.render = (function () {
   var mem = null, mx = null;          /* permanent memory: scars, stamps, stains */
   var mix = null, mxx = null;         /* scratch for masking */
   var earth = null, floor2 = null, vign = null;  /* painted once: earth, floor, darkness */
-  var wired = false, now = 0, sx = 1, sy = 1, frames = 0, nestDirty = true;
+  var wired = false, now = 0, lastNow = 0, sx = 1, sy = 1, frames = 0, nestDirty = true;
+  var fit = 1, fitShown = -1, MINFIT = 0.58;   /* how much room the action bar needs */
   var L = null;                       /* the nest layout */
   var beats = [];
   var bodies = new Map();             /* per-ant render memory: heading, gait, wobble */
@@ -6178,7 +6905,8 @@ FZ.render = (function () {
   var peak = new Map(), hurtAt = new Map(), doneAt = new Map();
   var gimg = new Map();
   var stamped = new Set();            /* charters already carved into the nest */
-  var lastTick = -1, floodMark = 0, spursMade = false, lastDial = null;
+  var compWas = new Map();            /* which chambers had no way in last frame */
+  var lastTick = -1, floodMark = 0, spursMade = false, lastDial = null, joins = 0;
 
   /* ---------------------------------------------------------- tiny helpers */
   function A(a) { ctx.globalAlpha = a < 0 ? 0 : a > 1 ? 1 : a; }
@@ -6273,6 +7001,52 @@ FZ.render = (function () {
     for (var i = 0; i < FZ.EL.length; i++) glyph(FZ.EL[i].sym, MAT.ink);
   }
 
+  /* ===================================== THE COLONY MAKES ROOM FOR THE ACTION
+     The action bar is fixed to the floor of the screen and lies over the
+     colony. When it appears it can sit exactly on top of the bodies that ARE
+     the incident — the queue wedged in the passage, the pile at the doorway —
+     at the very moment the player is being asked to look down and read them.
+
+     So the nest gets out of the way. Once a frame we measure the height left
+     above the bar and ease the WHOLE world — soil, tunnels, chambers, dig
+     faces, spoil, crumbs, ants, incident grounds, scars, flood, every mark in
+     this file — into that height with one uniform scale, over about a quarter
+     of a second, so the colony is visibly making room rather than jumping.
+
+     The scale is applied to the canvas ELEMENT, not to the drawing, and that
+     is the whole trick. getBoundingClientRect reports the transformed box, so
+     CONTROLS' tap mapping and the DOM paper tag follow the world exactly
+     without a line changing anywhere else; clientWidth is a layout metric and
+     ignores transforms, so nothing reflows, boot never re-sizes the field, and
+     the excavation the colony has dug is never thrown away. */
+  var barAt = 0, barWas = 1;
+  function fitWant() {
+    if (!cv || !(H > 0)) return 1;
+    var el = document.getElementById('act');
+    var r = (el && el.firstChild) ? el.getBoundingClientRect() : null;
+    if (r && r.height) {
+      var c = cv.getBoundingClientRect();
+      barAt = now;
+      barWas = clamp((r.top - c.top - 10) / H, MINFIT, 1);
+      return barWas;
+    }
+    /* one decision closing and the next opening a moment later must not make the
+       colony bob up and down. It stays stood back until the asking has stopped. */
+    return (now - barAt < 900) ? barWas : 1;
+  }
+  function fitStep(dt) {
+    var want = fitWant();
+    if (fitShown < 0) fit = want;
+    else {
+      fit += (want - fit) * (1 - Math.exp(-clamp(dt, 0, 140) / 90));
+      if (Math.abs(want - fit) < 0.0015) fit = want;
+    }
+    if (Math.abs(fit - fitShown) < 0.0012) return;
+    fitShown = fit;
+    cv.style.transformOrigin = '50% 0%';
+    cv.style.transform = fit > 0.999 ? 'none' : 'scale(' + fit.toFixed(4) + ')';
+  }
+
   /* ============================================================ THE LAYERS */
   function mk(w, h) {
     var c = document.createElement('canvas');
@@ -6345,7 +7119,8 @@ FZ.render = (function () {
     mx.setTransform(1, 0, 0, 1, 0, 0); mx.globalCompositeOperation = 'source-over';
     mx.globalAlpha = 1; mx.clearRect(0, 0, W, H);
     beats.length = 0; bodies.clear(); peak.clear(); hurtAt.clear(); doneAt.clear();
-    stamped.clear(); floodMark = 0; spursMade = false; L = null; nestDirty = true;
+    stamped.clear(); compWas.clear(); joins = 0;
+    floodMark = 0; spursMade = false; L = null; nestDirty = true;
   }
 
   /* ------------------------------------------------------------ excavation */
@@ -6723,26 +7498,49 @@ FZ.render = (function () {
   /* ------------------------------------------------ what the passages are like
      Wear is a road the colony has chosen; a jam is a road it cannot get down.
      Both are drawn on the floor, in earth, and neither has a number. */
+  /* A JAMMED PASSAGE NEEDS NO OVERLAY: the bodies wedged in it, shoulder to
+     shoulder and not moving, ARE the jam — AESTHETIC §0.
+
+     A chamber with no way in is the one thing the bodies cannot say, because
+     the whole point is that there are no bodies there. So it gets the one
+     drawn convention in this file: DASHED MEANS NO TUNNEL REACHES THIS.
+     The dashes march, slowly, the way a surveyor's pending line does.
+
+     And because a convention is only learned at the moment it changes, the
+     dashes closing into one solid line is a BEAT — a small, clear, one-shot
+     event wherever on screen it happens. That is the whole lesson of §16.2
+     delivered in about a second, with nothing written down. */
   function drawRoads(S) {
     if (!L) return;
-    for (var i = 0; i < L.edges.length; i++) {
-      var le = L.edges[i], e = le.ref;
-      if (!e.dug) continue;
-      /* A JAMMED PASSAGE NEEDS NO OVERLAY. The bodies wedged in it, shoulder to
-         shoulder and not moving, are the jam — AESTHETIC §0. What used to be
-         drawn here was a dashed band across the tunnel that read as rungs on a
-         ladder, a second explanation of something the picture already showed. */
-    }
-    /* a chamber no tunnel reaches. Nobody is coming, and you can see why. */
-    for (i = 0; i < L.nodes.length; i++) {
+    var main = (S.nest && S.nest.main !== undefined) ? S.nest.main : null;
+    for (var i = 0; i < L.nodes.length; i++) {
       var n = L.nodes[i];
-      if (!n.ref || n.ref.comp === undefined) continue;
-      var cut = L.edges.length && n.ref.comp !== (S.nest ? S.nest.main : n.ref.comp);
+      if (!n.ref || n.ref.comp === undefined || n.ref.kind === 'surface') continue;
+      var cut = !!(L.edges.length && main !== null && n.ref.comp !== main);
+      var was = compWas.get(n.id);
+      compWas.set(n.id, cut);
+      if (was === true && !cut) {
+        joins++;
+        /* which passage got here — the answer to "why is it connected now" is a
+           tunnel, so the light runs down that tunnel and into the room */
+        var ce = null;
+        for (var q = 0; q < L.edges.length; q++) {
+          var le = L.edges[q];
+          if (!le.ref.dug || (le.A !== n && le.B !== n)) continue;
+          var far = le.A === n ? le.B : le.A;
+          ce = { x: far.x / sx, y: far.y / sy, tx: n.x / sx, ty: n.y / sy };
+          break;
+        }
+        if (ce) push({ k: 'way', x: ce.x, y: ce.y, tx: ce.tx, ty: ce.ty, life: 620 });
+        push({ k: 'join', x: n.x / sx, y: n.y / sy, r: n.rr + 3, life: 1150 });
+        push({ k: 'holed', x: n.x / sx, y: n.y / sy, life: 760 });
+      }
       if (!cut) continue;
-      A(0.5); ctx.strokeStyle = MAT.ink; ctx.lineWidth = 1.2;
+      A(0.6); ctx.strokeStyle = MAT.ink; ctx.lineWidth = 1.3;
       ctx.setLineDash([2, 4]);
-      ctx.beginPath(); ctx.arc(n.x, n.y, n.r + 4, 0, TAU); ctx.stroke();
-      ctx.setLineDash([]);
+      ctx.lineDashOffset = -(now * 0.009) % 6;
+      ctx.beginPath(); ctx.arc(n.x, n.y, n.rr + 3, 0, TAU); ctx.stroke();
+      ctx.setLineDash([]); ctx.lineDashOffset = 0;
     }
   }
 
@@ -6893,10 +7691,13 @@ FZ.render = (function () {
       g.moveTo(px, py - 3 - hash(i) * 2); g.lineTo(px + 3 + hash(i + 1) * 2, py + 2); g.lineTo(px - 3, py + 3);
       g.closePath(); g.fill();
     }
-    g.globalAlpha = 0.38; g.strokeStyle = SIG.red; g.lineWidth = 1.3;
-    for (i = 0; i < 3; i++) {
-      g.beginPath(); g.moveTo(x - 7 + i * 5, y + 8); g.lineTo(x - 2 + i * 5, y - 8); g.stroke();
-    }
+    /* A SCAR IS NOT A SIGNAL. It is what is left when the signal has gone: the
+       colony's memory of a place where something landed. It stays red, because
+       red is what damage is, but it is one short mark at the strength of a
+       pencil note — never loud enough to compete with a live incident, which
+       is the thing the player is actually being asked about. */
+    g.globalAlpha = 0.22; g.strokeStyle = SIG.red; g.lineWidth = 1.1;
+    g.beginPath(); g.moveTo(x - 4, y + 6); g.lineTo(x + 3, y - 6); g.stroke();
     var im = sym ? glyph(sym, MAT.ink) : null;
     if (im) { g.globalAlpha = 0.42; g.drawImage(im, x + 11, y - 9, 17, 17); }
     g.globalAlpha = 1;
@@ -6920,6 +7721,18 @@ FZ.render = (function () {
 
   /* ================================================================== beats */
   function push(b) { b.t = now || performance.now(); beats.push(b); if (beats.length > 26) beats.splice(0, beats.length - 26); }
+  function alive(kind) {
+    for (var i = 0; i < beats.length; i++) if (beats[i].k === kind && now - beats[i].t < beats[i].life) return true;
+    return false;
+  }
+  /* THE ONE-EVENT RULE, enforced on the loudest marks in the file. Two things
+     landing inside a second used to draw two expanding red rings across half
+     the screen at once, and a screen of red is a screen with no signal left in
+     it. Only the newest of a loud kind is ever live; the older one has already
+     become a scar, and a scar is a quiet mark. */
+  function only(kind) {
+    for (var i = beats.length - 1; i >= 0; i--) if (beats[i].k === kind) beats.splice(i, 1);
+  }
 
   function wire() {
     if (wired || !window.FZ || !FZ.bus) return;
@@ -6934,7 +7747,7 @@ FZ.render = (function () {
     FZ.bus.on('job:lost', function (d) {
       if (!d) return;
       var n = 0;
-      for (var i = beats.length - 1; i >= 0; i--) if (beats[i].k === 'spill' && ++n > 3) beats.splice(i, 1);
+      for (var i = beats.length - 1; i >= 0; i--) if (beats[i].k === 'spill' && ++n > 1) beats.splice(i, 1);
       push({ k: 'spill', x: d.x, y: d.y, life: 820 });
     });
     FZ.bus.on('agent:hurt', function (d) {
@@ -6947,14 +7760,16 @@ FZ.render = (function () {
       push({ k: 'act', x: d.x, y: d.y, ok: !!d.ok, kind: d.kind, life: 700 });
       if (d.ok && d.kind && mx) memStamp(d.kind, X(d.x), Y(d.y));
     });
-    FZ.bus.on('outbreak:open', function (d) { if (d) push({ k: 'open', x: d.x, y: d.y, life: 560 }); });
+    FZ.bus.on('outbreak:open', function (d) { if (!d) return; only('open'); push({ k: 'open', x: d.x, y: d.y, life: 560 }); });
     FZ.bus.on('outbreak:answered', function (d) {
       if (!d) return;
+      only('shut');
       push({ k: 'shut', x: d.x, y: d.y, r: d.r || 60, life: 900 });
     });
     FZ.bus.on('outbreak:landed', function (d) {
       if (!d) return;
-      push({ k: 'burst', x: d.x, y: d.y, r: d.r || 60, life: 900 });
+      only('burst');
+      push({ k: 'burst', x: d.x, y: d.y, r: d.r || 60, life: 820 });
       if (dx) collapseAt(X(d.x), Y(d.y), 17);
       if (mx) memScar(d.sym, X(d.x), Y(d.y));
     });
@@ -7033,7 +7848,7 @@ FZ.render = (function () {
     ctx.translate(x, y);
     ctx.rotate(stunned ? b.ang + 1.4 : b.ang);
     ctx.scale(sc, sc);
-    var al = dim * (gave ? 0.7 : 1);
+    var al = dim * (gave ? 0.7 : 1) * (stunned ? 0.82 : 1);
 
     /* --- the little pocket a body is always standing in, and its shadow --- */
     A(0.26 * al); ctx.fillStyle = MAT.sand;
@@ -7124,11 +7939,11 @@ FZ.render = (function () {
       ctx.beginPath(); ctx.arc(x, y, 15 * sc, 0, TAU); ctx.stroke();
       ctx.setLineDash([]);
     }
-    /* --- struck --- */
-    if (stunned) {
-      A(0.85 * dim); ctx.strokeStyle = SIG.red; ctx.lineWidth = 1.6;
-      ctx.beginPath(); ctx.moveTo(x - 4, y - 11 * sc); ctx.lineTo(x + 4, y - 11 * sc); ctx.stroke();
-    }
+    /* --- struck. The BLOW is red, for the second it lands. Being down is not:
+       a worker on its side with its legs pulled in, among workers that are
+       walking, has already said it. A red tick standing over every stunned
+       body meant a quiet nest could hold a dozen red marks, and then the one
+       incident actually asking for the player had nothing louder to be. --- */
     var ht = hurtAt.get(a.id);
     if (ht !== undefined && now - ht < 600) ring(x, y, (10 + (now - ht) * 0.02) * sc, SIG.red, 1.6, (1 - (now - ht) / 600) * 0.8 * dim);
     if (a.flash) ring(x, y, (11 + (1 - Math.min(1, a.flash)) * 6) * sc, MAT.paper, 1.6, 0.5 * Math.min(1, a.flash) * dim);
@@ -7368,7 +8183,9 @@ FZ.render = (function () {
       if (x2 === 0) ctx.moveTo(x2, y2); else ctx.lineTo(x2, y2);
     }
     ctx.stroke();
-    if (k > 0.8) {
+    /* the water is at the brood — but never while something is landing, because
+       two red things at once is one red thing too many */
+    if (k > 0.8 && !alive('burst')) {
       A(0.35 + Math.sin(now * 0.006) * 0.2); ctx.strokeStyle = SIG.red; ctx.lineWidth = 1.4;
       ctx.beginPath(); ctx.moveTo(0, lvl - 3); ctx.lineTo(W, lvl - 3); ctx.stroke();
     }
@@ -7453,13 +8270,16 @@ FZ.render = (function () {
     return out.slice(0, 3);
   }
   function paperTag(text, cx, cy, above) {
-    ctx.font = '12px "IBM Plex Mono",ui-monospace,monospace';
-    var maxw = Math.min(W - 30, 244);
-    var ls = wrap(text, maxw - 20);
+    /* the nest may be standing back from the action bar; the writing does not
+       shrink with it, so a sentence is the same size on the glass either way */
+    var u = 1 / clamp(fit, 0.55, 1);
+    ctx.font = (12 * u).toFixed(1) + 'px "IBM Plex Mono",ui-monospace,monospace';
+    var maxw = Math.min(W - 30, 244 * u);
+    var ls = wrap(text, maxw - 20 * u);
     if (!ls.length) return null;
     var tw = 0;
     for (var i = 0; i < ls.length; i++) tw = Math.max(tw, ctx.measureText(ls[i]).width);
-    var bw = tw + 20, bh = 13 + ls.length * 15;
+    var bw = tw + 20 * u, bh = (13 + ls.length * 15) * u;
     var bx = clamp(cx - bw / 2, 6, Math.max(6, W - bw - 6));
     var by = above ? cy - bh : cy;
     var ar = actRect();
@@ -7471,7 +8291,7 @@ FZ.render = (function () {
     ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
     A(0.95); ctx.fillStyle = MAT.ink;
     ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-    for (var l = 0; l < ls.length; l++) ctx.fillText(ls[l], bx + 10, by + 19 + l * 15);
+    for (var l = 0; l < ls.length; l++) ctx.fillText(ls[l], bx + 10 * u, by + (19 + l * 15) * u);
     return { x: bx, y: by, w: bw, h: bh };
   }
 
@@ -7504,16 +8324,20 @@ FZ.render = (function () {
     if (!ids.length && top.o.who) ids = idsOf(top.o.who);
     return ids.length ? new Set(ids) : null;
   }
-  /* Where the answer dial may be drawn: never clipped by an edge, never under
-     the action bar that is telling the player to tap it. It is displaced only
-     as far as the answer radius allows, so what you tap is still an answer. */
+  /* What the bar still covers, in nest coordinates, WHILE the colony is easing
+     out from under it. Once the move has finished this returns null — there is
+     nothing left to dodge, so the tag and the dial stop being displaced at all
+     and simply sit on the thing they belong to. */
   function actRect() {
     if (!cv) return null;
     var el = document.getElementById('act');
     if (!el || !el.firstChild) return null;
     var r = el.getBoundingClientRect(), c = cv.getBoundingClientRect();
     if (!r.height) return null;
-    return { top: r.top - c.top - 12, bottom: r.bottom - c.top + 12 };
+    var k = fit > 0.05 ? fit : 1;
+    var top = (r.top - c.top) / k;
+    if (top >= H - 2) return null;
+    return { top: top - 12, bottom: (r.bottom - c.top) / k + 12 };
   }
   function safeSpot(x, y, r) {
     var fr = clamp(r * 0.5, 24, 44);
@@ -7550,7 +8374,7 @@ FZ.render = (function () {
       var left = clamp(1 - ((S.tick || 0) - (o.born || 0)) / (o.fuse || 1), 0, 1);
       var lead = top && top.o === o;
       var col = left < 0.34 ? SIG.red : SIG.amber;
-      var q = lead ? 1 : 0.4;
+      var q = lead ? 1 : 0.28;
       A(0.09 * q); ctx.fillStyle = col;
       ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
     }
@@ -7572,16 +8396,30 @@ FZ.render = (function () {
       var hot = left < 0.34;
       var col = hot ? SIG.red : SIG.amber;
       var bl = hot ? 0.62 + Math.abs(Math.sin(now * 0.012)) * 0.38 : 1;
-      var q = lead ? 1 : 0.42;
-      /* the ground that is still in danger */
-      A(0.22 * q * bl); ctx.strokeStyle = col; ctx.lineWidth = 1.4;
-      ctx.setLineDash([3, 5]);
-      ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.stroke();
-      ctx.setLineDash([]);
+      var q = lead ? 1 : 0.3;
+      /* ONE FRAME AT FULL STRENGTH, EVER. The wide dashed boundary — how far an
+         answer may land — is drawn only around the incident the player is being
+         asked about. A second live incident keeps its bodies, its ground stain
+         and a small dial, and nothing else: it is legible from what is happening
+         in it, which is the whole point of the grammar. */
+      if (lead) {
+        A(0.22 * bl); ctx.strokeStyle = col; ctx.lineWidth = 1.4;
+        ctx.setLineDash([3, 5]);
+        ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.stroke();
+        ctx.setLineDash([]);
+      }
       /* the time left, on a compact dial — the wide dashed ring is how far an
          answer may land, the dial is how long it has. The dial is nudged clear
          of the screen edge and of the action bar, never further than the ring
          allows, so the thing you are told to tap is always tappable. */
+      /* two incidents standing on the same ground draw one instrument between
+         them, not two nested rings. The quieter one keeps its stain and its
+         bodies; the dial belongs to the one being asked about. */
+      if (!lead && top) {
+        var lx = X(top.o.x) - x, ly = Y(top.o.y) - y;
+        var lr = clamp((top.o.r || 60) * sx, 30, Math.min(W, H) * 0.33) * 0.9;
+        if (lx * lx + ly * ly < lr * lr) continue;
+      }
       var sp = safeSpot(x, y, r);
       var fr = sp.fr;
       if (sp.off > 3) { A(0.3 * q); line(x, y, sp.x, sp.y, col, 1.2, 0.3 * q); }
@@ -7672,6 +8510,42 @@ FZ.render = (function () {
       }
       return true;
     }
+    if (b.k === 'way') {
+      /* the way in, arriving: a bright length of floor running down the passage
+         that just broke through, into the room that had nobody coming */
+      var wx = X(b.tx), wy = Y(b.ty);
+      var hd = clamp(e, 0, 1), tl = Math.max(0, hd - 0.3);
+      A(0.8 * (1 - k * 0.7)); ctx.strokeStyle = MAT.paper; ctx.lineWidth = 7;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x + (wx - x) * tl, y + (wy - y) * tl);
+      ctx.lineTo(x + (wx - x) * hd, y + (wy - y) * hd);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+      return true;
+    }
+    if (b.k === 'join') {
+      /* THE DASHES CLOSE. Since the chapter began this outline has been saying
+         "no tunnel reaches this chamber". A face has just broken through into
+         it, so the gaps shut, one at a time, into a single solid line — and
+         then the line lets go in one ring. Say nothing. */
+      var jr = b.r || 20;
+      var close = clamp(k / 0.5, 0, 1);
+      var hold = k < 0.5 ? 1 : 1 - (k - 0.5) / 0.5;
+      A(0.9 * hold); ctx.strokeStyle = MAT.ink; ctx.lineWidth = 1.3 + close * 1.6;
+      if (close > 0.985) ctx.setLineDash([]);
+      else {
+        ctx.setLineDash([2 + close * 13, 4 * (1 - close) + 0.4]);
+        ctx.lineDashOffset = -now * 0.02 * (1 - close);
+      }
+      ctx.beginPath(); ctx.arc(x, y, jr, 0, TAU); ctx.stroke();
+      ctx.setLineDash([]); ctx.lineDashOffset = 0;
+      if (k > 0.42) {
+        var ee = ease((k - 0.42) / 0.58);
+        ring(x, y, jr + 4 + ee * 24, MAT.ink, 2.4 * (1 - ee), (1 - ee) * 0.55);
+      }
+      return true;
+    }
     if (b.k === 'hurt') {
       A((1 - k) * 0.5); ctx.fillStyle = MAT.sand2;
       for (var h = 0; h < 8; h++) {
@@ -7693,12 +8567,19 @@ FZ.render = (function () {
       return true;
     }
     if (b.k === 'burst') {
-      var r1 = clamp((b.r || 60) * sx, 30, Math.min(W, H) * 0.33);
-      ring(x, y, r1 * (1 + e * 0.4), SIG.red, 3.5 - k * 2.6, (1 - k) * 0.9);
-      A((1 - k) * 0.75); ctx.fillStyle = MAT.soil3;
-      for (var q = 0; q < 10; q++) {
-        var qa = (q / 10) * TAU, qd = r1 * (0.2 + e * 0.5);
-        ctx.beginPath(); ctx.arc(x + Math.cos(qa) * qd, y + Math.sin(qa) * qd, 3 * (1 - k), 0, TAU); ctx.fill();
+      /* THE ROOF COMES IN. The damage is earth falling — that is the picture —
+         and the red is one tight ring saying it landed HERE, close enough to
+         the rubble to be part of it. It used to be a shockwave the width of a
+         phone, which is not a signal, it is weather. */
+      var r1 = clamp((b.r || 60) * sx * 0.5, 22, 54);
+      ring(x, y, r1 * (0.7 + e * 0.35), SIG.red, 2.6 - k * 1.8, (1 - k) * 0.8);
+      A((1 - k) * 0.8); ctx.fillStyle = MAT.soil3;
+      for (var q = 0; q < 11; q++) {
+        var qa = (q / 11) * TAU + hash(b.t + q) * 0.6;
+        var qd = r1 * (0.15 + e * 0.55) * (0.6 + hash(q * 2.7) * 0.7);
+        ctx.beginPath();
+        ctx.arc(x + Math.cos(qa) * qd, y + Math.sin(qa) * qd + e * e * 7, 3.2 * (1 - k), 0, TAU);
+        ctx.fill();
       }
       return true;
     }
@@ -7774,8 +8655,11 @@ FZ.render = (function () {
   function draw(S) {
     if (!ctx) return;
     now = performance.now();
+    var dt = lastNow ? now - lastNow : 16;
+    lastNow = now;
     frames++;
     wire();
+    fitStep(dt);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.lineCap = 'butt'; ctx.lineJoin = 'miter'; ctx.setLineDash([]);
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
@@ -7987,6 +8871,8 @@ FZ.render = (function () {
     /* test hooks — read-only, for the placement/legibility harness */
     __drawn: function () { return drawn; },
     __dial: function () { return lastDial; },
+    __fit: function () { return fit; },
+    __joins: function () { return joins; },
     resize: function (w, h) {
       W = Math.max(1, Math.round(w)); H = Math.max(1, Math.round(h));
       if (!cv) return;
@@ -9071,6 +9957,30 @@ FZ.controls = (function () {
     if (ob() && ob().tryAnswer) {
       try { ans = ob().tryAnswer(kind, x, y); } catch (e) { ans = null; }
     }
+
+    /* ------------------------------------------------------------------------------
+       A THUMB ERROR MUST NOT END A CHAPTER.
+
+       Measured on the shipped build: a critic armed the meeting stone, put it down three
+       hundred and forty pixels from the incident, went from four food to one, and was
+       then REFUSED the correct placement for lack of food. The chapter was over because
+       a finger landed in the wrong place — and this is a phone, where a thumb is nine
+       millimetres wide and the nest is three hundred and ninety.
+
+       So a placement that lands inside no incident is not charged and not applied. It is
+       not even a mistake: the instrument stays IN HAND, the one message region says where
+       it belongs, and the player simply puts it down again. Being wrong about WHICH
+       failure this is still costs — that is the lesson and it is priced. Missing with
+       your thumb is not a diagnosis, so it is priced at nothing.
+       ------------------------------------------------------------------------------ */
+    if (NEEDS_XY[kind] && (!ans || !ans.hit)) {
+      say((ans && ans.msg) || loop('tooFar') || aimLine(kind), 'bad');
+      api.armed = kind;                        /* still in hand — try again, free */
+      api.aim = null;
+      paint(st);
+      return;
+    }
+
     var out = FZ.sim.apply(kind, NEEDS_XY[kind] ? x : undefined, NEEDS_XY[kind] ? y : undefined);
 
     /* nothing was spent -> say why, and never claim an answer that did not happen.

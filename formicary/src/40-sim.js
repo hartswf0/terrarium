@@ -299,6 +299,8 @@ FZ.sim = (function () {
     /* ---- the trade-off dials (§15) ---- */
     trustBias: 0, ownership: 0, aggro: 0, ownEnabled: true,
     conflicts: [], stat: null, waiting: 0,
+    /* ---- THE PACER (§16.3, L10.1): how overdue this colony is for trouble ---- */
+    calm: 0, urge: 0, stirAt: 0, _due: {},
     /* ---- what a miss costs: the residual floor strain cannot fall below ---- */
     scar: 0, scars: [], works: [], budgetMax: 14,
     /* ---- THE BODIES: colony-wide observables, rebuilt each tick in bodies() ---- */
@@ -842,6 +844,18 @@ FZ.sim = (function () {
     }
     return out;
   }
+  /* MAY WORK TURN UP WHERE THE NETWORK DOES NOT REACH? Only where the passage has a name
+     for it. A room with no tunnel to it is Si's picture and it is the best one in the
+     world model — but in a passage that has never met Si it is four workers digging for
+     two hundred ticks while the only live detector has nothing to read, which is exactly
+     where the round-five walkthrough lost its player. The opening passage, which enables
+     no detectors at all and asks nothing of anybody, keeps it: there is nothing there to
+     starve, and watching them cut is the whole point of that thirty seconds. */
+  function sealOK() {
+    const en = FZ.sim.enabled;
+    if (!en) return true;
+    return en.has('Si') || en.size === 0;
+  }
   function freeChamber(nearX, nearY) {
     const C = chamberNodes(), open = [];
     for (let i = 0; i < C.length; i++) if (!C[i].job) open.push(C[i]);
@@ -850,8 +864,16 @@ FZ.sim = (function () {
     /* SOMETIMES THE WORK IS SOMEWHERE THEY CANNOT GET TO. A third of new crumbs turn up
        in a room the network does not reach, so somebody has to walk to the end of the
        tunnel and cut. That is what keeps digging a normal part of a colony's day rather
-       than a one-off at the start, and it is the physical body of Si. */
-    if (nearX == null) {
+       than a one-off at the start, and it is the physical body of Si.
+
+       ONLY WHERE THE PASSAGE HAS A NAME FOR IT. Measured on the round-five build: passage
+       two enabled exactly one element — Co — and then put a third of its crumbs behind
+       solid earth, so four workers spent two hundred ticks digging while the only live
+       detector had nothing to read and the player had nothing to answer. That is where
+       the fifteen quiet seconds in the walkthrough came from. Unreachable work is a
+       superb picture, but it is Si's picture; a passage that has not met Si yet gets
+       work it can walk to. */
+    if (nearX == null && sealOK()) {
       const walled = [];
       for (let i = 0; i < pool.length; i++) if (pool[i].comp !== NEST.main) walled.push(pool[i]);
       if (walled.length && rnd() < 0.35) return walled[Math.floor(rnd() * walled.length)];
@@ -864,7 +886,15 @@ FZ.sim = (function () {
       }
       return best;
     }
-    return pool[Math.floor(rnd() * pool.length)];
+    /* and when this passage has no name for an unreachable room, the crumb goes somewhere
+       the colony can actually walk to */
+    let ok = pool;
+    if (!sealOK()) {
+      const reach = [];
+      for (let i = 0; i < pool.length; i++) if (pool[i].comp === NEST.main) reach.push(pool[i]);
+      if (reach.length) ok = reach;
+    }
+    return ok[Math.floor(rnd() * ok.length)];
   }
   /* the node a worker is at, or the one it is walking into */
   function whereIs(a) {
@@ -1044,6 +1074,7 @@ FZ.sim = (function () {
     S.varMul = 1; S.monoMul = 1; S.blind = 0;
     S.trustBias = 0; S.ownership = 0; S.aggro = 0;
     S.conflicts = []; S.stat = freshStat(); S._said = {};
+    S.calm = 0; S.urge = 0; S.stirAt = 0; S._due = {};
     S.scar = 0; S.scars = []; S.works = []; S.waiting = 0;
     S.column = null; S.lineage = []; S.fell = null; S.bigJob = 0; S.arb = false;
     S.weather = { frantic: 0, dark: 0, crowd: 0, scarce: 0 };
@@ -1110,6 +1141,8 @@ FZ.sim = (function () {
         liar: false, lies: 0, chase: null, chaseRumor: false, churner: false,
         pk: null, drained: 0, idleRun: 0, pcool: 0, avoid: null, heardRumor: 0, lockAt: 0,
         wx: null, wy: null, wt: 0,          /* where an idle worker is patrolling to */
+        /* an errand that survives the walk: see the re-decide guard in step() */
+        commit: 0,
         /* ---- THE BODIES: what this worker is visibly doing, every tick ---- */
         posture: 'wander', tx: 0, ty: 0, hesitate: 0, load: 0, holdN: 0,
         follow: 0, trust: 1, marks: 0, knows: [], defiant: 0,
@@ -1187,7 +1220,7 @@ FZ.sim = (function () {
     });
 
     /* --- elements --- */
-    FZ.EL.forEach(e => { e.heat = 0; e.fires = 0; e.peak = 0; e.on = false; e.countered = false; e.who = []; });
+    FZ.EL.forEach(e => { e.heat = 0; e.fires = 0; e.peak = 0; e.on = false; e.fireAt = 0; e.countered = false; e.who = []; });
 
     S._lw = S.w; S._lh = S.h;
     aggregate();
@@ -1393,6 +1426,423 @@ FZ.sim = (function () {
     a.hesitate = Math.min(1, a.hesitate + 0.3);
   }
 
+  /* ============================================================
+     THE PACER — a decision every few seconds, in EVERY passage (L10.1)
+     ------------------------------------------------------------
+     ROUND-FIVE VERDICT: "chapter four produced exactly ONE decision in its entire
+     twenty-seven-second run… a player can look away for twenty seconds and lose
+     nothing." Measured, the cause was in this file, not in the clock on top of it. The
+     guarantee layer fired on a fixed modulus, and the coordination guarantee looked for
+     a crumb with NO claimant on it — which, in a passage with three crumbs and seven
+     workers, stops existing about ten seconds in. From then on the guarantee silently
+     did nothing and the colony went quiet with the player still holding an instrument.
+
+     So the guarantee layer is now DRIVEN by how long the colony has been quiet.
+
+       S.calm   ticks since anything the player could be asked about was burning
+       S.urge   0..1 — how overdue this colony is for trouble. It is ZERO while a failure
+                is live, so the pacer never piles onto a decision the player is already
+                making, and it is FULL after about two and a half seconds of nothing.
+
+     Urge does two things and nothing else:
+       1. It pulls this scenario's own scheduled guarantees forward (see `due`): a colony
+          nobody is troubling is handed overlapping work sooner.
+       2. At full urge it STIRS — runs one provocation drawn from THIS scenario's own
+          `force` set, aimed at whichever taught failure has been coldest, preferring one
+          the player is actually holding an instrument for. A decision nobody can answer
+          is not a decision.
+
+     NOTHING IS INVENTED. Every provocation below is a guarantee the scenario already
+     declared in `force`; the pacer only decides WHEN. The instant anything catches,
+     calm resets, urge collapses to zero and the pacer goes silent again — so a player
+     who is answering never meets it, and a player who is watching always does.
+
+     The sandbox needs none of this: it is already measured at a decision every three
+     seconds and never goes quiet long enough for urge to reach one. The pacer is a
+     FLOOR under the incident rate, not a term added to it.
+     ============================================================ */
+  const QUIET_FREE = 40,      /* ~0.7s of earned quiet after a failure stops burning */
+        QUIET_RAMP = 105,     /* and full urge about two and a half seconds in */
+        URGE_PULL = 0.74,     /* how far urge collapses a scheduled guarantee's interval */
+        /* A PROVOCATION IS A WALK, NOT A SWITCH. Measured the hard way: stirring every
+           sixty ticks re-assigned workers faster than any of them could cross a passage,
+           so five bodies queued for one room and none of them ever arrived. A stir that
+           took hold is given time to arrive; a stir that found nothing to do is retried
+           straight away, because that costs the colony nothing. */
+        STIR_SETTLE = 165,    /* ~3s: long enough to walk in and meet somebody */
+        STIR_RETRY = 55,
+        COMMIT = 300,         /* and how long a body sent somewhere keeps going there */
+        /* A FAILURE THAT NEVER STOPS MUST NOT GO SILENT. `fire` is a rising edge, so a
+           condition that saturates and stays saturated speaks once and then never again,
+           and the player is left watching a colony that is visibly falling apart with
+           nothing on the table. Longer than one fuse plus its cooldown, so it can only
+           ever land in the gap AFTER an incident closed, never on top of one. */
+        REANNOUNCE = 470;
+
+  function pace() {
+    let live = false;
+    const els = FZ.EL, en = FZ.sim.enabled;
+    for (let i = 0; i < els.length; i++) {
+      const e = els[i];
+      if (!en.has(e.sym)) continue;
+      if (e.on || e.heat > 0.22) { live = true; break; }
+    }
+    S.calm = live ? 0 : S.calm + 1;
+    S.urge = clamp((S.calm - QUIET_FREE) / QUIET_RAMP, 0, 1);
+  }
+  /* a scheduled guarantee, pulled forward by how quiet it has been */
+  function due(key, every, first) {
+    const d = S._due;
+    if (d[key] == null) d[key] = (first == null ? 0 : first) - every;
+    const want = Math.max(26, Math.round(every * (1 - URGE_PULL * S.urge)));
+    if (S.tick - d[key] < want) return false;
+    d[key] = S.tick;
+    return true;
+  }
+
+  /* ---------------- the provocations ----------------
+     Each one is this scenario's own declared guarantee, run now instead of on the hour.
+     Each returns whether it actually changed anything, so the stir can try the next.
+
+     THE COLONY IS BIGGER THAN YOUR STONE. Every provocation prefers ground the player's
+     institutions do NOT cover. This is not a way of cheating the counter — it is the
+     counter's boundary, and it is a fact about institutions the game should teach rather
+     than assert. Measured: passage two used to hand over one meeting stone, the stone
+     covered all three crumbs, and the passage then ran eighteen seconds with nothing on
+     the table at all, because the only failure it had enabled could no longer happen
+     anywhere. An institution holds the ground it is standing on. */
+  /* work the colony could actually get a second body to. A crumb in a room with no tunnel
+     to it is a real situation and it has its own element (Si) — but it is not somewhere a
+     collision can be staged, because nobody can walk in. */
+  function takeable(j) {
+    if (!j || j.done || j.locked !== false) return false;
+    const nd = nodeById(j.node);
+    return !nd || nd.comp === NEST.main;
+  }
+  function bare(j) { return !FZ.elh.cover(S, j.x, j.y); }
+  /* the open work, the ground nobody is keeping first */
+  function outside(list) {
+    const a = [], b = [];
+    for (let i = 0; i < list.length; i++) (bare(list[i]) ? a : b).push(list[i]);
+    return a.length ? a : b;
+  }
+  function pick(list) { return list.length ? list[Math.floor(rnd() * list.length)] : null; }
+
+  /* TWO WORKERS WALK INTO ONE CRUMB BY TWO DIFFERENT TUNNELS.
+     The old version demanded a crumb nobody had claimed — which is exactly why the
+     guarantee evaporated. A second body walking in on work somebody is already doing is
+     the SAME picture and it is the common case, so it is the fallback. */
+  function stirPair() {
+    if (S.ownership >= 0.5) return false;      /* §15.2 an owner is not handed shared work */
+    const free = [];
+    for (let i = 0; i < S.agents.length; i++) {
+      const a = S.agents[i];
+      if (a.stun > 0 || a.adversary || a.locker || a.liar) continue;
+      if (a.terr > 0.5 || S.tick < a.idleUntil) continue;
+      free.push(a);
+    }
+    if (free.length < 2) return false;
+    const cand = [];
+    for (let i = 0; i < S.jobs.length; i++) if (takeable(S.jobs[i])) cand.push(S.jobs[i]);
+    if (!cand.length) return false;
+
+    /* THE CRUMB SOMEBODY IS ALREADY STANDING ON, on ground no institution covers. A
+       collision is two bodies in one room, so the cheapest way to make one is to walk a
+       second body into a room that already has one. */
+    const outs = outside(cand);
+    let j = null;
+    for (let i = 0; i < outs.length; i++) if (workersAt(outs[i]) === 1) { j = outs[i]; break; }
+    if (!j) for (let i = 0; i < outs.length; i++) if (!outs[i].claims.size) { j = outs[i]; break; }
+    if (!j) j = pick(outs);
+    if (!j) return false;
+    const nd = nodeById(j.node);
+    if (!nd) return false;
+
+    /* THE TWO WAYS IN. Every chamber in this nest has two, and which one a body came in
+       by is exactly what Co reads. So the pair is drawn from the MOUTHS: the worker
+       standing in the room next door, one passage out, arrives in a second or two — and
+       it arrives by a passage nobody in that room used. Picking the worker furthest away
+       instead, which is what this did before, sends a body on a ten-second walk that the
+       router has usually changed its mind about by the time it gets there. That is why a
+       passage with a guaranteed collision every two seconds produced one in twenty. */
+    const inRoom = {}, camein = {};
+    let have = 0;
+    j.claims.forEach(id => {
+      const a = agentById(id);
+      if (!atWork(a, j)) return;
+      inRoom[a.id] = 1; have++;
+      if (a.via != null) camein[a.via] = 1;
+      a.commit = S.tick + COMMIT;
+    });
+    if (have >= 2) return false;              /* it is already happening */
+
+    /* the mouths, the ones nobody arrived by first */
+    const mouths = [];
+    for (let k = 0; k < nd.edges.length; k++) {
+      const e = NEST.edges[nd.edges[k]];
+      if (!e || !e.dug) continue;
+      mouths.push({ eid: e.id, nid: other(e, nd.id), fresh: camein[e.id] ? 0 : 1 });
+    }
+    mouths.sort((p, q) => q.fresh - p.fresh);
+    if (!mouths.length) return false;
+
+    let sent = 0;
+    for (let m = 0; m < mouths.length && have + sent < 2; m++) {
+      const mo = nodeById(mouths[m].nid), eid = mouths[m].eid;
+      if (!mo) continue;
+      /* SOMEBODY WHO IS ALREADY THERE. Standing in the room next door, or already in the
+         passage between — a body one step out is a body that arrives, and a body on the
+         far side of the nest is a body the router changes its mind about. Scored, so the
+         one that is nearest to walking in is the one that is sent. */
+      let best = null, bs = Infinity;
+      for (let i = 0; i < free.length; i++) {
+        const a = free[i];
+        if (inRoom[a.id] || a.at === j.node) continue;
+        let sc;
+        if (a.at === mo.id) sc = 0;
+        else if (a.edge === eid) sc = 1;
+        else sc = 2 + d2(a.x, a.y, mo.x, mo.y) / 40000;
+        if (sc < bs) { bs = sc; best = a; }
+      }
+      if (!best || bs > 4) continue;            /* ~200px of the mouth, and no further */
+      if (!claim(best, j)) continue;
+      best.commit = S.tick + COMMIT;
+      inRoom[best.id] = 1;
+      sent++;
+    }
+    return sent > 0;
+  }
+  /* how many of a crumb's claimants are physically standing in the room with it */
+  function workersAt(j) {
+    let n = 0;
+    j.claims.forEach(id => { const a = agentById(id); if (atWork(a, j)) n++; });
+    return n;
+  }
+
+  /* EVERY ROAD BUT ONE GOES COLD. The copying term goes back up and the free bodies are
+     pointed at whatever the colony is already on: the column, the worn passage and the
+     room packed to its walls. That is Cf and Fl, and it is one picture. */
+  function stirHerd() {
+    const G = S._g;
+    S.copyBias = Math.min(0.92, Math.max(S.copyBias, 0.85));
+    let t = G && G.targetTop ? jobById(G.targetTop) : null;
+    if (!takeable(t) || !bare(t)) {
+      const cand = [];
+      for (let i = 0; i < S.jobs.length; i++) if (takeable(S.jobs[i])) cand.push(S.jobs[i]);
+      if (!cand.length) return false;
+      const out = outside(cand);
+      let bk = -1; t = null;
+      for (let i = 0; i < out.length; i++) if (out[i].knownBy > bk) { bk = out[i].knownBy; t = out[i]; }
+    }
+    if (!t) return false;
+    let n = 0;
+    for (let i = 0; i < S.agents.length && n < 6; i++) {
+      const a = S.agents[i];
+      if (a.stun > 0 || a.adversary || a.locker || a.liar || S.tick < a.idleUntil) continue;
+      if (a.hold.indexOf(t.id) > -1) { n++; a.commit = S.tick + COMMIT; continue; }
+      a.known.add(t.id);
+      if (claim(a, t)) { a.commit = S.tick + COMMIT; n++; }
+    }
+    return n >= 3;
+  }
+
+  /* A BODY PARKED IN THE PASSAGE, AND THE LINE BEHIND IT. A locker whose crumb got
+     finished is holding nothing to lock and stops being a lockout at all. Give it work. */
+  function stirLock() {
+    for (let i = 0; i < S.agents.length; i++) {
+      const a = S.agents[i];
+      if (!a.locker || a.stun > 0 || a.hold.length || S.tick < a.idleUntil) continue;
+      /* a lock inside a charter is broken the moment it is made (see Lo), so the body
+         parks in a passage the stone does not reach */
+      const cand = [];
+      for (let k = 0; k < S.jobs.length; k++) if (takeable(S.jobs[k])) cand.push(S.jobs[k]);
+      if (!cand.length) return false;
+      const j = pick(outside(cand));
+      if (j && claim(a, j)) { a.idleRun = 0; return true; }
+    }
+    return false;
+  }
+
+  /* A CLAIM PASSED BACK AND FORTH AND NEVER WORKED. */
+  function stirChurn() {
+    let n = 0;
+    for (let i = 0; i < S.agents.length && n < 2; i++) {
+      const a = S.agents[i];
+      if (!a.churner || a.stun > 0 || S.tick < a.idleUntil) continue;
+      if (a.hold.length) drop(a, a.hold[0]);
+      const j = nearestOpen(a.x, a.y);
+      if (j && j.locked === false && claim(a, j)) n++;
+    }
+    return n > 0;
+  }
+
+  /* THE NEXT LIE, NOW. A liar with nothing to lose does not wait for the hour. */
+  function stirLie() {
+    const L = S._g && S._g.liar;
+    if (!L || L.stun > 0) return false;
+    spawnRumor(L);
+    return true;
+  }
+
+  /* FINISHED WORK COMES APART: the saboteur is pointed at the fullest crumb again. */
+  function stirSabotage() {
+    const G = S._g;
+    if (!G || !G.adv.length) return false;
+    let bj = null, bp = -1;
+    for (let i = 0; i < S.jobs.length; i++) {
+      const j = S.jobs[i];
+      if (!j.done && j.progress > bp) { bp = j.progress; bj = j; }
+    }
+    if (!bj) return false;
+    let n = 0;
+    for (let i = 0; i < G.adv.length; i++) {
+      const a = G.adv[i];
+      if (a.stun > 0) continue;
+      a.mark = bj.id; a.markT = S.tick + 300; n++;
+    }
+    return n > 0;
+  }
+
+  /* THE RIVALS WANT THE SAME CRUMB AGAIN. §15.3 is respected: a worker that already lost
+     its turf war by force or gave it up stays out of the economy. Passivity is a real
+     ending, not a lull the pacer is allowed to undo. */
+  function stirRivals() {
+    let n = 0;
+    for (let i = 0; i < S.agents.length && n < 2; i++) {
+      const a = S.agents[i];
+      if (a.rival == null || a.stun > 0 || S.tick < a.idleUntil) continue;
+      const r = agentById(a.rival);
+      if (!r || r.stun > 0 || S.tick < r.idleUntil) continue;
+      if (S.tick < (a.truceUntil || 0)) continue;    /* a truce is what the player bought */
+      const j = r.hold.length ? jobById(r.hold[0]) : nearestOpen(a.x, a.y);
+      if (!j || j.done || j.locked !== false) continue;
+      a.known.add(j.id);
+      if (claim(a, j)) { a.esc = Math.max(a.esc || 0, 1); n++; }
+    }
+    return n > 0;
+  }
+
+  /* ONE PAIR OF HANDS, TOO MANY ROOMS. */
+  function stirPile() {
+    for (let i = 0; i < S.agents.length; i++) {
+      const a = S.agents[i];
+      if (!a.greedy || a.stun > 0 || S.tick < a.idleUntil) continue;
+      let n = 0;
+      for (let k = 0; k < S.jobs.length && a.hold.length < 4; k++) {
+        const j = S.jobs[k];
+        if (j.done || j.locked !== false || a.hold.indexOf(j.id) > -1) continue;
+        a.known.add(j.id);
+        if (claim(a, j)) n++;
+      }
+      if (n) return true;
+    }
+    return false;
+  }
+
+  /* WORK IN A ROOM WITH NO TUNNEL TO IT. Literally unreachable: somebody has to walk to
+     the end of the network and cut. This is the body of Si, and it is the one situation
+     in the whole world model that no passage is built around yet. */
+  function stirSeal() {
+    if (S.jobs.length >= S.maxJobs) return false;
+    const C = chamberNodes(), walled = [];
+    for (let i = 0; i < C.length; i++) if (!C[i].job && C[i].comp !== NEST.main) walled.push(C[i]);
+    if (!walled.length) return false;
+    const n = walled[Math.floor(rnd() * walled.length)];
+    const j = makeJob({ value: 5 }, n.x, n.y);
+    if (j.node !== n.id) { clearRoom(j); return false; }
+    S.jobs.push(j);
+    /* somebody has to have heard of it, or nobody ever goes and digs */
+    for (let i = 0; i < S.agents.length && i < 3; i++) S.agents[i].known.add(j.id);
+    return true;
+  }
+
+  /* THE WORK MOVES TO NEW GROUND. This is the one provocation that belongs to no force
+     key, because it is the answer to a situation every passage can reach: every crumb
+     the colony has is inside the institution the player built, so nothing can go wrong
+     anywhere and the passage goes quiet with the player holding a working instrument.
+     A colony does not stop finding crumbs because you put a stone down. The next one
+     turns up on ground nobody is keeping — which is the lesson, not a loophole. */
+  function stirGround() {
+    if (S.jobs.length >= S.maxJobs) return false;
+    const C = chamberNodes(), out = [];
+    for (let i = 0; i < C.length; i++) {
+      const nd = C[i];
+      if (nd.job || nd.comp !== NEST.main) continue;
+      if (FZ.elh.cover(S, nd.x, nd.y)) continue;
+      out.push(nd);
+    }
+    if (!out.length) return false;
+    const nd = out[Math.floor(rnd() * out.length)];
+    const j = makeJob({ value: 5 }, nd.x, nd.y);
+    if (j.node !== nd.id) { clearRoom(j); return false; }
+    S.jobs.push(j);
+    const aw = S.force.silo ? 90 : 150;
+    for (let i = 0; i < S.agents.length; i++) {
+      const a = S.agents[i];
+      if (d2(a.x, a.y, j.x, j.y) < aw * aw) a.known.add(j.id);
+    }
+    if (!S.force.silo) for (let i = 0; i < S.agents.length && i < 3; i++) S.agents[i].known.add(j.id);
+    if (S.spawnEvery) S.spawnAt = S.tick + S.spawnEvery;   /* it IS this passage's spawn, early */
+    return true;
+  }
+
+  /* WORK BEHIND A FACE NOBODY IS CUTTING. */
+  function stirDep() {
+    const open = [];
+    for (let i = 0; i < S.jobs.length; i++) {
+      const j = S.jobs[i];
+      if (j.done) continue;
+      if (j.prereq) { const p = jobById(j.prereq); if (p && !p.done) return false; }
+      open.push(j);
+    }
+    if (open.length < 2) return false;
+    const k = Math.floor(rnd() * open.length), j = open[k];
+    const p = open[(k + 1) % open.length];
+    if (p === j || p.progress > j.progress) return false;
+    j.prereq = p.id;
+    return true;
+  }
+
+  /* the provocation each force key guarantees, and the element it is the body of */
+  const STIRS = [
+    { sym: 'Co', key: 'coordination', run: stirPair },
+    { sym: 'Cf', key: 'stampede', run: stirHerd },
+    { sym: 'Fl', key: 'stampede', run: stirHerd },
+    { sym: 'Lo', key: 'lock', run: stirLock },
+    { sym: 'Cl', key: 'churn', run: stirChurn },
+    { sym: 'Gu', key: 'rumor', run: stirLie },
+    { sym: 'Sa', key: 'saboteur', run: stirSabotage },
+    { sym: 'Tw', key: 'rivals', run: stirRivals },
+    { sym: 'Ow', key: 'overload', run: stirPile },
+    { sym: 'Si', key: 'silo', run: stirSeal },
+    { sym: 'Dp', key: 'dependency', run: stirDep },
+  ];
+  function stir() {
+    /* GROUND FIRST. If every crumb the colony has is inside an institution, none of the
+       provocations below has anywhere to happen — so the colony finds a crumb somewhere
+       else before it finds trouble. Measured: passage two used to die exactly here. */
+    let bareN = 0;
+    for (let i = 0; i < S.jobs.length; i++) if (takeable(S.jobs[i]) && bare(S.jobs[i])) bareN++;
+    if (!bareN && stirGround()) return true;
+
+    const F = S.force, en = FZ.sim.enabled, tools = S.tools, pool = [];
+    for (let i = 0; i < STIRS.length; i++) {
+      const s = STIRS[i];
+      if (!F[s.key] || !en.has(s.sym)) continue;
+      const e = FZ.ELBY[s.sym];
+      if (!e || e.on) continue;
+      let armed = 0;
+      const ans = e.answers || [];
+      for (let k = 0; k < ans.length; k++) if (tools.indexOf(ans[k]) > -1) { armed = 1; break; }
+      pool.push({ run: s.run, armed: armed, heat: e.heat });
+    }
+    if (!pool.length) return false;
+    /* the coldest failure the player can actually answer goes first */
+    pool.sort((p, q) => (q.armed - p.armed) || (p.heat - q.heat));
+    for (let i = 0; i < pool.length; i++) if (pool[i].run()) return true;
+    return false;
+  }
+
   /* ---------------- one tick ---------------- */
   function step() {
     if (S.gameOver) return;
@@ -1484,23 +1934,19 @@ FZ.sim = (function () {
       if (S.ledgerOn && L && L.lies > 0) S.trust[L.id] = 0.06;
     }
 
-    /* forced coordination pairs: the guarantee behind chapter 1.
-       §15.2: a colony that has retreated into file ownership is not handed overlapping work
-       at all any more — the work is pre-partitioned, which is exactly how ownership makes
-       merge conflict go away, and exactly why nothing is shared or learned either. */
-    if (F.coordination && S.tick % (F.pairEvery || 200) === 40 && S.ownership < 0.5) {
-      const open = S.jobs.filter(j => !j.done && !j.claims.size);
-      if (open.length) {
-        const j = open[Math.floor(rnd() * open.length)];
-        /* §15.2 a worker that has retreated into owning its own files cannot be handed
-           somebody else's work any more. That is how the ownership answer suppresses Mc. */
-        const A = S.agents.filter(a => a.stun <= 0 && !a.adversary && !a.locker && a.terr <= 0.5);
-        if (A.length >= 2) {
-          A.sort((p, q) => (p.x + p.y) - (q.x + q.y));
-          claim(A[0], j); claim(A[A.length - 1], j);
-        }
-      }
-    }
+    /* ---- THE PACER. How long has this colony had nothing to say for itself? ---- */
+    pace();
+
+    /* forced coordination pairs: the guarantee behind chapter 1, now on the pacer's
+       clock rather than a fixed modulus, and no longer dependent on an unclaimed crumb.
+       §15.2: a colony that has retreated into file ownership is not handed overlapping
+       work at all any more — the work is pre-partitioned, which is exactly how ownership
+       makes merge conflict go away, and exactly why nothing is shared or learned either. */
+    if (F.coordination && due('pair', F.pairEvery || 200, 40)) stirPair();
+
+    /* ---- AND IF IT STILL HAS NOTHING TO SAY, GIVE IT SOMETHING. One provocation from
+       this passage's own force set, every ~1.1s, until something catches. ---- */
+    if (S.urge >= 1 && S.tick >= S.stirAt) S.stirAt = S.tick + (stir() ? STIR_SETTLE : STIR_RETRY);
     /* lineage drift: the sandbox slides back into monoculture if you stop paying for variance */
     if (F.drift && S.tick % 2600 === 0 && S._g) {
       const top = S._g.topHue;
@@ -1577,7 +2023,13 @@ FZ.sim = (function () {
       }
 
       if (!a.hold.length && !a.chaseRumor && a.chase == null && a.waitFor == null) decide(a);
-      else if (a.waitFor == null && rnd() < 0.004 * T) decide(a);
+      /* A WORKER SENT SOMEWHERE DOES NOT CHANGE ITS MIND HALFWAY DOWN THE TUNNEL. Walking
+         a real passage takes seconds, and a one-in-two-hundred-and-fifty chance of
+         re-deciding, every tick, dissolves an errand before the body arrives — which is
+         why two workers handed the same crumb were never both in the room to collide
+         over it. `commit` is the same idea the saboteur's mark and the chaser's tether
+         already use: an intention that survives the walk. */
+      else if (a.waitFor == null && S.tick > (a.commit || 0) && rnd() < 0.004 * T) decide(a);
 
       /* §15.2 an owner enforces its ownership: whatever it holds, it holds alone. Nobody
          else's copy of that work is ever integrated, so two lineages can no longer finish
@@ -2162,8 +2614,14 @@ FZ.sim = (function () {
       e.heat = Math.min(1, e.heat + amount * scale);
       if (o.who) e.who = o.who;
       if (o.at) e.at = o.at;      /* where this failure is happening, for whoever draws it */
-      if (!e.on && e.heat >= 0.35) {
-        e.on = true; e.fires++;
+      /* A FAILURE THAT NEVER STOPS MUST NOT GO SILENT. `fire` is a rising edge, so a
+         condition that saturates and stays saturated used to speak exactly once and then
+         never again — the colony visibly coming apart with nothing on the table, which
+         is the round-five verdict in one sentence. If it is still saturated a whole fuse
+         and cooldown later, it is still happening, and it says so again. */
+      const chronic = e.on && e.heat >= 0.5 && S.tick - (e.fireAt || 0) > REANNOUNCE;
+      if (chronic || (!e.on && e.heat >= 0.35)) {
+        e.on = true; e.fires++; e.fireAt = S.tick; S.calm = 0; S.urge = 0;
         emit('fire', {
           sym: e.sym,
           at: o.at || { x: S.w / 2, y: S.h / 2 },
@@ -2288,7 +2746,14 @@ FZ.sim = (function () {
         if (d2(a.x, a.y, x, y) < CHARTER_R * CHARTER_R) a.terr = 0;
       }
     } else if (kind === 'slow') {
-      S.slowUntil = S.tick + 900;
+      /* THE BELL RINGS FOR EIGHT SECONDS, NOT SIXTEEN (§16.3). This number was set when
+         the fuse was six hundred and twenty ticks and a tick covered more ground; against
+         the re-cut clock it was longer than half a passage. SLOW is the only instrument
+         that counters six elements at once, so while it is ringing a two-element passage
+         has nothing left that can happen — measured at eighteen seconds of a thirty-second
+         passage with no decision on the table at all. It brakes for a little longer than
+         one fuse, which is what a brake is for; it does not buy the rest of the chapter. */
+      S.slowUntil = S.tick + 480;
     } else if (kind === 'lens') {
       S.lensUntil = S.tick + 1500; S.lensOn = true;
       S.jobs.forEach(j => { j.revealed = true; j.shun = 0; });
@@ -2501,6 +2966,9 @@ FZ.sim.defaults = [
       /* the three trade-off dials, for tooling and for FIELD */
       trustBias: +S.trustBias.toFixed(2), ownership: +S.ownership.toFixed(2),
       aggro: +S.aggro.toFixed(2), speedMul: +S.speedMul.toFixed(2),
+      /* THE PACER, for whoever measures the incident rate next: how long this colony has
+         had nothing to say, and how overdue it is. urge=1 means the pacer is stirring. */
+      calm: S.calm, urge: +S.urge.toFixed(2),
       conflict: { force: S.stat.force, passivity: S.stat.passivity, truce: S.stat.truce, unsettled: S.stat.unsettled },
       /* THE BODIES, as a census: proof the failures are things happening on the field and
          not numbers in a table. If `queued` is zero while Lo is hot, the body is missing. */

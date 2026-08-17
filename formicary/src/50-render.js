@@ -44,7 +44,8 @@ FZ.render = (function () {
   var mem = null, mx = null;          /* permanent memory: scars, stamps, stains */
   var mix = null, mxx = null;         /* scratch for masking */
   var earth = null, floor2 = null, vign = null;  /* painted once: earth, floor, darkness */
-  var wired = false, now = 0, sx = 1, sy = 1, frames = 0, nestDirty = true;
+  var wired = false, now = 0, lastNow = 0, sx = 1, sy = 1, frames = 0, nestDirty = true;
+  var fit = 1, fitShown = -1, MINFIT = 0.58;   /* how much room the action bar needs */
   var L = null;                       /* the nest layout */
   var beats = [];
   var bodies = new Map();             /* per-ant render memory: heading, gait, wobble */
@@ -53,7 +54,8 @@ FZ.render = (function () {
   var peak = new Map(), hurtAt = new Map(), doneAt = new Map();
   var gimg = new Map();
   var stamped = new Set();            /* charters already carved into the nest */
-  var lastTick = -1, floodMark = 0, spursMade = false, lastDial = null;
+  var compWas = new Map();            /* which chambers had no way in last frame */
+  var lastTick = -1, floodMark = 0, spursMade = false, lastDial = null, joins = 0;
 
   /* ---------------------------------------------------------- tiny helpers */
   function A(a) { ctx.globalAlpha = a < 0 ? 0 : a > 1 ? 1 : a; }
@@ -148,6 +150,52 @@ FZ.render = (function () {
     for (var i = 0; i < FZ.EL.length; i++) glyph(FZ.EL[i].sym, MAT.ink);
   }
 
+  /* ===================================== THE COLONY MAKES ROOM FOR THE ACTION
+     The action bar is fixed to the floor of the screen and lies over the
+     colony. When it appears it can sit exactly on top of the bodies that ARE
+     the incident — the queue wedged in the passage, the pile at the doorway —
+     at the very moment the player is being asked to look down and read them.
+
+     So the nest gets out of the way. Once a frame we measure the height left
+     above the bar and ease the WHOLE world — soil, tunnels, chambers, dig
+     faces, spoil, crumbs, ants, incident grounds, scars, flood, every mark in
+     this file — into that height with one uniform scale, over about a quarter
+     of a second, so the colony is visibly making room rather than jumping.
+
+     The scale is applied to the canvas ELEMENT, not to the drawing, and that
+     is the whole trick. getBoundingClientRect reports the transformed box, so
+     CONTROLS' tap mapping and the DOM paper tag follow the world exactly
+     without a line changing anywhere else; clientWidth is a layout metric and
+     ignores transforms, so nothing reflows, boot never re-sizes the field, and
+     the excavation the colony has dug is never thrown away. */
+  var barAt = 0, barWas = 1;
+  function fitWant() {
+    if (!cv || !(H > 0)) return 1;
+    var el = document.getElementById('act');
+    var r = (el && el.firstChild) ? el.getBoundingClientRect() : null;
+    if (r && r.height) {
+      var c = cv.getBoundingClientRect();
+      barAt = now;
+      barWas = clamp((r.top - c.top - 10) / H, MINFIT, 1);
+      return barWas;
+    }
+    /* one decision closing and the next opening a moment later must not make the
+       colony bob up and down. It stays stood back until the asking has stopped. */
+    return (now - barAt < 900) ? barWas : 1;
+  }
+  function fitStep(dt) {
+    var want = fitWant();
+    if (fitShown < 0) fit = want;
+    else {
+      fit += (want - fit) * (1 - Math.exp(-clamp(dt, 0, 140) / 90));
+      if (Math.abs(want - fit) < 0.0015) fit = want;
+    }
+    if (Math.abs(fit - fitShown) < 0.0012) return;
+    fitShown = fit;
+    cv.style.transformOrigin = '50% 0%';
+    cv.style.transform = fit > 0.999 ? 'none' : 'scale(' + fit.toFixed(4) + ')';
+  }
+
   /* ============================================================ THE LAYERS */
   function mk(w, h) {
     var c = document.createElement('canvas');
@@ -220,7 +268,8 @@ FZ.render = (function () {
     mx.setTransform(1, 0, 0, 1, 0, 0); mx.globalCompositeOperation = 'source-over';
     mx.globalAlpha = 1; mx.clearRect(0, 0, W, H);
     beats.length = 0; bodies.clear(); peak.clear(); hurtAt.clear(); doneAt.clear();
-    stamped.clear(); floodMark = 0; spursMade = false; L = null; nestDirty = true;
+    stamped.clear(); compWas.clear(); joins = 0;
+    floodMark = 0; spursMade = false; L = null; nestDirty = true;
   }
 
   /* ------------------------------------------------------------ excavation */
@@ -598,26 +647,49 @@ FZ.render = (function () {
   /* ------------------------------------------------ what the passages are like
      Wear is a road the colony has chosen; a jam is a road it cannot get down.
      Both are drawn on the floor, in earth, and neither has a number. */
+  /* A JAMMED PASSAGE NEEDS NO OVERLAY: the bodies wedged in it, shoulder to
+     shoulder and not moving, ARE the jam — AESTHETIC §0.
+
+     A chamber with no way in is the one thing the bodies cannot say, because
+     the whole point is that there are no bodies there. So it gets the one
+     drawn convention in this file: DASHED MEANS NO TUNNEL REACHES THIS.
+     The dashes march, slowly, the way a surveyor's pending line does.
+
+     And because a convention is only learned at the moment it changes, the
+     dashes closing into one solid line is a BEAT — a small, clear, one-shot
+     event wherever on screen it happens. That is the whole lesson of §16.2
+     delivered in about a second, with nothing written down. */
   function drawRoads(S) {
     if (!L) return;
-    for (var i = 0; i < L.edges.length; i++) {
-      var le = L.edges[i], e = le.ref;
-      if (!e.dug) continue;
-      /* A JAMMED PASSAGE NEEDS NO OVERLAY. The bodies wedged in it, shoulder to
-         shoulder and not moving, are the jam — AESTHETIC §0. What used to be
-         drawn here was a dashed band across the tunnel that read as rungs on a
-         ladder, a second explanation of something the picture already showed. */
-    }
-    /* a chamber no tunnel reaches. Nobody is coming, and you can see why. */
-    for (i = 0; i < L.nodes.length; i++) {
+    var main = (S.nest && S.nest.main !== undefined) ? S.nest.main : null;
+    for (var i = 0; i < L.nodes.length; i++) {
       var n = L.nodes[i];
-      if (!n.ref || n.ref.comp === undefined) continue;
-      var cut = L.edges.length && n.ref.comp !== (S.nest ? S.nest.main : n.ref.comp);
+      if (!n.ref || n.ref.comp === undefined || n.ref.kind === 'surface') continue;
+      var cut = !!(L.edges.length && main !== null && n.ref.comp !== main);
+      var was = compWas.get(n.id);
+      compWas.set(n.id, cut);
+      if (was === true && !cut) {
+        joins++;
+        /* which passage got here — the answer to "why is it connected now" is a
+           tunnel, so the light runs down that tunnel and into the room */
+        var ce = null;
+        for (var q = 0; q < L.edges.length; q++) {
+          var le = L.edges[q];
+          if (!le.ref.dug || (le.A !== n && le.B !== n)) continue;
+          var far = le.A === n ? le.B : le.A;
+          ce = { x: far.x / sx, y: far.y / sy, tx: n.x / sx, ty: n.y / sy };
+          break;
+        }
+        if (ce) push({ k: 'way', x: ce.x, y: ce.y, tx: ce.tx, ty: ce.ty, life: 620 });
+        push({ k: 'join', x: n.x / sx, y: n.y / sy, r: n.rr + 3, life: 1150 });
+        push({ k: 'holed', x: n.x / sx, y: n.y / sy, life: 760 });
+      }
       if (!cut) continue;
-      A(0.5); ctx.strokeStyle = MAT.ink; ctx.lineWidth = 1.2;
+      A(0.6); ctx.strokeStyle = MAT.ink; ctx.lineWidth = 1.3;
       ctx.setLineDash([2, 4]);
-      ctx.beginPath(); ctx.arc(n.x, n.y, n.r + 4, 0, TAU); ctx.stroke();
-      ctx.setLineDash([]);
+      ctx.lineDashOffset = -(now * 0.009) % 6;
+      ctx.beginPath(); ctx.arc(n.x, n.y, n.rr + 3, 0, TAU); ctx.stroke();
+      ctx.setLineDash([]); ctx.lineDashOffset = 0;
     }
   }
 
@@ -768,10 +840,13 @@ FZ.render = (function () {
       g.moveTo(px, py - 3 - hash(i) * 2); g.lineTo(px + 3 + hash(i + 1) * 2, py + 2); g.lineTo(px - 3, py + 3);
       g.closePath(); g.fill();
     }
-    g.globalAlpha = 0.38; g.strokeStyle = SIG.red; g.lineWidth = 1.3;
-    for (i = 0; i < 3; i++) {
-      g.beginPath(); g.moveTo(x - 7 + i * 5, y + 8); g.lineTo(x - 2 + i * 5, y - 8); g.stroke();
-    }
+    /* A SCAR IS NOT A SIGNAL. It is what is left when the signal has gone: the
+       colony's memory of a place where something landed. It stays red, because
+       red is what damage is, but it is one short mark at the strength of a
+       pencil note — never loud enough to compete with a live incident, which
+       is the thing the player is actually being asked about. */
+    g.globalAlpha = 0.22; g.strokeStyle = SIG.red; g.lineWidth = 1.1;
+    g.beginPath(); g.moveTo(x - 4, y + 6); g.lineTo(x + 3, y - 6); g.stroke();
     var im = sym ? glyph(sym, MAT.ink) : null;
     if (im) { g.globalAlpha = 0.42; g.drawImage(im, x + 11, y - 9, 17, 17); }
     g.globalAlpha = 1;
@@ -795,6 +870,18 @@ FZ.render = (function () {
 
   /* ================================================================== beats */
   function push(b) { b.t = now || performance.now(); beats.push(b); if (beats.length > 26) beats.splice(0, beats.length - 26); }
+  function alive(kind) {
+    for (var i = 0; i < beats.length; i++) if (beats[i].k === kind && now - beats[i].t < beats[i].life) return true;
+    return false;
+  }
+  /* THE ONE-EVENT RULE, enforced on the loudest marks in the file. Two things
+     landing inside a second used to draw two expanding red rings across half
+     the screen at once, and a screen of red is a screen with no signal left in
+     it. Only the newest of a loud kind is ever live; the older one has already
+     become a scar, and a scar is a quiet mark. */
+  function only(kind) {
+    for (var i = beats.length - 1; i >= 0; i--) if (beats[i].k === kind) beats.splice(i, 1);
+  }
 
   function wire() {
     if (wired || !window.FZ || !FZ.bus) return;
@@ -809,7 +896,7 @@ FZ.render = (function () {
     FZ.bus.on('job:lost', function (d) {
       if (!d) return;
       var n = 0;
-      for (var i = beats.length - 1; i >= 0; i--) if (beats[i].k === 'spill' && ++n > 3) beats.splice(i, 1);
+      for (var i = beats.length - 1; i >= 0; i--) if (beats[i].k === 'spill' && ++n > 1) beats.splice(i, 1);
       push({ k: 'spill', x: d.x, y: d.y, life: 820 });
     });
     FZ.bus.on('agent:hurt', function (d) {
@@ -822,14 +909,16 @@ FZ.render = (function () {
       push({ k: 'act', x: d.x, y: d.y, ok: !!d.ok, kind: d.kind, life: 700 });
       if (d.ok && d.kind && mx) memStamp(d.kind, X(d.x), Y(d.y));
     });
-    FZ.bus.on('outbreak:open', function (d) { if (d) push({ k: 'open', x: d.x, y: d.y, life: 560 }); });
+    FZ.bus.on('outbreak:open', function (d) { if (!d) return; only('open'); push({ k: 'open', x: d.x, y: d.y, life: 560 }); });
     FZ.bus.on('outbreak:answered', function (d) {
       if (!d) return;
+      only('shut');
       push({ k: 'shut', x: d.x, y: d.y, r: d.r || 60, life: 900 });
     });
     FZ.bus.on('outbreak:landed', function (d) {
       if (!d) return;
-      push({ k: 'burst', x: d.x, y: d.y, r: d.r || 60, life: 900 });
+      only('burst');
+      push({ k: 'burst', x: d.x, y: d.y, r: d.r || 60, life: 820 });
       if (dx) collapseAt(X(d.x), Y(d.y), 17);
       if (mx) memScar(d.sym, X(d.x), Y(d.y));
     });
@@ -908,7 +997,7 @@ FZ.render = (function () {
     ctx.translate(x, y);
     ctx.rotate(stunned ? b.ang + 1.4 : b.ang);
     ctx.scale(sc, sc);
-    var al = dim * (gave ? 0.7 : 1);
+    var al = dim * (gave ? 0.7 : 1) * (stunned ? 0.82 : 1);
 
     /* --- the little pocket a body is always standing in, and its shadow --- */
     A(0.26 * al); ctx.fillStyle = MAT.sand;
@@ -999,11 +1088,11 @@ FZ.render = (function () {
       ctx.beginPath(); ctx.arc(x, y, 15 * sc, 0, TAU); ctx.stroke();
       ctx.setLineDash([]);
     }
-    /* --- struck --- */
-    if (stunned) {
-      A(0.85 * dim); ctx.strokeStyle = SIG.red; ctx.lineWidth = 1.6;
-      ctx.beginPath(); ctx.moveTo(x - 4, y - 11 * sc); ctx.lineTo(x + 4, y - 11 * sc); ctx.stroke();
-    }
+    /* --- struck. The BLOW is red, for the second it lands. Being down is not:
+       a worker on its side with its legs pulled in, among workers that are
+       walking, has already said it. A red tick standing over every stunned
+       body meant a quiet nest could hold a dozen red marks, and then the one
+       incident actually asking for the player had nothing louder to be. --- */
     var ht = hurtAt.get(a.id);
     if (ht !== undefined && now - ht < 600) ring(x, y, (10 + (now - ht) * 0.02) * sc, SIG.red, 1.6, (1 - (now - ht) / 600) * 0.8 * dim);
     if (a.flash) ring(x, y, (11 + (1 - Math.min(1, a.flash)) * 6) * sc, MAT.paper, 1.6, 0.5 * Math.min(1, a.flash) * dim);
@@ -1243,7 +1332,9 @@ FZ.render = (function () {
       if (x2 === 0) ctx.moveTo(x2, y2); else ctx.lineTo(x2, y2);
     }
     ctx.stroke();
-    if (k > 0.8) {
+    /* the water is at the brood — but never while something is landing, because
+       two red things at once is one red thing too many */
+    if (k > 0.8 && !alive('burst')) {
       A(0.35 + Math.sin(now * 0.006) * 0.2); ctx.strokeStyle = SIG.red; ctx.lineWidth = 1.4;
       ctx.beginPath(); ctx.moveTo(0, lvl - 3); ctx.lineTo(W, lvl - 3); ctx.stroke();
     }
@@ -1328,13 +1419,16 @@ FZ.render = (function () {
     return out.slice(0, 3);
   }
   function paperTag(text, cx, cy, above) {
-    ctx.font = '12px "IBM Plex Mono",ui-monospace,monospace';
-    var maxw = Math.min(W - 30, 244);
-    var ls = wrap(text, maxw - 20);
+    /* the nest may be standing back from the action bar; the writing does not
+       shrink with it, so a sentence is the same size on the glass either way */
+    var u = 1 / clamp(fit, 0.55, 1);
+    ctx.font = (12 * u).toFixed(1) + 'px "IBM Plex Mono",ui-monospace,monospace';
+    var maxw = Math.min(W - 30, 244 * u);
+    var ls = wrap(text, maxw - 20 * u);
     if (!ls.length) return null;
     var tw = 0;
     for (var i = 0; i < ls.length; i++) tw = Math.max(tw, ctx.measureText(ls[i]).width);
-    var bw = tw + 20, bh = 13 + ls.length * 15;
+    var bw = tw + 20 * u, bh = (13 + ls.length * 15) * u;
     var bx = clamp(cx - bw / 2, 6, Math.max(6, W - bw - 6));
     var by = above ? cy - bh : cy;
     var ar = actRect();
@@ -1346,7 +1440,7 @@ FZ.render = (function () {
     ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
     A(0.95); ctx.fillStyle = MAT.ink;
     ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-    for (var l = 0; l < ls.length; l++) ctx.fillText(ls[l], bx + 10, by + 19 + l * 15);
+    for (var l = 0; l < ls.length; l++) ctx.fillText(ls[l], bx + 10 * u, by + (19 + l * 15) * u);
     return { x: bx, y: by, w: bw, h: bh };
   }
 
@@ -1379,16 +1473,20 @@ FZ.render = (function () {
     if (!ids.length && top.o.who) ids = idsOf(top.o.who);
     return ids.length ? new Set(ids) : null;
   }
-  /* Where the answer dial may be drawn: never clipped by an edge, never under
-     the action bar that is telling the player to tap it. It is displaced only
-     as far as the answer radius allows, so what you tap is still an answer. */
+  /* What the bar still covers, in nest coordinates, WHILE the colony is easing
+     out from under it. Once the move has finished this returns null — there is
+     nothing left to dodge, so the tag and the dial stop being displaced at all
+     and simply sit on the thing they belong to. */
   function actRect() {
     if (!cv) return null;
     var el = document.getElementById('act');
     if (!el || !el.firstChild) return null;
     var r = el.getBoundingClientRect(), c = cv.getBoundingClientRect();
     if (!r.height) return null;
-    return { top: r.top - c.top - 12, bottom: r.bottom - c.top + 12 };
+    var k = fit > 0.05 ? fit : 1;
+    var top = (r.top - c.top) / k;
+    if (top >= H - 2) return null;
+    return { top: top - 12, bottom: (r.bottom - c.top) / k + 12 };
   }
   function safeSpot(x, y, r) {
     var fr = clamp(r * 0.5, 24, 44);
@@ -1425,7 +1523,7 @@ FZ.render = (function () {
       var left = clamp(1 - ((S.tick || 0) - (o.born || 0)) / (o.fuse || 1), 0, 1);
       var lead = top && top.o === o;
       var col = left < 0.34 ? SIG.red : SIG.amber;
-      var q = lead ? 1 : 0.4;
+      var q = lead ? 1 : 0.28;
       A(0.09 * q); ctx.fillStyle = col;
       ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
     }
@@ -1447,16 +1545,30 @@ FZ.render = (function () {
       var hot = left < 0.34;
       var col = hot ? SIG.red : SIG.amber;
       var bl = hot ? 0.62 + Math.abs(Math.sin(now * 0.012)) * 0.38 : 1;
-      var q = lead ? 1 : 0.42;
-      /* the ground that is still in danger */
-      A(0.22 * q * bl); ctx.strokeStyle = col; ctx.lineWidth = 1.4;
-      ctx.setLineDash([3, 5]);
-      ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.stroke();
-      ctx.setLineDash([]);
+      var q = lead ? 1 : 0.3;
+      /* ONE FRAME AT FULL STRENGTH, EVER. The wide dashed boundary — how far an
+         answer may land — is drawn only around the incident the player is being
+         asked about. A second live incident keeps its bodies, its ground stain
+         and a small dial, and nothing else: it is legible from what is happening
+         in it, which is the whole point of the grammar. */
+      if (lead) {
+        A(0.22 * bl); ctx.strokeStyle = col; ctx.lineWidth = 1.4;
+        ctx.setLineDash([3, 5]);
+        ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.stroke();
+        ctx.setLineDash([]);
+      }
       /* the time left, on a compact dial — the wide dashed ring is how far an
          answer may land, the dial is how long it has. The dial is nudged clear
          of the screen edge and of the action bar, never further than the ring
          allows, so the thing you are told to tap is always tappable. */
+      /* two incidents standing on the same ground draw one instrument between
+         them, not two nested rings. The quieter one keeps its stain and its
+         bodies; the dial belongs to the one being asked about. */
+      if (!lead && top) {
+        var lx = X(top.o.x) - x, ly = Y(top.o.y) - y;
+        var lr = clamp((top.o.r || 60) * sx, 30, Math.min(W, H) * 0.33) * 0.9;
+        if (lx * lx + ly * ly < lr * lr) continue;
+      }
       var sp = safeSpot(x, y, r);
       var fr = sp.fr;
       if (sp.off > 3) { A(0.3 * q); line(x, y, sp.x, sp.y, col, 1.2, 0.3 * q); }
@@ -1547,6 +1659,42 @@ FZ.render = (function () {
       }
       return true;
     }
+    if (b.k === 'way') {
+      /* the way in, arriving: a bright length of floor running down the passage
+         that just broke through, into the room that had nobody coming */
+      var wx = X(b.tx), wy = Y(b.ty);
+      var hd = clamp(e, 0, 1), tl = Math.max(0, hd - 0.3);
+      A(0.8 * (1 - k * 0.7)); ctx.strokeStyle = MAT.paper; ctx.lineWidth = 7;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x + (wx - x) * tl, y + (wy - y) * tl);
+      ctx.lineTo(x + (wx - x) * hd, y + (wy - y) * hd);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+      return true;
+    }
+    if (b.k === 'join') {
+      /* THE DASHES CLOSE. Since the chapter began this outline has been saying
+         "no tunnel reaches this chamber". A face has just broken through into
+         it, so the gaps shut, one at a time, into a single solid line — and
+         then the line lets go in one ring. Say nothing. */
+      var jr = b.r || 20;
+      var close = clamp(k / 0.5, 0, 1);
+      var hold = k < 0.5 ? 1 : 1 - (k - 0.5) / 0.5;
+      A(0.9 * hold); ctx.strokeStyle = MAT.ink; ctx.lineWidth = 1.3 + close * 1.6;
+      if (close > 0.985) ctx.setLineDash([]);
+      else {
+        ctx.setLineDash([2 + close * 13, 4 * (1 - close) + 0.4]);
+        ctx.lineDashOffset = -now * 0.02 * (1 - close);
+      }
+      ctx.beginPath(); ctx.arc(x, y, jr, 0, TAU); ctx.stroke();
+      ctx.setLineDash([]); ctx.lineDashOffset = 0;
+      if (k > 0.42) {
+        var ee = ease((k - 0.42) / 0.58);
+        ring(x, y, jr + 4 + ee * 24, MAT.ink, 2.4 * (1 - ee), (1 - ee) * 0.55);
+      }
+      return true;
+    }
     if (b.k === 'hurt') {
       A((1 - k) * 0.5); ctx.fillStyle = MAT.sand2;
       for (var h = 0; h < 8; h++) {
@@ -1568,12 +1716,19 @@ FZ.render = (function () {
       return true;
     }
     if (b.k === 'burst') {
-      var r1 = clamp((b.r || 60) * sx, 30, Math.min(W, H) * 0.33);
-      ring(x, y, r1 * (1 + e * 0.4), SIG.red, 3.5 - k * 2.6, (1 - k) * 0.9);
-      A((1 - k) * 0.75); ctx.fillStyle = MAT.soil3;
-      for (var q = 0; q < 10; q++) {
-        var qa = (q / 10) * TAU, qd = r1 * (0.2 + e * 0.5);
-        ctx.beginPath(); ctx.arc(x + Math.cos(qa) * qd, y + Math.sin(qa) * qd, 3 * (1 - k), 0, TAU); ctx.fill();
+      /* THE ROOF COMES IN. The damage is earth falling — that is the picture —
+         and the red is one tight ring saying it landed HERE, close enough to
+         the rubble to be part of it. It used to be a shockwave the width of a
+         phone, which is not a signal, it is weather. */
+      var r1 = clamp((b.r || 60) * sx * 0.5, 22, 54);
+      ring(x, y, r1 * (0.7 + e * 0.35), SIG.red, 2.6 - k * 1.8, (1 - k) * 0.8);
+      A((1 - k) * 0.8); ctx.fillStyle = MAT.soil3;
+      for (var q = 0; q < 11; q++) {
+        var qa = (q / 11) * TAU + hash(b.t + q) * 0.6;
+        var qd = r1 * (0.15 + e * 0.55) * (0.6 + hash(q * 2.7) * 0.7);
+        ctx.beginPath();
+        ctx.arc(x + Math.cos(qa) * qd, y + Math.sin(qa) * qd + e * e * 7, 3.2 * (1 - k), 0, TAU);
+        ctx.fill();
       }
       return true;
     }
@@ -1649,8 +1804,11 @@ FZ.render = (function () {
   function draw(S) {
     if (!ctx) return;
     now = performance.now();
+    var dt = lastNow ? now - lastNow : 16;
+    lastNow = now;
     frames++;
     wire();
+    fitStep(dt);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.lineCap = 'butt'; ctx.lineJoin = 'miter'; ctx.setLineDash([]);
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
@@ -1862,6 +2020,8 @@ FZ.render = (function () {
     /* test hooks — read-only, for the placement/legibility harness */
     __drawn: function () { return drawn; },
     __dial: function () { return lastDial; },
+    __fit: function () { return fit; },
+    __joins: function () { return joins; },
     resize: function (w, h) {
       W = Math.max(1, Math.round(w)); H = Math.max(1, Math.round(h));
       if (!cv) return;

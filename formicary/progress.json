@@ -1,7 +1,7 @@
 {
-  "round": 5,
-  "updated": "2026-08-17 02:58 UTC",
-  "note": "ROUND 4 RESULT: THE NEST IS REAL, VERIFIED STRUCTURALLY. An independent geometric test \u2014 4720 samples, all ten chapters \u2014 found zero ants in solid soil, worst case 12.6px from a corridor centreline in corridors 14 to 16px wide. Digging is watchable and permanent: a face advances, spoil accumulates, a dashed unreachable chamber becomes solid when the tunnel arrives. Queues are real countable bodies in real passages. THE HONEST COST: fixing pace one way broke it the other. Ants walk watchably now, but the incident clock was left at 19 seconds and chapter 4 yields ONE decision in 27 seconds \u2014 a player can look away and lose nothing. AND ALL THREE CRITICS INDEPENDENTLY FOUND THE SAME REMAINING BUG: the incident ring anchors to an edge midpoint rather than to the bodies that constitute the failure, so a ring reading THE JAMMED TUNNEL sits on empty corridor while the real queue sits outside it. The graph is real; the marker still points at the wrong place.",
+  "round": 6,
+  "updated": "2026-08-17 05:35 UTC",
+  "note": "ROUND 5: the marker finally points at the bodies. Measured at 10Hz across every live incident, percentage-empty is zero and 3 to 11 bodies sit inside the ring for the whole fuse, each individually circled. Decision density is answered \u2014 a new incident on the same tick the last one closes, every 5.9 seconds. Thumb errors are refunded completely. And the one-message grammar was verified by dumping every visible text node at 150ms intervals: for 36 straight ticks the only text on the page is the crown, then exactly two things appear, one tag and one button. TWO PRECISE DEFECTS REMAIN. The ring TELEPORTS \u2014 re-pinning snaps instead of sliding, up to 412px inside a 700ms window, so roughly one in six correctly diagnosed and correctly aimed answers is thrown away because the target moved between the button and the field. And being good at the game makes it boring: the incident filler skips elements flagged as countered, so answering well empties the screen.",
   "pieces": [
     {
       "id": "N",
@@ -55,6 +55,27 @@
           },
           "built": "The nest draws the truth now: ants walking corridors, queueing nose to tail, kneeling at dig faces with spoil, resting in chambers. Unreachable chambers are drawn with a dashed outline that becomes solid the moment a tunnel arrives.",
           "gap": "The action bar OVERLAYS the nest instead of making room for it, so the bodies that ARE the incident get hidden exactly when the player is being asked to read them. The world should scale to the available height rather than being covered. Also at collapse the field carries two huge expanding shockwave rings, five small rings, two amber brackets, two scars and a paper tag at once \u2014 the exact depiction-law failure signature.",
+          "shots": []
+        },
+        {
+          "n": 5,
+          "verdict": "close",
+          "score": 87,
+          "laws": {
+            "L1": 7,
+            "L2": 9,
+            "L3": 8,
+            "L4": 7,
+            "L5": 8,
+            "L6": 9,
+            "L7": 7,
+            "L8": 7,
+            "L9": 9,
+            "L10": 8,
+            "L11": 8
+          },
+          "built": "The world now scales to make room for the action bar instead of being covered by it, so the bodies that constitute an incident stay visible exactly when the player is asked to read them. The collapse pile-up is capped.",
+          "gap": "Dash overload. Four different meanings are all encoded as dashed rings \u2014 an unreachable chamber, a rolled-back crumb, a possession scratch, and more \u2014 so the player must learn a code instead of reading a picture. In particular 'no way in' should be a DRAWN WALL, not a coded ring: stroke a sealed face of packed earth across every tunnel mouth the chamber would have, with spoil chevrons pressed against it, reusing the marks already drawn at a live dig face but mirrored inward.",
           "shots": []
         }
       ]
@@ -112,6 +133,27 @@
           },
           "built": "Incidents can now anchor on physical situations, and the field is tappable as the answer gesture: arm the meeting stone, then place it at a junction.",
           "gap": "ALL THREE CRITICS INDEPENDENTLY FOUND THE SAME THING. The incident ring is anchored to an edge midpoint rather than to the bodies that constitute the failure, and the body is only held until the tag is hung rather than for the whole fuse. So a ring reading THE JAMMED TUNNEL sits on a stretch of corridor containing ZERO ants while an obvious queue of four sits 200px outside it. The graph is real and the crowds are real, but the marker keeps pointing at the wrong place, so the picture still contradicts the sentence.",
+          "shots": []
+        },
+        {
+          "n": 5,
+          "verdict": "close",
+          "score": 85,
+          "laws": {
+            "L1": 8,
+            "L2": 8,
+            "L3": 8,
+            "L4": 8,
+            "L5": 7,
+            "L6": 6,
+            "L7": 8,
+            "L8": 8,
+            "L9": 8,
+            "L10": 8,
+            "L11": 8
+          },
+          "built": "The marker sits on the bodies now, measured at 10Hz across every live incident: percentage-empty zero on all six chapter-4 incidents and ten of eleven in the sandbox, with a minimum of 3 to 11 bodies inside the ring for the whole fuse. Each implicated ant is individually circled. Decision density is answered: a new incident opens on the same tick the previous one closes, every 5.9 seconds, unbroken for 40 seconds. Thumb errors are completely fixed \u2014 three deliberate mis-taps left the budget at 4, 4, 4, 4 with the instrument still in hand. And L11 was verified by dumping every visible text node at 150ms intervals: for 36 consecutive ticks the only text anywhere on the page is the crown, then exactly two things appear \u2014 one tag and one button. The critic called that grammar stricter than anything in the reference work.",
+          "gap": "THE RING TELEPORTS. Re-pinning snaps instantly instead of sliding, producing centre displacements of 106 to 412px inside a single 700ms window \u2014 up to 5.9 times the ring's own radius on a 390px field. A reach test that taps the ring centre after a realistic 700ms of hand travel scores 14 of 17 instead of 14 of 14 at zero lag, and every miss coincides with a jump. Roughly one in six correctly diagnosed, correctly aimed answers is thrown away because the target moved between the button and the field.",
           "shots": []
         }
       ]
@@ -237,6 +279,27 @@
             "r4W-digwatch-2.png",
             "r4W-tour-ch3.png"
           ]
+        },
+        {
+          "n": 5,
+          "verdict": "close",
+          "score": 82,
+          "laws": {
+            "L1": 8,
+            "L2": 9,
+            "L3": 7,
+            "L4": 8,
+            "L5": 8,
+            "L6": 7,
+            "L7": 9,
+            "L8": 4,
+            "L9": 8,
+            "L10": 6,
+            "L11": 8
+          },
+          "built": "The colony moves watchably and the nest stays structurally honest. All 28 still fire, all six trade-offs still verified, audit still passing.",
+          "gap": "BEING GOOD AT THE GAME MAKES IT BORING. The incident filler skips any element flagged as countered and selects on heat alone, so once the player answers correctly the sources of new incidents are suppressed and the screen goes empty. Select instead from live structural distress read straight off the nest: any crumb with three or more claims and net-zero progress, any passage with a head-on block or two or more queued, any crumb whose progress fell \u2014 and open the matching incident on that site even when the element reads as countered.",
+          "shots": []
         }
       ]
     },
