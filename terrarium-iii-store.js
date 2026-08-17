@@ -2,6 +2,7 @@
  * The durable store remains byte-for-byte in terrarium-iii-store-core.js.
  * Optional compiler/presentation sidecars must never block persistence OR one
  * another: a presentation failure must not prevent the architecture compiler.
+ * Architecture loader stamp: 2026-08-17 collision-proxy pass.
  */
 import './terrarium-iii-store-core.js';
 
