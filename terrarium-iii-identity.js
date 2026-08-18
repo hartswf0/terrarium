@@ -32,10 +32,10 @@ function init(){document.getElementById('iii-identity-chip')?.remove();document.
 global.III_IDENTITY={ensure,generate,reroll,rename,use,seedPrompt,parseCommand,get profile(){return profile},get name(){return profile?.display_name||''},get version(){return VERSION}};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(window);
 
-// Pages architecture bootstrap: V4.1 only. No remote V3 compiler is armed first.
+// Pages architecture bootstrap: V4.1.1 only. No remote V3 compiler is armed first.
 (async()=>{
   try{
-    await import('./terrarium-iii-assumption-trace.js?v=4.1.0');
-    await import('./terrarium-iii-v3-gate.js?v=4.1.0');
-  }catch(err){console.error('[III ARCHITECTURE] V4.1 Pages bootstrap unavailable',err)}
+    await import('./terrarium-iii-assumption-trace.js?v=4.1.1');
+    await import('./terrarium-iii-v3-gate.js?v=4.1.1');
+  }catch(err){console.error('[III ARCHITECTURE] V4.1.1 Pages bootstrap unavailable',err)}
 })();
