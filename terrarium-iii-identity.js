@@ -45,15 +45,10 @@ global.III_IDENTITY={ensure,generate,reroll,rename,use,seedPrompt,parseCommand,g
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(window);
 
-// Pages-branch bootstrap: use the pinned, tested V3 compiler from main while
-// keeping the serving branch's persistence/identity code intact. Assumptions
-// and the fail-closed gate are local so their UI can evolve independently.
-const V3_PIN='fc29ef94c9941f2af7c0031ef13832f21a3e94cd';
-import(`https://cdn.jsdelivr.net/gh/hartswf0/terrarium@${V3_PIN}/terrarium-iii-collision-budget.js`).catch(err=>console.warn('[III COLLISION] bootstrap unavailable',err));
+// Pages architecture bootstrap: V4 only. No remote V3 compiler is armed first.
 (async()=>{
   try{
-    await import(`https://cdn.jsdelivr.net/gh/hartswf0/terrarium@${V3_PIN}/terrarium-iii-architecture-v3.js`);
-    await import('./terrarium-iii-assumption-trace.js?v=0.1');
-    await import('./terrarium-iii-v3-gate.js?v=0.1');
-  }catch(err){console.warn('[III ARCHITECTURE] Pages bootstrap unavailable',err)}
+    await import('./terrarium-iii-assumption-trace.js?v=4.0.0');
+    await import('./terrarium-iii-v3-gate.js?v=4.0.0');
+  }catch(err){console.error('[III ARCHITECTURE] V4 Pages bootstrap unavailable',err)}
 })();
