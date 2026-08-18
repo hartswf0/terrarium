@@ -35,4 +35,4 @@ function intercept(btn){if(!btn||btn.__iiiMemoryGarage)return;btn.__iiiMemoryGar
 function install(){if(installed)return;installed=true;if(!makeShell())return;intercept(document.getElementById('btn-open-garage'));intercept(document.getElementById('btn-mp-garage'));document.getElementById('btn-garage-close')?.addEventListener('click',()=>document.body.classList.remove('iii-garage-open'),true);document.getElementById('btn-garage-save')?.addEventListener('click',()=>setTimeout(()=>store()?.captureSession?.('rig-save').catch(()=>{}),0));setLegacyVisible(false);modal.classList.remove('show');global.III_GARAGE={open:openLibrary,close:closeLibrary,refresh,version:VERSION,get tab(){return tab}}}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })(window);
-import('./terrarium-iii-identity.js').catch(err=>console.warn('[III ID] sidecar unavailable',err));
+import('./terrarium-iii-identity.js?v=4.1.0').catch(err=>console.warn('[III ID] sidecar unavailable',err));
