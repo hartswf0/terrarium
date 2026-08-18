@@ -2,7 +2,7 @@
  * The durable store remains byte-for-byte in terrarium-iii-store-core.js.
  * Optional compiler/presentation sidecars must never block persistence OR one
  * another: a presentation failure must not prevent the architecture compiler.
- * Architecture loader stamp: 2026-08-17 collision-proxy pass.
+ * Architecture loader stamp: 2026-08-18 assumption-trace pass.
  */
 import './terrarium-iii-store-core.js';
 
@@ -22,5 +22,6 @@ optional('./terrarium-iii-collision-budget.js?v=0.2', 'COLLISION');
   await optional('./terrarium-iii-reference.js', 'REFERENCE');
   await optional('./terrarium-iii-reference-guard.js', 'REFERENCE GUARD');
   await optional('./terrarium-iii-architecture-v3.js?v=3.0.2', 'ARCHITECTURE V3');
+  await optional('./terrarium-iii-assumption-trace.js?v=0.1', 'ASSUMPTIONS');
   await optional('./terrarium-iii-v3-gate.js?v=0.2', 'V3 GATE');
 })();
