@@ -9,8 +9,6 @@ const PROFILE_TABLE='iii_profiles';
 const MEMORY=new Map();
 let client=null,clientKey='',profile=null,opening=null,welcomed=false,observer=null;
 
-// Compatibility note: database columns remain energy/body for now, but the
-// conceptual grammar is SPIRIT × FORM: invisible cause → visible consequence.
 const DIALECTS={
   rust:{spirit:['Iron','Flint','Ash','Rust','Coal','Crash','Rattle'],form:['Wagon','Mill','Crane','Truck','Bunker','Depot','Tank','Rover']},
   wet:{spirit:['Storm','Drift','Gale','Bolt','Squall','Hail','Rush'],form:['Skiff','Ferry','Crab','Dock','Pump','Kettle','Ark','Lighthouse']},
@@ -20,59 +18,42 @@ const DIALECTS={
   road:{spirit:['Blaze','Drift','Charge','Roam','Rush','Rogue','Jolt'],form:['Rover','Crawler','Sled','Hauler','Bike','Van','Chariot','Pathfinder']}
 };
 const pick=a=>a[Math.floor(Math.random()*a.length)];
-function generate(dialect){
-  const d=dialect&&DIALECTS[dialect]?dialect:pick(Object.keys(DIALECTS));
-  const set=DIALECTS[d],spirit=pick(set.spirit),form=pick(set.form),name=spirit+' '+form;
-  return{
-    display_name:name,generated_name:name,name_origin:'generated',dialect:d,
-    energy:spirit,body:form,
-    seed_json:{grammar:'spirit×form',dialect:d,spirit,form,energy:spirit,body:form,generated_at:new Date().toISOString()}
-  };
-}
+function generate(dialect){const d=dialect&&DIALECTS[dialect]?dialect:pick(Object.keys(DIALECTS));const set=DIALECTS[d],spirit=pick(set.spirit),form=pick(set.form),name=spirit+' '+form;return{display_name:name,generated_name:name,name_origin:'generated',dialect:d,energy:spirit,body:form,seed_json:{grammar:'spirit×form',dialect:d,spirit,form,energy:spirit,body:form,generated_at:new Date().toISOString()}}}
 function cfg(){const c=global.III_NET?.config?.()||{};return{url:String(c.url||'').replace(/\/+$/,''),key:String(c.key||'')}}
 function projectRef(url){try{return new URL(url).hostname.split('.')[0]||'default'}catch(_){return'default'}}
 function store(name){try{return global[name]||null}catch(_){return null}}
-function authStore(ref){const p='terrarium-iii-auth:'+ref+':';return{
-  getItem(k){k=p+k;try{const v=store('localStorage')?.getItem(k);if(v!=null)return v}catch(_){}try{const v=store('sessionStorage')?.getItem(k);if(v!=null)return v}catch(_){}return MEMORY.get(k)||null},
-  setItem(k,v){k=p+k;v=String(v);try{store('localStorage')?.setItem(k,v);MEMORY.set(k,v);return}catch(_){}try{store('sessionStorage')?.setItem(k,v);MEMORY.set(k,v);return}catch(_){}MEMORY.set(k,v)},
-  removeItem(k){k=p+k;try{store('localStorage')?.removeItem(k)}catch(_){}try{store('sessionStorage')?.removeItem(k)}catch(_){}MEMORY.delete(k)}
-}}
+function authStore(ref){const p='terrarium-iii-auth:'+ref+':';return{getItem(k){k=p+k;try{const v=store('localStorage')?.getItem(k);if(v!=null)return v}catch(_){}try{const v=store('sessionStorage')?.getItem(k);if(v!=null)return v}catch(_){}return MEMORY.get(k)||null},setItem(k,v){k=p+k;v=String(v);try{store('localStorage')?.setItem(k,v);MEMORY.set(k,v);return}catch(_){}try{store('sessionStorage')?.setItem(k,v);MEMORY.set(k,v);return}catch(_){}MEMORY.set(k,v)},removeItem(k){k=p+k;try{store('localStorage')?.removeItem(k)}catch(_){}try{store('sessionStorage')?.removeItem(k)}catch(_){}MEMORY.delete(k)}}}
 function sb(){const c=cfg(),f=global.supabase?.createClient;if(typeof f!=='function')throw Error('SUPABASE CLIENT NOT AVAILABLE');const id=c.url+'|'+c.key;if(client&&clientKey===id)return client;clientKey=id;client=f(c.url,c.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storage:authStore(projectRef(c.url)),storageKey:'session'}});return client}
 async function identity(){const s=sb();let r=await s.auth.getSession();if(r.error)throw r.error;let session=r.data?.session;if(!session?.user?.id){r=await s.auth.signInAnonymously();if(r.error)throw r.error;session=r.data?.session}if(!session?.user?.id)throw Error('ANONYMOUS IDENTITY UNAVAILABLE');return{s,userId:session.user.id}}
 function seedOf(p){const spirit=p?.seed_json?.spirit||p?.energy||'',form=p?.seed_json?.form||p?.body||'';return{spirit,form}}
-async function save(next){
-  const {s,userId}=await identity(),seed=next.seed_json||{};
-  const row={user_id:userId,display_name:String(next.display_name||'').trim().slice(0,64),generated_name:String(next.generated_name||next.display_name||'').trim().slice(0,64),name_origin:next.name_origin==='custom'?'custom':'generated',dialect:next.dialect||null,energy:next.energy||seed.spirit||null,body:next.body||seed.form||null,seed_json:seed,updated_at:new Date().toISOString()};
-  const r=await s.from(PROFILE_TABLE).upsert(row,{onConflict:'user_id'}).select().single();if(r.error)throw r.error;profile=r.data;applyToExistingUI();global.dispatchEvent(new CustomEvent('terrarium:identity',{detail:profile}));return profile;
-}
+async function save(next){const {s,userId}=await identity(),seed=next.seed_json||{};const row={user_id:userId,display_name:String(next.display_name||'').trim().slice(0,64),generated_name:String(next.generated_name||next.display_name||'').trim().slice(0,64),name_origin:next.name_origin==='custom'?'custom':'generated',dialect:next.dialect||null,energy:next.energy||seed.spirit||null,body:next.body||seed.form||null,seed_json:seed,updated_at:new Date().toISOString()};const r=await s.from(PROFILE_TABLE).upsert(row,{onConflict:'user_id'}).select().single();if(r.error)throw r.error;profile=r.data;applyToExistingUI();global.dispatchEvent(new CustomEvent('terrarium:identity',{detail:profile}));return profile}
 async function ensure(){if(profile)return profile;if(opening)return opening;opening=(async()=>{const {s,userId}=await identity();let r=await s.from(PROFILE_TABLE).select('*').eq('user_id',userId).maybeSingle();if(r.error)throw r.error;if(r.data){profile=r.data;applyToExistingUI();return profile}return save(generate())})().finally(()=>opening=null);return opening}
 async function reroll(){const p=await save(generate(profile?.dialect));global.notify?.('NAME SAVED · '+p.display_name);return p}
 async function rename(name){name=String(name||'').trim().replace(/\s+/g,' ').slice(0,64);if(name.length<2)throw Error('NAME TOO SHORT');const base=profile||await ensure();const p=await save({...base,display_name:name,name_origin:'custom'});global.notify?.('NAME SAVED · '+p.display_name);return p}
 function seedPrompt(kind){const p=profile||generate(),n=p.display_name,{spirit,form}=seedOf(p),genome=[spirit,form].filter(Boolean).join(' × ')||n;if(kind==='world')return `Create a world called ${n}. Treat ${genome} as SPIRIT × FORM: the first term is the invisible law animating the place and the second is its visible consequence. Translate that relationship into terrain, atmosphere, architecture, motion, inhabitants, and rules. Do not decorate the surface with the spirit; make the world behave as though the spirit causes the form.`;if(kind==='build')return `Build ${n}. Treat ${genome} as SPIRIT × FORM: invisible cause becoming visible structure. Make the relationship legible in silhouette, parts, movement, material, and behavior. Do not attach the spirit as decoration; let it determine how the form works.`;return `Make my rig ${n}. Treat ${genome} as SPIRIT × FORM: inner temperament becoming visible body. Turn it into a controllable avatar or vehicle whose silhouette, motion, parts, and behavior make the inner spirit visibly consequential.`}
 function candidateInputs(){return[...document.querySelectorAll('#ritual-input,#command-input,#chat-input,input[placeholder*="describe changes" i],textarea[placeholder*="describe changes" i]')]}
-function applyToExistingUI(){
-  // Delete the old experiment if a stale module created it before this version.
-  document.getElementById('iii-identity-chip')?.remove();
-  document.getElementById('iii-identity-panel')?.remove();
-  if(!profile)return;
-  candidateInputs().forEach(input=>{
-    if(!input.dataset.iiiBasePlaceholder)input.dataset.iiiBasePlaceholder=input.getAttribute('placeholder')||'describe changes';
-    const base=input.dataset.iiiBasePlaceholder.replace(/^.*? · /,'');
-    input.placeholder=profile.display_name+' · '+base;
-    input.dataset.playerName=profile.display_name;
-    installCommandInput(input);
-  });
-  const hello=document.getElementById('r-tab-hello');
-  if(hello){hello.dataset.playerName=profile.display_name;hello.title='HELLO · '+profile.display_name;hello.setAttribute('aria-label','HELLO · '+profile.display_name)}
-}
+function applyToExistingUI(){document.getElementById('iii-identity-chip')?.remove();document.getElementById('iii-identity-panel')?.remove();if(!profile)return;candidateInputs().forEach(input=>{if(!input.dataset.iiiBasePlaceholder)input.dataset.iiiBasePlaceholder=input.getAttribute('placeholder')||'describe changes';const base=input.dataset.iiiBasePlaceholder.replace(/^.*? · /,'');input.placeholder=profile.display_name+' · '+base;input.dataset.playerName=profile.display_name;installCommandInput(input)});const hello=document.getElementById('r-tab-hello');if(hello){hello.dataset.playerName=profile.display_name;hello.title='HELLO · '+profile.display_name;hello.setAttribute('aria-label','HELLO · '+profile.display_name)}}
 function use(kind,input){const text=seedPrompt(kind);if(kind==='world')document.getElementById('r-tab-world')?.click();else document.getElementById('r-tab-hello')?.click();input=input||candidateInputs()[0];if(input){input.value=text;input.dispatchEvent(new Event('input',{bubbles:true}));input.focus()}return text}
 function parseCommand(text){const t=String(text||'').trim();let m=t.match(/^(?:call me|my name is|rename me)\s+(.+)$/i);if(m)return{kind:'rename',value:m[1]};if(/^(?:reroll|shuffle|new)\s+(?:my\s+)?name\??$/i.test(t))return{kind:'reroll'};if(/^(?:who am i|what(?:'s| is) my name)\??$/i.test(t))return{kind:'who'};if(/^(?:make|create)\s+(?:a\s+)?world\s+(?:from|with)\s+my\s+name\.?$/i.test(t))return{kind:'seed',value:'world'};if(/^(?:build|make a build)\s+(?:from|with)\s+my\s+name\.?$/i.test(t))return{kind:'seed',value:'build'};if(/^(?:make|build)\s+(?:my\s+)?rig\s+(?:from|with)\s+my\s+name\.?$/i.test(t))return{kind:'seed',value:'rig'};return null}
 async function runCommand(cmd,input){if(cmd.kind==='rename'){await rename(cmd.value);input.value='';return true}if(cmd.kind==='reroll'){await reroll();input.value='';return true}if(cmd.kind==='who'){const p=await ensure();global.notify?.('YOU ARE '+p.display_name.toUpperCase());input.value='';return true}if(cmd.kind==='seed'){use(cmd.value,input);return false}return false}
 function installCommandInput(input){if(input.__iiiIdentityAmbient)return;input.__iiiIdentityAmbient=true;input.addEventListener('keydown',async e=>{if(e.key!=='Enter'||e.shiftKey||e.isComposing)return;const cmd=parseCommand(input.value);if(!cmd)return;if(cmd.kind==='seed'){use(cmd.value,input);return}e.preventDefault();e.stopImmediatePropagation();try{await runCommand(cmd,input)}catch(err){console.warn('[III ID] command',err);global.notify?.('NAME NOT SAVED')}} ,true)}
 function patchNetwork(){const net=global.III_NET;if(!net||net.__iiiIdentityPatched)return false;const join=net.join.bind(net);net.join=async function(options={}){const p=await ensure().catch(()=>null),name=String(options.name||'').trim();return join({...options,name:(!name||/^PLAYER$/i.test(name))?(p?.display_name||name||'PLAYER'):name})};net.__iiiIdentityPatched=true;return true}
 function installWelcome(){if(document.__iiiIdentityWelcome)return;document.__iiiIdentityWelcome=true;document.addEventListener('click',e=>{const b=e.target?.closest?.('button,a,[role="button"]');if(!b)return;const text=String(b.textContent||'').replace(/\s+/g,' ').trim();if(!/ENTER THE FIELD/i.test(text))return;setTimeout(async()=>{if(welcomed)return;const p=await ensure().catch(()=>null);if(!p)return;welcomed=true;global.notify?.('WELCOME, '+p.display_name.toUpperCase())},280)},true)}
-function observeUI(){if(observer)return;observer=new MutationObserver(()=>applyToExistingUI());observer.observe(document.documentElement,{subtree:true,childList:true});}
+function observeUI(){if(observer)return;observer=new MutationObserver(()=>applyToExistingUI());observer.observe(document.documentElement,{subtree:true,childList:true})}
 function init(){document.getElementById('iii-identity-chip')?.remove();document.getElementById('iii-identity-panel')?.remove();installWelcome();observeUI();ensure().then(applyToExistingUI).catch(e=>console.warn('[III ID] profile unavailable',e));if(!patchNetwork())setTimeout(patchNetwork,700)}
 global.III_IDENTITY={ensure,generate,reroll,rename,use,seedPrompt,parseCommand,get profile(){return profile},get name(){return profile?.display_name||''},get version(){return VERSION}};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(window);
+
+// Pages-branch bootstrap: use the pinned, tested V3 compiler from main while
+// keeping the serving branch's persistence/identity code intact. Assumptions
+// and the fail-closed gate are local so their UI can evolve independently.
+const V3_PIN='fc29ef94c9941f2af7c0031ef13832f21a3e94cd';
+import(`https://cdn.jsdelivr.net/gh/hartswf0/terrarium@${V3_PIN}/terrarium-iii-collision-budget.js`).catch(err=>console.warn('[III COLLISION] bootstrap unavailable',err));
+(async()=>{
+  try{
+    await import(`https://cdn.jsdelivr.net/gh/hartswf0/terrarium@${V3_PIN}/terrarium-iii-architecture-v3.js`);
+    await import('./terrarium-iii-assumption-trace.js?v=0.1');
+    await import('./terrarium-iii-v3-gate.js?v=0.1');
+  }catch(err){console.warn('[III ARCHITECTURE] Pages bootstrap unavailable',err)}
+})();
