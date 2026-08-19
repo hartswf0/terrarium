@@ -1,0 +1,1334 @@
+{
+ "program": "antbat-genie",
+ "kind": "scene",
+ "note": "The trailer as the correspondence loop left it at 03:04Z: 9 locked chassis parts, 35 built parts, one clad elevation, no roof, no door.",
+ "parts": [
+  {
+   "id": "deck",
+   "kind": "box",
+   "position": [
+    0,
+    0.63,
+    0
+   ],
+   "size": [
+    6.096,
+    0.16,
+    2.591
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#7f725f",
+   "opacity": 1,
+   "metalness": 0.15,
+   "roughness": 0.78,
+   "role": "structure",
+   "system": "structure",
+   "locked": true,
+   "profile": [],
+   "connections": []
+  },
+  {
+   "id": "rail-L",
+   "kind": "box",
+   "position": [
+    0,
+    0.47,
+    -1.06
+   ],
+   "size": [
+    6.2,
+    0.13,
+    0.1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#34383c",
+   "opacity": 1,
+   "metalness": 0.15,
+   "roughness": 0.78,
+   "role": "structure",
+   "system": "structure",
+   "locked": true,
+   "profile": [],
+   "connections": []
+  },
+  {
+   "id": "rail-R",
+   "kind": "box",
+   "position": [
+    0,
+    0.47,
+    1.06
+   ],
+   "size": [
+    6.2,
+    0.13,
+    0.1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#34383c",
+   "opacity": 1,
+   "metalness": 0.15,
+   "roughness": 0.78,
+   "role": "structure",
+   "system": "structure",
+   "locked": true,
+   "profile": [],
+   "connections": []
+  },
+  {
+   "id": "tongue-L",
+   "kind": "box",
+   "position": [
+    -3.65,
+    0.46,
+    -0.43
+   ],
+   "size": [
+    1.55,
+    0.1,
+    0.09
+   ],
+   "rotation": [
+    0,
+    18,
+    0
+   ],
+   "color": "#34383c",
+   "opacity": 1,
+   "metalness": 0.15,
+   "roughness": 0.78,
+   "role": "structure",
+   "system": "structure",
+   "locked": true,
+   "profile": [],
+   "connections": []
+  },
+  {
+   "id": "tongue-R",
+   "kind": "box",
+   "position": [
+    -3.65,
+    0.46,
+    0.43
+   ],
+   "size": [
+    1.55,
+    0.1,
+    0.09
+   ],
+   "rotation": [
+    0,
+    -18,
+    0
+   ],
+   "color": "#34383c",
+   "opacity": 1,
+   "metalness": 0.15,
+   "roughness": 0.78,
+   "role": "structure",
+   "system": "structure",
+   "locked": true,
+   "profile": [],
+   "connections": []
+  },
+  {
+   "id": "wheel-1",
+   "kind": "cylinder",
+   "position": [
+    0.45,
+    0.43,
+    -1.36
+   ],
+   "size": [
+    0.39,
+    0.18,
+    24
+   ],
+   "rotation": [
+    90,
+    0,
+    0
+   ],
+   "color": "#17191b",
+   "opacity": 1,
+   "metalness": 0.15,
+   "roughness": 0.78,
+   "role": "chassis",
+   "system": "structure",
+   "locked": true,
+   "profile": [],
+   "connections": []
+  },
+  {
+   "id": "wheel-2",
+   "kind": "cylinder",
+   "position": [
+    0.45,
+    0.43,
+    1.36
+   ],
+   "size": [
+    0.39,
+    0.18,
+    24
+   ],
+   "rotation": [
+    90,
+    0,
+    0
+   ],
+   "color": "#17191b",
+   "opacity": 1,
+   "metalness": 0.15,
+   "roughness": 0.78,
+   "role": "chassis",
+   "system": "structure",
+   "locked": true,
+   "profile": [],
+   "connections": []
+  },
+  {
+   "id": "wheel-3",
+   "kind": "cylinder",
+   "position": [
+    1.35,
+    0.43,
+    -1.36
+   ],
+   "size": [
+    0.39,
+    0.18,
+    24
+   ],
+   "rotation": [
+    90,
+    0,
+    0
+   ],
+   "color": "#17191b",
+   "opacity": 1,
+   "metalness": 0.15,
+   "roughness": 0.78,
+   "role": "chassis",
+   "system": "structure",
+   "locked": true,
+   "profile": [],
+   "connections": []
+  },
+  {
+   "id": "wheel-4",
+   "kind": "cylinder",
+   "position": [
+    1.35,
+    0.43,
+    1.36
+   ],
+   "size": [
+    0.39,
+    0.18,
+    24
+   ],
+   "rotation": [
+    90,
+    0,
+    0
+   ],
+   "color": "#17191b",
+   "opacity": 1,
+   "metalness": 0.15,
+   "roughness": 0.78,
+   "role": "chassis",
+   "system": "structure",
+   "locked": true,
+   "profile": [],
+   "connections": []
+  },
+  {
+   "id": "wall-sill-front",
+   "kind": "box",
+   "position": [
+    0,
+    0.77,
+    -1.2
+   ],
+   "size": [
+    5.88,
+    0.12,
+    0.1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#9b6a3c",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 0.78,
+   "role": "wall-frame",
+   "system": "structure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "deck"
+   ]
+  },
+  {
+   "id": "wall-sill-rear",
+   "kind": "box",
+   "position": [
+    0,
+    0.77,
+    1.2
+   ],
+   "size": [
+    5.88,
+    0.12,
+    0.1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#9b6a3c",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 0.78,
+   "role": "wall-frame",
+   "system": "structure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "deck"
+   ]
+  },
+  {
+   "id": "wall-sill-left",
+   "kind": "box",
+   "position": [
+    -2.94,
+    0.77,
+    0
+   ],
+   "size": [
+    0.1,
+    0.12,
+    2.5
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#9b6a3c",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 0.78,
+   "role": "wall-frame",
+   "system": "structure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "deck"
+   ]
+  },
+  {
+   "id": "wall-sill-right",
+   "kind": "box",
+   "position": [
+    2.94,
+    0.77,
+    0
+   ],
+   "size": [
+    0.1,
+    0.12,
+    2.5
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#9b6a3c",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 0.78,
+   "role": "wall-frame",
+   "system": "structure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "deck"
+   ]
+  },
+  {
+   "id": "wall-post-left-front",
+   "kind": "box",
+   "position": [
+    -2.89,
+    1.98,
+    -1.15
+   ],
+   "size": [
+    0.12,
+    2.3,
+    0.12
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#9b6a3c",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 0.78,
+   "role": "wall-frame",
+   "system": "structure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "wall-sill-front",
+    "wall-sill-left"
+   ]
+  },
+  {
+   "id": "wall-post-left-rear",
+   "kind": "box",
+   "position": [
+    -2.89,
+    1.98,
+    1.15
+   ],
+   "size": [
+    0.12,
+    2.3,
+    0.12
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#9b6a3c",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 0.78,
+   "role": "wall-frame",
+   "system": "structure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "wall-sill-rear",
+    "wall-sill-left"
+   ]
+  },
+  {
+   "id": "wall-post-right-front",
+   "kind": "box",
+   "position": [
+    2.89,
+    1.98,
+    -1.15
+   ],
+   "size": [
+    0.12,
+    2.3,
+    0.12
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#9b6a3c",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 0.78,
+   "role": "wall-frame",
+   "system": "structure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "wall-sill-front",
+    "wall-sill-right"
+   ]
+  },
+  {
+   "id": "wall-post-right-rear",
+   "kind": "box",
+   "position": [
+    2.89,
+    1.98,
+    1.15
+   ],
+   "size": [
+    0.12,
+    2.3,
+    0.12
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#9b6a3c",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 0.78,
+   "role": "wall-frame",
+   "system": "structure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "wall-sill-rear",
+    "wall-sill-right"
+   ]
+  },
+  {
+   "id": "wall-plate-front",
+   "kind": "box",
+   "position": [
+    0,
+    3.19,
+    -1.2
+   ],
+   "size": [
+    5.88,
+    0.12,
+    0.1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#9b6a3c",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 0.78,
+   "role": "wall-frame",
+   "system": "structure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "wall-post-left-front",
+    "wall-post-right-front"
+   ]
+  },
+  {
+   "id": "wall-plate-rear",
+   "kind": "box",
+   "position": [
+    0,
+    3.19,
+    1.2
+   ],
+   "size": [
+    5.88,
+    0.12,
+    0.1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#9b6a3c",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 0.78,
+   "role": "wall-frame",
+   "system": "structure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "wall-post-left-rear",
+    "wall-post-right-rear"
+   ]
+  },
+  {
+   "id": "wall-plate-left",
+   "kind": "box",
+   "position": [
+    -2.94,
+    3.19,
+    0
+   ],
+   "size": [
+    0.1,
+    0.12,
+    2.5
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#9b6a3c",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 0.78,
+   "role": "wall-frame",
+   "system": "structure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "wall-post-left-front",
+    "wall-post-left-rear"
+   ]
+  },
+  {
+   "id": "wall-plate-right",
+   "kind": "box",
+   "position": [
+    2.94,
+    3.19,
+    0
+   ],
+   "size": [
+    0.1,
+    0.12,
+    2.5
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#9b6a3c",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 0.78,
+   "role": "wall-frame",
+   "system": "structure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "wall-post-right-front",
+    "wall-post-right-rear"
+   ]
+  },
+  {
+   "id": "rear-cladding-left",
+   "kind": "box",
+   "position": [
+    2.99,
+    1.98,
+    -0.955
+   ],
+   "size": [
+    0.1,
+    2.3,
+    0.39
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#292c2e",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 0.9,
+   "role": "wall-cladding",
+   "system": "enclosure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "wall-sill-right",
+    "wall-post-right-front",
+    "wall-plate-right"
+   ]
+  },
+  {
+   "id": "rear-cladding-right",
+   "kind": "box",
+   "position": [
+    2.99,
+    1.98,
+    0.955
+   ],
+   "size": [
+    0.1,
+    2.3,
+    0.39
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#292c2e",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 0.9,
+   "role": "wall-cladding",
+   "system": "enclosure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "wall-sill-right",
+    "wall-post-right-rear",
+    "wall-plate-right"
+   ]
+  },
+  {
+   "id": "rear-cladding-lower",
+   "kind": "box",
+   "position": [
+    2.99,
+    1.2,
+    0
+   ],
+   "size": [
+    0.1,
+    0.74,
+    1.52
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#292c2e",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 0.9,
+   "role": "wall-cladding",
+   "system": "enclosure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "wall-sill-right"
+   ]
+  },
+  {
+   "id": "rear-cladding-upper",
+   "kind": "box",
+   "position": [
+    2.99,
+    2.83,
+    0
+   ],
+   "size": [
+    0.1,
+    0.6,
+    1.52
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#292c2e",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 0.9,
+   "role": "wall-cladding",
+   "system": "enclosure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "wall-plate-right"
+   ]
+  },
+  {
+   "id": "rear-window-glass",
+   "kind": "box",
+   "position": [
+    3.055,
+    2.05,
+    0
+   ],
+   "size": [
+    0.035,
+    0.72,
+    1.28
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#26363c",
+   "opacity": 0.72,
+   "metalness": 0.12,
+   "roughness": 0.22,
+   "role": "window-glazing",
+   "system": "enclosure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "rear-window-trim-left",
+    "rear-window-trim-right"
+   ]
+  },
+  {
+   "id": "rear-window-trim-left",
+   "kind": "box",
+   "position": [
+    3.075,
+    2.05,
+    -0.7
+   ],
+   "size": [
+    0.1,
+    0.96,
+    0.12
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#a66f3d",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 0.72,
+   "role": "window-trim",
+   "system": "enclosure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "rear-cladding-left"
+   ]
+  },
+  {
+   "id": "rear-window-trim-right",
+   "kind": "box",
+   "position": [
+    3.075,
+    2.05,
+    0.7
+   ],
+   "size": [
+    0.1,
+    0.96,
+    0.12
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#a66f3d",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 0.72,
+   "role": "window-trim",
+   "system": "enclosure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "rear-cladding-right"
+   ]
+  },
+  {
+   "id": "rear-window-trim-bottom",
+   "kind": "box",
+   "position": [
+    3.075,
+    1.63,
+    0
+   ],
+   "size": [
+    0.1,
+    0.12,
+    1.52
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#a66f3d",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 0.72,
+   "role": "window-trim",
+   "system": "enclosure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "rear-cladding-lower"
+   ]
+  },
+  {
+   "id": "rear-window-trim-top",
+   "kind": "box",
+   "position": [
+    3.075,
+    2.47,
+    0
+   ],
+   "size": [
+    0.1,
+    0.12,
+    1.52
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#a66f3d",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 0.72,
+   "role": "window-trim",
+   "system": "enclosure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "rear-cladding-upper"
+   ]
+  },
+  {
+   "id": "rear-course-lower-1",
+   "kind": "box",
+   "position": [
+    3.046,
+    1.04,
+    0
+   ],
+   "size": [
+    0.018,
+    0.025,
+    2.3
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#151719",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 1,
+   "role": "cladding-joint",
+   "system": "enclosure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "rear-cladding-lower",
+    "rear-cladding-left",
+    "rear-cladding-right"
+   ]
+  },
+  {
+   "id": "rear-course-lower-2",
+   "kind": "box",
+   "position": [
+    3.046,
+    1.28,
+    0
+   ],
+   "size": [
+    0.018,
+    0.025,
+    2.3
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#151719",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 1,
+   "role": "cladding-joint",
+   "system": "enclosure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "rear-cladding-lower",
+    "rear-cladding-left",
+    "rear-cladding-right"
+   ]
+  },
+  {
+   "id": "rear-course-lower-3",
+   "kind": "box",
+   "position": [
+    3.046,
+    1.52,
+    0
+   ],
+   "size": [
+    0.018,
+    0.025,
+    2.3
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#151719",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 1,
+   "role": "cladding-joint",
+   "system": "enclosure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "rear-cladding-lower",
+    "rear-cladding-left",
+    "rear-cladding-right"
+   ]
+  },
+  {
+   "id": "rear-course-side-l-1",
+   "kind": "box",
+   "position": [
+    3.046,
+    1.76,
+    -0.955
+   ],
+   "size": [
+    0.018,
+    0.025,
+    0.39
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#151719",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 1,
+   "role": "cladding-joint",
+   "system": "enclosure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "rear-cladding-left"
+   ]
+  },
+  {
+   "id": "rear-course-side-r-1",
+   "kind": "box",
+   "position": [
+    3.046,
+    1.76,
+    0.955
+   ],
+   "size": [
+    0.018,
+    0.025,
+    0.39
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#151719",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 1,
+   "role": "cladding-joint",
+   "system": "enclosure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "rear-cladding-right"
+   ]
+  },
+  {
+   "id": "rear-course-side-l-2",
+   "kind": "box",
+   "position": [
+    3.046,
+    2,
+    -0.955
+   ],
+   "size": [
+    0.018,
+    0.025,
+    0.39
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#151719",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 1,
+   "role": "cladding-joint",
+   "system": "enclosure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "rear-cladding-left"
+   ]
+  },
+  {
+   "id": "rear-course-side-r-2",
+   "kind": "box",
+   "position": [
+    3.046,
+    2,
+    0.955
+   ],
+   "size": [
+    0.018,
+    0.025,
+    0.39
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#151719",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 1,
+   "role": "cladding-joint",
+   "system": "enclosure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "rear-cladding-right"
+   ]
+  },
+  {
+   "id": "rear-course-side-l-3",
+   "kind": "box",
+   "position": [
+    3.046,
+    2.24,
+    -0.955
+   ],
+   "size": [
+    0.018,
+    0.025,
+    0.39
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#151719",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 1,
+   "role": "cladding-joint",
+   "system": "enclosure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "rear-cladding-left"
+   ]
+  },
+  {
+   "id": "rear-course-side-r-3",
+   "kind": "box",
+   "position": [
+    3.046,
+    2.24,
+    0.955
+   ],
+   "size": [
+    0.018,
+    0.025,
+    0.39
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#151719",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 1,
+   "role": "cladding-joint",
+   "system": "enclosure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "rear-cladding-right"
+   ]
+  },
+  {
+   "id": "rear-course-side-l-4",
+   "kind": "box",
+   "position": [
+    3.046,
+    2.48,
+    -0.955
+   ],
+   "size": [
+    0.018,
+    0.025,
+    0.39
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#151719",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 1,
+   "role": "cladding-joint",
+   "system": "enclosure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "rear-cladding-left"
+   ]
+  },
+  {
+   "id": "rear-course-side-r-4",
+   "kind": "box",
+   "position": [
+    3.046,
+    2.48,
+    0.955
+   ],
+   "size": [
+    0.018,
+    0.025,
+    0.39
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#151719",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 1,
+   "role": "cladding-joint",
+   "system": "enclosure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "rear-cladding-right"
+   ]
+  },
+  {
+   "id": "rear-course-upper-1",
+   "kind": "box",
+   "position": [
+    3.046,
+    2.62,
+    0
+   ],
+   "size": [
+    0.018,
+    0.025,
+    2.3
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#151719",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 1,
+   "role": "cladding-joint",
+   "system": "enclosure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "rear-cladding-upper",
+    "rear-cladding-left",
+    "rear-cladding-right"
+   ]
+  },
+  {
+   "id": "rear-course-upper-2",
+   "kind": "box",
+   "position": [
+    3.046,
+    2.86,
+    0
+   ],
+   "size": [
+    0.018,
+    0.025,
+    2.3
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#151719",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 1,
+   "role": "cladding-joint",
+   "system": "enclosure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "rear-cladding-upper",
+    "rear-cladding-left",
+    "rear-cladding-right"
+   ]
+  },
+  {
+   "id": "rear-course-upper-3",
+   "kind": "box",
+   "position": [
+    3.046,
+    3.1,
+    0
+   ],
+   "size": [
+    0.018,
+    0.025,
+    2.3
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "color": "#151719",
+   "opacity": 1,
+   "metalness": 0,
+   "roughness": 1,
+   "role": "cladding-joint",
+   "system": "enclosure",
+   "locked": false,
+   "profile": [],
+   "connections": [
+    "rear-cladding-upper",
+    "rear-cladding-left",
+    "rear-cladding-right"
+   ]
+  }
+ ]
+}

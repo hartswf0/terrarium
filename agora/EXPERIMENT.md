@@ -160,3 +160,49 @@ an API key and a re-run of the loop, and it is the obvious next experiment.
   distance than one aimed at a neighbour.
 - **Nothing here says the buildings are good.** It says a reading that names a
   part beats the same edit aimed at a random part, on another program's rules.
+
+---
+
+## Appendix — the trailer
+
+The trailer the whole lineage sits on (`agora/trailer.json`, from the 03:04Z log)
+is 9 locked chassis parts plus 35 the builder made in seven cycles. The part
+census says what those seven cycles bought:
+
+```
+14  cladding-joint     0.02 × 0.03 strips, all on one wall
+12  wall-frame         posts, sills, plates — the cage
+ 4  wall-cladding      one elevation, the rear
+ 4  window-trim        + 1 glazing
+```
+
+**Forty per cent of the builder's output is horizontal course joints on the one
+wall it had already clad.** Three elevations open, no roof, no door — and the
+final accusation, *"the entire long elevation is still a gigantic translucent
+void bounded by timber rails,"* is about a wall the builder never reached, at
+suck 98, after 12 API calls and 28 MB of input.
+
+`agora/trailer-finished.json` completes it structurally: three elevations clad, a
+door with a step to arrive on, a real window opening, a pitched roof with eaves.
+Eighteen parts, hand-built from the frame's own coordinates. **Not an antbat
+product** — the antbats and the judge assessed it afterwards.
+
+| | before | finished |
+| --- | ---: | ---: |
+| parts | 44 | 62 |
+| strict lint | 6 (0.14/part) | 6 (**0.10**/part) |
+| **geometric lint** | 1 | **0** |
+| antbat `NO_DOOR` | 44 of 44 parts | **0** |
+| visible from six views | 100% | 96.8% |
+
+Geometric findings to zero: every part is on the ground or on something. The
+visibility *drop* is correct and worth saying out loud — **a building with walls
+hides its studs**, so a metric that rewards seeing everything punishes enclosure.
+It was the right metric for the sparse exploded scenes and it is the wrong one
+here.
+
+One bug in the build is worth keeping in the record because it is the same bug
+the whole system is about: the step was first called `front-door-step`, and the
+linter, which keys on text, classified it as a **door**. The world therefore had
+two doors and no arrival, and reported `DOOR_NO_ARRIVAL`. Renaming it
+`arrival-step` fixed it. A name is a claim, and this linter believes names.
