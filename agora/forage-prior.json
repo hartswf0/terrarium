@@ -1,0 +1,57 @@
+{
+ "source": "agora-cave · 0 dossiers + 4 correspondence logs",
+ "generated": "2026-08-19T08:05:31.241Z",
+ "trainedOn": {
+  "dossiers": 0,
+  "buildings": [],
+  "corpusSessions": [
+   "pagoda",
+   "lander",
+   "castle",
+   "cabin"
+  ]
+ },
+ "speciesValue": {
+  "NO_DOOR": 1,
+  "DOOR_NO_ARRIVAL": 1,
+  "BELOW_GRADE": 1,
+  "FLOATING": 1,
+  "BAD_SUPPORT": 1,
+  "ORPHAN": 1,
+  "EXHAUSTED": 1,
+  "BURIED": 1,
+  "CONTESTED": 1,
+  "UNREACHED_HOT": 1,
+  "WRONG_FORM": 1,
+  "MISSING_MAJOR": 1,
+  "SURFACE_ONLY": 1
+ },
+ "gestureValue": {
+  "RELOCATE_ORPHAN": 1,
+  "EXPOSE_BURIED": 0.8,
+  "ADD_DOOR": 0.55,
+  "ADD_ARRIVAL": 0.5,
+  "APERTURE": 0.2,
+  "BUILD_THE_AMBIGUITY": 0,
+  "ENCLOSE_CAVITY": -0.3,
+  "ADD_MEMBER": -0.35,
+  "THICKEN": -0.45
+ },
+ "rules": [
+  "relocate before adding — one repair in six in the corpus ever weakened its own accusation, and it was a relocation",
+  "never repeat an operation on a part whose reading it did not move",
+  "a resemblance judgement is not forageable: no instrument here can check WRONG_FORM or MISSING_MAJOR",
+  "measure the effect on the part the operation names, never on a world total"
+ ],
+ "arithmetic": [
+  "RELOCATE_ORPHAN      seed +1.00  (no trials yet)  →  +1.00",
+  "EXPOSE_BURIED        seed +0.80  (no trials yet)  →  +0.80",
+  "ADD_DOOR             seed +0.55  (no trials yet)  →  +0.55",
+  "ADD_ARRIVAL          seed +0.50  (no trials yet)  →  +0.50",
+  "APERTURE             seed +0.20  (no trials yet)  →  +0.20",
+  "BUILD_THE_AMBIGUITY  seed +0.00  (no trials yet)  →  +0.00",
+  "ENCLOSE_CAVITY       seed -0.30  (no trials yet)  →  -0.30",
+  "ADD_MEMBER           seed -0.35  (no trials yet)  →  -0.35",
+  "THICKEN              seed -0.45  (no trials yet)  →  -0.45"
+ ]
+}

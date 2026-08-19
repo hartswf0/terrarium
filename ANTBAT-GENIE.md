@@ -66,6 +66,10 @@ timber rails is a thing. It is not a cabin. It is a thing.
 The suck score cannot see the difference between "not the cabin" and "nothing."
 That is the whole problem, and it is not a tuning problem.
 
+> **§0 is partly wrong about what that number was for. See §0b**, which arrived
+> with the fifth artifact in the archive: the score is a detector output, not a
+> loss, and a high one is the hunt succeeding.
+
 ---
 
 ## 1. COLLECTOR DIAGNOSTIC
@@ -602,6 +606,50 @@ caste with no defect to look for, and naming it now would give it one.
 
 ---
 
+## 0b. Correction to §0 — what the number was for
+
+§0 read the suck score as a loss to be minimised and reported that "four for four,
+the objective was not approached." The number is right and the reading was wrong,
+and the fifth artifact in the archive says so plainly.
+
+`OPERATIVE BUILDER — FUCKED UNTIL PROVEN OTHERWISE` ships its own `THEORY.md`, and
+its state machine is not a descent:
+
+```text
+score > 15 OR hard failure   → FUCKED → BUILDER PATCH
+score <= 15 AND no hard failure → MOVE CAMERA → CRITIC AGAIN
+2 low sweeps                 → NOT CURRENTLY FUCKED → pause, never DONE
+```
+
+`WORLD_SUCK_SCORE is a maximum, never an average.` **A low score does not mean the
+building is good. It means this target survived this look, so move the sensor.**
+The correspondence transcripts use exactly that vocabulary:
+
+```
+TARGET SURVIVED · Crew cabin and viewports · SUCK 10 · changing camera / hunting next failure
+TARGET LOCKED   · Ladder assembly         · SUCK 94 · lander-ladder-left … glows red
+```
+
+So the score is a detector output, and a high one is the hunt succeeding. The
+lander's climb from 10 to 99 across sixteen cycles is not sixteen cycles of
+decay — the focus rotates almost every cycle (ladder → antenna → cabin → gear →
+descent stage → rear face → footpads → legs), and each freshly examined region is
+worse than the one just repaired, because the builder only ever repaired what it
+was accused of. **The number climbing while the focus rotates is coverage.**
+
+What survives from §0 unchanged: `threshold: 15` still encodes an arrival the
+system's own theory disclaims (`NOT CURRENTLY FUCKED`, never `DONE`), and the
+focus-lock, repeat-similarity and escalation machinery is still where the grind
+lives — the castle spent four cycles and 59 changed parts on one accusation for
++2, 0, 0. The objective-fallacy reading holds against the threshold and the
+grinding. It does not hold against the score, which was never a gradient.
+
+A delta between two *different* focuses therefore measures the badness of newly
+examined territory, not whether a repair worked. Only a repeated focus tests a
+repair. There are six such tests in the whole corpus. One of them worked.
+
+---
+
 ## 10. What the build found that the theory did not
 
 `antbat-genie.html` now exists. Naur's loop only closes if the text is allowed to
@@ -666,3 +714,193 @@ the number was answering a question nobody needed answered, while
 
 The next move is not to fix the score. It is to go stand at one of the
 unreachable hot nodes and see what is there.
+
+---
+
+## 11. The defect grammar, the fan-out, and the cave
+
+`if we can't build better structures it doesn't matter.` So the antbats were
+taught to read a building, sent out to study four of them, and made to record
+whether what they did about it worked.
+
+### 11.1 How they read
+
+The brutal loop reads a world through six deterministic linters that need no
+model and no reference — `EMPTY`, `NO_DOOR`, `DOOR_NO_ARRIVAL`, `BELOW_GRADE`,
+`FLOATING`, `BAD_SUPPORT`. Those are inherited as defect species. Three of them
+are **declaration checks**: they read `supportId`, or ask whether a named object
+exists. That makes them unreachable on a correspondence scene, which declares
+`connections` and no supports at all — the pagoda declares **zero connections
+across ninety-two parts**, so `BAD_SUPPORT` can never fire on it and `FLOATING`
+never could either.
+
+So they are re-derived geometrically. **An ant does not ask a part whether it is
+held up; it looks underneath.** Three probes go down from the footprint and
+`FLOATING` is the fraction that find nothing. Contact is a box-to-box clearance
+against a tolerance, not a neighbour rank — the first version ranked neighbours
+and therefore measured part *size*: with k=7 always returning seven neighbours
+however far away they are, a one-node finial read as perfectly attached.
+
+Five more species are native to these instruments, because a linter cannot walk:
+`ORPHAN` (nothing within a contact tolerance), `EXHAUSTED` (the promise ran out),
+`BURIED` (every node reads as inside some other solid — weighted by how many
+nodes can support the claim, since a two-node part cannot), `CONTESTED` (the ant
+stands where the bat's delay reports air), `UNREACHED_HOT` (the frontier).
+
+Every membership is fuzzy and every one reaches the render. A part is 0.7
+`FLOATING` and 0.4 `ORPHAN` at once, and that is not a contradiction to resolve
+before reporting.
+
+### 11.2 What they found in each building
+
+| | pagoda | lander | cabin |
+| --- | --- | --- | --- |
+| `FLOATING` | **16.1** over 23 parts | 14.4 over 18 | 9.9 over 13 |
+| `BURIED` | 21.4 over 41 | **28.2 over 53** | 3.8 over 8 |
+| `UNREACHED_HOT` | 31.7 over 38 | 14.1 over 22 | 27.7 over 33 |
+| `NO_DOOR` | — | — | **44 of 44 parts** |
+| `ORPHAN` | 5.2 over 8 | 1.2 over 3 | 0.07 |
+
+The cabin is the one worth stopping on. Seven cycles, four builds, a final suck
+of 98, and the accusation the loop never made: **a tiny house with no door.** The
+word "door" appears three times in that log's entire critic output and never as
+the target. The antbats read it on all forty-four parts in one pass, because the
+question is a linter, not a judgement.
+
+### 11.3 The difference that makes the difference
+
+`active_difference` is a field in the brutal loop's own critic schema. Here it is
+computed rather than asserted — every build in the four logs, classified by its
+own summary verb, against what the next verdict did:
+
+| gesture | n | mean Δsuck | weakened | flat | worse |
+| --- | --- | --- | --- | --- | --- |
+| RELOCATE | 3 | **−2.00** | 2 | 0 | 1 |
+| REBUILD | 8 | +0.12 | 3 | 1 | 4 |
+| RESIZE | 3 | +1.33 | 0 | 1 | 2 |
+| ENCLOSE | 2 | +2.00 | 0 | 0 | 2 |
+| ARTICULATE | 1 | +4.00 | 0 | 0 | 1 |
+
+Edit size against outcome: **r = 0.10 over 17 builds.** No relationship. Size is
+not the variable, in either direction.
+
+Restricted to the transitions that actually test a repair — same focus, targeted
+build — there are **six in the whole corpus, and one worked**: the cabin's rear
+cladding, nine parts, *relocated* from the long wall to the open trailer end,
+99 → 94. Every rebuild, resize, enclosure and articulation aimed at a repeated
+accusation left it flat or worse.
+
+That single ordering is the whole of what four chat logs can honestly teach, and
+it is what the seed prior encodes: **move the thing before you add a thing.**
+
+### 11.4 The fan-out
+
+Ants are issued a species affinity, round-robin over whatever the cave values
+most, and keep their own dossier. Loading a new prior re-fans them — that is the
+entire mechanical consequence of valuing a species, and it is the only place the
+accumulated learning touches an ant. It changes where foraging is worth doing. It
+never changes what counts as a finding.
+
+### 11.5 What the genie now does, and how it knows
+
+Operations name a species and a part. The next generation re-reads that part and
+the difference is the learning signal — measured **on the part the operation
+named**, never on a world total, because a world total moves whenever anything
+anywhere moves and therefore cannot say whether this operation did what it was
+for.
+
+It has already corrected the system three times, which is the argument for having
+built it:
+
+- `OPEN_SEALED_VOID` shrank a buried part. The reading went **up** by 6.8 and
+  13.3 on two different buildings — shrinking a buried thing leaves it buried. It
+  was replaced by `EXPOSE_BURIED`, which moves the part out along the outward
+  direction exactly far enough to clear the box it is inside, and no further. A
+  first attempt at *that* used a fraction of the world radius and flung a wheel
+  27 m into the sky, which is not exposure, it is loss.
+- `RELOCATE_ORPHAN` guessed its travel from half-extents and left the pagoda's
+  shrub orphaned at 1.00 after moving it. The clearance was already measured, so
+  it now moves exactly that, plus a hair.
+- The anti-grind rule refuses to repeat an operation on a part whose reading it
+  did not move. That is the castle's four cycles on one accusation, written as a
+  rule the program cannot talk itself out of. The refusal is reported as a wish.
+
+Measured, after the corrections: `ADD_DOOR` −11 and −44 at world scope,
+`EXPOSE_BURIED` −0.89 and −0.91 on the part, `RELOCATE_ORPHAN` −0.88 and −0.47.
+Every operation now removes the thing it was aimed at.
+
+### 11.6 The cave
+
+`agora-cave.html` holds three kinds of evidence and keeps them apart, because
+they answer different questions.
+
+**From code:** the six linters, with the note that half of them are unreachable
+on the scenes they would be most useful for.
+
+**From text:** the accusation language, counted rather than believed. Across the
+thirty accusations in the four logs:
+
+```
+WRONG_FORM      42  (34%)   ← nothing can check this
+MISSING_MAJOR   39  (31%)   ← nothing can check this
+ORPHAN          15  (12%)
+NO_DOOR         10   (8%)
+DOOR_NO_ARRIVAL  8   (6%)
+SURFACE_ONLY     6   (5%)
+FLOATING         3   (2%)
+BURIED           1   (1%)
+```
+
+**Two thirds of the critics' language is spent on the two categories no
+instrument in the system can verify.** That is not a failure of the critics —
+resemblance to a photograph is a real property and a model is the only instrument
+for it. It is a reason to stop spending the *forage* budget there: species with
+`text` provenance are capped at 1.0 in the prior and never rise, however often
+they are named.
+
+**From the instruments:** the dossiers, the only self-measured evidence in the
+building.
+
+The update is small enough to read, and printed on the page:
+
+```
+gestureValue[op] = seed·(1−w) + measured·w        w = min(n/6, 1)
+                   measured = mean(−Δ / |before|) on the part the operation named
+
+speciesValue[sp] = 1 + 0.6·reliability + 0.5·prevalence + 0.3·spread
+                   provenance 'text' → capped at 1.0
+```
+
+Six trials replace the seed entirely. If relocation stops working, the cave will
+say so and the seed will be gone.
+
+The cave refuses to score a building, refuses to rank buildings against each
+other, refuses to learn from what an accusation *said* rather than how often the
+system said it, and refuses to promote a species to forageable because it was
+named often — only because something could be done about it.
+
+---
+
+## 12. Still open
+
+The stepping stones in §9 are untouched. Four more, none resolved.
+
+**ix. `EXHAUSTED` and `CONTESTED` have no operation.** They are read, valued and
+foraged for, and the genie has nothing to do about either. A species with no
+gesture is one whose reliability the cave can never measure — it accumulates
+sightings and no evidence, forever. Either they earn an operation or the prior
+should say out loud that it cannot learn about them.
+
+**x. The corpus is six repair tests.** Everything in §11.3 rests on that, and the
+one working repair is a single build in a single log. The seed exists to be
+overwritten; whether it survives contact with real dossiers is unknown, and the
+arithmetic is printed on the page so that it can be watched failing.
+
+**xi. Nobody has run the archived buildings through generations.** One genie call
+each is not a lineage. What a pagoda becomes after twenty generations of being
+read rather than compared is the actual experiment, and it has not been run.
+
+**xii. The cabin had no door for seven cycles.** The instrument that would have
+caught it existed, in a sibling program, in the same archive, on the same day.
+Nothing connected them. That is the interesting failure in this collection, and
+it is not a technical one.

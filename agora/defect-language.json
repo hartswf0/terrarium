@@ -1,0 +1,52 @@
+{
+ "lexicon": {
+  "ORPHAN": "disconnect|detached|floating|midair|mid-air|unattached|unsupported|terminat\\w+ in|crossing the base|perched|pasted-on|nonsense",
+  "FLOATING": "floats?|hover|suspended|above the ground|not touching",
+  "BURIED": "buried|swallow|hidden|invisible|clipped|embedded",
+  "NO_DOOR": "\\bdoor|entry|entrance|threshold",
+  "DOOR_NO_ARRIVAL": "stair|path|ramp|walkway|approach|arrival",
+  "MISSING_MAJOR": "absent|missing|lacks?|no legible|eliminat\\w+|destroys|barren|empty|void|open cage|unfinished",
+  "WRONG_FORM": "blunt|oversized|crude|generic|blank|flat|toy|cartoon|silo|appliance|blob",
+  "SURFACE_ONLY": "trim|siding|cladding|joint|texture|finish|decorat"
+ },
+ "counts": {
+  "NO_DOOR": 10,
+  "DOOR_NO_ARRIVAL": 8,
+  "MISSING_MAJOR": 39,
+  "WRONG_FORM": 42,
+  "ORPHAN": 15,
+  "SURFACE_ONLY": 6,
+  "FLOATING": 3,
+  "BURIED": 1
+ },
+ "perSession": {
+  "pagoda": {
+   "NO_DOOR": 7,
+   "DOOR_NO_ARRIVAL": 8,
+   "MISSING_MAJOR": 10,
+   "WRONG_FORM": 15,
+   "ORPHAN": 5,
+   "SURFACE_ONLY": 2,
+   "FLOATING": 2,
+   "BURIED": 1
+  },
+  "lander": {
+   "MISSING_MAJOR": 13,
+   "WRONG_FORM": 16,
+   "ORPHAN": 9,
+   "FLOATING": 1
+  },
+  "castle": {
+   "MISSING_MAJOR": 4,
+   "WRONG_FORM": 8,
+   "ORPHAN": 1
+  },
+  "cabin": {
+   "NO_DOOR": 3,
+   "MISSING_MAJOR": 12,
+   "WRONG_FORM": 3,
+   "SURFACE_ONLY": 4
+  }
+ },
+ "accusations": 30
+}

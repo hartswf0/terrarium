@@ -118,6 +118,7 @@ button,input,select{font:inherit;color:inherit}
   <div id="refusals">
     <span>no score</span><span>no target</span><span>no threshold</span>
     <span>no critic</span><span>no reference</span><span>no stopping condition</span>
+    <span style="border-color:#3f6f52;color:#9be08a">prior · <b id="prior-src">none (naive foraging)</b></span>
   </div>
   <div id="hud">
     <div class="hudcell grow"><b>frontier</b><i id="h-frontier">0</i><small>unreached &amp; interesting — growing is alive</small></div>
@@ -138,7 +139,9 @@ button,input,select{font:inherit;color:inherit}
     <button class="b" id="btn-view">View</button>
     <label class="b" for="file-in">Import</label>
     <input id="file-in" type="file" accept=".json" class="hidden">
-    <button class="b" id="btn-export">Export</button>
+    <label class="b" for="prior-in">Prior</label>
+    <input id="prior-in" type="file" accept=".json" class="hidden">
+    <button class="b" id="btn-export">Dossier</button>
     <button class="b" id="btn-reseed">Reseed</button>
   </div>
   <div id="tabs">
@@ -150,6 +153,8 @@ button,input,select{font:inherit;color:inherit}
     <button class="t" data-tab="parity">parity<u id="n-parity">0</u></button>
     <button class="t" data-tab="stalls">stalls<u id="n-stalls">0</u></button>
     <button class="t" data-tab="disagree">disagree<u id="n-disagree">0</u></button>
+    <button class="t" data-tab="species">species<u id="n-species">0</u></button>
+    <button class="t" data-tab="scouts">scouts<u id="n-scouts">0</u></button>
     <button class="t" data-tab="lineage">lineage<u id="n-lineage">0</u></button>
     <button class="t" data-tab="theory">theory</button>
   </div>
@@ -476,8 +481,15 @@ function readNodesFuzzy(){
     s.mem.verify = clamp(0.35*s.interior + 0.5*clamp(s.disagree/3,0,1) + 0.25*clamp(s.stallsHere/3,0,1),0,1);
     s.mem.wander = clamp(unseen*0.9,0,1);
     /* interestingness: never thresholded, never ranked into a leaderboard.
-       used only as a movement gradient and as a frontier weight. */
-    s.interest = 0.9*s.mem.wander + 0.75*s.mem.seam + 0.62*s.mem.clash + 0.5*s.mem.verify;
+       used only as a movement gradient and as a frontier weight. The species
+       term is the only place the cave's accumulated learning touches the ant:
+       it changes where foraging is worth doing, never what counts as a finding. */
+    const pr=partReport.get(s.partId);
+    let pull=0;
+    if(pr) for(const sp of SPECIES) pull += pr.mem[sp]*priorValue(sp);
+    s.speciesPull = clamp(pull/4,0,2);
+    s.interest = 0.9*s.mem.wander + 0.75*s.mem.seam + 0.62*s.mem.clash + 0.5*s.mem.verify
+               + 0.8*s.speciesPull;
   }
 }
 
@@ -594,6 +606,7 @@ function antStep(ant){
   const cur=NODES[ant.idx];
   cur.visits++;
   probeParity(cur);
+  scoutRecord(ant,cur);
   pheromone[ant.idx]+=0.06+cur.interest*0.17;
   cur.label=Math.min(4,cur.label+0.35);
 
@@ -603,9 +616,15 @@ function antStep(ant){
 
   /* mint a label when this node says something the ant is not already carrying */
   if(cur.interest>0.9 && ant.carrying.length<3 && Math.random()<0.3){
-    const act = cur.mem.clash>cur.mem.seam ? 'crowding'
-              : cur.interior>0.5 ? 'interior'
-              : cur.mem.seam>0.45 ? 'seam' : 'unnamed';
+    /* the label is typed by defect species when the reading offers one, so the
+       transfer ledger records which KIND of defect travelled, not just that
+       something did. */
+    const sp=speciesOfNode(cur);
+    let act=null,best=0.2;
+    if(sp) for(const k of SPECIES) if(sp[k]>best){best=sp[k];act=k}
+    if(!act) act = cur.mem.clash>cur.mem.seam ? 'crowding'
+                 : cur.interior>0.5 ? 'interior'
+                 : cur.mem.seam>0.45 ? 'seam' : 'unnamed';
     ant.carrying.push(mintLabel(cur,act,cur.mem));
   }
 
@@ -971,6 +990,220 @@ function assignLights(){
   });
 }
 
+/* ========================= THE DEFECT GRAMMAR =============================
+   Teaching the antbats to read a building.
+
+   The brutal loop (OPERATIVE BUILDER — FUCKED UNTIL PROVEN OTHERWISE) reads a
+   world through six deterministic linters that need no model and no reference:
+
+     EMPTY            critical  world contains no building objects
+     NO_DOOR          high      >4 objects and no semantic door
+     DOOR_NO_ARRIVAL  high      a door exists but no stair or path does
+     BELOW_GRADE      medium    aabb.min.y < -0.25
+     FLOATING         high      mass/floor/column/stair/path above grade, no supportId
+     BAD_SUPPORT      high      supportId names an object that does not exist
+
+   Those are the defect species the ants inherit. Three of them (FLOATING,
+   BAD_SUPPORT, EMPTY) are declaration checks — they read a field. The antbats
+   cannot read a field on an imported correspondence scene, which carries
+   `connections` and no `supportId` at all, so they are re-derived GEOMETRICALLY:
+   an ant does not ask a part whether it is supported, it looks underneath.
+
+   Five more species are native to these instruments and have no equivalent in
+   the linter, because a linter cannot walk:
+
+     ORPHAN                nothing in the neighbourhood belongs to anything else
+     EXHAUSTED             the component ends here — the promise ran out
+     BURIED                every node on this part reads as inside some other solid
+     CONTESTED             the ant stands where the bat's delay reports air
+     UNREACHED_HOT         interesting, and nothing has been able to get there
+
+   Every membership is fuzzy and every one is carried to the render. A part is
+   0.7 FLOATING and 0.4 ORPHAN at once, and that is not a contradiction to be
+   resolved before reporting.
+   ========================================================================== */
+const SPECIES = ['NO_DOOR','DOOR_NO_ARRIVAL','BELOW_GRADE','FLOATING','BAD_SUPPORT',
+                 'ORPHAN','EXHAUSTED','BURIED','CONTESTED','UNREACHED_HOT'];
+const SPECIES_NOTE = {
+  NO_DOOR:'no semantic door anywhere in a world large enough to need one',
+  DOOR_NO_ARRIVAL:'a door exists and nothing arrives at it — no stair, path, ramp or step',
+  BELOW_GRADE:'geometry sunk beneath the ground plane',
+  FLOATING:'above grade with nothing underneath it — support checked by looking, not by asking',
+  BAD_SUPPORT:'declares a connection to a part that is not in the world',
+  ORPHAN:'no neighbour on this surface belongs to any other part',
+  EXHAUSTED:'the ants ran out of anywhere better to go — the component ends',
+  BURIED:'every point of this part’s surface is inside some other solid — geometry nothing can ever see',
+  CONTESTED:'the ant stands on surface where the bat’s delay reports air',
+  UNREACHED_HOT:'interesting, and nothing has managed to reach it'
+};
+const SPECIES_COLOR = {
+  NO_DOOR:0xffd166, DOOR_NO_ARRIVAL:0xffa94d, BELOW_GRADE:0x8a7fd8, FLOATING:0xff5b4d,
+  BAD_SUPPORT:0xff8fb0, ORPHAN:0xefbd4d, EXHAUSTED:0xff8f6a, BURIED:0xd85ce5,
+  CONTESTED:0xf3f4f2, UNREACHED_HOT:0x2de2d0
+};
+let partReport=new Map();     // partId -> geometric reading
+let census=null;              // species -> summed membership over parts
+
+/* Support is checked by looking underneath, not by reading a field. The ray
+   goes down from the part's own footprint; what stops it is what holds it up. */
+/* Box-to-box clearance. Attachment must not be a function of how many nodes a
+   part happens to carry: ranked neighbours make a one-node finial read as
+   perfectly attached, because k=7 always returns seven neighbours however far
+   away they are. Contact is a distance. */
+function boxGap(a,b){
+  const dx=Math.max(0,a.min.x-b.max.x,b.min.x-a.max.x);
+  const dy=Math.max(0,a.min.y-b.max.y,b.min.y-a.max.y);
+  const dz=Math.max(0,a.min.z-b.max.z,b.min.z-a.max.z);
+  return Math.sqrt(dx*dx+dy*dy+dz*dz);
+}
+function readPartsGeometrically(){
+  partReport=new Map();
+  const meshes=worldMeshes(); if(!meshes.length)return;
+  const R=state.bounds.radius, gap=Math.max(0.05,R*0.02);
+  const boxes=new Map();
+  for(const m of meshes) boxes.set(m.userData.partId,new THREE.Box3().setFromObject(m));
+  const byPart=new Map();
+  for(const n of NODES){
+    const r=byPart.get(n.partId)||{nodes:[],foreign:0,stalls:0,interior:0,contested:0,unreached:0,minY:Infinity};
+    r.nodes.push(n); r.stalls+=n.stallsHere; r.interior+=n.interior;
+    r.contested+=clamp(n.disagree/4,0,1);
+    if(n.visits===0&&n.interest>1.0)r.unreached++;
+    r.minY=Math.min(r.minY,n.point.y);
+    for(const e of (GRAPH.neighbors[n.i]||[])) if(NODES[e.idx].partId!==n.partId) r.foreign++;
+    byPart.set(n.partId,r);
+  }
+  /* the world-level readings: one door question asked once, of the whole world */
+  const parts=state.house.parts;
+  const idOf=p=>((p.id||'')+' '+(p.role||'')+' '+(p.kind||'')).toLowerCase();
+  const doors=parts.filter(p=>/\b(door|entry|entrance|gate|hatch|airlock)\b/.test(idOf(p)));
+  const arrivals=parts.filter(p=>/\b(stair|step|path|ramp|walk|ladder|porch|landing|deck)\b/.test(idOf(p)));
+  const worldNoDoor = parts.length>4 && doors.length===0 ? 1 : 0;
+  const worldNoArrival = doors.length>0 && arrivals.length===0 ? 1 : 0;
+  const known=new Set(parts.map(p=>p.id));
+
+  for(const p of parts){
+    const r=byPart.get(p.id)||{nodes:[],foreign:0,stalls:0,interior:0,contested:0,unreached:0,minY:0};
+    const n=Math.max(1,r.nodes.length);
+    const mesh=meshes.find(m=>m.userData.partId===p.id);
+    const box=mesh?new THREE.Box3().setFromObject(mesh):null;
+    const minY=box?box.min.y:r.minY;
+
+    /* FLOATING, by looking. Three probes down from the footprint; a part is
+       floating in proportion to how many of them find nothing. */
+    let unheld=0,probes=0;
+    if(box&&minY>gap){
+      const c=box.getCenter(new THREE.Vector3()),sz=box.getSize(new THREE.Vector3());
+      const spots=[[0,0],[-0.34,-0.34],[0.34,0.34]];
+      for(const [ux,uz] of spots){
+        probes++;
+        const o=new THREE.Vector3(c.x+ux*sz.x,minY-gap*0.35,c.z+uz*sz.z);
+        raycaster.set(o,new THREE.Vector3(0,-1,0)); raycaster.far=minY+gap;
+        const hs=raycaster.intersectObjects(meshes.filter(m=>m!==mesh),false);
+        if(!hs.length) unheld++;
+      }
+    }
+    const floating = probes? clamp((unheld/probes)*clamp(minY/(gap*4),0,1),0,1) : 0;
+    const badSupport = (p.connections||[]).length
+      ? clamp((p.connections||[]).filter(c=>!known.has(c)).length/(p.connections||[]).length,0,1) : 0;
+
+    const mem={
+      NO_DOOR: worldNoDoor,
+      DOOR_NO_ARRIVAL: worldNoArrival,
+      BELOW_GRADE: clamp(-(minY+0.25)/Math.max(0.25,R*0.06),0,1),
+      FLOATING: floating,
+      BAD_SUPPORT: badSupport,
+      ORPHAN: 0,
+      EXHAUSTED: clamp((r.stalls/n)/0.35,0,1),
+      BURIED: 0,
+      CONTESTED: clamp((r.contested/n)/0.4,0,1),
+      UNREACHED_HOT: clamp((r.unreached/n)/0.5,0,1)
+    };
+    /* BURIED: this part reads as interior everywhere and outside nowhere.
+       A room with no way in is not a room the linter can see, because the
+       linter never goes inside. */
+    const meanInterior=r.interior/n;
+    let outside=0; for(const q of r.nodes) if(q.interior<0.2) outside++;
+    /* "every node reads as inside" is a claim a two-node part cannot support.
+       Confidence in the reading is part of the reading, so it multiplies in
+       rather than gating it — a small part is weakly buried, not un-buried. */
+    const confidence=clamp(n/8,0,1);
+    mem.BURIED = clamp(meanInterior*2*(1-outside/n),0,1)*confidence;
+
+    const contact=Math.max(0.04,R*0.03);
+    let nearest=Infinity,nearestId=null;
+    if(box) for(const [oid,ob] of boxes){
+      if(oid===p.id)continue;
+      const g2=boxGap(box,ob); if(g2<nearest){nearest=g2;nearestId=oid}
+    }
+    mem.ORPHAN = Number.isFinite(nearest)?clamp(nearest/contact,0,1):1;
+
+    partReport.set(p.id,{id:p.id,role:p.role||'part',kind:p.kind||'box',nodes:n,mem,
+      minY:+((box?minY:0).toFixed(3)),unheld,probes,
+      clearance:Number.isFinite(nearest)?+nearest.toFixed(4):null,nearestPart:nearestId});
+  }
+  census={};
+  for(const sp of SPECIES){
+    let sum=0,worst=null,wv=0;
+    for(const [id,r] of partReport){ sum+=r.mem[sp]; if(r.mem[sp]>wv){wv=r.mem[sp];worst=id} }
+    census[sp]={total:+sum.toFixed(3),worst,worstValue:+wv.toFixed(3),
+      parts:[...partReport.values()].filter(r=>r.mem[sp]>0.15).length};
+  }
+}
+function speciesOfNode(n){
+  const r=partReport.get(n.partId); return r?r.mem:null;
+}
+
+/* ---- the forage prior -----------------------------------------------------
+   What the cave has learned, loaded back in. `value` is how much a species is
+   worth going to look for; `gesture` is what the genie should prefer to do
+   about it. Absent a prior every species is worth 1 and every gesture is
+   neutral — the ants forage naively and the cave fills up from that.
+   -------------------------------------------------------------------------- */
+let PRIOR={source:'none (naive foraging)',speciesValue:{},gestureValue:{},rules:[]};
+function priorValue(sp){ const v=PRIOR.speciesValue[sp]; return v==null?1:v }
+function priorGesture(op){ const v=PRIOR.gestureValue[op]; return v==null?0:v }
+async function loadPrior(){
+  try{
+    const r=await fetch('agora/forage-prior.json',{cache:'no-store'});
+    if(!r.ok) throw new Error('no prior on disk');
+    const j=await r.json(); applyPrior(j,'agora/forage-prior.json');
+  }catch(e){ /* naive foraging is a legitimate state, not an error */ }
+}
+function applyPrior(j,src){
+  PRIOR={source:j.source||src,speciesValue:j.speciesValue||{},gestureValue:j.gestureValue||{},
+         rules:j.rules||[],trainedOn:j.trainedOn,generated:j.generated};
+  $('#prior-src').textContent=PRIOR.source;
+  /* a new prior re-fans the scouts: the whole point of valuing a species is
+     that more ants go looking for it. */
+  if(NODES.length){ readNodesFuzzy(); assignScouts(); }
+  toast('forage prior loaded · scouts re-fanned by value');
+  renderLedger();
+}
+
+/* ---- scouts ---------------------------------------------------------------
+   The ants fan out across the species rather than all chasing the same signal.
+   Each scout is issued an affinity and its own dossier; the assignment is
+   round-robin over the species the prior values most, so the fan-out itself is
+   the thing that gets trained.
+   -------------------------------------------------------------------------- */
+function assignScouts(){
+  const ranked=SPECIES.slice().sort((a,b)=>priorValue(b)-priorValue(a));
+  ants.forEach((a,i)=>{
+    a.affinity=ranked[i%ranked.length];
+    a.dossier={species:a.affinity,found:0,parts:new Map(),firstAt:null};
+  });
+}
+function scoutRecord(ant,node){
+  const mem=speciesOfNode(node); if(!mem)return;
+  const v=mem[ant.affinity]||0;
+  if(v<=0.15)return;
+  ant.dossier.found++;
+  if(ant.dossier.firstAt==null)ant.dossier.firstAt=state.step;
+  const rec=ant.dossier.parts.get(node.partId)||{part:node.partId,hits:0,peak:0};
+  rec.hits++; rec.peak=Math.max(rec.peak,v);
+  ant.dossier.parts.set(node.partId,rec);
+}
+
 /* ============================== GENIE ====================================
    A genie grants exactly what was asked and never what was meant, and the
    third wish is spent undoing the first two. That is focusAttempts:4 in the
@@ -1010,7 +1243,11 @@ function readSignals(){
     attachment:r.foreign/Math.max(1,r.nodes.length*7),
     center:centroid(r.nodes)
   }));
-  S.unattached=S.parts.filter(p=>p.attachment<0.035&&p.n>3).sort((a,b)=>a.attachment-b.attachment)[0]||null;
+  /* unattached now means: nothing else comes within a contact tolerance of it.
+     The old rank-based attachment measured part size, not detachment. */
+  S.parts.forEach(p=>{const r=partReport.get(p.id); p.orphan=r?r.mem.ORPHAN:0;
+    p.clearance=r?r.clearance:null; p.nearestPart=r?r.nearestPart:null});
+  S.unattached=S.parts.filter(p=>p.orphan>0.5).sort((a,b)=>b.orphan-a.orphan)[0]||null;
 
   /* the air the bat measured, which nothing declares */
   const cav=(bat&&bat.cavities||[]).slice(-160).sort((a,b)=>b.r-a.r)[0];
@@ -1044,32 +1281,144 @@ function readSignals(){
   return S;
 }
 
+/* ---- the anti-grind rule --------------------------------------------------
+   The castle session ran three builds on one accusation — 23, 25 and 11 changed
+   parts — and moved the score +2, 0, 0. The corpus contains six repair tests in
+   total and exactly one of them ever weakened the accusation it addressed.
+   So: an operation that was applied to a part last generation and did not
+   reduce that part's reading is not applied again. The refusal is a wish. */
+function ground(op,partId){ return op+':'+partId }
+function grindBlocked(op,partId,species){
+  if(!state.lastOps||!state.lastOps.has(ground(op,partId))) return null;
+  const before=state.lastPartRead&&state.lastPartRead[partId];
+  const now=partReport.get(partId);
+  if(!before||!now) return null;
+  const b=before[species]||0, a=now.mem[species]||0;
+  if(a < b-0.05) return null;                      // it did move: allowed again
+  return 'refusing to repeat '+op+' on '+partId+' — last generation it left '+
+         species+' at '+fx(a,2)+' against '+fx(b,2)+', and this corpus contains one '+
+         'repair in six that ever moved the thing it was aimed at';
+}
+
 function grantWishes(){
   if(!NODES.length) return null;
-  readNodesFuzzy(); scanFrontier();
+  readNodesFuzzy(); scanFrontier(); readPartsGeometrically();
   const S=readSignals(),R=state.bounds.radius;
   const parts=state.house.parts.map(p=>JSON.parse(JSON.stringify(p)));
-  const wishes=[],ops=[];
+  const wishes=[],ops=[],refused=[];
   const nid=k=>k+'-g'+state.generation+'-'+Math.random().toString(36).slice(2,5);
 
   if(S.unattached){
     const me=partById(S.unattached.id);
     const others=S.parts.filter(p=>p.id!==S.unattached.id)
       .sort((a,b)=>a.center.distanceTo(S.unattached.center)-b.center.distanceTo(S.unattached.center));
-    const to=others[0];
+    const to=(S.unattached.nearestPart&&S.parts.find(x=>x.id===S.unattached.nearestPart))||others[0];
     if(me&&to){
-      const a=S.unattached.center,b=to.center,mid=a.clone().add(b).multiplyScalar(0.5);
-      const len=Math.max(0.4,a.distanceTo(b));
-      const dir=b.clone().sub(a).normalize();
-      const q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),dir);
-      const e=new THREE.Euler().setFromQuaternion(q);
-      parts.push({id:nid('member'),kind:'cylinder',position:[mid.x,mid.y,mid.z],
-        size:[Math.max(0.12,R*0.035),len,Math.max(0.12,R*0.035)],
-        rotation:[e.x,e.y,e.z],color:'#b7a26a',role:'structure',
-        opacity:1,metalness:0.1,roughness:0.7,connections:[me.id,partById(to.id)?to.id:null].filter(Boolean)});
-      wishes.push('to be attached — '+me.id+' has attachment '+fx(S.unattached.attachment,3)+
-        ' (almost no neighbour belongs to anything else) and stall density '+fx(S.unattached.stallDensity,2));
-      ops.push({op:'ADD_MEMBER',from:me.id,to:to.id});
+      const a=S.unattached.center,b=to.center;
+      /* RELOCATE before ADD. The one repair in the whole corpus that weakened
+         its own accusation was a relocation of nine parts: the cabin's rear
+         cladding moved from the long wall to the open end, 99 -> 94. Every
+         addition and articulation on a repeated accusation went flat or worse.
+         So the genie moves the thing before it builds a new thing. */
+      const relocate = priorGesture('RELOCATE_ORPHAN') >= priorGesture('ADD_MEMBER');
+      const block=grindBlocked(relocate?'RELOCATE_ORPHAN':'ADD_MEMBER',me.id,'ORPHAN');
+      if(block){ refused.push(block); }
+      else if(relocate){
+        const q=parts.find(x=>x.id===me.id);
+        /* Move exactly the measured clearance, plus a hair. The first version
+           guessed with half-extents and left the pagoda's shrub still orphaned
+           at 1.00 after the move; the clearance is already measured, so use it. */
+        const travel=Math.max(R*0.002,(S.unattached.clearance||0)*1.08);
+        if(q&&travel>R*0.01){
+          const dir=b.clone().sub(a).normalize();
+          const pos=q.position||[0,0,0];
+          q.position=[pos[0]+dir.x*travel,pos[1]+dir.y*travel,pos[2]+dir.z*travel];
+          q.connections=[...new Set([...(q.connections||[]),to.id])];
+          wishes.push('to be where it belongs — nothing comes within '+
+            fx(S.unattached.clearance,2)+'m of '+me.id+', so it is moved '+fx(travel,2)+
+            'm onto '+to.id+' rather than braced to it');
+          ops.push({op:'RELOCATE_ORPHAN',part:me.id,to:to.id,travel:+travel.toFixed(3),species:'ORPHAN'});
+        }
+      } else {
+        const mid=a.clone().add(b).multiplyScalar(0.5);
+        const len=Math.max(0.4,a.distanceTo(b));
+        const dir=b.clone().sub(a).normalize();
+        const qt=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),dir);
+        const e=new THREE.Euler().setFromQuaternion(qt);
+        parts.push({id:nid('member'),kind:'cylinder',position:[mid.x,mid.y,mid.z],
+          size:[Math.max(0.12,R*0.035),len,Math.max(0.12,R*0.035)],
+          rotation:[e.x,e.y,e.z],color:'#b7a26a',role:'structure',
+          opacity:1,metalness:0.1,roughness:0.7,connections:[me.id,to.id]});
+        wishes.push('to be attached — nothing comes within '+fx(S.unattached.clearance,2)+
+          'm of '+me.id);
+        ops.push({op:'ADD_MEMBER',from:me.id,to:to.id,species:'ORPHAN'});
+      }
+    }
+  }
+
+  /* what the reading says about the world as a whole, in the linter's own terms */
+  if(census){
+    if(census.NO_DOOR.total>0.5){
+      const front=S.parts.slice().sort((a,b)=>a.center.z-b.center.z)[0];
+      if(front){
+        const c=front.center,t=Math.max(0.12,R*0.03);
+        parts.push({id:nid('door'),kind:'box',position:[c.x,Math.max(t*4,R*0.16),c.z-R*0.02],
+          size:[R*0.14,R*0.30,t],rotation:[0,0,0],color:'#2b2622',role:'door',
+          opacity:1,metalness:0.05,roughness:0.9,connections:[front.id]});
+        wishes.push('to be enterable at all — '+state.house.parts.length+
+          ' parts and nothing in this world reads as a door');
+        ops.push({op:'ADD_DOOR',near:front.id,species:'NO_DOOR'});
+      }
+    } else if(census.DOOR_NO_ARRIVAL.total>0.5){
+      const d=state.house.parts.find(p=>/door|entry|gate/i.test(p.id+' '+(p.role||'')));
+      if(d){
+        const dp=d.position||[0,0,0];
+        parts.push({id:nid('path'),kind:'box',position:[dp[0],0.06,dp[2]-R*0.22],
+          size:[R*0.18,0.12,R*0.42],rotation:[0,0,0],color:'#6b6660',role:'path',
+          opacity:1,metalness:0,roughness:1,connections:[d.id]});
+        wishes.push('to be arrived at — '+d.id+' exists and nothing reaches it');
+        ops.push({op:'ADD_ARRIVAL',to:d.id,species:'DOOR_NO_ARRIVAL'});
+      }
+    }
+    const buried=[...partReport.values()].sort((a,b)=>b.mem.BURIED-a.mem.BURIED)[0];
+    const bblock=buried?grindBlocked('EXPOSE_BURIED',buried.id,'BURIED'):null;
+    if(bblock) refused.push(bblock);
+    else if(buried&&buried.mem.BURIED>0.55){
+      const q=parts.find(x=>x.id===buried.id);
+      const meshes=worldMeshes();
+      const own=meshes.find(m=>m.userData.partId===buried.id);
+      if(q&&q.position&&own){
+        /* Shrinking a buried part leaves it buried. The first version of this
+           operation did exactly that and the reading went UP by 6.8 and 13.3 on
+           two different buildings — the measurement caught it. So it is moved
+           out instead, which is the one gesture this corpus has seen work.
+           How far out is not a guess: far enough to clear the thing it is
+           inside, and no further. A fraction of the world radius flung a wheel
+           27m into the sky, which is not exposure, it is loss. */
+        const ownBox=new THREE.Box3().setFromObject(own);
+        const c=state.bounds.center, pos=q.position;
+        const here=ownBox.getCenter(new THREE.Vector3());
+        const dir=here.clone().sub(c); if(dir.lengthSq()<1e-6)dir.set(1,0,0); dir.normalize();
+        const support=(b,d)=>{let m=-Infinity;
+          for(const x of [b.min.x,b.max.x])for(const y of [b.min.y,b.max.y])for(const z2 of [b.min.z,b.max.z])
+            m=Math.max(m,x*d.x+y*d.y+z2*d.z); return m};
+        let hostMax=support(ownBox,dir),hostId=null;
+        for(const m of meshes){
+          if(m===own)continue;
+          const b=new THREE.Box3().setFromObject(m);
+          if(!b.intersectsBox(ownBox))continue;
+          const sv=support(b,dir);
+          if(sv>hostMax){hostMax=sv;hostId=m.userData.partId}
+        }
+        const ownMin=-support(ownBox,dir.clone().negate());
+        const needed=hostMax-ownMin+Math.max(0.02,R*0.01);
+        const travel=clamp(needed,R*0.005,R*0.22);
+        q.position=[pos[0]+dir.x*travel,pos[1]+dir.y*travel,pos[2]+dir.z*travel];
+        wishes.push('to be visible at all — every point of '+buried.id+' is inside '+
+          (hostId?hostId:'other solid')+', so it is moved '+fx(travel,2)+'m out — far enough to clear it, no further');
+        ops.push({op:'EXPOSE_BURIED',part:buried.id,travel:+travel.toFixed(3),
+          host:hostId,species:'BURIED'});
+      }
     }
   }
 
@@ -1135,13 +1484,17 @@ function grantWishes(){
     ops.push({op:'BUILD_THE_AMBIGUITY',node:S.disagree.node});
   }
 
-  if(!wishes.length){
+  for(const r of refused) wishes.push('REFUSED: '+r);
+
+  if(!ops.length){
     /* the honest verdict is not a fallthrough here. it is the normal case, and
        its recommendation is the same one classifyInverse buried in an else. */
-    wishes.push('AMBIGUOUS — nothing this house implies is legible yet; acquire another crawl before building');
-    return {wishes,ops,parts:null,signals:S};
+    if(!refused.length)
+      wishes.push('AMBIGUOUS — nothing this house implies is legible yet; acquire another crawl before building');
+    return {wishes,ops,parts:null,signals:S,refused};
   }
-  return {wishes,ops,parts,signals:S};
+  ops.sort((a,b)=>priorGesture(b.op)-priorGesture(a.op));
+  return {wishes,ops,parts,signals:S,refused};
 }
 
 function featureVector(){
@@ -1169,19 +1522,58 @@ function noveltyVsAncestors(f){
   }
   return min;
 }
+function snapshotCensus(){
+  const out={}; if(!census)return out;
+  for(const sp of SPECIES) out[sp]=census[sp].total;
+  return out;
+}
+function snapshotPartRead(){
+  const out={}; for(const [id,r] of partReport) out[id]=Object.assign({},r.mem);
+  return out;
+}
 function runGenie(){
   if(!state.house||!NODES.length){toast('nothing to read yet');return}
   const g=grantWishes();
   if(!g){toast('the genie has nothing to read');return}
   const features=featureVector(), novelty=noveltyVsAncestors(features);
   let thumb=''; try{ thumb=thumbnail(); }catch(e){}
+  const nowCensus=snapshotCensus();
+
+  /* close the previous generation's record with what its operations actually
+     did to the reading. This is the antbats' own temporal difference, measured
+     in their own ledger rather than borrowed from anybody's score. */
+  const prev=state.lineage[state.lineage.length-1];
+  if(prev&&!prev.censusAfter){
+    prev.censusAfter=nowCensus;
+    /* Measured on the part the operation names. A global census sum moves when
+       anything anywhere moves, so it cannot say whether THIS operation did what
+       it was for. World-level species (a door for the whole world) have no part
+       and fall back to the census, which is the right scope for them. */
+    prev.effect=(prev.ops||[]).filter(o=>o.species).map(o=>{
+      const id=o.part||o.from||null;
+      let b,a,scope;
+      if(id&&prev.partReadBefore&&prev.partReadBefore[id]&&partReport.get(id)){
+        b=prev.partReadBefore[id][o.species]; a=partReport.get(id).mem[o.species]; scope='part '+id;
+      }else{
+        b=prev.censusBefore?prev.censusBefore[o.species]:null; a=nowCensus[o.species]; scope='world';
+      }
+      return {op:o.op,species:o.species,part:id,scope,
+        before:b==null?null:+b.toFixed(3), after:a==null?null:+a.toFixed(3),
+        delta:(b==null||a==null)?null:+(a-b).toFixed(3)};
+    });
+  }
 
   state.lineage.push({
     house_id:state.house.id, parent_id:state.house.parent,
-    implied_wish:g.wishes.join(' · '), ops:g.ops,
+    implied_wish:g.wishes.join(' · '), ops:g.ops, refused:g.refused||[],
     novelty:+novelty.toFixed(3), features, thumb, generation:state.generation,
-    step:state.step
+    step:state.step, censusBefore:nowCensus, partReadBefore:snapshotPartRead(),
+    scouts:ants.filter(a=>a.dossier).map(a=>({species:a.affinity,found:a.dossier.found,
+      firstAt:a.dossier.firstAt,
+      parts:[...a.dossier.parts.values()].sort((x,y)=>y.peak-x.peak).slice(0,4)}))
   });
+  state.lastOps=new Set(g.ops.map(o=>ground(o.op,o.part||o.from||o.near||o.to||'')));
+  state.lastPartRead=snapshotPartRead();
 
   showWish(g.wishes,novelty);
 
@@ -1222,7 +1614,10 @@ function respawn(keepLineage){
   state.ledger.frontier=new Map(); state.ledger.disagree=new Map();
   state.trailSeg=[];
   readNodesFuzzy();
+  readPartsGeometrically();
+  readNodesFuzzy();
   makeAnts(state.antCount);
+  assignScouts();
   buildOccupancy(); buildNodeHash(); makeBat();
   initFx();
   if(!keepLineage) state.lineage=[];
@@ -1233,6 +1628,7 @@ function tick(){
   for(const a of ants) antStep(a);
   decayLabels();
   if(state.batOn) batTick();
+  if(state.step%17===0) readPartsGeometrically();
   if(state.step%9===0)  readNodesFuzzy();
   if(state.step%23===0) scanFrontier();
   /* the ants teach the model the bat argues with, but only where they stood */
@@ -1269,6 +1665,8 @@ function updateHud(){
   $('#n-parity').textContent=state.ledger.parity.length;
   $('#n-stalls').textContent=state.ledger.stalls.length;
   $('#n-disagree').textContent=state.ledger.disagree.size;
+  $('#n-species').textContent=census?SPECIES.filter(k=>census[k].total>0.15).length:0;
+  $('#n-scouts').textContent=ants.filter(a=>a.dossier&&a.dossier.found).length;
   $('#n-lineage').textContent=state.lineage.length;
 }
 function memBar(label,v,cls){
@@ -1381,6 +1779,45 @@ const TABS={
       'ant: solid · bat: air <u>last step '+d.lastStep+'</u>');
     return h;
   },
+  species(){
+    let h='<div class="note">How the antbats <strong>read</strong> a building. Six species are the brutal loop’s own '+
+      'deterministic linters — the ones that need no model and no reference. Three of those are declaration checks in '+
+      'the original (<code>supportId</code>, object existence) and are re-derived here by <strong>looking</strong>, because an '+
+      'imported correspondence scene carries <code>connections</code> and no <code>supportId</code> at all: an ant does not ask a '+
+      'part whether it is held up, it probes underneath. Four more are native to these instruments, because a linter cannot walk.</div>';
+    if(!census){ h+='<div class="note">nothing read yet.</div>'; return h }
+    for(const sp of SPECIES){
+      const c=census[sp];
+      h+=row(fx(c.total,2),'<span class="tag c-front">'+sp+'</span>'+
+        esc(SPECIES_NOTE[sp])+'<u> · '+c.parts+' parts carry it'+
+        (c.worst?' · worst '+esc(c.worst)+' at '+fx(c.worstValue,2):'')+'</u>'+
+        memBar('value to forage',clamp(priorValue(sp)/2,0,1),'c-genie'));
+    }
+    h+='<div class="note">Per-part reading:</div>';
+    for(const r of [...partReport.values()].sort((a,b)=>
+        Math.max(...Object.values(b.mem))-Math.max(...Object.values(a.mem))).slice(0,26)){
+      const live=Object.entries(r.mem).filter(([,v])=>v>0.15).sort((a,b)=>b[1]-a[1]);
+      if(!live.length)continue;
+      h+=row(esc(r.kind),'<span class="tag c-dim">'+esc(r.id)+'</span>'+
+        live.map(([k,v])=>'<span class="tag c-front">'+k+' '+fx(v,2)+'</span>').join('')+
+        '<u> · '+r.nodes+' nodes · minY '+fx(r.minY,2)+
+        (r.probes?' · '+r.unheld+'/'+r.probes+' probes found nothing underneath':'')+'</u>');
+    }
+    return h;
+  },
+  scouts(){
+    let h='<div class="note"><strong>scouts</strong> fan out across the species instead of all chasing one signal. '+
+      'Each ant is issued an affinity — round-robin over whatever the cave values most — and keeps its own dossier. '+
+      'The fan-out is the thing that gets trained: a prior that values a species sends more ants to look for it.</div>';
+    for(const a of ants){
+      if(!a.dossier)continue;
+      const top=[...a.dossier.parts.values()].sort((x,y)=>y.peak-x.peak).slice(0,3);
+      h+=row(esc(a.id),'<span class="tag c-front">'+esc(a.affinity)+'</span>'+
+        a.dossier.found+' sightings'+(a.dossier.firstAt!=null?' · first at step '+a.dossier.firstAt:' · nothing yet')+
+        (top.length?'<u> · '+top.map(t=>esc(t.part)+' ('+fx(t.peak,2)+')').join(' · ')+'</u>':''));
+    }
+    return h;
+  },
   lineage(){
     let h='<div class="note"><strong>lineage</strong> is the genie’s memory. Novelty is measured against this house’s own '+
       'ancestors and never against anything outside it. It is recorded, not thresholded — there is nothing in this program '+
@@ -1389,9 +1826,19 @@ const TABS={
       '<div class="lin'+(i===state.lineage.length-1?' on':'')+'">'+
       (l.thumb?'<img src="'+l.thumb+'">':'<img>')+
       '<b>gen '+l.generation+'</b><i>nov '+fx(l.novelty,2)+'</i></div>').join('')+'</div>';
-    for(const l of [...state.lineage].reverse())
+    for(const l of [...state.lineage].reverse()){
       h+=row('gen '+l.generation,'<span class="tag c-genie">wish</span>'+esc(l.implied_wish)+
         '<u> · '+l.ops.map(o=>o.op).join(', ')+' · novelty '+fx(l.novelty,3)+'</u>');
+      if(l.effect&&l.effect.length)
+        for(const e of l.effect)
+          h+=row('effect','<span class="tag '+(e.delta<0?'c-genie':'c-clash')+'">'+e.op+'</span>'+
+            e.species+' on '+esc(e.scope||'world')+' '+fx(e.before,2)+' → '+fx(e.after,2)+
+            ' <b>'+(e.delta==null?'—':(e.delta>0?'+':'')+fx(e.delta,2))+'</b>'+
+            (e.delta<0?' · the operation moved the thing it was aimed at':
+             e.delta>0?' · it went the other way':' · nothing moved'));
+      if(l.refused&&l.refused.length)
+        for(const r of l.refused) h+=row('refused','<span class="tag c-front">anti-grind</span>'+esc(r));
+    }
     if(!state.lineage.length)h+='<div class="note">no generations yet — ask the genie what this house implies.</div>';
     return h;
   },
@@ -1441,7 +1888,7 @@ function wire(){
     const opts=[4,10,18,28];
     state.antCount=opts[(opts.indexOf(state.antCount)+1)%opts.length];
     $('#btn-ants').textContent='Ants '+state.antCount;
-    makeAnts(state.antCount); initFx();
+    makeAnts(state.antCount); assignScouts(); initFx();
   });
   $('#btn-view').addEventListener('click',()=>{
     const R=state.bounds.radius;
@@ -1460,6 +1907,12 @@ function wire(){
     respawn(false); toast('seeded — a house with things worth finding in it');
   });
   $('#btn-export').addEventListener('click',exportRun);
+  $('#prior-in').addEventListener('change',e=>{
+    const f=e.target.files&&e.target.files[0]; if(!f)return;
+    const r=new FileReader();
+    r.onload=()=>{ try{ applyPrior(JSON.parse(r.result),f.name) }catch(err){ toast('bad prior: '+err.message) } };
+    r.readAsText(f); e.target.value='';
+  });
   $('#file-in').addEventListener('change',e=>{
     const f=e.target.files&&e.target.files[0]; if(!f)return;
     const r=new FileReader();
@@ -1500,8 +1953,17 @@ function importPayload(d,name){
 }
 function exportRun(){
   const payload={
-    program:'antbat-genie', exportedAt:nowISO(),
+    program:'antbat-genie', kind:'dossier', exportedAt:nowISO(),
     generation:state.generation, step:state.step, halfLife:+HALF_LIFE.toFixed(3),
+    priorUsed:PRIOR.source,
+    reading:{
+      census:census?Object.fromEntries(SPECIES.map(k=>[k,census[k]])):null,
+      parts:[...partReport.values()].map(r=>({id:r.id,role:r.role,kind:r.kind,nodes:r.nodes,
+        minY:r.minY,mem:Object.fromEntries(Object.entries(r.mem).filter(([,v])=>v>0.02)
+          .map(([k,v])=>[k,+v.toFixed(3)]))}))
+    },
+    scouts:ants.filter(a=>a.dossier).map(a=>({species:a.affinity,found:a.dossier.found,
+      firstAt:a.dossier.firstAt,parts:[...a.dossier.parts.values()]})),
     house:state.house,
     lineage:state.lineage.map(l=>({...l,thumb:undefined})),
     ledger:{
@@ -1520,9 +1982,9 @@ function exportRun(){
   const blob=new Blob([JSON.stringify(payload,null,1)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download='antbat-'+nowISO().replace(/[:.]/g,'')+'.json';
+  a.download='antbat-dossier-'+nowISO().replace(/[:.]/g,'')+'.json';
   a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
-  toast('exported ledger + lineage · no score in the file');
+  toast('dossier exported · drop it into agora-cave.html to teach the next ants');
 }
 
 /* ------------------------------ init ------------------------------------- */
@@ -1533,6 +1995,7 @@ function init(){
   state.house=seedHouse();
   respawn(false);
   $('#boot').classList.add('gone');
+  loadPrior();
   frame();
   toast('no score in this program · ask the genie what the house implies');
 }

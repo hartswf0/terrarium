@@ -86,6 +86,8 @@ node tests/audit-geometry.mjs
 
 ## Project map
 
+- `antbat-genie.html` — ant / bat / genie defect foraging over a building; no score, no target, no critic (theory: `ANTBAT-GENIE.md`)
+- `agora-cave.html` — the commons where antbat studies accumulate and the forage prior is trained (`agora/`)
 - `index.html` — sendable project landing page
 - `TERRARIUM.html` — self-contained Terrarium build
 - `unset-04-hartsoe-iii.html` — host-authoritative WebRTC build; Supabase Realtime is signaling only

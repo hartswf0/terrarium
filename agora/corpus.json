@@ -1,0 +1,1068 @@
+{
+ "built": "from four correspondence exports 2026-08-19T01:59Z..03:04Z",
+ "sessions": [
+  {
+   "name": "pagoda",
+   "exported": "01:59Z",
+   "reference": "1000061609.png",
+   "threshold": 15,
+   "finalSuck": 96,
+   "cycles": 7,
+   "parts": 92,
+   "connections": 0,
+   "locked": 3,
+   "focusAttempts": null,
+   "repeatSimilarity": null,
+   "escalationCount": null,
+   "machinery": {
+    "focus": false,
+    "cameraRotation": false,
+    "targetedBuild": false
+   },
+   "roles": [
+    "balcony",
+    "curved-roof",
+    "deep-eave",
+    "double-door",
+    "finial",
+    "foundation",
+    "gold-ridge",
+    "landscape",
+    "lattice-door",
+    "lattice-window",
+    "path",
+    "railing",
+    "railing-post",
+    "raised-corner",
+    "rock",
+    "shrub",
+    "stairs",
+    "stone-lantern",
+    "tapered-enclosure",
+    "terrace",
+    "timber-beam",
+    "timber-post",
+    "tree"
+   ],
+   "kinds": [
+    "box",
+    "cone",
+    "cylinder",
+    "sphere"
+   ],
+   "cyclesLog": [
+    {
+     "cycle": 3,
+     "mode": "BUILD",
+     "view": "front 3/4",
+     "state": "LOCKED",
+     "focus": "(whole world)",
+     "suck": 96,
+     "killer": "This barely reads as the reference pagoda: three huge, flat polygonal roof slabs smother the undersized wall tiers, with no graceful slopes, deep curved eaves, raised corners, or ridge detailing. The stacked-house proportions and taper are wrong, the fa\u00e7ade\u2019s doors, windows, posts, balconies, railings, and entrance stairs are absent, and the base inexplicably resembles a wheeled cart. The entire landscaped island, path, rocks, trees, and lanterns is missing.",
+     "build": {
+      "changed": null,
+      "whole": true,
+      "summary": "whole-world rebuild"
+     }
+    },
+    {
+     "cycle": 4,
+     "mode": "BUILD",
+     "view": "front 3/4",
+     "state": "LOCKED",
+     "focus": "(whole world)",
+     "suck": 88,
+     "killer": "The pagoda is a crude stack of box fa\u00e7ades under thin, nearly flat roof plates; the deep curved eaves, raised corners, gold ridges, finial, and elegant taper are absent, and the top is visibly cropped. Blank brown rectangles replace all doors, lattice windows, posts, and trim, while the sparse railings look disconnected. The broad entrance platform and stairs are blocky and poorly integrated. The island is an empty slab with only two cone trees, two boulders, and two crude lanterns, missing the reference\u2019s path, dense landscaping, rocks, shrubs, and balanced composition.",
+     "build": {
+      "changed": null,
+      "whole": true,
+      "summary": "whole-world rebuild"
+     }
+    },
+    {
+     "cycle": 5,
+     "mode": "BUILD",
+     "view": "front 3/4",
+     "state": "LOCKED",
+     "focus": "(whole world)",
+     "suck": 93,
+     "killer": "The pagoda is tiny, washed out, and visually lost in a huge empty frame. Its tiers read as narrow floating boxes separated by thin flat plates rather than a substantial tapered tower with deep curved eaves; the roof corners, ridges, finial, wall detailing, windows, doors, posts, and railings are crude or missing. The entrance stairs and platform look fragmented, while the undersized island has sparse cone trees and blobs instead of the reference\u2019s dense, balanced rocks, shrubs, lanterns, and path.",
+     "build": {
+      "changed": null,
+      "whole": true,
+      "summary": "whole-world rebuild"
+     }
+    },
+    {
+     "cycle": 6,
+     "mode": "BUILD",
+     "view": "front 3/4",
+     "state": "LOCKED",
+     "focus": "(whole world)",
+     "suck": 96,
+     "killer": "The tower is a blunt stack of oversized blank boxes with nearly flat roof plates, lacking the reference\u2019s elegant taper, deep curved eaves, raised corners, gold ridges, and complete finial. Floating gold rods and balls are disconnected nonsense. Doors, lattice windows, posts, trim, side balconies, and coherent railings are absent or crude. The stairs meet a fragmented base, while the island is a barren clipped platform with a few blob shrubs, cone trees, and rocks instead of the dense path, lanterns, and balanced landscaping. The near-flat frontal view and cropped top further destroy the reference\u2019s readable silhouette.",
+     "build": {
+      "changed": null,
+      "whole": true,
+      "summary": "whole-world rebuild"
+     }
+    }
+   ],
+   "transitions": [
+    {
+     "from_cycle": 3,
+     "to_cycle": 4,
+     "gesture": "OTHER",
+     "changed": null,
+     "whole": true,
+     "focus_before": "(whole world)",
+     "focus_after": "(whole world)",
+     "focus_repeated": true,
+     "suck_before": 96,
+     "suck_after": 88,
+     "delta": -8,
+     "summary": "whole-world rebuild"
+    },
+    {
+     "from_cycle": 4,
+     "to_cycle": 5,
+     "gesture": "OTHER",
+     "changed": null,
+     "whole": true,
+     "focus_before": "(whole world)",
+     "focus_after": "(whole world)",
+     "focus_repeated": true,
+     "suck_before": 88,
+     "suck_after": 93,
+     "delta": 5,
+     "summary": "whole-world rebuild"
+    },
+    {
+     "from_cycle": 5,
+     "to_cycle": 6,
+     "gesture": "OTHER",
+     "changed": null,
+     "whole": true,
+     "focus_before": "(whole world)",
+     "focus_after": "(whole world)",
+     "focus_repeated": true,
+     "suck_before": 93,
+     "suck_after": 96,
+     "delta": 3,
+     "summary": "whole-world rebuild"
+    }
+   ]
+  },
+  {
+   "name": "lander",
+   "exported": "02:31Z",
+   "reference": "1000061400.png",
+   "threshold": 15,
+   "finalSuck": 99,
+   "cycles": 16,
+   "parts": 81,
+   "connections": 173,
+   "locked": 9,
+   "focusAttempts": 1,
+   "repeatSimilarity": null,
+   "escalationCount": null,
+   "machinery": {
+    "focus": true,
+    "cameraRotation": true,
+    "targetedBuild": true
+   },
+   "roles": [
+    "antenna-dish",
+    "antenna-feed",
+    "antenna-mount",
+    "antenna-support",
+    "brace",
+    "cabin-panel",
+    "chassis",
+    "crew-pod",
+    "descent-stage",
+    "descent-stage-brace",
+    "descent-stage-frame",
+    "descent-stage-platform",
+    "egress-platform",
+    "engine",
+    "equipment",
+    "equipment-bay",
+    "equipment-bay-frame",
+    "equipment-canister",
+    "equipment-mount",
+    "equipment-recess-brace",
+    "faceted-blanket-corner",
+    "faceted-rear-shell-panel",
+    "footpad",
+    "footpad-ankle",
+    "ladder-leg-brace-tie",
+    "ladder-mount",
+    "ladder-rail",
+    "ladder-rung",
+    "landing-leg",
+    "rear-bay-frame",
+    "rear-longitudinal-brace",
+    "rear-triangular-brace",
+    "recess-equipment-box",
+    "recessed-equipment-bay",
+    "roof",
+    "structure",
+    "thermal-blanket-bay",
+    "viewport"
+   ],
+   "kinds": [
+    "box",
+    "cone",
+    "cylinder",
+    "extrude"
+   ],
+   "cyclesLog": [
+    {
+     "cycle": 1,
+     "mode": "BUILD",
+     "view": "front 3/4",
+     "state": "SURVIVED",
+     "focus": "Crew cabin and viewports",
+     "suck": 10,
+     "killer": "The crew pod is a tall, smooth, nearly featureless cylinder with no legible viewports. The reference establishes a squat, irregular faceted cabin dominated by large dark angular windows. This destroys the lander\u2019s most recognizable silhouette and makes the upper stage read as a generic silo.",
+     "build": {
+      "changed": 29,
+      "whole": false,
+      "summary": "Initial lunar lander pod added atop the locked trailer deck."
+     }
+    },
+    {
+     "cycle": 2,
+     "mode": "LOOK",
+     "view": "left side",
+     "state": "SURVIVED",
+     "focus": "Landing-leg assembly",
+     "suck": 9,
+     "killer": "The legs are thin, nearly horizontal spokes that leave the descent stage squatting close to the ground. The reference has four tall, steeply splayed, triangulated landing legs that elevate and visually support the craft. This collapses the lander\u2019s characteristic wide, high-clearance stance.",
+     "build": null
+    },
+    {
+     "cycle": 3,
+     "mode": "LOOK",
+     "view": "rear 3/4",
+     "state": "SURVIVED",
+     "focus": "Descent stage body",
+     "suck": 9,
+     "killer": "The descent stage is a smooth, solid yellow drum with clean dark bands and no visible engine depth. The reference establishes a broad, faceted black-and-gold foil structure with exposed framing and a prominent central engine housing. This sterile cylindrical mass erases the lander\u2019s mechanical lower-stage character.",
+     "build": null
+    },
+    {
+     "cycle": 4,
+     "mode": "LOOK",
+     "view": "rear",
+     "state": "LOCKED",
+     "focus": "Ladder assembly",
+     "suck": 94,
+     "killer": "The ladder is a pair of detached, rungless rails projecting absurdly far toward the camera. The reference establishes a compact ladder integrated beside the cabin and landing gear. This oversized floating assembly dominates the rear view and destroys the lander\u2019s scale and access logic.",
+     "build": null
+    },
+    {
+     "cycle": 5,
+     "mode": "BUILD",
+     "view": "rear",
+     "state": "LOCKED",
+     "focus": "Roof antenna assembly",
+     "suck": 88,
+     "killer": "The roof equipment is a bare rectangular block topped by an oversized arrow-like spike, with no legible dish. The reference establishes a compact, irregular equipment cluster with a small angled antenna. This crude vertical ornament badly distorts the lander\u2019s upper silhouette and reads as a signpost rather than spacecraft hardware.",
+     "build": {
+      "changed": 7,
+      "whole": false,
+      "summary": "Rebuilt the ladder as a compact rear access ladder directly below the cabin door, with visible rungs and shell mounting brackets."
+     }
+    },
+    {
+     "cycle": 6,
+     "mode": "BUILD",
+     "view": "rear",
+     "state": "LOCKED",
+     "focus": "Crew cabin body",
+     "suck": 92,
+     "killer": "The upper stage is a tall, smooth gray cylinder with a flat dark collar, reading like a storage tank. The reference establishes a squat, irregular, faceted cabin assembled from angular panels and projecting bays. This destroys the lunar module\u2019s defining geometric silhouette and makes the entire craft look generically cylindrical.",
+     "build": {
+      "changed": 7,
+      "whole": false,
+      "summary": "Rebuilt the roof equipment as a compact asymmetric hardware cluster with a small rear-facing angled dish."
+     }
+    },
+    {
+     "cycle": 7,
+     "mode": "BUILD",
+     "view": "rear",
+     "state": "LOCKED",
+     "focus": "Rear landing gear assembly",
+     "suck": 96,
+     "killer": "The rear landing gear reads as oversized black wheels hanging beside a thin horizontal spoke. The reference establishes a wide, splayed triangular strut assembly terminating in a flat ground pad. This wheel-like geometry obliterates the lander\u2019s characteristic four-legged stance and makes it resemble a crude cart.",
+     "build": {
+      "changed": 10,
+      "whole": false,
+      "summary": "Rebuilt the crew cabin as a squat, angular pressure cabin with chamfered panels and a projecting rear access bay."
+     }
+    },
+    {
+     "cycle": 8,
+     "mode": "BUILD",
+     "view": "rear",
+     "state": "LOCKED",
+     "focus": "Descent stage body",
+     "suck": 95,
+     "killer": "The descent stage is a smooth cylindrical drum with a flat collar and uniform gold band. The reference establishes a broad, angular, foil-wrapped platform with distinct faceted bays and structural framing. This featureless barrel erases the lander\u2019s load-bearing base geometry and makes the craft read as stacked tanks.",
+     "build": {
+      "changed": 5,
+      "whole": false,
+      "summary": "Rebuilt the rear gear as a long splayed landing leg with a broad flat pad and visible triangular bracing."
+     }
+    },
+    {
+     "cycle": 9,
+     "mode": "BUILD",
+     "view": "rear",
+     "state": "LOCKED",
+     "focus": "Rear ladder assembly",
+     "suck": 91,
+     "killer": "The ladder hangs vertically through the center of the rear silhouette like a freestanding household ladder. The reference establishes a compact egress ladder integrated with the cabin platform and landing-leg structure. Its exposed central placement clutters the undercarriage and destroys the lander\u2019s credible structural hierarchy.",
+     "build": {
+      "changed": 15,
+      "whole": false,
+      "summary": "Rebuilt the descent stage as a broad angular foil-wrapped platform with discrete bays, chamfered corners, and visible rear structural framing."
+     }
+    },
+    {
+     "cycle": 10,
+     "mode": "BUILD",
+     "view": "rear",
+     "state": "LOCKED",
+     "focus": "Rear descent-stage face",
+     "suck": 89,
+     "killer": "The rear descent stage reads as a plain rectangular gold box with weak, nearly absent framing. The reference establishes a broad faceted foil-wrapped base divided into distinct bays by a prominent dark structural cage. Losing that depth and subdivision makes the lander\u2019s main load-bearing stage look like a featureless crate.",
+     "build": {
+      "changed": 9,
+      "whole": false,
+      "summary": "Shifted the ladder to the rear-left platform edge, shortened and inclined it, and tied it into the platform and rear-leg brace."
+     }
+    },
+    {
+     "cycle": 11,
+     "mode": "BUILD",
+     "view": "rear",
+     "state": "LOCKED",
+     "focus": "Rear cabin access bay",
+     "suck": 91,
+     "killer": "The rear cabin is dominated by a huge solid octagonal plug framed by bulky vertical slabs. The reference establishes a faceted, irregular ascent-stage rear with a deep dark equipment recess and exposed structure. This oversized sealed boss destroys the cabin\u2019s recognizable angular architecture and makes it read as a crude hatch housing.",
+     "build": {
+      "changed": 16,
+      "whole": false,
+      "summary": "Rebuilt the rear descent-stage face as three recessed bays within a thick dark structural cage, with faceted foil corners and crossed side-bay bracing."
+     }
+    },
+    {
+     "cycle": 12,
+     "mode": "BUILD",
+     "view": "rear",
+     "state": "LOCKED",
+     "focus": "Longitudinal footpads",
+     "suck": 94,
+     "killer": "The front and rear footpads appear as huge upright dark discs, reading as wheels beneath the lander. The reference establishes four flat, horizontal circular pads planted on the ground beneath splayed legs. Their vertical orientation fundamentally breaks the landing-gear silhouette and makes the craft look wheeled.",
+     "build": {
+      "changed": 13,
+      "whole": false,
+      "summary": "Opened the oversized rear plug into a dark angular equipment recess with thin faceted side panels and exposed internal bracing."
+     }
+    },
+    {
+     "cycle": 13,
+     "mode": "BUILD",
+     "view": "rear",
+     "state": "LOCKED",
+     "focus": "Longitudinal footpads",
+     "suck": 97,
+     "killer": "The front and rear footpads remain enormous upright black discs hanging in the foreground like wheels. The reference establishes small, flat pads planted horizontally beneath splayed legs. Their scale, orientation, and detachment still catastrophically break the landing-gear silhouette.",
+     "build": {
+      "changed": 2,
+      "whole": false,
+      "summary": "Flattened and lowered the longitudinal footpads into thin horizontal ground-contact discs, with consistent gold landing-gear finish."
+     }
+    },
+    {
+     "cycle": 14,
+     "mode": "BUILD",
+     "view": "right side",
+     "state": "LOCKED",
+     "focus": "Longitudinal footpads",
+     "suck": 98,
+     "killer": "The front and rear footpads still read as enormous detached upright black wheels. The reference shows compact circular pads lying flat on the ground beneath their legs. Their orientation, scale, and separation catastrophically corrupt the landing-gear silhouette.",
+     "build": {
+      "changed": 4,
+      "whole": false,
+      "summary": "Reduced both longitudinal pads to thin, horizontal ground-contact discs and moved them directly beneath their leg endpoints; added compact ankle joints to eliminate visible detachment."
+     }
+    },
+    {
+     "cycle": 15,
+     "mode": "BUILD",
+     "view": "front",
+     "state": "LOCKED",
+     "focus": "Landing-leg assembly",
+     "suck": 99,
+     "killer": "The landing legs read as a chaotic set of disconnected gold rods, several terminating in midair or crossing the base without supporting it. The reference establishes four strong, symmetric, outward-splayed legs carrying the lander to grounded pads. This broken assembly eliminates the lander\u2019s defining stance and makes the body appear perched on an unrelated platform.",
+     "build": {
+      "changed": 4,
+      "whole": false,
+      "summary": "Made both longitudinal footpads compact, thin, horizontal ground-contact discs and tightened their ankle connections."
+     }
+    }
+   ],
+   "transitions": [
+    {
+     "from_cycle": 4,
+     "to_cycle": 5,
+     "gesture": "REBUILD",
+     "changed": 7,
+     "whole": false,
+     "focus_before": "Ladder assembly",
+     "focus_after": "Roof antenna assembly",
+     "focus_repeated": false,
+     "suck_before": 94,
+     "suck_after": 88,
+     "delta": -6,
+     "summary": "Rebuilt the ladder as a compact rear access ladder directly below the cabin door, with visible rungs and shell mounting brackets."
+    },
+    {
+     "from_cycle": 5,
+     "to_cycle": 6,
+     "gesture": "REBUILD",
+     "changed": 7,
+     "whole": false,
+     "focus_before": "Roof antenna assembly",
+     "focus_after": "Crew cabin body",
+     "focus_repeated": false,
+     "suck_before": 88,
+     "suck_after": 92,
+     "delta": 4,
+     "summary": "Rebuilt the roof equipment as a compact asymmetric hardware cluster with a small rear-facing angled dish."
+    },
+    {
+     "from_cycle": 6,
+     "to_cycle": 7,
+     "gesture": "REBUILD",
+     "changed": 10,
+     "whole": false,
+     "focus_before": "Crew cabin body",
+     "focus_after": "Rear landing gear assembly",
+     "focus_repeated": false,
+     "suck_before": 92,
+     "suck_after": 96,
+     "delta": 4,
+     "summary": "Rebuilt the crew cabin as a squat, angular pressure cabin with chamfered panels and a projecting rear access bay."
+    },
+    {
+     "from_cycle": 7,
+     "to_cycle": 8,
+     "gesture": "REBUILD",
+     "changed": 5,
+     "whole": false,
+     "focus_before": "Rear landing gear assembly",
+     "focus_after": "Descent stage body",
+     "focus_repeated": false,
+     "suck_before": 96,
+     "suck_after": 95,
+     "delta": -1,
+     "summary": "Rebuilt the rear gear as a long splayed landing leg with a broad flat pad and visible triangular bracing."
+    },
+    {
+     "from_cycle": 8,
+     "to_cycle": 9,
+     "gesture": "REBUILD",
+     "changed": 15,
+     "whole": false,
+     "focus_before": "Descent stage body",
+     "focus_after": "Rear ladder assembly",
+     "focus_repeated": false,
+     "suck_before": 95,
+     "suck_after": 91,
+     "delta": -4,
+     "summary": "Rebuilt the descent stage as a broad angular foil-wrapped platform with discrete bays, chamfered corners, and visible rear structural framing."
+    },
+    {
+     "from_cycle": 9,
+     "to_cycle": 10,
+     "gesture": "RELOCATE",
+     "changed": 9,
+     "whole": false,
+     "focus_before": "Rear ladder assembly",
+     "focus_after": "Rear descent-stage face",
+     "focus_repeated": false,
+     "suck_before": 91,
+     "suck_after": 89,
+     "delta": -2,
+     "summary": "Shifted the ladder to the rear-left platform edge, shortened and inclined it, and tied it into the platform and rear-leg brace."
+    },
+    {
+     "from_cycle": 10,
+     "to_cycle": 11,
+     "gesture": "REBUILD",
+     "changed": 16,
+     "whole": false,
+     "focus_before": "Rear descent-stage face",
+     "focus_after": "Rear cabin access bay",
+     "focus_repeated": false,
+     "suck_before": 89,
+     "suck_after": 91,
+     "delta": 2,
+     "summary": "Rebuilt the rear descent-stage face as three recessed bays within a thick dark structural cage, with faceted foil corners and crossed side-bay bracing."
+    },
+    {
+     "from_cycle": 11,
+     "to_cycle": 12,
+     "gesture": "ENCLOSE",
+     "changed": 13,
+     "whole": false,
+     "focus_before": "Rear cabin access bay",
+     "focus_after": "Longitudinal footpads",
+     "focus_repeated": false,
+     "suck_before": 91,
+     "suck_after": 94,
+     "delta": 3,
+     "summary": "Opened the oversized rear plug into a dark angular equipment recess with thin faceted side panels and exposed internal bracing."
+    },
+    {
+     "from_cycle": 12,
+     "to_cycle": 13,
+     "gesture": "RESIZE",
+     "changed": 2,
+     "whole": false,
+     "focus_before": "Longitudinal footpads",
+     "focus_after": "Longitudinal footpads",
+     "focus_repeated": true,
+     "suck_before": 94,
+     "suck_after": 97,
+     "delta": 3,
+     "summary": "Flattened and lowered the longitudinal footpads into thin horizontal ground-contact discs, with consistent gold landing-gear finish."
+    },
+    {
+     "from_cycle": 13,
+     "to_cycle": 14,
+     "gesture": "RELOCATE",
+     "changed": 4,
+     "whole": false,
+     "focus_before": "Longitudinal footpads",
+     "focus_after": "Longitudinal footpads",
+     "focus_repeated": true,
+     "suck_before": 97,
+     "suck_after": 98,
+     "delta": 1,
+     "summary": "Reduced both longitudinal pads to thin, horizontal ground-contact discs and moved them directly beneath their leg endpoints; added compact ankle joints to eliminate visible detachm"
+    },
+    {
+     "from_cycle": 14,
+     "to_cycle": 15,
+     "gesture": "RESIZE",
+     "changed": 4,
+     "whole": false,
+     "focus_before": "Longitudinal footpads",
+     "focus_after": "Landing-leg assembly",
+     "focus_repeated": false,
+     "suck_before": 98,
+     "suck_after": 99,
+     "delta": 1,
+     "summary": "Made both longitudinal footpads compact, thin, horizontal ground-contact discs and tightened their ankle connections."
+    }
+   ]
+  },
+  {
+   "name": "castle",
+   "exported": "02:57Z",
+   "reference": "1000061413.png",
+   "threshold": 15,
+   "finalSuck": 100,
+   "cycles": 6,
+   "parts": 46,
+   "connections": 60,
+   "locked": 9,
+   "focusAttempts": 4,
+   "repeatSimilarity": 0.23636363636363636,
+   "escalationCount": 0,
+   "machinery": {
+    "focus": true,
+    "cameraRotation": true,
+    "targetedBuild": true
+   },
+   "roles": [
+    "armor rivet",
+    "asymmetrical flared furnace cheek armor",
+    "asymmetrical hull armor plate",
+    "asymmetrical hull repair plate",
+    "belt rivet",
+    "brow rivet",
+    "chassis",
+    "faceted asymmetrical lower castle hull",
+    "flared furnace cheek armor",
+    "furnace mouth jamb",
+    "furnace tooth",
+    "heavy furnace lower jaw",
+    "heavy furnace upper jaw",
+    "lower armor seam",
+    "offset hull armor plate",
+    "projecting armored furnace brow",
+    "projecting faceted riveted furnace face",
+    "recessed armored hull belt",
+    "recessed furnace maw cavity",
+    "repair plate rivet",
+    "structure",
+    "support cradle"
+   ],
+   "kinds": [
+    "box",
+    "cone",
+    "cylinder",
+    "extrude",
+    "sphere"
+   ],
+   "cyclesLog": [
+    {
+     "cycle": 1,
+     "mode": "BUILD",
+     "view": "front 3/4",
+     "state": "SURVIVED",
+     "focus": "lower hull and furnace face",
+     "suck": 10,
+     "killer": "The entire belly reads as an overexposed yellow blob with no legible armor, banding, platework, or mouth. The reference establishes a dark, riveted, rusted hull dominated by a deep toothed furnace maw. Losing that face destroys the castle\u2019s mechanical identity and primary front silhouette.",
+     "build": {
+      "changed": 6,
+      "whole": false,
+      "summary": "Bootstrap tranche: established the castle\u2019s lower mechanical belly and its supporting cradle on the locked chassis."
+     }
+    },
+    {
+     "cycle": 2,
+     "mode": "LOOK",
+     "view": "left side",
+     "state": "LOCKED",
+     "focus": "lower hull furnace face",
+     "suck": 98,
+     "killer": "This target remains uncontrolled. It is still a smooth faceted brown ball cinched by a flat dark belt, with no readable furnace mouth or armored face. The reference establishes an asymmetrical riveted hull, projecting tapered front plate, and deep toothed maw. The current geometry obliterates the machine\u2019s defining face and makes the castle read as a generic sphere.",
+     "build": null
+    },
+    {
+     "cycle": 3,
+     "mode": "BUILD",
+     "view": "left side",
+     "state": "LOCKED",
+     "focus": "lower hull furnace face",
+     "suck": 100,
+     "killer": "This target remains completely uncontrolled. From the left side it is now an overexposed yellow lump with a few meaningless horizontal ridges; the armored band, projecting furnace plate, and deep toothed mouth are unreadable. The reference establishes a dark asymmetrical riveted hull whose jutting maw defines the machine\u2019s face. Here that defining architecture is obliterated, leaving no recognizable castle hull at all.",
+     "build": {
+      "changed": 23,
+      "whole": false,
+      "summary": "Rebuilt the lower furnace face as a projecting tapered armor snout with a recessed maw, iron lips, teeth, and riveted asymmetrical platework."
+     }
+    },
+    {
+     "cycle": 4,
+     "mode": "BUILD",
+     "view": "rear 3/4",
+     "state": "LOCKED",
+     "focus": "lower hull furnace face",
+     "suck": 100,
+     "killer": "This target remains utterly uncontrolled. Even from the rear three-quarter view it is a gigantic glowing yellow cylinder with a ribbed nub, not an asymmetrical armored hull with a recessed band, projecting riveted furnace plate, and deep maw. The reference\u2019s defining mechanical body has been reduced to unreadable placeholder mass, destroying both the castle silhouette and its identity.",
+     "build": {
+      "changed": 25,
+      "whole": false,
+      "summary": "Darkened and armored the belly mass, enlarged the projecting furnace snout, and made the maw deeper, wider, and more strongly toothed. Added flared cheek plates and a heavy brow to connect the face visibly into the hull."
+     }
+    },
+    {
+     "cycle": 5,
+     "mode": "BUILD",
+     "view": "rear",
+     "state": "LOCKED",
+     "focus": "lower hull furnace face",
+     "suck": 100,
+     "killer": "This target remains utterly uncontrolled. It is now a bright rectangular box with a flat black cartoon grille and pasted-on triangular teeth, whereas the reference establishes a bulbous asymmetrical riveted hull with a projecting armored snout and a genuinely recessed, irregular maw. The crude square face destroys the castle\u2019s defining mechanical anatomy and makes it read like a toy appliance.",
+     "build": {
+      "changed": 11,
+      "whole": false,
+      "summary": "Replaced the cylindrical belly with a faceted asymmetrical armored hull, inset belt, and stronger projecting furnace snout; added visible plate seams and belt fasteners."
+     }
+    }
+   ],
+   "transitions": [
+    {
+     "from_cycle": 2,
+     "to_cycle": 3,
+     "gesture": "REBUILD",
+     "changed": 23,
+     "whole": false,
+     "focus_before": "lower hull furnace face",
+     "focus_after": "lower hull furnace face",
+     "focus_repeated": true,
+     "suck_before": 98,
+     "suck_after": 100,
+     "delta": 2,
+     "summary": "Rebuilt the lower furnace face as a projecting tapered armor snout with a recessed maw, iron lips, teeth, and riveted asymmetrical platework."
+    },
+    {
+     "from_cycle": 3,
+     "to_cycle": 4,
+     "gesture": "RESIZE",
+     "changed": 25,
+     "whole": false,
+     "focus_before": "lower hull furnace face",
+     "focus_after": "lower hull furnace face",
+     "focus_repeated": true,
+     "suck_before": 100,
+     "suck_after": 100,
+     "delta": 0,
+     "summary": "Darkened and armored the belly mass, enlarged the projecting furnace snout, and made the maw deeper, wider, and more strongly toothed. Added flared cheek plates and a heavy brow to"
+    },
+    {
+     "from_cycle": 4,
+     "to_cycle": 5,
+     "gesture": "REBUILD",
+     "changed": 11,
+     "whole": false,
+     "focus_before": "lower hull furnace face",
+     "focus_after": "lower hull furnace face",
+     "focus_repeated": true,
+     "suck_before": 100,
+     "suck_after": 100,
+     "delta": 0,
+     "summary": "Replaced the cylindrical belly with a faceted asymmetrical armored hull, inset belt, and stronger projecting furnace snout; added visible plate seams and belt fasteners."
+    }
+   ]
+  },
+  {
+   "name": "cabin",
+   "exported": "03:04Z",
+   "reference": "1000061583.png",
+   "threshold": 15,
+   "finalSuck": 98,
+   "cycles": 7,
+   "parts": 44,
+   "connections": 60,
+   "locked": 9,
+   "focusAttempts": 1,
+   "repeatSimilarity": 0.14583333333333334,
+   "escalationCount": 0,
+   "machinery": {
+    "focus": true,
+    "cameraRotation": true,
+    "targetedBuild": true
+   },
+   "roles": [
+    "chassis",
+    "cladding-joint",
+    "structure",
+    "wall-cladding",
+    "wall-frame",
+    "window-glazing",
+    "window-trim"
+   ],
+   "kinds": [
+    "box",
+    "cylinder"
+   ],
+   "cyclesLog": [
+    {
+     "cycle": 1,
+     "mode": "BUILD",
+     "view": "front 3/4",
+     "state": "SURVIVED",
+     "focus": "Left long-wall frame",
+     "suck": 10,
+     "killer": "The entire long wall is an undifferentiated rectangular void. The reference establishes a solid, low fa\u00e7ade with a precisely spaced door and window; this empty perimeter frame captures none of that defining elevation, so the build reads as a generic trailer cage rather than the reference cabin.",
+     "build": {
+      "changed": 12,
+      "whole": false,
+      "summary": "Established the first inspectable tiny-house wall-frame perimeter on the trailer deck."
+     }
+    },
+    {
+     "cycle": 2,
+     "mode": "LOOK",
+     "view": "left side",
+     "state": "SURVIVED",
+     "focus": "Left long-wall frame",
+     "suck": 10,
+     "killer": "This target remains completely uncontrolled: it is still one enormous skeletal opening with no fa\u00e7ade definition whatsoever. The reference establishes a low, fully enclosed long wall articulated by precisely placed door and window openings; this empty cage destroys the cabin\u2019s defining side elevation and reads as unfinished framing, not the reference structure.",
+     "build": null
+    },
+    {
+     "cycle": 3,
+     "mode": "LOOK",
+     "view": "rear 3/4",
+     "state": "LOCKED",
+     "focus": "Rear end-wall frame",
+     "suck": 98,
+     "killer": "The rear end is a completely empty rectangular frame. The reference establishes a solid, dark-clad end wall punctuated by one centered, trimmed window; this total absence of enclosure erases the cabin\u2019s rear fa\u00e7ade and leaves the build reading as a bare trailer cage.",
+     "build": null
+    },
+    {
+     "cycle": 4,
+     "mode": "BUILD",
+     "view": "rear 3/4",
+     "state": "LOCKED",
+     "focus": "Rear end-wall cladding",
+     "suck": 99,
+     "killer": "This target remains uncontrolled: the rear end is still a fully open frame with no visible enclosure. The reference establishes a solid dark-clad end fa\u00e7ade surrounding a centered window; leaving the entire plane absent obliterates the cabin volume and makes the build read as an exposed trailer skeleton.",
+     "build": {
+      "changed": 9,
+      "whole": false,
+      "summary": "Enclosed the rear frame with dark fa\u00e7ade panels and a centered trimmed window opening."
+     }
+    },
+    {
+     "cycle": 5,
+     "mode": "BUILD",
+     "view": "rear 3/4",
+     "state": "LOCKED",
+     "focus": "Rear end-wall cladding",
+     "suck": 94,
+     "killer": "This target remains uncontrolled: it has changed from absent enclosure into a monolithic pale-yellow slab. The reference establishes a dark, horizontally coursed rear fa\u00e7ade surrounding the centered window; the current blank panel has none of that cladding rhythm or material identity, so the end still reads as a crude placeholder rather than the cabin.",
+     "build": {
+      "changed": 9,
+      "whole": false,
+      "summary": "Relocated the rear cladding and its centered window from the long wall to the open trailer end, creating a solid dark end fa\u00e7ade."
+     }
+    },
+    {
+     "cycle": 6,
+     "mode": "BUILD",
+     "view": "rear 3/4",
+     "state": "LOCKED",
+     "focus": "Left long-wall enclosure",
+     "suck": 98,
+     "killer": "This target remains completely uncontrolled: the entire long elevation is still a gigantic translucent void bounded by timber rails. The reference establishes an opaque, dark, horizontally clad fa\u00e7ade articulated by a door and window; the current open cage eliminates the cabin\u2019s primary elevation and makes the build read as an unfinished trailer frame.",
+     "build": {
+      "changed": 18,
+      "whole": false,
+      "summary": "Added dark horizontal course joints across the rear cladding, preserving the centered window opening and trim."
+     }
+    }
+   ],
+   "transitions": [
+    {
+     "from_cycle": 3,
+     "to_cycle": 4,
+     "gesture": "ENCLOSE",
+     "changed": 9,
+     "whole": false,
+     "focus_before": "Rear end-wall frame",
+     "focus_after": "Rear end-wall cladding",
+     "focus_repeated": false,
+     "suck_before": 98,
+     "suck_after": 99,
+     "delta": 1,
+     "summary": "Enclosed the rear frame with dark fa\u00e7ade panels and a centered trimmed window opening."
+    },
+    {
+     "from_cycle": 4,
+     "to_cycle": 5,
+     "gesture": "RELOCATE",
+     "changed": 9,
+     "whole": false,
+     "focus_before": "Rear end-wall cladding",
+     "focus_after": "Rear end-wall cladding",
+     "focus_repeated": true,
+     "suck_before": 99,
+     "suck_after": 94,
+     "delta": -5,
+     "summary": "Relocated the rear cladding and its centered window from the long wall to the open trailer end, creating a solid dark end fa\u00e7ade."
+    },
+    {
+     "from_cycle": 5,
+     "to_cycle": 6,
+     "gesture": "ARTICULATE",
+     "changed": 18,
+     "whole": false,
+     "focus_before": "Rear end-wall cladding",
+     "focus_after": "Left long-wall enclosure",
+     "focus_repeated": false,
+     "suck_before": 94,
+     "suck_after": 98,
+     "delta": 4,
+     "summary": "Added dark horizontal course joints across the rear cladding, preserving the centered window opening and trim."
+    }
+   ]
+  }
+ ],
+ "gestureTable": {
+  "OTHER": {
+   "n": 3,
+   "sum": 0,
+   "down": 1,
+   "up": 2,
+   "flat": 0,
+   "examples": [
+    {
+     "session": "pagoda",
+     "delta": -8,
+     "summary": "whole-world rebuild"
+    },
+    {
+     "session": "pagoda",
+     "delta": 5,
+     "summary": "whole-world rebuild"
+    },
+    {
+     "session": "pagoda",
+     "delta": 3,
+     "summary": "whole-world rebuild"
+    }
+   ],
+   "meanDelta": 0.0
+  },
+  "REBUILD": {
+   "n": 8,
+   "sum": 1,
+   "down": 3,
+   "up": 4,
+   "flat": 1,
+   "examples": [
+    {
+     "session": "lander",
+     "delta": -6,
+     "summary": "Rebuilt the ladder as a compact rear access ladder directly below the cabin door, with visible rungs and shell"
+    },
+    {
+     "session": "lander",
+     "delta": 4,
+     "summary": "Rebuilt the roof equipment as a compact asymmetric hardware cluster with a small rear-facing angled dish."
+    },
+    {
+     "session": "lander",
+     "delta": 4,
+     "summary": "Rebuilt the crew cabin as a squat, angular pressure cabin with chamfered panels and a projecting rear access b"
+    }
+   ],
+   "meanDelta": 0.12
+  },
+  "RELOCATE": {
+   "n": 3,
+   "sum": -6,
+   "down": 2,
+   "up": 1,
+   "flat": 0,
+   "examples": [
+    {
+     "session": "lander",
+     "delta": -2,
+     "summary": "Shifted the ladder to the rear-left platform edge, shortened and inclined it, and tied it into the platform an"
+    },
+    {
+     "session": "lander",
+     "delta": 1,
+     "summary": "Reduced both longitudinal pads to thin, horizontal ground-contact discs and moved them directly beneath their "
+    },
+    {
+     "session": "cabin",
+     "delta": -5,
+     "summary": "Relocated the rear cladding and its centered window from the long wall to the open trailer end, creating a sol"
+    }
+   ],
+   "meanDelta": -2.0
+  },
+  "ENCLOSE": {
+   "n": 2,
+   "sum": 4,
+   "down": 0,
+   "up": 2,
+   "flat": 0,
+   "examples": [
+    {
+     "session": "lander",
+     "delta": 3,
+     "summary": "Opened the oversized rear plug into a dark angular equipment recess with thin faceted side panels and exposed "
+    },
+    {
+     "session": "cabin",
+     "delta": 1,
+     "summary": "Enclosed the rear frame with dark fa\u00e7ade panels and a centered trimmed window opening."
+    }
+   ],
+   "meanDelta": 2.0
+  },
+  "RESIZE": {
+   "n": 3,
+   "sum": 4,
+   "down": 0,
+   "up": 2,
+   "flat": 1,
+   "examples": [
+    {
+     "session": "lander",
+     "delta": 3,
+     "summary": "Flattened and lowered the longitudinal footpads into thin horizontal ground-contact discs, with consistent gol"
+    },
+    {
+     "session": "lander",
+     "delta": 1,
+     "summary": "Made both longitudinal footpads compact, thin, horizontal ground-contact discs and tightened their ankle conne"
+    },
+    {
+     "session": "castle",
+     "delta": 0,
+     "summary": "Darkened and armored the belly mass, enlarged the projecting furnace snout, and made the maw deeper, wider, an"
+    }
+   ],
+   "meanDelta": 1.33
+  },
+  "ARTICULATE": {
+   "n": 1,
+   "sum": 4,
+   "down": 0,
+   "up": 1,
+   "flat": 0,
+   "examples": [
+    {
+     "session": "cabin",
+     "delta": 4,
+     "summary": "Added dark horizontal course joints across the rear cladding, preserving the centered window opening and trim."
+    }
+   ],
+   "meanDelta": 4.0
+  }
+ },
+ "focusEffect": {
+  "repeatedFocus": {
+   "n": 9,
+   "meanDelta": 0.11,
+   "anyDecrease": 2
+  },
+  "freshFocus": {
+   "n": 11,
+   "meanDelta": 0.55,
+   "anyDecrease": 4
+  }
+ },
+ "analysis": {
+  "note": "A delta between two different focuses measures the badness of newly examined territory, not the success of a repair. Only repeated-focus transitions test a repair.",
+  "repairTests": {
+   "n": 6,
+   "decreases": [
+    {
+     "session": "cabin",
+     "gesture": "RELOCATE",
+     "changed": 9,
+     "delta": -5,
+     "summary": "Relocated the rear cladding and its centered window from the long wall to the open trailer end, creating a solid dark end fa\u00e7ade."
+    }
+   ],
+   "flatOrWorse": 5
+  },
+  "editSizeVsDelta": {
+   "r": 0.1,
+   "n": 17,
+   "meaning": "positive r = bigger edits are followed by worse scores"
+  },
+  "coverageInflation": {
+   "freshFocusMeanDelta": 0.55,
+   "meaning": "the suck number climbing while the focus rotates is the hunt working, not the building degrading: each fresh region is worse than the one just repaired"
+  }
+ }
+}

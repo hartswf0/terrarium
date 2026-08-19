@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#080a0d">
+<title>AGORA-CAVE — where the foraging is learned</title>
+<link rel="icon" href="favicon.svg">
+<style>
+:root{
+  --bg:#080a0d;--panel:#0d1116;--panel2:#131820;--line:#242c35;--fg:#edf1f4;--dim:#8b959f;--faint:#5f6a76;
+  --seam:#efbd4d;--clash:#ff514b;--verify:#d85ce5;--wander:#2de2d0;--genie:#9be08a;--bat:#7fb2ff;--front:#ff8f6a;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  -webkit-font-smoothing:antialiased;font-size:13px;line-height:1.55}
+a{color:var(--wander)}
+button,input,label.btn{font:inherit;color:inherit}
+.wrap{max-width:1100px;margin:0 auto;padding:16px 14px 90px}
+
+header{border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:18px}
+h1{font-size:17px;letter-spacing:.16em;margin:0 0 4px;font-weight:800}
+header p{margin:0;color:var(--dim);font-size:11.5px;max-width:70ch}
+.sub{color:var(--faint);font-size:10px;letter-spacing:.1em;text-transform:uppercase;margin-top:6px}
+
+nav{display:flex;gap:4px;flex-wrap:wrap;margin:14px 0 4px;position:sticky;top:0;background:var(--bg);
+  padding:8px 0;z-index:5;border-bottom:1px solid var(--line)}
+nav button{background:#141a22;border:1px solid #2c343e;border-radius:8px;padding:6px 10px;font-size:10px;
+  letter-spacing:.08em;text-transform:uppercase;font-weight:700}
+nav button.on{background:#1d2b23;border-color:#3f6f52;color:var(--genie)}
+
+section{display:none;padding-top:14px}
+section.on{display:block}
+h2{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--fg);margin:22px 0 8px;font-weight:800}
+h2:first-child{margin-top:4px}
+p.note{color:var(--dim);font-size:11.5px;max-width:78ch;margin:0 0 12px}
+p.note strong{color:#c3ccd4}
+code{background:#151b23;border:1px solid #232b34;border-radius:4px;padding:0 4px;font-size:11px;color:#c9d3db}
+
+table{width:100%;border-collapse:collapse;margin:6px 0 16px;font-size:11.5px}
+th{text-align:left;color:var(--faint);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;
+  font-weight:700;padding:5px 7px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:5px 7px;border-bottom:1px solid #161c23;vertical-align:top}
+tr:hover td{background:#0f141a}
+td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.good{color:var(--genie)}.bad{color:var(--clash)}.flat{color:var(--faint)}
+.tag{display:inline-block;padding:1px 6px;border-radius:999px;font-size:9px;letter-spacing:.06em;
+  border:1px solid currentColor;font-weight:700;white-space:nowrap}
+.c-code{color:var(--bat)}.c-text{color:var(--seam)}.c-instr{color:var(--wander)}
+.c-good{color:var(--genie)}.c-bad{color:var(--clash)}.c-dim{color:var(--faint)}
+
+.bar{height:6px;background:#1a212a;border-radius:3px;overflow:hidden;min-width:70px}
+.bar i{display:block;height:100%;border-radius:3px;background:currentColor}
+.split{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.card{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:11px 12px}
+.card h3{margin:0 0 6px;font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--faint);font-weight:700}
+.card .big{font-size:22px;font-weight:800;line-height:1.1}
+.card .cap{color:var(--dim);font-size:10.5px;margin-top:4px}
+
+.spark{display:flex;align-items:flex-end;gap:2px;height:34px;margin-top:6px}
+.spark i{flex:1;background:#2a3440;border-radius:1px 1px 0 0;min-width:3px}
+
+footer{position:fixed;left:0;right:0;bottom:0;background:#0b0f14f2;border-top:1px solid var(--line);
+  padding:9px 14px;display:flex;gap:7px;align-items:center;flex-wrap:wrap;z-index:9}
+footer .b{background:#151b23;border:1px solid #333c47;border-radius:8px;padding:7px 11px;font-size:10px;
+  letter-spacing:.07em;text-transform:uppercase;font-weight:700;cursor:pointer}
+footer .b.go{background:#1d2b23;border-color:#3f6f52;color:var(--genie)}
+footer .b.warn{border-color:#6d3b38;color:#ff8c86}
+footer .stat{color:var(--faint);font-size:10.5px;margin-left:auto}
+.hidden{display:none}
+#drop{border:1px dashed #34404c;border-radius:10px;padding:18px;text-align:center;color:var(--faint);
+  font-size:11px;margin:10px 0 18px}
+#drop.over{border-color:var(--genie);color:var(--genie);background:#0e1712}
+pre.calc{background:#0b0f14;border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow-x:auto;
+  font-size:11px;color:#b9c4cd;margin:6px 0 14px}
+.killer{color:#9aa5b0;font-size:11px}
+.wordbar{display:flex;align-items:center;gap:8px}
+.wordbar span{width:132px;flex:0 0 auto;font-size:10.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>AGORA-CAVE</h1>
+  <p>Where the antbats' studies accumulate, and where the next generation of ants is told how to forage.
+     Nothing here scores a building. It records what was looked for, what was found, what was done about it,
+     and whether the doing moved the thing it was aimed at.</p>
+  <div class="sub" id="hdr-sub">loading the wall…</div>
+</header>
+
+<nav>
+  <button class="on" data-s="wall">the wall</button>
+  <button data-s="diff">the difference that makes the difference</button>
+  <button data-s="logs">the four logs</button>
+  <button data-s="measured">what the antbats measured</button>
+  <button data-s="prior">the prior</button>
+  <button data-s="theory">how the cave learns</button>
+</nav>
+
+<section class="on" id="s-wall"></section>
+<section id="s-diff"></section>
+<section id="s-logs"></section>
+<section id="s-measured"></section>
+<section id="s-prior"></section>
+<section id="s-theory"></section>
+</div>
+
+<footer>
+  <label class="b" for="dossier-in">Feed dossier</label>
+  <input id="dossier-in" type="file" accept=".json" multiple class="hidden">
+  <button class="b go" id="btn-prior">Export forage-prior.json</button>
+  <button class="b" id="btn-dump">Export cave</button>
+  <button class="b warn" id="btn-forget">Forget dossiers</button>
+  <span class="stat" id="stat">—</span>
+</footer>
+
+<script>
+'use strict';
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const fx=(v,n=2)=>Number.isFinite(+v)?(+v).toFixed(n):'—';
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const sgn=v=>v==null?'flat':v<0?'good':v>0?'bad':'flat';
+const dsign=v=>v==null?'—':(v>0?'+':'')+fx(v,2);
+
+/* ============================ THE SPECIES ================================
+   Three provenances, and the difference between them is the point.
+
+   code  — a deterministic linter in OPERATIVE BUILDER — FUCKED UNTIL PROVEN
+           OTHERWISE. Needs no model and no reference. Six of these exist.
+   text  — a category the critics actually used, counted across the accusations
+           in the four correspondence logs. No instrument checks these.
+   instr — native to the antbat instruments; a linter cannot walk, so these have
+           no equivalent anywhere upstream.
+   ======================================================================== */
+const SPECIES=[
+ {id:'NO_DOOR',         prov:'code', note:'no semantic door in a world large enough to need one',
+  origin:'lintWorld(): items.length>4 && !doors.length → severity high'},
+ {id:'DOOR_NO_ARRIVAL', prov:'code', note:'a door exists and nothing arrives at it',
+  origin:'lintWorld(): doors.length && !stairs.length && !paths.length → high'},
+ {id:'BELOW_GRADE',     prov:'code', note:'geometry sunk beneath the ground plane',
+  origin:'lintWorld(): aabb.min.y < -0.25 → medium'},
+ {id:'FLOATING',        prov:'code', note:'above grade with nothing underneath — re-derived by probing down, because an imported scene has no supportId to read',
+  origin:'lintWorld(): kind∈{mass,floor,column,stair,path} && min.y>0.25 && !supportId → high'},
+ {id:'BAD_SUPPORT',     prov:'code', note:'declares a connection to a part not in the world',
+  origin:'lintWorld(): supportId && !objects.has(supportId) → high'},
+ {id:'ORPHAN',          prov:'instr',note:'nothing comes within a contact tolerance of it — clearance, not neighbour rank',
+  origin:'box-to-box clearance / contact tolerance R·0.03'},
+ {id:'EXHAUSTED',       prov:'instr',note:'the ants ran out of anywhere better to go; the component ends here',
+  origin:'stall density — the promise measure, per part'},
+ {id:'BURIED',          prov:'instr',note:'every point of its surface is inside some other solid: geometry nothing can see',
+  origin:'ray parity per node, weighted by how many nodes can support the claim'},
+ {id:'CONTESTED',       prov:'instr',note:'the ant stands on surface where the bat’s delay reports air',
+  origin:'ant/bat disagreement field — never arbitrated'},
+ {id:'UNREACHED_HOT',   prov:'instr',note:'interesting, and nothing has managed to reach it',
+  origin:'frontier register (unresolvedHot, promoted)'},
+ {id:'WRONG_FORM',      prov:'text', note:'blunt, oversized, crude, generic, blank, toy, cartoon, blob — resemblance judgements',
+  origin:'critic accusations; no deterministic instrument can check this'},
+ {id:'MISSING_MAJOR',   prov:'text', note:'absent, missing, lacks, eliminates, destroys, barren, open cage, unfinished',
+  origin:'critic accusations; CRITIC_PROMPT ranks it first: “a missing major part beats a detail”'},
+ {id:'SURFACE_ONLY',    prov:'text', note:'trim, siding, cladding, joints, texture, finish — the articulation trap',
+  origin:'critic accusations; the gesture family with the worst measured record'}
+];
+const PROV_LABEL={code:'from the linter',text:'from the accusations',instr:'from the instruments'};
+
+/* Seed gesture values. The corpus measures GESTURES, not species: it predates the
+   reading entirely. RELOCATE is the only gesture family in four logs with a
+   negative mean, and it is negative because of one repair — the cabin's rear
+   cladding moved from the long wall to the open end, 99 → 94. Everything that
+   ADDED or ARTICULATED on a repeated accusation went flat or worse. The seed is
+   that, and nothing more; measured dossier evidence overwrites it. */
+const SEED_GESTURE={
+  RELOCATE_ORPHAN:+1.00, EXPOSE_BURIED:+0.80,
+  ADD_DOOR:+0.55, ADD_ARRIVAL:+0.50,
+  APERTURE:+0.20,
+  BUILD_THE_AMBIGUITY:0.00,
+  ENCLOSE_CAVITY:-0.30, ADD_MEMBER:-0.35, THICKEN:-0.45
+};
+const GESTURE_FAMILY={
+  RELOCATE_ORPHAN:'RELOCATE', EXPOSE_BURIED:'RELOCATE', ADD_DOOR:'MISSING_MAJOR',
+  ADD_ARRIVAL:'MISSING_MAJOR', APERTURE:'ENCLOSE', ENCLOSE_CAVITY:'ENCLOSE',
+  ADD_MEMBER:'ENCLOSE', THICKEN:'RESIZE', BUILD_THE_AMBIGUITY:'(none)'
+};
+
+const CAVE={corpus:null,language:null,dossiers:[],prior:null};
+const STORE='agora-cave-dossiers-v1';
+
+function loadStore(){
+  try{ CAVE.dossiers=JSON.parse(localStorage.getItem(STORE)||'[]') }catch(e){ CAVE.dossiers=[] }
+}
+function saveStore(){
+  try{ localStorage.setItem(STORE,JSON.stringify(CAVE.dossiers)) }
+  catch(e){ /* the wall is finite; older studies fall off it */
+    CAVE.dossiers=CAVE.dossiers.slice(-24);
+    try{ localStorage.setItem(STORE,JSON.stringify(CAVE.dossiers)) }catch(e2){}
+  }
+}
+
+/* ---- accumulated evidence -------------------------------------------------
+   Every dossier carries a reading (what was found) and, if the genie ran twice,
+   an effect (what an operation did to the thing it was aimed at). Sightings say
+   what is out there; effects say what is worth doing. They are kept apart
+   because they answer different questions.
+   -------------------------------------------------------------------------- */
+function evidence(){
+  const sight={},effect={},byBuilding={};
+  for(const d of CAVE.dossiers){
+    const b=d.building||'unnamed';
+    byBuilding[b]=byBuilding[b]||{n:0,census:{}};
+    byBuilding[b].n++;
+    const c=d.peak||{};
+    for(const k in c){
+      const t=(c[k]&&c[k].total)||0, parts=(c[k]&&c[k].parts)||0;
+      sight[k]=sight[k]||{total:0,parts:0,runs:0,buildings:new Set()};
+      sight[k].total+=t; sight[k].parts+=parts; sight[k].runs++;
+      if(t>0.15) sight[k].buildings.add(b);
+      byBuilding[b].census[k]=(byBuilding[b].census[k]||0)+t;
+    }
+    for(const e of (d.effects||[])){
+      if(e.delta==null)continue;
+      const k=e.op;
+      effect[k]=effect[k]||{n:0,sum:0,worked:0,backfired:0,nothing:0,species:{},examples:[]};
+      const a=effect[k];
+      /* Reward is the FRACTION of the thing that went away, not the raw delta.
+         A world-scope census falling 44→0 and a part membership falling 1.0→0.1
+         are both "removed", and only the fraction says so in one unit. */
+      const base=Math.max(Math.abs(e.before||0),1e-6);
+      a.n++; a.sum+= clamp(-e.delta/base,-2,2);
+      e.fraction=+(-e.delta/base).toFixed(3);
+      a[e.delta<0?'worked':e.delta>0?'backfired':'nothing']++;
+      a.species[e.species]=(a.species[e.species]||0)+1;
+      if(a.examples.length<4) a.examples.push({building:b,species:e.species,part:e.part,
+        before:e.before,after:e.after,delta:e.delta});
+    }
+  }
+  for(const k in sight){ sight[k].buildings=[...sight[k].buildings]; }
+  for(const k in effect){ effect[k].mean=effect[k].sum/effect[k].n; }
+  return {sight,effect,byBuilding};
+}
+
+/* ---- the prior ------------------------------------------------------------
+   Arithmetic kept small enough to read. A species is worth foraging for in
+   proportion to how often it turns up and how reliably something can be done
+   about it; a gesture is worth doing in proportion to how much of the thing it
+   was aimed at it actually removed. No hidden terms.
+   -------------------------------------------------------------------------- */
+function computePrior(){
+  const {sight,effect}=evidence();
+  const runs=Math.max(1,CAVE.dossiers.length);
+  const speciesValue={},gestureValue={},show=[];
+
+  for(const op of new Set([...Object.keys(SEED_GESTURE),...Object.keys(effect)])){
+    const seed=SEED_GESTURE[op]||0, e=effect[op];
+    let v=seed, line=`${op.padEnd(20)} seed ${seed>=0?'+':''}${seed.toFixed(2)}`;
+    if(e){
+      const measured=clamp(e.mean,-2,2);   // already a fraction removed
+      const w=clamp(e.n/6,0,1);                       // trust grows with trials
+      v=seed*(1-w)+measured*w;
+      line+=`  measured ${measured>=0?'+':''}${measured.toFixed(2)} over ${e.n} trial(s)`+
+            `  weight ${w.toFixed(2)}  →  ${v>=0?'+':''}${v.toFixed(2)}`+
+            `   [${e.worked} removed / ${e.nothing} nothing / ${e.backfired} backfired]`;
+    } else line+='  (no trials yet)  →  '+(v>=0?'+':'')+v.toFixed(2);
+    gestureValue[op]=+v.toFixed(3); show.push(line);
+  }
+
+  for(const sp of SPECIES){
+    const s=sight[sp.id];
+    const prevalence=s?clamp((s.total/runs)/12,0,1):0;
+    const spread=s?clamp(s.buildings.length/Math.max(1,Object.keys(evidence().byBuilding).length),0,1):0;
+    // reliability: of the operations that name this species, how many removed it
+    let tried=0,worked=0;
+    for(const op in effect){ const c=effect[op].species[sp.id]||0;
+      if(c){ tried+=effect[op].n; worked+=effect[op].worked } }
+    const reliability=tried?worked/tried:0;
+    let v=1 + 0.6*reliability + 0.5*prevalence + 0.3*spread;
+    if(sp.prov==='text') v=Math.min(v,1);   // nothing here can check a resemblance judgement
+    speciesValue[sp.id]=+v.toFixed(3);
+  }
+  const prior={
+    source:'agora-cave · '+CAVE.dossiers.length+' dossier'+(CAVE.dossiers.length===1?'':'s')+
+           ' + 4 correspondence logs',
+    generated:new Date().toISOString(),
+    trainedOn:{dossiers:CAVE.dossiers.length,
+      buildings:[...new Set(CAVE.dossiers.map(d=>d.building||'unnamed'))],
+      corpusSessions:(CAVE.corpus&&CAVE.corpus.sessions||[]).map(s=>s.name)},
+    speciesValue,gestureValue,
+    rules:[
+      'relocate before adding — one repair in six in the corpus ever weakened its own accusation, and it was a relocation',
+      'never repeat an operation on a part whose reading it did not move',
+      'a resemblance judgement is not forageable: no instrument here can check WRONG_FORM or MISSING_MAJOR',
+      'measure the effect on the part the operation names, never on a world total'
+    ],
+    arithmetic:show
+  };
+  CAVE.prior=prior; return prior;
+}
+
+/* ================================ VIEWS ================================== */
+function bar(v,cls,scale){ const w=clamp((v/(scale||1))*100,0,100);
+  return `<span class="bar ${cls}" style="display:inline-block;width:90px;vertical-align:middle"><i style="width:${w}%"></i></span>` }
+
+function viewWall(){
+  const {sight}=evidence();
+  const lang=(CAVE.language&&CAVE.language.counts)||{};
+  const totalLang=Object.values(lang).reduce((a,b)=>a+b,0)||1;
+  let h=`<h2>the wall</h2>
+  <p class="note">Thirteen defect species, and where each one came from. The split matters more than the list:
+  <strong>six are checkable by a linter</strong> that needs no model and no reference, <strong>five are native to the
+  antbat instruments</strong> and have no upstream equivalent because a linter cannot walk, and <strong>two are
+  resemblance judgements</strong> that nothing in this system can verify — which is exactly where the four logs spent
+  most of their accusations.</p>
+  <table><thead><tr><th>species</th><th>provenance</th><th>what it is</th><th class="num">named in accusations</th>
+  <th class="num">peak reading</th><th class="num">forage value</th></tr></thead><tbody>`;
+  const prior=computePrior();
+  for(const sp of SPECIES){
+    const s=sight[sp.id], l=lang[sp.id]||0;
+    h+=`<tr><td><span class="tag c-${sp.prov==='code'?'code':sp.prov==='text'?'text':'instr'}">${sp.id}</span></td>
+      <td class="c-dim" style="font-size:10.5px">${PROV_LABEL[sp.prov]}<br><span style="color:#4d5761">${esc(sp.origin)}</span></td>
+      <td class="c-dim" style="font-size:11px;max-width:34ch">${esc(sp.note)}</td>
+      <td class="num">${l?l+' <span class="c-dim">('+Math.round(100*l/totalLang)+'%)</span>':'<span class="c-dim">—</span>'}</td>
+      <td class="num">${s?fx(s.total,1)+' <span class="c-dim">summed over '+s.runs+' study/ies</span>':'<span class="c-dim">no dossier</span>'}</td>
+      <td class="num">${fx(prior.speciesValue[sp.id],2)} ${bar(prior.speciesValue[sp.id],'c-good',2)}</td></tr>`;
+  }
+  h+='</tbody></table>';
+
+  h+=`<h2>what the critics actually talked about</h2>
+  <p class="note">Counted across ${CAVE.language?CAVE.language.accusations:0} accusations in the four logs. The two
+  most-used categories are the two no instrument can check. The five that a linter could have caught outright — door,
+  arrival, floating, disconnection, buried — account for a third of the language, and the cabin, whose antbats read
+  <code>NO_DOOR</code> on all 44 parts, heard the word "door" three times in seven cycles and never as the target.</p>`;
+  const entries=Object.entries(lang).sort((a,b)=>b[1]-a[1]);
+  const max=entries.length?entries[0][1]:1;
+  for(const [k,v] of entries){
+    const sp=SPECIES.find(x=>x.id===k);
+    h+=`<div class="wordbar"><span class="tag c-${sp&&sp.prov==='code'?'code':sp&&sp.prov==='text'?'text':'instr'}">${k}</span>
+      <span class="bar c-${sp&&sp.prov==='text'?'bad':'good'}" style="flex:1"><i style="width:${100*v/max}%"></i></span>
+      <span style="width:auto;color:var(--dim)">${v}</span></div>`;
+  }
+  h+=`<p class="note" style="margin-top:12px">Blue and cyan are checkable. Red is not.</p>`;
+  return h;
+}
+
+function viewDiff(){
+  const c=CAVE.corpus; if(!c) return '<p class="note">corpus not loaded</p>';
+  const a=c.analysis, g=c.gestureTable;
+  let h=`<h2>the difference that makes the difference</h2>
+  <p class="note">Bateson's phrase, and the brutal loop's own schema field: the critic returns an
+  <code>active_difference</code> every cycle. Here it is computed rather than asserted — for every build in the four
+  logs, what changed and what happened to the accusation next.</p>
+
+  <p class="note"><strong>The first thing to get right is what the number means.</strong> A high suck score is not the
+  loop failing. The transcripts read <code>TARGET SURVIVED · SUCK 10 · changing camera</code> and
+  <code>TARGET LOCKED · SUCK 94</code>: a low score means <em>this target survived this look, go look somewhere else</em>,
+  and a high score means <em>found one, build</em>. The score is a detector output, maximum over views, never an average.
+  So a delta between two <em>different</em> focuses measures how bad the newly examined region is — not whether a repair
+  worked. Only a repeated focus tests a repair.</p>
+
+  <div class="split">
+    <div class="card"><h3>repair tests in the whole corpus</h3><div class="big">${a.repairTests.n}</div>
+      <div class="cap">builds aimed at an accusation that was then re-tested on the same focus</div></div>
+    <div class="card"><h3>that weakened the accusation</h3><div class="big good">${a.repairTests.decreases.length}</div>
+      <div class="cap">${a.repairTests.flatOrWorse} left it flat or worse</div></div>
+    <div class="card"><h3>edit size vs outcome</h3><div class="big">r = ${fx(a.editSizeVsDelta.r,2)}</div>
+      <div class="cap">over ${a.editSizeVsDelta.n} builds — essentially no relationship. Bigger edits are not
+      more effective, and they are not less. Size is not the variable.</div></div>
+    <div class="card"><h3>fresh-focus mean delta</h3><div class="big">${dsign(a.coverageInflation.freshFocusMeanDelta)}</div>
+      <div class="cap">the score climbing as the focus rotates is coverage, not decay</div></div>
+  </div>
+
+  <h2>the one repair</h2>`;
+  for(const d of a.repairTests.decreases)
+    h+=`<p class="note"><span class="tag c-good">${d.gesture}</span> <strong>${d.session}</strong>, ${d.changed} parts,
+      <span class="good">${d.delta}</span> — “${esc(d.summary)}”<br>
+      <span class="c-dim">It moved something that already existed to where it belonged. It did not add anything.</span></p>`;
+
+  h+=`<h2>gesture families</h2>
+  <p class="note">Every build classified by its own summary verb, against what the next verdict did. Small n, stated
+  as such. The ordering is the finding, not the decimals.</p>
+  <table><thead><tr><th>gesture</th><th class="num">n</th><th class="num">mean Δsuck</th>
+  <th class="num">weakened</th><th class="num">flat</th><th class="num">worse</th><th>example</th></tr></thead><tbody>`;
+  for(const [k,v] of Object.entries(g).sort((x,y)=>x[1].meanDelta-y[1].meanDelta))
+    h+=`<tr><td><span class="tag c-${v.meanDelta<0?'good':'bad'}">${k}</span></td>
+      <td class="num">${v.n}</td><td class="num ${sgn(v.meanDelta)}">${dsign(v.meanDelta)}</td>
+      <td class="num good">${v.down}</td><td class="num flat">${v.flat}</td><td class="num bad">${v.up}</td>
+      <td class="killer">${esc((v.examples[0]||{}).summary||'')}</td></tr>`;
+  h+=`</tbody></table>
+  <p class="note">RELOCATE is the only family with a negative mean. ARTICULATE — adding joints, courses, trim — is the
+  worst thing in the table. That single ordering is what the genie's seed prior encodes, and it is the whole of what
+  four chat logs can honestly teach: <strong>move the thing before you add a thing.</strong></p>`;
+  return h;
+}
+
+function viewLogs(){
+  const c=CAVE.corpus; if(!c) return '<p class="note">corpus not loaded</p>';
+  let h=`<h2>the four logs</h2>
+  <p class="note">Each one is a different machine. The evolution across ninety minutes is itself a temporal
+  difference: focus, camera rotation and targeted builds arrive between the first log and the second, and the
+  grind arrives with them.</p>`;
+  for(const s of c.sessions){
+    const m=s.machinery;
+    h+=`<h2 style="color:var(--wander)">${s.name} <span class="c-dim" style="text-transform:none;letter-spacing:0">
+      · ${s.exported} · ${s.parts} parts · ${s.connections} declared connections · final suck ${s.finalSuck} against a threshold of ${s.threshold}</span></h2>
+    <p class="note">machinery:
+      ${['focus','cameraRotation','targetedBuild'].map(k=>`<span class="tag c-${m[k]?'good':'dim'}">${k} ${m[k]?'on':'off'}</span>`).join(' ')}
+      ${s.focusAttempts!=null?`<span class="tag c-dim">focusAttempts ${s.focusAttempts}</span>`:''}
+      ${s.repeatSimilarity!=null?`<span class="tag c-dim">repeat similarity ${fx(s.repeatSimilarity,2)}</span>`:''}</p>
+    <table><thead><tr><th>cycle</th><th>gesture</th><th class="num">parts changed</th><th>focus</th>
+    <th class="num">suck</th><th class="num">Δ</th><th>what the builder said it did</th></tr></thead><tbody>`;
+    for(const t of s.transitions){
+      h+=`<tr><td class="num">${t.from_cycle}→${t.to_cycle}</td>
+        <td><span class="tag c-${t.gesture==='RELOCATE'?'good':'dim'}">${t.gesture}</span></td>
+        <td class="num">${t.changed==null?'whole world':t.changed}</td>
+        <td style="font-size:10.5px">${t.focus_repeated?'<span class="tag c-bad">same</span> ':''}${esc(t.focus_after)}</td>
+        <td class="num">${t.suck_before}→${t.suck_after}</td>
+        <td class="num ${sgn(t.delta)}">${t.delta>0?'+':''}${t.delta}</td>
+        <td class="killer">${esc(t.summary)}</td></tr>`;
+    }
+    h+='</tbody></table>';
+    const worst=s.cyclesLog.filter(r=>r.killer).slice(-2);
+    for(const w of worst) h+=`<p class="note"><span class="tag c-bad">${esc(w.focus)}</span> ${esc((w.killer||'').slice(0,320))}</p>`;
+  }
+  return h;
+}
+
+function viewMeasured(){
+  const {sight,effect,byBuilding}=evidence();
+  let h=`<h2>what the antbats measured</h2>
+  <p class="note">This is the only part of the cave that is not borrowed. The four logs measure gestures against a
+  critic's score; these measure an operation against <strong>the reading of the part it named</strong>. A world total
+  moves whenever anything anywhere moves, so it cannot say whether an operation did what it was for. A part can.</p>`;
+  if(!CAVE.dossiers.length)
+    return h+`<div id="drop">no dossiers yet — run <a href="antbat-genie.html">antbat-genie.html</a>, press
+      <strong>Genie</strong> twice with a run in between, and export the dossier. Drop it here or use “Feed dossier”.
+      <br><br><span class="c-dim">Two genie calls are needed: the first states what the house implies, the second
+      measures what happened.</span></div>`;
+
+  h+=`<h2>operations, against the thing they were aimed at</h2>
+  <table><thead><tr><th>operation</th><th>family</th><th class="num">trials</th><th class="num">removed</th>
+  <th class="num">nothing</th><th class="num">backfired</th><th class="num">mean fraction removed</th><th>evidence</th></tr></thead><tbody>`;
+  for(const [op,e] of Object.entries(effect).sort((a,b)=>b[1].mean-a[1].mean)){
+    h+=`<tr><td><span class="tag c-${e.mean>0?'good':'bad'}">${op}</span></td>
+      <td class="c-dim">${GESTURE_FAMILY[op]||'—'}</td>
+      <td class="num">${e.n}</td><td class="num good">${e.worked}</td><td class="num flat">${e.nothing}</td>
+      <td class="num bad">${e.backfired}</td>
+      <td class="num ${e.mean>0?'good':'bad'}">${e.mean>0?'+':''}${fx(e.mean,3)}<br><span class="c-dim" style="font-size:9px">fraction removed</span></td>
+      <td class="killer">${e.examples.map(x=>`${esc(x.building)} · ${esc(x.species)} on ${esc(x.part||'world')} ${fx(x.before,2)}→${fx(x.after,2)}`).join('<br>')}</td></tr>`;
+  }
+  h+='</tbody></table>';
+
+  h+=`<h2>sightings</h2>
+  <p class="note">Peak reading per study, summed. Peak rather than final, because a dossier's own census is taken at
+  export — after the genie has already removed some of what was found.</p>
+  <table><thead><tr><th>species</th><th class="num">summed peak</th>
+  <th class="num">parts carrying it</th><th class="num">runs</th><th>buildings</th></tr></thead><tbody>`;
+  for(const [k,s] of Object.entries(sight).sort((a,b)=>b[1].total-a[1].total)){
+    const sp=SPECIES.find(x=>x.id===k);
+    h+=`<tr><td><span class="tag c-${sp&&sp.prov==='code'?'code':'instr'}">${k}</span></td>
+      <td class="num">${fx(s.total,1)}</td><td class="num">${s.parts}</td><td class="num">${s.runs}</td>
+      <td class="c-dim">${s.buildings.map(esc).join(', ')||'—'}</td></tr>`;
+  }
+  h+='</tbody></table>';
+
+  h+=`<h2>per building</h2><table><thead><tr><th>building</th><th class="num">studies</th><th>reading</th></tr></thead><tbody>`;
+  for(const [b,v] of Object.entries(byBuilding)){
+    const top=Object.entries(v.census).filter(([,t])=>t>0.15).sort((a,b2)=>b2[1]-a[1]);
+    h+=`<tr><td>${esc(b)}</td><td class="num">${v.n}</td>
+      <td>${top.map(([k,t])=>`<span class="tag c-dim">${k} ${fx(t,1)}</span>`).join(' ')||'<span class="c-dim">nothing found</span>'}</td></tr>`;
+  }
+  h+='</tbody></table>';
+
+  h+=`<h2>the studies themselves</h2><table><thead><tr><th>exported</th><th>building</th><th class="num">gen</th>
+  <th>prior it used</th><th>scouts</th></tr></thead><tbody>`;
+  for(const d of [...CAVE.dossiers].reverse()){
+    h+=`<tr><td class="c-dim">${esc((d.exportedAt||'').replace('T',' ').slice(0,19))}</td>
+      <td>${esc(d.building||'unnamed')}</td><td class="num">${d.generation??'—'}</td>
+      <td class="c-dim" style="font-size:10.5px">${esc(d.priorUsed||'none')}</td>
+      <td class="killer">${(d.scouts||[]).filter(s=>s.found).map(s=>esc(s.species)+':'+s.found).join(' · ')||'—'}</td></tr>`;
+  }
+  return h+'</tbody></table>';
+}
+
+function viewPrior(){
+  const p=computePrior();
+  let h=`<h2>the prior</h2>
+  <p class="note">What gets handed back to the ants. <code>speciesValue</code> changes where foraging is worth doing;
+  <code>gestureValue</code> changes what the genie reaches for first. Neither changes what counts as a finding —
+  the instruments are not up for negotiation, only the attention is.</p>
+  <p class="note">Load it in antbat-genie with the <strong>Prior</strong> button, or save this file to
+  <code>agora/forage-prior.json</code> and it loads on boot.</p>
+  <h2>gesture arithmetic</h2><pre class="calc">${esc(p.arithmetic.join('\n'))}</pre>
+  <h2>species values</h2><table><thead><tr><th>species</th><th>provenance</th><th class="num">value</th><th></th></tr></thead><tbody>`;
+  for(const sp of SPECIES){
+    const v=p.speciesValue[sp.id];
+    h+=`<tr><td><span class="tag c-${sp.prov==='code'?'code':sp.prov==='text'?'text':'instr'}">${sp.id}</span></td>
+      <td class="c-dim">${PROV_LABEL[sp.prov]}</td><td class="num">${fx(v,3)}</td>
+      <td>${bar(v,'c-good',2)}${sp.prov==='text'?' <span class="c-dim" style="font-size:10px">capped — nothing here can check a resemblance judgement</span>':''}</td></tr>`;
+  }
+  h+='</tbody></table><h2>rules carried with it</h2>';
+  for(const r of p.rules) h+=`<p class="note">— ${esc(r)}</p>`;
+  h+=`<h2>trained on</h2><p class="note">${esc(JSON.stringify(p.trainedOn))}</p>`;
+  return h;
+}
+
+function viewTheory(){
+  return `<h2>how the cave learns</h2>
+  <p class="note">Three things arrive here and they are not the same kind of thing, so they are kept apart.</p>
+
+  <p class="note"><strong>1 · The linter, from code.</strong> Six deterministic checks that need no model and no
+  reference. Three of them read a declared field — <code>supportId</code>, object existence — and are therefore
+  unreachable on a correspondence scene, which declares <code>connections</code> and no supports at all. The pagoda
+  declares <em>zero</em> connections across ninety-two parts, so <code>BAD_SUPPORT</code> can never fire on it and
+  <code>FLOATING</code> never could either. The antbats re-derive both by looking: probes go down from the footprint
+  and clearance is measured between boxes. An ant does not ask a part whether it is held up.</p>
+
+  <p class="note"><strong>2 · The accusations, from text.</strong> Counted, not read. The two categories the critics
+  used most are the two nothing can verify. That is not a failure of the critics — resemblance to a photograph is a
+  real property and a model is the only instrument for it. It is a reason to stop spending the forage budget there:
+  species with <code>text</code> provenance are capped at 1.0 in the prior and never rise, however often they are named.</p>
+
+  <p class="note"><strong>3 · The dossiers, from the instruments.</strong> The only self-measured evidence in the
+  building. An operation names a species and a part; the next generation re-reads that part; the difference is the
+  learning signal. It has already corrected the system twice: <code>OPEN_SEALED_VOID</code>, which shrank a buried
+  part, drove the reading <em>up</em> by 6.8 and 13.3 on two different buildings, and was replaced by
+  <code>EXPOSE_BURIED</code>, which moves the part out only as far as it takes to clear what it is inside. The first
+  <code>RELOCATE_ORPHAN</code> guessed its travel from half-extents and left the pagoda's shrub orphaned at 1.00; the
+  clearance was already measured, so it now moves exactly that.</p>
+
+  <h2>the update</h2>
+  <pre class="calc">gestureValue[op] = seed·(1−w) + measured·w        w = min(n/6, 1)
+                   measured = mean(−Δ / |before|) on the part the operation named
+
+speciesValue[sp] = 1 + 0.6·reliability + 0.5·prevalence + 0.3·spread
+                   reliability = of operations naming sp, the fraction that removed it
+                   prevalence  = summed reading per run, normalised
+                   spread      = how many distinct buildings carry it
+                   provenance 'text' → capped at 1.0</pre>
+
+  <p class="note">The seed is not neutral and does not pretend to be. It is the ordering of the gesture table:
+  RELOCATE is the only family in four logs with a negative mean, and it is negative because of exactly one repair.
+  Six trials replace the seed entirely. If relocation stops working, the cave will say so and the seed will be gone.</p>
+
+  <h2>what the cave refuses</h2>
+  <p class="note">— No score for a building, and no ranking of buildings against each other.<br>
+  — No learning from the accusations' <em>content</em>, only from their distribution; the cave counts what was said,
+  it does not believe it.<br>
+  — No promotion of a species to forageable because it was named often. Only because something could be done about it.<br>
+  — No silent truncation: when the wall runs out of room, older studies fall off and the count says so.</p>`;
+}
+
+/* =============================== SHELL =================================== */
+const VIEWS={wall:viewWall,diff:viewDiff,logs:viewLogs,measured:viewMeasured,prior:viewPrior,theory:viewTheory};
+let current='wall';
+function render(){
+  $('#s-'+current).innerHTML=VIEWS[current]();
+  $$('section').forEach(s=>s.classList.toggle('on',s.id==='s-'+current));
+  $$('nav button').forEach(b=>b.classList.toggle('on',b.dataset.s===current));
+  const {effect}=evidence();
+  const trials=Object.values(effect).reduce((a,e)=>a+e.n,0);
+  if(CAVE.corpus) $('#hdr-sub').textContent =
+    `${CAVE.corpus.sessions.length} correspondence logs · ${CAVE.corpus.sessions.reduce((a,s)=>a+s.transitions.length,0)} builds · `+
+    `${CAVE.language?CAVE.language.accusations:0} accusations counted · ${CAVE.dossiers.length} antbat dossiers on the wall`;
+  $('#stat').textContent=`${CAVE.dossiers.length} dossier${CAVE.dossiers.length===1?'':'s'} · ${trials} measured operation${trials===1?'':'s'} · 4 logs · 13 species`;
+  if(current==='measured') wireDrop();
+}
+function ingest(obj,name){
+  if(!obj||obj.program!=='antbat-genie'){ alert('not an antbat dossier: '+name); return 0 }
+  const lineage=obj.lineage||[];
+  const effects=[];
+  for(const l of lineage) for(const e of (l.effect||[])) effects.push(e);
+  const building=(obj.house&&obj.house.parts&&obj.house.parts.length)
+    ? (obj.buildingName|| guessBuilding(obj)) : 'unnamed';
+  /* The census in a dossier is the reading at export — after the genie has
+     already removed things. Every generation's censusBefore is also in there,
+     so the peak across the run is what was actually found in this building. */
+  const peak={};
+  const add=(m,shape)=>{ for(const k in (m||{})){
+    const t=shape==='census'?((m[k]&&m[k].total)||0):(m[k]||0);
+    if(!peak[k]||t>peak[k].total) peak[k]={total:t,parts:(shape==='census'?(m[k]&&m[k].parts)||0:0)};
+  }};
+  for(const l of lineage) add(l.censusBefore,'flat');
+  add(obj.reading&&obj.reading.census,'census');
+  CAVE.dossiers.push({exportedAt:obj.exportedAt,generation:obj.generation,priorUsed:obj.priorUsed,
+    building,reading:obj.reading,peak,scouts:obj.scouts,effects,
+    parts:(obj.house&&obj.house.parts||[]).length});
+  return 1;
+}
+function guessBuilding(o){
+  const ids=(o.house&&o.house.parts||[]).map(p=>String(p.id));
+  if(ids.some(i=>/lander/.test(i)))return 'lander';
+  if(ids.some(i=>/pagoda|eave|finial|lantern/.test(i)))return 'pagoda';
+  if(ids.some(i=>/cladding|course|sill/.test(i)))return 'cabin';
+  if(ids.some(i=>/furnace|hull/.test(i)))return 'castle';
+  if(ids.some(i=>/orphan|slab|wall-n/.test(i)))return 'seed house';
+  return 'unnamed ('+ids.length+' parts)';
+}
+function readFiles(files){
+  let n=0,pending=files.length;
+  for(const f of files){
+    const r=new FileReader();
+    r.onload=()=>{ try{ n+=ingest(JSON.parse(r.result),f.name) }catch(e){ alert('could not read '+f.name+': '+e.message) }
+      if(!--pending){ saveStore(); render(); } };
+    r.readAsText(f);
+  }
+}
+function wireDrop(){
+  const d=$('#drop'); if(!d)return;
+  d.addEventListener('dragover',e=>{e.preventDefault();d.classList.add('over')});
+  d.addEventListener('dragleave',()=>d.classList.remove('over'));
+  d.addEventListener('drop',e=>{e.preventDefault();d.classList.remove('over');readFiles(e.dataTransfer.files)});
+}
+function download(obj,name){
+  const b=new Blob([JSON.stringify(obj,null,1)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+async function boot(){
+  loadStore();
+  try{ CAVE.corpus=await (await fetch('agora/corpus.json',{cache:'no-store'})).json() }catch(e){}
+  try{ CAVE.language=await (await fetch('agora/defect-language.json',{cache:'no-store'})).json() }catch(e){}
+  $('#hdr-sub').textContent = CAVE.corpus
+    ? `${CAVE.corpus.sessions.length} correspondence logs · ${CAVE.corpus.sessions.reduce((a,s)=>a+s.transitions.length,0)} builds · ${CAVE.language?CAVE.language.accusations:0} accusations counted · ${CAVE.dossiers.length} antbat dossiers on the wall`
+    : 'corpus not found — serve this file from the repository root';
+  $$('nav button').forEach(b=>b.addEventListener('click',()=>{current=b.dataset.s;render()}));
+  $('#dossier-in').addEventListener('change',e=>{ readFiles(e.target.files); e.target.value='' });
+  $('#btn-prior').addEventListener('click',()=>download(computePrior(),'forage-prior.json'));
+  $('#btn-dump').addEventListener('click',()=>download(
+    {cave:'agora',exportedAt:new Date().toISOString(),dossiers:CAVE.dossiers,prior:computePrior()},
+    'agora-cave-'+new Date().toISOString().replace(/[:.]/g,'')+'.json'));
+  $('#btn-forget').addEventListener('click',()=>{
+    if(!CAVE.dossiers.length) return;
+    if(confirm('Forget '+CAVE.dossiers.length+' dossiers? The corpus and the species stay.')){
+      CAVE.dossiers=[]; saveStore(); render();
+    }});
+  window.addEventListener('dragover',e=>e.preventDefault());
+  window.addEventListener('drop',e=>{e.preventDefault(); if(e.dataTransfer.files.length) readFiles(e.dataTransfer.files)});
+  render();
+}
+boot();
+</script>
+</body>
+</html>
