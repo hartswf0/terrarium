@@ -1,0 +1,780 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<meta name="color-scheme" content="light">
+<title>FORMICARY — A/B</title>
+<style>
+/* IBM Plex Mono, embedded so this runs anywhere with no network. */
+@font-face{font-family:'IBM Plex Mono';font-style:normal;font-weight:400;font-display:swap;src:url(data:font/woff2;base64,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) format('woff2');}
+@font-face{font-family:'IBM Plex Mono';font-style:normal;font-weight:700;font-display:swap;src:url(data:font/woff2;base64,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) format('woff2');}
+
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#6b3318;font-family:'IBM Plex Mono',ui-monospace,monospace;color:#17150f;
+  -webkit-user-select:none;user-select:none;touch-action:none;overscroll-behavior:none}
+#app{position:fixed;inset:0;display:flex;flex-direction:column}
+#crown{flex:none;padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 8px;background:#f5efe3;
+  display:flex;align-items:center;gap:12px;font-size:11px;letter-spacing:.08em;border-bottom:2px solid #17150f}
+#crown .k{color:rgba(23,21,15,.55)}
+#crown b{font-weight:700;font-size:13px}
+#way{margin-left:auto;border:2px solid #17150f;padding:1px 7px;font-weight:700;font-size:11px}
+#strainWrap{flex:1;height:8px;background:#e2d3b4;border:1px solid #17150f;position:relative;min-width:60px;max-width:120px}
+#strainBar{position:absolute;left:0;top:0;bottom:0;width:0%;background:#ff2e2e}
+#world{flex:1;position:relative;min-height:0}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#tag{position:absolute;background:#f5efe3;border:2px solid #17150f;border-left:6px solid #ffd23f;
+  padding:8px 10px;max-width:250px;font-size:12px;line-height:1.35;display:none;pointer-events:none;z-index:5;
+  box-shadow:3px 3px 0 rgba(23,21,15,.25)}
+#tag b{display:block;font-size:13px;letter-spacing:.06em;margin-bottom:3px}
+#act{flex:none;background:#f5efe3;border-top:2px solid #17150f;padding:8px 10px calc(env(safe-area-inset-bottom,0px) + 10px);
+  display:none;gap:8px}
+#act.on{display:flex}
+.tool{flex:1;background:#f5efe3;border:2px solid #17150f;padding:8px 4px 6px;display:flex;flex-direction:column;
+  align-items:center;gap:3px;font-size:10px;letter-spacing:.06em;font-weight:600;font-family:inherit;color:#17150f;
+  cursor:pointer;min-height:58px;position:relative}
+.tool svg{width:26px;height:22px}
+.tool.armed{background:#17150f;color:#f5efe3}
+.tool.armed svg *{stroke:#f5efe3!important}
+.hint{position:absolute;left:0;right:0;bottom:0;padding:6px 12px;background:#ffd23f;border-top:2px solid #17150f;
+  font-size:11px;text-align:center;display:none;z-index:6}
+.hint.on{display:block}
+.card{position:fixed;inset:0;background:#f5efe3;z-index:20;display:none;flex-direction:column;justify-content:center;
+  padding:26px 22px calc(env(safe-area-inset-bottom,0px) + 22px);overflow-y:auto}
+.card.on{display:flex}
+.card .eyebrow{font-size:11px;letter-spacing:.16em;color:rgba(23,21,15,.55);margin-bottom:6px}
+.card h1{font-size:23px;letter-spacing:.06em;font-weight:700;margin-bottom:10px;line-height:1.15}
+.card p{font-size:13.5px;line-height:1.55;margin-bottom:12px;max-width:34em}
+.card .rule{height:2px;background:#17150f;margin:6px 0 16px}
+.btn{background:#17150f;color:#f5efe3;border:none;font-family:inherit;font-size:14px;font-weight:700;letter-spacing:.12em;
+  padding:16px;width:100%;cursor:pointer;margin-top:6px}
+.btn.ghost{background:#f5efe3;color:#17150f;border:2px solid #17150f}
+.pick{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+.res{font-size:12px;line-height:1.5;background:#e9e0cd;border-left:4px solid #19e6c8;padding:9px 11px;margin-bottom:12px}
+.res.bad{border-left-color:#ff2e2e}
+small{font-size:11px;color:rgba(23,21,15,.6);line-height:1.5;display:block;margin-top:14px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="crown">
+    <span><span class="k">STORED</span> <b id="cDone">0</b><span class="k">/6</span></span>
+    <span><span class="k">STRAIN</span></span>
+    <div id="strainWrap"><div id="strainBar"></div></div>
+    <span id="way">A</span>
+  </div>
+  <div id="world">
+    <canvas id="cv"></canvas>
+    <div id="tag"></div>
+    <div class="hint" id="hint"></div>
+  </div>
+  <div id="act"></div>
+</div>
+
+<div class="card on" id="cIntro">
+  <div class="eyebrow">FORMICARY — A TEST</div>
+  <h1>ONE PASSAGE,<br>TWO WAYS.</h1>
+  <div class="rule"></div>
+  <p>Below the ground, a colony of ants carries crumbs to the store. Nobody is in charge of them. Sometimes they get in each other's way.</p>
+  <p>Your job is the same both times: <b>store six crumbs before the strain fills.</b></p>
+  <p>The only thing that changes is <b>how you find out something is wrong.</b> Play both. Then I'll ask you one question.</p>
+  <button class="btn" id="bIntro">BEGIN</button>
+  <small>Two rounds, about a minute each. Best on a phone, one hand.</small>
+</div>
+
+<div class="card" id="cBrief">
+  <div class="eyebrow" id="brEyebrow">ROUND 1 OF 2</div>
+  <h1 id="brTitle"></h1>
+  <div class="rule"></div>
+  <div id="brBody"></div>
+  <button class="btn" id="bBrief">GO</button>
+</div>
+
+<div class="card" id="cEnd">
+  <div class="eyebrow" id="enEyebrow"></div>
+  <h1 id="enTitle"></h1>
+  <div class="rule"></div>
+  <div id="enBody"></div>
+  <button class="btn" id="bEnd"></button>
+  <button class="btn ghost" id="bRetry">TRY THAT ONE AGAIN</button>
+</div>
+
+<div class="card" id="cAsk">
+  <div class="eyebrow">THE QUESTION</div>
+  <h1>WHICH ONE MADE YOU FEEL<br>RESPONSIBLE FOR THIS COLONY?</h1>
+  <div class="rule"></div>
+  <div id="askScores"></div>
+  <div class="pick">
+    <button class="btn ghost" data-pick="A">A — THE ONE THAT TOLD ME</button>
+    <button class="btn ghost" data-pick="B">B — THE ONE THAT MADE ME LOOK</button>
+    <button class="btn ghost" data-pick="?">HONESTLY, NEITHER</button>
+  </div>
+  <small>Not which was easier. Which one felt like it was actually your colony.</small>
+</div>
+
+<div class="card" id="cThanks">
+  <div class="eyebrow">NOTED</div>
+  <h1 id="thTitle"></h1>
+  <div class="rule"></div>
+  <div id="thBody"></div>
+  <button class="btn ghost" id="bAgain">PLAY BOTH AGAIN</button>
+</div>
+
+<script>
+"use strict";
+/* ============================================================================
+   FORMICARY A/B — one failure, two interfaces.
+
+   WAY A  "ANNOUNCED"   the incident rings itself, names itself, starts a clock.
+                        You pick an instrument and place it. (our current build)
+   WAY B  "ATTENDED"    the nest is there but the bodies are dark. You hold to
+                        look. Nothing is announced. You find it, or you miss it.
+                        Where you were looking IS where the instrument goes.
+
+   Everything else is identical: same colony, same rules, same jam, same goal,
+   same clock, same instruments. Only discovery differs. Layouts differ between
+   rounds so playing one does not spoil the other; order is randomised.
+   ============================================================================ */
+
+const MAT={paper:'#f5efe3',paper2:'#e9e0cd',sand:'#e2d3b4',sand2:'#d3bf99',
+  soil:'#9d5130',soil2:'#82401f',soil3:'#6b3318',ink:'#17150f',ink2:'#4a4335'};
+const SIG={teal:'#19e6c8',amber:'#ffd23f',red:'#ff2e2e',blue:'#3b82f6'};
+
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const sc=document.createElement('canvas'),sctx=sc.getContext('2d');   /* scratch: full nest */
+const mk=document.createElement('canvas'),mctx=mk.getContext('2d');   /* attention mask     */
+let W=0,H=0,DPR=1;
+
+function size(){
+  const r=document.getElementById('world').getBoundingClientRect();
+  W=Math.max(200,r.width|0); H=Math.max(240,r.height|0);
+  DPR=Math.min(devicePixelRatio||1,2);
+  for(const [c,x] of [[cv,ctx],[sc,sctx],[mk,mctx]]){
+    c.width=W*DPR; c.height=H*DPR; x.setTransform(DPR,0,0,DPR,0,0);
+  }
+  if(S) layout();
+}
+addEventListener('resize',()=>{size();});
+
+/* ---------- seeded rng ---------- */
+function rng(seed){let s=(seed>>>0)||123456789;return()=>{s^=s<<13;s>>>=0;s^=s>>17;s^=s<<5;s>>>=0;return s/4294967296;};}
+
+/* ---------- world ---------- */
+let S=null, way='A', RAF=0;
+const GOAL=6, FUSE=560, JAM_N=4;
+
+function makeWorld(seed,variant){
+  const rnd=rng(seed);
+  const st={rnd,seed,variant,tick:0,done:0,strain:0,over:false,won:false,
+    nodes:[],edges:[],ants:[],crumbs:[],stones:[],
+    jam:null,jamSeen:false,found:false,miss:0,answered:0,wrong:0,
+    hold:null,holdAt:null,lookMs:0,firstActionAt:0,
+    puff:[],flash:0};
+  return st;
+}
+function addNode(st,x,y,kind,r){const n={id:st.nodes.length+1,x,y,kind,r:r||13};st.nodes.push(n);return n;}
+function addEdge(st,a,b,cap){const e={id:st.edges.length+1,a,b,cap:cap||1,len:Math.hypot(a.x-b.x,a.y-b.y),
+  on:[],flow:0,stall:0,wear:0};st.edges.push(e);a.deg=(a.deg||0)+1;b.deg=(b.deg||0)+1;return e;}
+
+/* Two layouts. Same shape of failure: everything must pass one trunk. */
+function layout(){
+  const st=S; if(!st) return;
+  st.nodes.length=0; st.edges.length=0;
+  const cx=W*0.5, top=H*0.13, bot=H*0.88, rnd=st.rnd;
+  const v=st.variant;
+
+  const mouth=addNode(st,cx+(v?-W*0.13:W*0.12),top,'mouth',11);
+  const midY=top+(bot-top)*0.42;
+  const hub =addNode(st,cx+(v?W*0.10:-W*0.08),midY,'hub',15);
+  const store=addNode(st,cx+(v?-W*0.05:W*0.04),bot,'store',22);
+  const spineMid=addNode(st,cx+(v?W*0.00:W*0.02),midY+(bot-midY)*0.52,'junction',13);
+
+  /* THE TRUNK. Every crumb in this nest is up at the larders and the store is down
+     here, so all of it must come through this one narrow gallery. */
+  const trunk=addEdge(st,hub,spineMid,1);
+  addEdge(st,spineMid,store,2);
+  addEdge(st,mouth,hub,2);
+
+  /* larders hang off the hub — the crumbs are all up here, so all traffic
+     funnels down the single trunk to the store below. */
+  const lard=[];
+  const spread=v?[-0.30,-0.13,0.16,0.31]:[-0.29,-0.12,0.14,0.30];
+  for(let i=0;i<4;i++){
+    const lx=Math.min(W-34,Math.max(34,cx+W*spread[i]));
+    const ly=midY-(bot-top)*(0.06+((i%2)?0.15:0.03));
+    const n=addNode(st,lx,ly,'larder',15);
+    addEdge(st,hub,n,2); lard.push(n);
+  }
+  const side=addNode(st,cx+(v?-W*0.26:W*0.27),midY+(bot-midY)*0.55,'chamber',14);
+  addEdge(st,spineMid,side,2);
+
+  st.mouth=mouth; st.hub=hub; st.store=store; st.spineMid=spineMid; st.trunk=trunk;
+  st.larders=lard;
+
+  if(!st.ants.length){
+    for(let i=0;i<12;i++){
+      st.ants.push({id:i+1,node:store,edge:null,t:0,dir:1,path:[],carry:0,goal:null,
+        wait:Math.floor(rnd()*70),ph:rnd()*6.28,gait:0.85+rnd()*0.3,x:store.x,y:store.y,post:'wander',hue:0});
+    }
+    for(let i=0;i<7;i++) spawnCrumb(st);
+  }
+  st.ants.forEach(a=>{if(!st.nodes.includes(a.node)) a.node=st.store; a.edge=null; a.path=[];});
+  st.crumbs.forEach(c=>{ if(!st.nodes.includes(c.node)) c.node=st.larders[(Math.random()*4)|0]; });
+  st.ants.forEach(a=>place(a));
+}
+function spawnCrumb(st){
+  const pool=st.larders.concat([st.mouth]);
+  const n=pool[Math.floor(st.rnd()*pool.length)];
+  st.crumbs.push({node:n,taken:0,jig:st.rnd()*6.28});
+}
+
+/* ---------- graph movement ---------- */
+function neighbours(st,n){const out=[];for(const e of st.edges){if(e.a===n)out.push([e,e.b]);else if(e.b===n)out.push([e,e.a]);}return out;}
+function route(st,from,to){
+  if(from===to) return [];
+  const prev=new Map(), seen=new Set([from]); let q=[from];
+  while(q.length){
+    const nx=[];
+    for(const n of q) for(const [e,m] of neighbours(st,n)){
+      if(seen.has(m))continue; seen.add(m); prev.set(m,[e,n]);
+      if(m===to){ const path=[]; let cur=m; while(cur!==from){const [pe,pn]=prev.get(cur); path.unshift(pe); cur=pn;} return path; }
+      nx.push(m);
+    }
+    q=nx;
+  }
+  return [];
+}
+function place(a){
+  if(a.edge){
+    const e=a.edge, A=a.dir>0?e.a:e.b, B=a.dir>0?e.b:e.a;
+    a.x=A.x+(B.x-A.x)*a.t; a.y=A.y+(B.y-A.y)*a.t;
+  } else if(a.node){ a.x=a.node.x+Math.cos(a.ph)*a.node.r*0.42; a.y=a.node.y+Math.sin(a.ph)*a.node.r*0.42; }
+}
+
+/* CONFORMITY, and it is the whole reason a jam happens.
+   An ant mostly just goes wherever the others are already going. Alone that is a
+   sensible, cheap heuristic. Together it puts the entire colony on one route at
+   once — and the ones coming back meet the ones going out in a gallery that only
+   fits one body. Nobody here is doing anything unreasonable. */
+const COPY=0.86;
+function pickGoal(st,a){
+  if(a.carry) return st.store;
+  const open=st.crumbs.filter(c=>!c.taken);
+  if(!open.length) return st.store;
+  if(st.rnd()<COPY){
+    const tally=new Map();
+    for(const o of st.ants){ if(o===a||o.carry||!o.goal) continue;
+      tally.set(o.goal,(tally.get(o.goal)||0)+1); }
+    let top=null,tn=0;
+    for(const [n,c] of tally){ if(c>tn && open.some(o=>o.node===n)){tn=c;top=n;} }
+    if(top) return top;
+  }
+  let best=null,bd=1e9;
+  for(const c of open){
+    const d=Math.hypot(c.node.x-a.x,c.node.y-a.y)+(st.rnd()*30);
+    if(d<bd){bd=d;best=c.node;}
+  }
+  return best||st.store;
+}
+
+const SPEED=0.0072, GAP=0.072;
+
+function step(st){
+  st.tick++;
+  const rnd=st.rnd;
+
+  for(const e of st.edges) e.flow=0;
+
+  for(const a of st.ants){
+    if(a.wait>0)a.wait--;
+    if(!a.edge){
+      if(!a.path.length){
+        const g=pickGoal(st,a); a.goal=g;
+        if(g===a.node){
+          if(a.carry && a.node===st.store){ a.carry=0; st.done++; st.strain=Math.max(0,st.strain-4); st.flash=10;
+            st.puff.push({x:a.x,y:a.y,t:0,c:SIG.teal});
+            if(st.done>=GOAL){ st.won=true; st.over=true; }
+            if(st.crumbs.filter(c=>!c.taken).length<4) spawnCrumb(st);
+          } else if(!a.carry){
+            const c=st.crumbs.find(c=>c.node===a.node&&!c.taken);
+            if(c){ c.taken=1; a.carry=1; st.crumbs.splice(st.crumbs.indexOf(c),1); }
+          }
+          a.goal=null; a.ph+=0.09; a.post=a.carry?'carry':'wander'; place(a); continue;
+        }
+        a.path=route(st,a.node,g);
+        if(!a.path.length){ a.ph+=0.06; a.post='wander'; place(a); continue; }
+      }
+      const e=a.path[0];
+      const dir=(e.a===a.node)?1:-1;
+      /* one body at a time near the mouth of a narrow edge */
+      const occupied=e.on.filter(o=>o!==a && ((dir>0? o.t<GAP*1.4 : o.t>1-GAP*1.4))).length;
+      const room=e.on.length < (e===st.trunk?5:7);
+      if(occupied===0 && room){
+        a.edge=e; a.dir=dir; a.t=dir>0?0:1; e.on.push(a); a.path.shift(); a.post='haul';
+      } else { a.post='wait'; a.wait=2; }
+      place(a); continue;
+    }
+    /* on an edge */
+    const e=a.edge;
+    const ahead=e.on.filter(o=>o!==a && o.dir===a.dir && ((a.dir>0)? o.t>a.t : o.t<a.t));
+    let block=false;
+    for(const o of ahead){ if(Math.abs(o.t-a.t)<GAP){ block=true; break; } }
+    const head=e.on.filter(o=>o.dir!==a.dir);
+    let nose=false;
+    if(!block && head.length && e.cap<2){
+      for(const o of head){ if(Math.abs(o.t-a.t)<GAP*1.5){ block=true; nose=true; break; } }
+    }
+    /* a meeting stone at either end arbitrates: they take turns and the gallery drains */
+    const arb=st.stones.some(s=>s.node===e.a||s.node===e.b);
+    if(block && arb && rnd()<0.55) block=false;
+
+    if(block){
+      a.post=(e===st.trunk||e.cap<2)?'jam':'wait';
+      a.stuckT=(a.stuckT||0)+1;
+      /* nose to nose with nothing to settle it: eventually somebody backs out, having
+         wasted the trip. This is what makes the jam cost something even unanswered. */
+      if(nose && !arb && a.stuckT>150 && a.id%2===0){ a.dir*=-1; a.stuckT=0; }
+    } else a.stuckT=0;
+    if(!block){
+      const sp=SPEED*a.gait*(a.carry?0.86:1)/Math.max(0.6,e.len/140);
+      a.t+=sp*a.dir; e.flow++; a.post='haul'; e.wear=Math.min(1,e.wear+0.0009);
+    }
+    if(a.t>=1||a.t<=0){
+      a.node=a.dir>0?e.b:e.a; e.on.splice(e.on.indexOf(a),1); a.edge=null; a.t=0; a.post='wander';
+    }
+    place(a);
+  }
+
+  /* --- the failure: a passage packed with bodies that are not moving --- */
+  for(const e of st.edges){
+    const stuck=e.on.filter(o=>o.post==='jam'||o.post==='wait').length;
+    const facing=e.on.some(o=>o.dir>0)&&e.on.some(o=>o.dir<0);
+    if(e.on.length>=JAM_N && stuck>=3 && (facing||e.flow<=1)) e.stall+=2;
+    else e.stall=Math.max(0,e.stall-3);
+  }
+  const worst=st.edges.slice().sort((p,q)=>q.stall-p.stall)[0];
+  if(!st.jam && worst && worst.stall>22){
+    const n=(worst.a.deg>=worst.b.deg)?worst.a:worst.b;
+    st.jam={edge:worst,node:n,born:st.tick,fuse:FUSE,state:'live'};
+  }
+  if(st.jam && st.jam.state==='live'){
+    const j=st.jam, e=j.edge;
+    /* it does damage the whole time it burns */
+    if(e.on.length>=2) j.clear=0;
+    st.strain=Math.min(100,st.strain+0.055);
+    if(st.tick%42===0){ const c=e.on.find(o=>o.carry); if(c && st.rnd()<0.55){ c.carry=0; st.puff.push({x:c.x,y:c.y,t:0,c:SIG.red}); } }
+    if(st.tick-j.born>j.fuse){
+      j.state='landed'; st.miss++; st.strain=Math.min(100,st.strain+16);
+      st.puff.push({x:cxOf(e),y:cyOf(e),t:0,c:SIG.red,big:1});
+      e.on.forEach(o=>{o.wait=90;o.carry=0;});
+      setTimeout(()=>{},0);
+      st.jam=null; e.stall=0;
+    } else if(e.on.length<2 && (j.clear=(j.clear||0)+1)>95){
+      j.state='gone'; st.jam=null; e.stall=0;
+    } else if(st.stones.some(s=>s.node===e.a||s.node===e.b)){
+      j.state='answered'; st.answered++; st.strain=Math.max(0,st.strain-10);
+      st.puff.push({x:cxOf(e),y:cyOf(e),t:0,c:SIG.teal,big:1});
+      st.jam=null; e.stall=0;
+    }
+  }
+  if(st.strain>=100){ st.over=true; st.won=false; }
+  for(const so of st.stones){ so.t=Math.min(1,so.t+0.05); so.life--; }
+  st.stones=st.stones.filter(so=>so.life>0);
+  if(st.flash>0)st.flash--;
+  for(const p of st.puff) p.t++;
+  st.puff=st.puff.filter(p=>p.t<26);
+}
+const cxOf=e=>(e.a.x+e.b.x)/2, cyOf=e=>(e.a.y+e.b.y)/2;
+
+/* ---------- drawing ---------- */
+function soil(x){
+  const g=x.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,MAT.soil); g.addColorStop(.55,MAT.soil2); g.addColorStop(1,MAT.soil3);
+  x.fillStyle=g; x.fillRect(0,0,W,H);
+  x.fillStyle='rgba(23,21,15,.10)';
+  const r=rng(9001);
+  for(let i=0;i<170;i++){ const px=r()*W,py=r()*H,s=0.7+r()*1.8; x.fillRect(px,py,s,s); }
+  x.strokeStyle='rgba(23,21,15,.07)'; x.lineWidth=1;
+  for(let i=0;i<6;i++){ const y=H*(0.12+i*0.15); x.beginPath();
+    for(let px=0;px<=W;px+=16) x.lineTo(px,y+Math.sin(px*0.02+i)*4); x.stroke(); }
+}
+function nestPath(x,st){
+  x.lineCap='round'; x.lineJoin='round';
+  for(const e of st.edges){ x.lineWidth=(e.cap<2?15:19); x.beginPath(); x.moveTo(e.a.x,e.a.y); x.lineTo(e.b.x,e.b.y); x.stroke(); }
+  for(const n of st.nodes){ x.beginPath(); x.arc(n.x,n.y,n.r,0,7); x.fill(); }
+}
+function drawNest(x,st){
+  /* excavated sand */
+  x.strokeStyle=MAT.sand; x.fillStyle=MAT.sand; nestPath(x,st);
+  x.save(); x.globalAlpha=.5; x.strokeStyle=MAT.sand2; x.lineWidth=2;
+  for(const e of st.edges){ x.beginPath(); x.moveTo(e.a.x,e.a.y); x.lineTo(e.b.x,e.b.y); x.stroke(); }
+  x.restore();
+  /* store sockets = the score, in the wall */
+  const s=st.store;
+  for(let i=0;i<GOAL;i++){
+    const a=-2.5+i*(5/(GOAL-1)), px=s.x+Math.cos(a)*(s.r-7), py=s.y+Math.sin(a)*(s.r-7);
+    x.beginPath(); x.arc(px,py,3.1,0,7);
+    x.fillStyle=i<st.done?MAT.ink:'rgba(23,21,15,.16)'; x.fill();
+  }
+  /* meeting stones — permanent architecture */
+  for(const st2 of st.stones){ drawStone(x,st2.node,st2.t*Math.min(1,st2.life/120)); }
+  /* crumbs */
+  for(const c of st.crumbs){
+    const jx=c.node.x+Math.cos(c.jig)*c.node.r*0.45, jy=c.node.y+Math.sin(c.jig)*c.node.r*0.45;
+    x.save(); x.translate(jx,jy); x.rotate(c.jig);
+    x.fillStyle=MAT.sand2; x.strokeStyle=MAT.ink; x.lineWidth=1.1;
+    x.beginPath(); x.ellipse(0,0,5.2,3.6,0,0,7); x.fill(); x.stroke();
+    x.restore();
+  }
+  /* ants */
+  for(const a of st.ants) drawAnt(x,a,st);
+  /* puffs */
+  for(const p of st.puff){
+    const k=p.t/26, r=(p.big?26:11)*(0.5+k*1.6);
+    x.strokeStyle=p.c; x.globalAlpha=(1-k)*0.9; x.lineWidth=p.big?2.6:1.8;
+    x.beginPath(); x.arc(p.x,p.y,r,0,7); x.stroke(); x.globalAlpha=1;
+  }
+}
+function drawStone(x,n,t){
+  const k=Math.min(1,(t||1));
+  x.save(); x.translate(n.x,n.y-2); x.globalAlpha=k;
+  x.strokeStyle=MAT.ink; x.fillStyle=MAT.sand2; x.lineWidth=2.2;
+  x.beginPath(); x.moveTo(-10,7); x.lineTo(-10,-2); x.quadraticCurveTo(0,-13,10,-2); x.lineTo(10,7);
+  x.stroke();
+  x.strokeStyle=SIG.teal; x.lineWidth=1.6; x.globalAlpha=k*0.85;
+  x.beginPath(); x.moveTo(-10,7); x.lineTo(-10,-2); x.quadraticCurveTo(0,-13,10,-2); x.lineTo(10,7); x.stroke();
+  x.globalAlpha=k;
+  x.fillStyle=MAT.ink;
+  for(let i=-1;i<2;i++){ x.beginPath(); x.arc(i*7,9,2.1,0,7); x.fill(); }
+  x.restore();
+}
+function drawAnt(x,a,st){
+  const jam=(a.post==='jam'), wait=(a.post==='wait');
+  const wob=Math.sin(st.tick*0.22*a.gait+a.ph)*(jam||wait?0.35:1.1);
+  x.save(); x.translate(a.x,a.y);
+  let ang=0;
+  if(a.edge){ const A=a.dir>0?a.edge.a:a.edge.b,B=a.dir>0?a.edge.b:a.edge.a; ang=Math.atan2(B.y-A.y,B.x-A.x); }
+  else ang=a.ph;
+  x.rotate(ang);
+  x.strokeStyle=MAT.ink; x.lineWidth=1.05;
+  for(let i=-1;i<2;i++){ const lx=i*2.6;
+    x.beginPath(); x.moveTo(lx,0); x.lineTo(lx-1.4,-3.4-wob*0.4); x.stroke();
+    x.beginPath(); x.moveTo(lx,0); x.lineTo(lx-1.4, 3.4+wob*0.4); x.stroke(); }
+  x.beginPath(); x.moveTo(4.4,0); x.lineTo(6.6,-2.2); x.stroke();
+  x.beginPath(); x.moveTo(4.4,0); x.lineTo(6.6, 2.2); x.stroke();
+  x.fillStyle=MAT.ink;
+  x.beginPath(); x.ellipse(-3.4,0,3.3,2.5,0,0,7); x.fill();
+  x.beginPath(); x.ellipse(0.6,0,2.1,1.7,0,0,7); x.fill();
+  x.beginPath(); x.ellipse(4.0,0,1.9,1.6,0,0,7); x.fill();
+  if(a.carry){ x.save(); x.translate(7.0,0); x.rotate(0.5);
+    x.fillStyle=MAT.sand2; x.strokeStyle=MAT.ink; x.lineWidth=1;
+    x.beginPath(); x.ellipse(0,0,4.2,2.9,0,0,7); x.fill(); x.stroke(); x.restore(); }
+  x.restore();
+  if(jam){ x.strokeStyle='rgba(255,46,46,.55)'; x.lineWidth=1.3;
+    x.beginPath(); x.arc(a.x,a.y,8.5,0,7); x.stroke(); }
+}
+
+/* ---------- attention mask (WAY B) ---------- */
+const LOOK_R=86;
+function paintMask(st){
+  /* fade memory */
+  mctx.globalCompositeOperation='destination-out';
+  mctx.fillStyle='rgba(0,0,0,0.021)'; mctx.fillRect(0,0,W,H);
+  mctx.globalCompositeOperation='source-over';
+  if(st.hold){
+    const g=mctx.createRadialGradient(st.hold.x,st.hold.y,LOOK_R*0.22,st.hold.x,st.hold.y,LOOK_R);
+    g.addColorStop(0,'rgba(0,0,0,1)'); g.addColorStop(0.72,'rgba(0,0,0,.92)'); g.addColorStop(1,'rgba(0,0,0,0)');
+    mctx.fillStyle=g; mctx.beginPath(); mctx.arc(st.hold.x,st.hold.y,LOOK_R,0,7); mctx.fill();
+  }
+}
+
+/* ---------- frame ---------- */
+function frame(){
+  RAF=requestAnimationFrame(frame);
+  const st=S; if(!st) return;
+  if(!st.over) step(st);   /* identical clock in both ways — the only variable is discovery */
+
+  ctx.clearRect(0,0,W,H); soil(ctx);
+
+  if(way==='A'){
+    drawNest(ctx,st);
+    if(st.jam&&st.jam.state==='live') drawRing(ctx,st,1);
+  } else {
+    /* architecture is known; the bodies are not */
+    /* you know the SHAPE of the nest — a surveyor's outline, nothing more. Who is
+       inside it, and what they are doing, only exists where you are looking. */
+    ctx.save();
+    ctx.globalAlpha=.22; ctx.strokeStyle=MAT.sand2; ctx.lineWidth=1.3; ctx.setLineDash([]);
+    for(const e of st.edges){ ctx.beginPath(); ctx.moveTo(e.a.x,e.a.y); ctx.lineTo(e.b.x,e.b.y); ctx.stroke(); }
+    for(const n of st.nodes){ ctx.beginPath(); ctx.arc(n.x,n.y,n.r,0,7); ctx.stroke(); }
+    ctx.restore();
+    sctx.clearRect(0,0,W,H); drawNest(sctx,st);
+    paintMask(st);
+    sctx.globalCompositeOperation='destination-in';
+    sctx.drawImage(mk,0,0,W,H); sctx.globalCompositeOperation='source-over';
+    ctx.drawImage(sc,0,0,W,H);
+    if(st.hold) drawLookRim(ctx,st);
+    /* the only global cue: the ground itself is uneasy while something burns */
+    if(st.jam&&st.jam.state==='live') unease(ctx,st);
+  }
+  ui(st);
+  if(st.over) finish(st);
+}
+function drawRing(x,st,full){
+  const j=st.jam,e=j.edge, X=cxOf(e), Y=cyOf(e);
+  const k=1-(st.tick-j.born)/j.fuse;
+  const r=54;
+  x.save();
+  x.fillStyle='rgba(255,46,46,.10)'; x.beginPath(); x.arc(X,Y,r,0,7); x.fill();
+  x.strokeStyle=SIG.red; x.lineWidth=2.4; x.setLineDash([]);
+  x.beginPath(); x.arc(X,Y,r,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.max(0,k)); x.stroke();
+  x.strokeStyle='rgba(23,21,15,.35)'; x.lineWidth=1.2; x.beginPath(); x.arc(X,Y,r,0,7); x.stroke();
+  x.strokeStyle=SIG.amber; x.lineWidth=2.6;
+  for(const [sx,sy] of [[-1,-1],[1,-1],[-1,1],[1,1]]){
+    x.beginPath(); x.moveTo(X+sx*r,Y+sy*r-sy*12); x.lineTo(X+sx*r,Y+sy*r); x.lineTo(X+sx*r-sx*12,Y+sy*r); x.stroke();
+  }
+  x.restore();
+}
+function drawLookRim(x,st){
+  const h=st.hold;
+  x.save();
+  const gl=x.createRadialGradient(h.x,h.y,LOOK_R*0.55,h.x,h.y,LOOK_R*1.02);
+  gl.addColorStop(0,'rgba(245,239,227,0)'); gl.addColorStop(1,'rgba(245,239,227,.13)');
+  x.fillStyle=gl; x.beginPath(); x.arc(h.x,h.y,LOOK_R*1.02,0,7); x.fill();
+  x.strokeStyle='rgba(245,239,227,.42)'; x.lineWidth=1.6;
+  x.beginPath(); x.arc(h.x,h.y,LOOK_R*0.96,0,7); x.stroke();
+  if(st.dwellOK){
+    x.strokeStyle='rgba(25,230,200,.30)'; x.lineWidth=3;
+    x.beginPath(); x.arc(h.x,h.y,LOOK_R*0.96,0,7); x.stroke();
+  }
+  if(st.holdDwell>0){
+    x.strokeStyle=SIG.teal; x.lineWidth=3;
+    x.beginPath(); x.arc(h.x,h.y,LOOK_R*0.96,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.min(1,st.holdDwell)); x.stroke();
+  }
+  if(st.dwellOK&&st.dwellNode){
+    const n=st.dwellNode;
+    x.setLineDash([3,4]); x.strokeStyle='rgba(25,230,200,.75)'; x.lineWidth=1.4;
+    x.beginPath(); x.moveTo(h.x,h.y); x.lineTo(n.x,n.y); x.stroke(); x.setLineDash([]);
+    x.strokeStyle=SIG.teal; x.lineWidth=2;
+    x.beginPath(); x.arc(n.x,n.y,n.r+5,0,7); x.stroke();
+  }
+  x.restore();
+}
+function unease(x,st){
+  const k=Math.min(1,(st.tick-st.jam.born)/st.jam.fuse);
+  const n=6+((k*10)|0);
+  x.save(); x.globalAlpha=0.22+0.4*k; x.fillStyle=MAT.soil3;
+  const r=rng(st.tick*7+3);
+  for(let i=0;i<n;i++){ const px=r()*W, py=r()*H*0.98, s=1+r()*2.2; x.fillRect(px,py,s,s*2.2); }
+  x.restore();
+  /* the strain bar is the only other global signal, and both ways have it */
+}
+
+/* ---------- ui ---------- */
+const elDone=document.getElementById('cDone'),elBar=document.getElementById('strainBar'),
+      elTag=document.getElementById('tag'),elAct=document.getElementById('act'),
+      elHint=document.getElementById('hint'),elWay=document.getElementById('way');
+let armed=null;
+function ui(st){
+  elDone.textContent=st.done;
+  elBar.style.width=Math.min(100,st.strain)+'%';
+  elWay.textContent=way;
+  if(way==='A'){
+    const live=st.jam&&st.jam.state==='live';
+    if(live && st.jam.edge.on.length>=3){
+      if(elTag.style.display!=='block'){
+        elTag.innerHTML='<b>THE JAMMED TUNNEL</b>They all chose the route everyone else chose.';
+        elTag.style.display='block';
+      }
+      const e=st.jam.edge; const X=cxOf(e),Y=cyOf(e);
+      const wr=document.getElementById('world').getBoundingClientRect();
+      const tw=elTag.offsetWidth||220, th=elTag.offsetHeight||60, R=54, PAD=18;
+      let tx=X-tw/2, ty=Y-R-PAD-th;
+      if(ty<6){ ty=Y+R+PAD; }
+      if(ty+th>H-6){ ty=Math.max(6,Y-R-PAD-th); }
+      tx=Math.max(6,Math.min(W-tw-6,tx));
+      /* if it still overlaps the ring, slide it sideways rather than over it */
+      if(!(ty+th < Y-R-2 || ty > Y+R+2)){ tx=(X<W/2)? Math.min(W-tw-6,X+R+12) : Math.max(6,X-R-12-tw); }
+      elTag.style.left=tx+'px'; elTag.style.top=ty+'px';
+      elAct.classList.add('on');
+    } else if(live){ elAct.classList.add('on'); }
+      else { elTag.style.display='none'; elAct.classList.remove('on'); armed=null; paintTools(); }
+  } else {
+    elTag.style.display='none'; elAct.classList.remove('on');
+  }
+}
+function paintTools(){
+  [...elAct.children].forEach(b=>b.classList.toggle('armed',b.dataset.k===armed));
+}
+const ARCH='<svg viewBox="0 0 26 22"><path d="M4 19V9a9 9 0 0 1 18 0v10" fill="none" stroke="#17150f" stroke-width="2.2"/><path d="M2 19h22" stroke="#17150f" stroke-width="2.2"/></svg>';
+const BELL='<svg viewBox="0 0 26 22"><path d="M13 3a7 7 0 0 0-7 7v6h14v-6a7 7 0 0 0-7-7z" fill="none" stroke="#17150f" stroke-width="2.2"/><path d="M3 16h20M11 19h4" stroke="#17150f" stroke-width="2.2"/></svg>';
+function buildTools(){
+  elAct.innerHTML='';
+  for(const [k,label,svg] of [['charter','MEETING STONE',ARCH],['slow','BELL',BELL]]){
+    const b=document.createElement('button'); b.className='tool'; b.dataset.k=k;
+    b.innerHTML=svg+'<span>'+label+'</span>';
+    b.onclick=()=>{ armed=(armed===k?null:k); paintTools();
+      elHint.classList.toggle('on',!!armed);
+      elHint.textContent=armed==='charter'?'Now tap the trouble.':'Tap anywhere to ring it.'; };
+    elAct.appendChild(b);
+  }
+}
+
+/* ---------- input ---------- */
+function xy(ev){ const r=cv.getBoundingClientRect(); const t=ev.touches?ev.touches[0]:ev;
+  return {x:(t.clientX-r.left)*(W/r.width), y:(t.clientY-r.top)*(H/r.height)}; }
+function segDist(p,a,b){
+  const vx=b.x-a.x, vy=b.y-a.y, wx=p.x-a.x, wy=p.y-a.y;
+  const L=vx*vx+vy*vy; let t=L?((wx*vx+wy*vy)/L):0; t=Math.max(0,Math.min(1,t));
+  return {d:Math.hypot(p.x-(a.x+vx*t),p.y-(a.y+vy*t)),t};
+}
+/* what would a stone laid here actually govern? */
+function stoneTarget(st,p){
+  let be=null,bd=1e9,bt=0;
+  for(const e of st.edges){ const r=segDist(p,e.a,e.b); if(r.d<bd){bd=r.d;be=e;bt=r.t;} }
+  const nn=nearestNode(st,p);
+  if(nn.d<44) return {node:nn.n,d:nn.d,edge:null};
+  if(be&&bd<48){ const n=(bt<0.5)?be.a:be.b;
+    const other=(bt<0.5)?be.b:be.a;
+    /* prefer the busier junction — that is what a meeting stone is for */
+    const pick=((n.deg||0)>=(other.deg||0))?n:other;
+    return {node:pick,d:bd,edge:be}; }
+  return {node:nn.n,d:nn.d,edge:null};
+}
+function nearestNode(st,p){ let b=null,bd=1e9; for(const n of st.nodes){ const d=Math.hypot(n.x-p.x,n.y-p.y); if(d<bd){bd=d;b=n;} } return {n:b,d:bd}; }
+function placeStone(st,p){
+  const {node:n,d}=stoneTarget(st,p);
+  if(!n||d>96) return {ok:false,why:'far'};
+  if(st.stones.some(s=>s.node===n)) return {ok:false,why:'dup'};
+  st.stones.push({node:n,t:0,life:620});
+  if(!st.firstActionAt) st.firstActionAt=st.tick;
+  const live=st.jam&&st.jam.state==='live';
+  const right=live&&(st.jam.edge.a===n||st.jam.edge.b===n);
+  if(!right){ st.wrong++; st.strain=Math.min(100,st.strain+3); }
+  return {ok:true,right};
+}
+function down(ev){
+  ev.preventDefault(); const st=S; if(!st||st.over) return;
+  const p=xy(ev);
+  if(way==='A'){
+    if(!armed) return;
+    if(armed==='charter'){ const r=placeStone(st,p);
+      if(!r.ok&&r.why==='far'){ elHint.textContent='Not there. Where it is happening.'; return; } }
+    else { const q=stoneTarget(st,p); if(q.node) st.stones.push({node:q.node,t:0,life:620}); }
+    armed=null; paintTools(); elHint.classList.remove('on');
+  } else {
+    st.hold=p; st.holdDwell=0; st.holdStart=performance.now();
+  }
+}
+function move(ev){ const st=S; if(!st||st.over)return; if(way==='B'&&st.hold){ ev.preventDefault();
+  const p=xy(ev); const d=Math.hypot(p.x-st.hold.x,p.y-st.hold.y); st.hold=p;
+  if(d>6){ st.holdDwell=0; st.moved=true; } } }
+function up(){ const st=S; if(!st)return;
+  if(way==='B'&&st.hold){ st.holdAt={x:st.hold.x,y:st.hold.y}; st.hold=null; st.holdDwell=0; } }
+cv.addEventListener('pointerdown',down); cv.addEventListener('pointermove',move);
+addEventListener('pointerup',up); addEventListener('pointercancel',up);
+
+/* WAY B dwell: holding on real trouble long enough IS the placement. */
+setInterval(()=>{
+  const st=S; if(!st||st.over||way!=='B') return;
+  if(!st.hold){ st.holdDwell=0; return; }
+  st.lookMs+=60;
+  const tgt=stoneTarget(st,st.hold); const n=tgt.node, d=tgt.d;
+  st.dwellNode = n;
+  st.dwellOK = d<52 && n && !st.stones.some(s=>s.node===n);
+  if(!st.dwellOK || st.moved){ st.holdDwell=0; st.moved=false; return; }
+  st.holdDwell=Math.min(1,(st.holdDwell||0)+0.062);   /* ~1.1s of a still hand */
+  if(st.holdDwell>=1){
+    const live=st.jam&&st.jam.state==='live';
+    const e=live?st.jam.edge:null;
+    const near=e&&(e.a===n||e.b===n);
+    const r=placeStone(st,{x:n.x,y:n.y});
+    st.holdDwell=0; st.hold=null;
+    if(r.ok&&near) st.found=true;
+  }
+},60);
+
+/* ---------- flow ---------- */
+let order=[], idx=0, results={};
+function briefFor(w,n){
+  const t=document.getElementById('brTitle'), b=document.getElementById('brBody');
+  document.getElementById('brEyebrow').textContent='ROUND '+n+' OF 2';
+  if(w==='A'){
+    t.textContent='WAY A';
+    b.innerHTML='<p>When something goes wrong, <b>the colony will tell you.</b> A ring appears around the trouble, a note names it, and a clock starts.</p>'+
+      '<p>Pick the <b>meeting stone</b> at the bottom, then tap the trouble. A stone at a junction makes the ants take turns.</p>'+
+      '<p class="res">Store six crumbs before the strain bar fills.</p>';
+  } else {
+    t.textContent='WAY B';
+    b.innerHTML='<p>You know the shape of the nest. <b>You cannot see who is in it.</b></p>'+
+      '<p><b>Hold your finger anywhere to look there.</b> What you have looked at stays in your memory for a few seconds, then fades.</p>'+
+      '<p>Nothing will tell you anything is wrong. <b>Keep holding on trouble and you will lay a meeting stone there.</b></p>'+
+      '<p class="res">Store six crumbs before the strain bar fills.</p>';
+  }
+}
+function startRound(){
+  way=order[idx];
+  S=makeWorld(4471+idx*977, idx);
+  layout(); buildTools(); armed=null; paintTools();
+  mctx.clearRect(0,0,W,H);
+  elHint.classList.remove('on'); elTag.style.display='none'; elAct.classList.remove('on');
+  hideCards(); size();
+}
+function finish(st){
+  if(st.reported) return; st.reported=1;
+  results[way]={won:st.won,done:st.done,miss:st.miss,answered:st.answered,wrong:st.wrong,
+    found:st.found,ticks:st.tick,look:st.lookMs};
+  const t=document.getElementById('enTitle'), b=document.getElementById('enBody');
+  document.getElementById('enEyebrow').textContent='WAY '+way+' — ROUND '+(idx+1)+' OF 2';
+  t.textContent=st.won?'THE STORE IS FULL':'THE STRAIN WON';
+  let r='';
+  if(way==='A'){
+    r='<div class="res'+(st.answered?'':' bad')+'">You answered '+st.answered+' jam'+(st.answered===1?'':'s')+
+      ' and missed '+st.miss+'. The colony told you where to look every time.</div>';
+  } else {
+    r='<div class="res'+(st.found?'':' bad')+'">You answered '+st.answered+' jam'+(st.answered===1?'':'s')+
+      ' and missed '+st.miss+'. Nothing ever told you where to look'+(st.found?' — you found it.':'.')+'</div>';
+  }
+  if(st.wrong) r+='<div class="res bad">'+st.wrong+' stone'+(st.wrong===1?'':'s')+' laid where nothing was wrong.</div>';
+  b.innerHTML=r+'<p>'+(st.won
+    ? 'Six crumbs stored. Nothing in this colony got smarter — you just made one junction take turns.'
+    : 'No ant here did anything unreasonable. They all took the route that was working, until it was not.')+'</p>';
+  document.getElementById('bEnd').textContent=(idx===0)?'NEXT WAY':'THE QUESTION';
+  show('cEnd');
+}
+function hideCards(){ document.querySelectorAll('.card').forEach(c=>c.classList.remove('on')); }
+function show(id){ hideCards(); document.getElementById(id).classList.add('on'); }
+
+document.getElementById('bIntro').onclick=()=>{
+  order=Math.random()<0.5?['A','B']:['B','A']; idx=0; results={};
+  briefFor(order[0],1); show('cBrief');
+};
+document.getElementById('bBrief').onclick=()=>startRound();
+document.getElementById('bRetry').onclick=()=>startRound();
+document.getElementById('bEnd').onclick=()=>{
+  if(idx===0){ idx=1; briefFor(order[1],2); show('cBrief'); }
+  else{
+    const s=document.getElementById('askScores');
+    const A=results.A||{},B=results.B||{};
+    s.innerHTML='<div class="res">Way A — '+(A.won?'stored 6':'strain won')+', answered '+(A.answered||0)+', missed '+(A.miss||0)+
+      '.<br>Way B — '+(B.won?'stored 6':'strain won')+', answered '+(B.answered||0)+', missed '+(B.miss||0)+'.</div>';
+    show('cAsk');
+  }
+};
+document.querySelectorAll('[data-pick]').forEach(b=>{
+  b.onclick=()=>{
+    const p=b.dataset.pick;
+    const t=document.getElementById('thTitle'),bd=document.getElementById('thBody');
+    if(p==='A'){ t.textContent='THEN THE MARKER STAYS.'; bd.innerHTML='<p>Way A wins. The plateau is real and the work is polish, not another rebuild — finish the round-6 fixes and push the announced version as far as it goes.</p>'; }
+    else if(p==='B'){ t.textContent='THEN ATTENTION IS THE GAME.'; bd.innerHTML='<p>Way B wins, and the rebuild is worth it. Darkness replaces every marker, the six institutions become ways of not having to look, and machine speed becomes the difficulty curve honestly — you lose because you cannot be in two places.</p>'; }
+    else { t.textContent='THEN NEITHER IS IT YET.'; bd.innerHTML='<p>Fair. Tell me what was missing from both and I will build against that instead of guessing.</p>'; }
+    bd.innerHTML+='<p><small>A: '+JSON.stringify(results.A||{})+'<br>B: '+JSON.stringify(results.B||{})+'</small></p>';
+    show('cThanks');
+  };
+});
+document.getElementById('bAgain').onclick=()=>{ show('cIntro'); };
+
+size(); frame();
+</script>
+</body>
+</html>
