@@ -111,3 +111,67 @@ to show progress or it refuses.
 
 Both failure modes were in `ANTBAT-GENIE.md` before this loop was written. Having
 them written down did not prevent them. Having a test that fires did.
+
+---
+
+## The body test
+
+`trailer-fit.html` — a dimensioned figure, put inside the thing, at real scale.
+
+**The model.** Not a downloaded mannequin: a rigged mesh looks like a person and
+has dimensions nobody can cite, and for a fit study the dimensions *are* the
+model. The figure is a link-segment body whose every limb is a published fraction
+of stature — Winter, *Biomechanics and Motor Control of Human Movement* 4th ed.,
+Table 4.1, after Drillis & Contini. Cross-checked against Dreyfuss, *The Measure
+of Man and Woman*: this model puts overhead grip reach at **2140 mm** for an
+1829 mm male where Dreyfuss gives the 95th-percentile male **2134 mm**.
+
+Stature 1829 mm is 6 ft 0 in, about the 90th percentile US male (ANSUR II 2012:
+50th 1756 mm, 95th 1855 mm). Change the stature and every clearance, every work
+height and every verdict moves with it — which is the point of deriving rather
+than looking up.
+
+| | mm |
+| --- | ---: |
+| eye height | 1712 |
+| shoulder height | 1496 |
+| elbow height | 1152 |
+| knuckle height | 860 |
+| shoulder width | 474 |
+| forward functional reach | 805 |
+| overhead grip reach | 2140 |
+| clear headroom needed | 1864 |
+
+**What it found, standing on the deck**
+
+```
+floor under foot     deck
+head clearance       3250 mm   (needs 1864)
+nearest obstruction   727 mm
+within arm's reach        1
+```
+
+Room to stand, and **one bare surface within arm's reach**. No counter, no table,
+no bed, no switch, no shelf. Move 900 mm toward the long wall and the nearest
+obstruction is **73 mm** — a body of 474 mm shoulder width cannot stand there,
+because the `OVER_WIDTH` repair moved both walls 470 mm inboard to get under the
+towing limit and nobody measured what that did to the room. It narrowed the
+interior from 2.50 m to about 1.56 m. **A legal fix that made the space a
+corridor.**
+
+And the work heights say the rest. A standard 900 mm counter sits **152 mm below
+this man's elbow**; a 750 mm table is **139 mm below** his seated elbow rest.
+Those are the sink and the table, before either exists.
+
+**Seeing it.** Systems cycle solid → ghost → hidden, shift-click to solo, with
+presets for *peel the envelope* and *bones only*. A section plane cuts along x or
+z. And *stand inside* puts the camera at 1712 mm behind the figure's eyes with a
+clip plane on the eye — ghosting a wall you are 50 mm from still fills the frame,
+so the half-space behind the eye is cut away outright, which is what "look
+inside" has always meant on a drawing.
+
+The verdict from in there, in the program's own words:
+
+> Room to stand, and one bare surface within arm's reach. No counter, no table,
+> no bed, no switch, no shelf. The body has nowhere to put its hands and nothing
+> to sit on: this is a shed with a door.
