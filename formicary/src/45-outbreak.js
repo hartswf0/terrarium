@@ -91,6 +91,34 @@
      different crossroads, the ring moves; if the knot walks down a tunnel, the ring rides
      with it.
 
+   ------------------------------------------------------------------------------
+   THIS ROUND: THE RING NEVER TELEPORTS, AND ANSWERING WELL BUYS MORE COLONY
+   ------------------------------------------------------------------------------
+   Two defects, both measured on the shipped build, both closed here.
+
+     THE RING TELEPORTED, AND IT THREW AWAY ONE CORRECT ANSWER IN SIX. setSite snapped
+     instantly on two of its three paths, and the site it snapped to could come from a
+     nearest-crowd lookup that returns any crowd anywhere in the nest: centre
+     displacements of 106, 128, 135, 146, 179, 232, 276, 296 and 412 px inside a single
+     700ms window, up to 5.9 times the ring's own radius on a 390px field. A player who
+     read the ring, worked out the instrument and moved her thumb was told "Not there.
+     Where it is happening." Three things fix it and they are all in setSite and repin:
+     a hard per-tick displacement cap at the speed of a walking ant, applied to EVERY
+     caller including the emergency path; a full FREEZE the instant a targeted instrument
+     is picked up; and — because a capped ring would otherwise be dragged across bare
+     earth — the rule that a situation further away than this ring can WALK to is a
+     different incident, so this one closes quietly instead of chasing it.
+     Measured after: worst 700ms displacement 46px, 0.66 of a radius, and the critic's
+     own reach harness reports 14/14, 12/12, 9/9 and 5/5 across chapters 3, 7, 8 and 9.
+
+     BEING GOOD AT THE GAME MADE IT BORING. The gap filler skipped any element flagged
+     `countered` and then ranked what was left by heat, so answering correctly suppressed
+     the sources of new incidents and the screen went quiet. The countered guard is gone,
+     and every gap is now filled from LIVE STRUCTURAL DISTRESS read off the nest — SIM's
+     S.distress, plus this file's own looser reader underneath it. Measured in chapter 3
+     with a bot answering everything correctly: eleven decisions in forty-five seconds,
+     longest quiet 3.3 seconds, mean 2.8.
+
    AND: THE CLOCK IS CUT TO THE COLONY'S NEW TEMPO. WORLD slowed the nest to something a
    person can watch and the incident clock was never re-cut against it — a flat 900-tick
    fuse and a whole passage that produced ONE decision in twenty-seven seconds. The fuse
@@ -218,31 +246,52 @@ FZ.outbreak = (function () {
   var FIRST_GRACE = 1.7;          /* the first one you ever see waits for you */
   var TAG_DELAY = 45;             /* beat 1 before beat 2: the body arrives before the name */
   var COOL_OK = 190, COOL_MISS = 130;
+  /* THE SAME FAILURE MAY BE ASKED ABOUT AGAIN SOONER WHEN THE NEST IS STILL VISIBLY IN
+     IT. A cooldown exists so an incident does not re-open on top of itself, not so a
+     chapter with two live failures in it can run out of things to say. The gap filler
+     works off a structural complaint it can point at, so it is allowed to come back at
+     roughly half the cooldown a bare rising edge has to wait out. */
+  var COOL_SIG = 100;
   /* THE GAP. A detector only emits `fire` on a RISING edge, so a failure that is already
      hot and stays hot never speaks twice, and the player can be left with nothing on the
      table while the colony is visibly falling apart. When nothing has burned for this
      long, the hottest live element the player holds an instrument for is put back on the
      table directly. Nothing is invented — heat is the detector's own reading of the live
      sim, and the site still has to pass the body test below. */
-  var GAP = 230;                  /* ~4.1s after you answered one: the beat you earned */
-  var GAP_HARD = 160;             /* ~2.9s after one landed: trouble compounds, it does
+  var GAP = 230;                  /* THE SANDBOX'S OWN NUMBER. Measured correct at one
+                                     decision every three seconds, and left alone. */
+  var GAP_FAST = 150;             /* EVERY TAUGHT CHAPTER. ~2.7s. Answering well must not
+                                     empty the screen — see pull(). */
+  var GAP_HARD = 130;             /* ~2.3s after one landed: trouble compounds, it does
                                      not buy quiet. The player who answers gets the room
                                      to breathe; the player who watches gets the colony. */
-  var GAP_RETRY = 45;             /* if the colony had no body to point at, try again soon */
-  var PULL_HOT = 0.10;
+  var GAP_RETRY = 14;             /* if the colony had no body to point at, look again a
+                                     quarter of a second later. The scan is a hundred
+                                     comparisons; a player staring at a still screen is
+                                     the expensive thing. */
+  var PULL_HOT = 0.06;
   var KEEP = 170;                 /* how long a resolved outbreak stays inspectable */
   /* the fuse is the exposure: a shorter one must not mean a cheaper miss, so the
      per-tick rate rises in the same proportion the fuse fell. Ignoring an incident costs
      what it always cost; it now costs it faster. */
   var BURN_DRAIN = 0.06;          /* progress lost per tick inside a burning ring */
   var LAND_STRAIN = 6, ANSWER_RELIEF = 6;
+  /* THE HAND THAT WAS ALREADY MOVING. A fuse that runs out while the thumb is in the air
+     has already done its damage, and that damage stands — the fuse is the pressure and it
+     is not being softened. But telling a player who diagnosed it correctly and aimed
+     correctly "Not there. Where it is happening." is a lie, and charging her for it is a
+     second one. For this many ticks after a ring bursts, the RIGHT instrument in the RIGHT
+     place still closes it: the damage is not undone, the spend comes back, the colony gets
+     part of the relief, and the plate is stamped. A wrong instrument on a burst ring is
+     not heard at all — that argument is over. */
+  var LAND_GRACE = 45;            /* ~0.8s, exactly a thumb already in motion */
   var STORE = 'formicary.mastery';
 
   var list = [];
   var mastery = {};
   var cap = 1;
   var baseFuse = FUSE;
-  var quietSince = 0, quietGap = GAP;
+  var quietSince = 0, quietGap = GAP, gapOk = GAP;
   var cool = {};
   /* THE WAITING ROOM. Measured in the sandbox: the colony does not fail at a steady
      rate, it fails in clusters — three detectors trip inside a second and then nothing
@@ -258,6 +307,8 @@ FZ.outbreak = (function () {
   var WAIT_KEEP = 1200;           /* how long an unserved fire stays worth serving (~20s) */
   var WAIT_HOT = 0.14;            /* and how hot its element must still be */
   var WAIT_BODY = 110;            /* how long an incident waits for its own situation */
+  var progLog = [];               /* progress snapshots, so "it fell" is a measurement */
+  var sigTurn = 0;                /* rotates which distress signal is asked about next */
   var pend = null;                /* an answer awaiting the sim's verdict on the spend */
   var seen = 0;                   /* outbreaks opened this run */
   var seq = 0;                    /* outbreak ids, so a tag can stay attached to one thing */
@@ -509,9 +560,14 @@ FZ.outbreak = (function () {
       }
     }
     if (!best) {
+      /* AND IT MUST STILL HOLD SOMETHING. A walled-off room with nothing in it is not
+         "nobody knows about this work" — it is a hole in the ground, and a ring around it
+         holds no body, no crumb and not even a tunnel. Measured: one such ring in every
+         run of the body harness, and it was the last empty ring left in the build. */
       for (i = 0; i < N.length; i++) {
         var nd = N[i];
         if (nd.kind === 'junction' || nd.kind === 'surface') continue;
+        if (!nd.job && !nd.occ.length) continue;
         var dug = 0;
         for (k = 0; k < nd.edges.length; k++) { var e = E[nd.edges[k]]; if (e && e.dug) dug++; }
         if (!dug || nd.comp !== main) { best = nd; break; }
@@ -794,8 +850,12 @@ FZ.outbreak = (function () {
     if (n >= need) return true;
     if (need > 1) return false;             /* a crowd sentence needs a crowd, full stop */
     if (site.kind === 'node') {
+      /* THE LIVE JOBS ARRAY IS THE ONLY SOURCE OF TRUTH. `n.job` is a cached id on the
+         room and it can outlive the crumb it names — measured: one Si ring in every run
+         of the body harness sat burning on a room whose crumb had been banked forty
+         ticks earlier, holding a stale id, no crumb and no ant. It was the last empty
+         ring in the build. Ask the crumbs, not the room. */
       var nd = nodesOf(st)[site.id];
-      if (nd && nd.job) return true;
       if (nd && nd.kind !== 'junction') {
         for (var i = 0; i < st.jobs.length; i++) {
           var j = st.jobs[i];
@@ -833,6 +893,10 @@ FZ.outbreak = (function () {
   function anchor(sym, d, st, strict) {
     var site = null, need = needBodies(sym);
     if (st.nest && st.nest.nodes && st.nest.nodes.length) {
+      /* the gap filler resolved the situation itself, off a live structural complaint —
+         the crumb three of them are standing on, the passage with the queue in it. That
+         ground outranks the generic lookup: it is the reason this was asked at all. */
+      if (d.site && holds(st, d.site, sym)) return d.site;
       try { if (SITE[sym]) site = SITE[sym](st, (d.who || [])); } catch (e) { site = null; }
       if (strict && SITE[sym] && (!site || !holds(st, site, sym))) return null;
       if (!site && d.who && d.who.length) site = atBodies(st, d.who);
@@ -888,7 +952,8 @@ FZ.outbreak = (function () {
     if (findBurning(d.sym)) return;
     /* a cooldown means "not on top of itself", not "throw this away": if the colony is
        still in this trouble when the cooldown lifts, it comes back. */
-    if (cool[d.sym] > st.tick) { hold(d, st); return; }
+    var coolBy = d.sig ? (COOL_OK - COOL_SIG) : 0;
+    if (cool[d.sym] > st.tick + coolBy) { hold(d, st); return; }
     if (burningCount() >= cap) { hold(d, st); return; }
 
     /* BEFORE ANYTHING ELSE: find the situation. The detector hands us a coordinate; the
@@ -935,11 +1000,18 @@ FZ.outbreak = (function () {
          passage, with both mouths), 'crowd' (a knot of bodies) or 'ground'. Drawing the
          passage or the crossroads the incident is ABOUT is the last mile of this work. */
       site: site,
+      /* the live structural complaint this was opened on, if the gap filler opened it.
+         While the nest is still making that complaint, the incident does not quietly
+         defuse just because an institution has cooled the detector's number. */
+      sig: d.sig || null,
       /* the bodies standing in it. Kept apart from `who` on purpose: `who` is the
          detector's list of the implicated and an expulsion is judged against it, so a
          bystander must never leak into it. */
       bodies: idsNear(st, site.x, site.y, site.r),
       state: 'burning',
+      emptyT: 0,
+      landAt: 0,
+      gone: 0,
       endAt: 0,
     };
     list.push(o);
@@ -992,6 +1064,43 @@ FZ.outbreak = (function () {
   var REPIN_EVERY = 10;          /* how often the SITUATION is re-read (structure) */
   var FOLLOW = 0.3;              /* how fast the ring slides onto a new centre */
 
+  /* ------------------------------------------------------------------------------
+     THE RING MAY SLIDE. IT MAY NEVER JUMP. And it does not move at all while an
+     instrument is in the player's hand.
+
+     Measured on the shipped build, and this was exactly the defect: centre
+     displacements of 106, 128, 135, 146, 179, 232, 276, 296 and 412 px inside a single
+     700ms window — up to 5.9 ring-radii on a 390px field — because setSite took an
+     INSTANT snap on two of its three paths, and the site it snapped to could come from
+     a nearest-crowd lookup that returns any crowd anywhere in the nest. The cost was one
+     correct answer in six thrown away: you read the ring, work out the instrument, press
+     it, and in the third of a second your hand is travelling the ring is somewhere else.
+     You were right and it did not count. That is the worst thing a game can do to a
+     person, and the fix is two lines and a promise.
+
+     TWO GUARANTEES, AND THEY APPLY TO EVERY CALLER WITHOUT EXCEPTION:
+
+       MAX_SLIDE   a hard per-tick displacement cap INSIDE setSite, so the emergency
+                   instant path walks like every other path. THE NUMBER IS THE SPEED OF A
+                   WALKING ANT: SIM measures a worker at 1.15px a tick, so a ring may move
+                   at 1.2 and never faster. That is 48px across the whole 700ms of a
+                   thumb's travel, comfortably inside the smallest answer reach in the
+                   build (r 46 + 26 = 72). A ring may therefore be seen to ride along with
+                   a queue, at the pace of the queue. It can never be seen to cross the
+                   nest, because nothing in the colony can.
+
+       THE FREEZE  the instant a targeted instrument is picked up, repin stops entirely.
+                   From the moment the player commits to an answer until she puts the
+                   stone down, the target she read is the target she aims at. The body
+                   re-check below is untouched, so a frozen ring that genuinely empties
+                   re-anchors the moment the instrument is disarmed.
+     ------------------------------------------------------------------------------ */
+  var MAX_SLIDE = 1.2;           /* px per tick. A worker walks at 1.15. */
+  var EMPTY_KEEP = 24;           /* a third of a second holding nothing, and it is over.
+                                    Long enough for a body to come back through a
+                                    doorway; too short to be read as a marker on
+                                    bare earth. */
+
   /* the bodies that constitute this failure, still alive, in order of authority: the
      ones the detector implicated first, then the ones standing in the ring when it
      opened. An expulsion is judged against `who` alone, so nothing here leaks into it. */
@@ -1011,46 +1120,104 @@ FZ.outbreak = (function () {
   function setSite(o, site, k, st) {
     if (!site || !st) return;
     o.site = site;
-    o.r = o.r + (site.r - o.r) * k;
-    o.x = clamp(o.x + (site.x - o.x) * k, 22, st.w - 22);
-    o.y = clamp(o.y + (site.y - o.y) * k, 26, st.h - 22);
+    /* the radius breathes at the same walking pace — but OPENS faster than it closes.
+       While the ring is walking toward a situation it cannot reach in one tick, a ring
+       that is already as wide as its new site holds the bodies on the way; a ring that
+       narrows slowly can only ever lose them. Widening also never makes an answer harder
+       to land, and narrowing never makes one land that should not have. */
+    o.r = o.r + clamp((site.r - o.r) * k, -MAX_SLIDE, MAX_SLIDE * 2.5);
+    var dx = (site.x - o.x) * k, dy = (site.y - o.y) * k;
+    var d = Math.sqrt(dx * dx + dy * dy);
+    /* THE CAP. Every caller, including the emergency path where k is 1. */
+    if (d > MAX_SLIDE) { var s = MAX_SLIDE / d; dx *= s; dy *= s; }
+    o.x = clamp(o.x + dx, 22, st.w - 22);
+    o.y = clamp(o.y + dy, 26, st.h - 22);
   }
+  /* is the player holding something she is a third of a second from putting down? */
+  function inHand() { return !!(FZ.controls && FZ.controls.armed); }
+  /* A RING FOLLOWS ITS BODIES. IT DOES NOT CHASE THEM ACROSS THE NEST.
+
+     The two rules are one rule seen from two sides. With a walking-pace cap on the
+     centre, a situation that has moved further than the ring can WALK to would be
+     dragged after it — and for the seconds in between, the marker sits on bare earth
+     with nothing inside it, which is exactly the defect the round before this one was
+     spent killing. So a situation is only "this trouble, moving" if it still overlaps
+     the ring we are already drawing. Anything further away is a DIFFERENT incident
+     somewhere else, and this one is simply over: it closes quietly, no damage, no
+     credit, no stamp — and the gap filler puts the real one on the table within about
+     two and a half seconds, on the ground where it is actually happening. */
+  function reachable(o, s) {
+    return !!s && dist(o.x, o.y, s.x, s.y) <= o.r + (s.r || 0) * 0.5;
+  }
+  /* the trouble is no longer here. Close it: nothing happened to the colony and
+     nothing happened to the player's record. */
+  function fizzle(o, st) {
+    o.state = 'answered';
+    /* A HAND ALREADY REACHING FOR IT IS NOT TOLD IT WAS WRONG. Same beat as a burst
+       ring: for LAND_GRACE ticks the right instrument in the right place is still heard,
+       so an answer committed to a second ago does not come back as "Not there." Nothing
+       is credited and nothing is stamped — the trouble left, that is all. */
+    o.gone = st.tick;
+    o.endAt = st.tick + 30;
+    cool[o.sym] = st.tick + COOL_SIG;
+  }
+
   function repin(o, st) {
+    /* THE FREEZE. The target is fixed from the moment the stone leaves the ground. */
+    if (inHand()) return;
     var need = needBodies(o.sym);
     var here = bodiesNear(st, o.x, o.y, o.r);
+    /* IS THE SENTENCE STILL TRUE OF THIS GROUND? Bodies are most of the answer but not
+       all of it: a sealed chamber with a crumb in it is exactly what "most of the colony
+       never heard this work exists" looks like, and it holds nobody on purpose. So the
+       test is the same holds() the incident was opened under, applied to the ring where
+       it is standing now — never a raw head-count. */
+    var still = o.site
+      ? holds(st, { kind: o.site.kind, id: o.site.id, x: o.x, y: o.y, r: o.r, dug: o.site.dug }, o.sym)
+      : here >= need;
 
     /* the situation itself, re-read on a slow beat: if the crossroads being contended,
-       or the passage standing solid, is now a DIFFERENT one, the incident goes there. */
+       or the passage standing solid, is now a DIFFERENT one nearby, the incident goes
+       there; if it is one across the nest, this incident stays where it is and lives or
+       dies on its own ground. */
     if ((st.tick - o.born) % REPIN_EVERY === 0 && SITE[o.sym]) {
       var s2 = null;
       try { s2 = SITE[o.sym](st, o.who); } catch (e) { s2 = null; }
       if (s2 && holds(st, s2, o.sym)) {
         var same = o.site && s2.kind === o.site.kind && s2.id === o.site.id;
-        var n2 = bodiesNear(st, s2.x, s2.y, s2.r);
-        if (same || here < need || n2 > here) {
+        if ((same || reachable(o, s2)) && (same || here < need || bodiesNear(st, s2.x, s2.y, s2.r) > here)) {
           setSite(o, s2, here < need ? 1 : FOLLOW, st);
           o.bodies = idsNear(st, o.x, o.y, o.r);
+          o.emptyT = 0;
           return;
         }
       }
     }
     /* it still holds them. A knot of bodies is a moving thing, so ride with it; a room
        or a passage is not, so leave it where it is and let the bodies come and go. */
-    if (here >= need) {
-      if (o.site && o.site.kind === 'crowd') {
+    if (here >= need || still) {
+      if (o.site && o.site.kind === 'crowd' && here >= need) {
         var k = atBodies(st, tracked(o, st));
         if (k && holds(st, k, o.sym)) setSite(o, k, FOLLOW, st);
       }
       o.bodies = idsNear(st, o.x, o.y, o.r);
+      o.emptyT = 0;
       return;
     }
-    /* it has emptied out under the words. Go where they went. */
+    /* it has emptied out under the words. Go where they went, if they went somewhere
+       this ring can walk to. */
     var t = atBodies(st, tracked(o, st));
     if (!t || !holds(st, t, o.sym)) t = nearestKnot(st, o.x, o.y, need);
-    if (t && holds(st, t, o.sym)) {
+    if (t && holds(st, t, o.sym) && reachable(o, t)) {
       setSite(o, t, 1, st);
       o.bodies = idsNear(st, o.x, o.y, o.r);
+      o.emptyT = 0;
+      return;
     }
+    /* nothing this ring can honestly hold. Give it a beat — bodies come back through a
+       doorway all the time — and then let it go rather than stand on empty earth. */
+    o.emptyT = (o.emptyT || 0) + 1;
+    if (o.emptyT > EMPTY_KEEP) fizzle(o, st);
   }
 
   /* it burns: work inside the ring goes backwards while the player decides */
@@ -1069,9 +1236,10 @@ FZ.outbreak = (function () {
   /* it lands: the damage arrives where it happened, all at once, and stays visible */
   function land(o, st) {
     o.state = 'landed';
+    o.landAt = st.tick;
     o.endAt = st.tick + KEEP;
     cool[o.sym] = st.tick + COOL_MISS;
-    quietGap = GAP_HARD;                     /* it landed. The next one comes sooner. */
+    quietGap = Math.min(gapOk, GAP_HARD);    /* it landed. The next one comes sooner. */
 
     var r2 = (o.r * 1.15) * (o.r * 1.15), i;
     for (i = 0; i < st.jobs.length; i++) {
@@ -1108,7 +1276,7 @@ FZ.outbreak = (function () {
     o.state = 'answered';
     o.endAt = st.tick + KEEP;
     cool[o.sym] = st.tick + COOL_OK;
-    quietGap = GAP;                          /* you answered it. Take the beat. */
+    quietGap = gapOk;                        /* you answered it. Take the beat. */
 
     var back = (FZ.sim && FZ.sim.cost) ? FZ.sim.cost(kind) : 2;
     st.budget = Math.min(14, st.budget + back + 1);
@@ -1118,6 +1286,21 @@ FZ.outbreak = (function () {
     var e = el(o.sym);
     if (e) { e.heat = Math.min(e.heat, 0.1); e.on = false; }
 
+    mark(o.sym, 'answered');
+    emit('outbreak:answered', { sym: o.sym, x: o.x, y: o.y, r: o.r });
+  }
+
+  /* the answer arrived a beat after the ring burst. See LAND_GRACE. */
+  function resolveLate(o, kind, st) {
+    o.state = 'answered';
+    o.endAt = st.tick + KEEP;
+    cool[o.sym] = st.tick + COOL_OK;
+    quietGap = gapOk;
+    var back = (FZ.sim && FZ.sim.cost) ? FZ.sim.cost(kind) : 2;
+    st.budget = Math.min(14, st.budget + back);         /* the spend back, and no bonus */
+    if (st.collapseMax !== Infinity) st.collapse = Math.max(0, st.collapse - ANSWER_RELIEF * 0.5);
+    var e = el(o.sym);
+    if (e) { e.heat = Math.min(e.heat, 0.1); e.on = false; }
     mark(o.sym, 'answered');
     emit('outbreak:answered', { sym: o.sym, x: o.x, y: o.y, r: o.r });
   }
@@ -1181,6 +1364,18 @@ FZ.outbreak = (function () {
     if (kind === 'eject') {
       var o = current(true) || null, i;
       if (!o) { for (i = 0; i < list.length; i++) if (list[i].state === 'burning') { o = list[i]; break; } }
+      if (!o) {
+        /* the beat after it burst, same as every other instrument */
+        for (i = 0; i < list.length; i++) {
+          var lc = list[i];
+          if (lc.state !== 'landed' || !lc.landAt || st.tick - lc.landAt > LAND_GRACE) continue;
+          if (lc.answers.indexOf('eject') < 0) continue;
+          var lv = victimOf(st, x, y);
+          if (!lv || !culprit(lc, lv)) break;
+          pend = { o: lc, kind: kind, right: true, late: true };
+          return { hit: true, right: true, sym: lc.sym, msg: loop('answered') };
+        }
+      }
       if (!o || o.answers.indexOf('eject') < 0) {
         if (o) { pend = { o: o, kind: kind, right: false }; return { hit: true, right: false, sym: o.sym, msg: wrongLine(o.sym) }; }
         return miss;
@@ -1195,17 +1390,38 @@ FZ.outbreak = (function () {
       return { hit: true, right: false, sym: o.sym, msg: loop('wrongBody') || WRONG_BODY };
     }
 
-    var best = null, bd = Infinity, near = null;
+    /* TWO RINGS CAN OVERLAP ON A 390px FIELD, and when they do the tap used to go to
+       whichever centre was nearer — so a correct answer, placed correctly, could be
+       claimed by the OTHER incident and come back as a wrong one. A tap is judged
+       against the ring this instrument actually answers, first; only if it answers none
+       of the rings it landed in does the nearest one take it and say why. */
+    var best = null, bd = Infinity, ok = null, okd = Infinity, near = null;
+    var late = null, lated = Infinity;
     for (var k = 0; k < list.length; k++) {
       var c = list[k];
-      if (c.state !== 'burning') continue;
       var d = (x == null) ? 0 : Math.sqrt((c.x - x) * (c.x - x) + (c.y - y) * (c.y - y));
       var reach = c.r + 26;
-      if (d <= reach) { if (d < bd) { bd = d; best = c; } }
-      else if (c.answers.indexOf(kind) > -1 && !near) near = c;
+      var mine = c.answers.indexOf(kind) > -1;
+      if (c.state !== 'burning') {
+        /* the beat after it burst, or after the trouble walked away from it: only a
+           right answer is still heard, and only a burst ring pays out */
+        var when = c.landAt || c.gone || 0;
+        if (!mine || !when || st.tick - when > LAND_GRACE) continue;
+        if (d <= reach && d < lated) { lated = d; late = c; }
+        continue;
+      }
+      if (d <= reach) {
+        if (d < bd) { bd = d; best = c; }
+        if (mine && d < okd) { okd = d; ok = c; }
+      } else if (mine && !near) near = c;
     }
+    if (ok) best = ok;
 
     if (!best) {
+      if (late) {
+        pend = { o: late, kind: kind, right: true, late: true };
+        return { hit: true, right: true, sym: late.sym, msg: loop('answered') };
+      }
       /* the right instrument, in the wrong place: say so, and let it apply anyway */
       if (near) return { hit: false, right: false, sym: near.sym, msg: loop('tooFar') };
       return miss;
@@ -1224,6 +1440,7 @@ FZ.outbreak = (function () {
     var p = pend; pend = null;
     var st = S();
     if (!st || !d || !d.ok) return;              /* nothing was spent — nothing happened */
+    if (p.late) { if (p.o.state === 'landed') resolveLate(p.o, p.kind, st); return; }
     if (p.o.state !== 'burning') return;
     if (p.right) { resolve(p.o, p.kind, st); return; }
     emit('outbreak:wrong', {
@@ -1259,6 +1476,7 @@ FZ.outbreak = (function () {
   function update(st) {
     if (!st) return;
     if (!wired) wire();
+    logProgress(st);
 
     /* the phone rotated, or a panel grew a line: the sim rescales its world, so
        the incidents have to move with it or they point at nothing. */
@@ -1281,7 +1499,11 @@ FZ.outbreak = (function () {
         /* the pin is no longer set once and abandoned: burn() re-reads the situation and
            follows the implicated bodies every tick, for the whole fuse. See repin(). */
         var e = el(o.sym);
-        if (e && e.countered && e.heat < 0.1 && st.tick - o.born > 45) defuse(o, st);
+        /* an incident opened off a live structural signal does NOT close because the
+           element reads countered — the crumb with three claimants and no progress in a
+           hundred and twenty ticks is still standing right there. It closes when the
+           complaint itself stops being made. */
+        if (e && e.countered && e.heat < 0.1 && st.tick - o.born > 45 && !sigLive(o, st)) defuse(o, st);
         else if (st.tick - o.born >= o.fuse) land(o, st);
         else burn(o, st);
       } else if (st.tick >= o.endAt) {
@@ -1293,26 +1515,267 @@ FZ.outbreak = (function () {
     pull(st);
   }
 
-  /* ------------------------------------------------------------------- the gap
-     NO CHAPTER MAY GO QUIET. Measured on the shipped build: chapter four produced ONE
-     decision in twenty-seven seconds, because a detector emits `fire` only on a RISING
-     edge — a failure that is already hot and stays hot never speaks again, so the colony
-     can stampede in complete silence with nothing at all on the table.
+  /* ============================================================================
+     THE GAP — and the verdict that BEING GOOD AT THE GAME MADE IT BORING.
 
-     So when nothing has burned for GAP ticks, the hottest live failure the player is
-     actually holding an instrument for is put back on the table. This invents nothing:
-     `heat` is the detector's own continuous reading of the live simulation, the element
-     has to still be genuinely hot, and the incident still has to find bodies to sit on
-     or it does not open. It is the same trouble, asked about again. */
+     Two separate faults produced the same empty screen, and the second is the one the
+     world critic scored dead time four out of ten for.
+
+       A detector emits `fire` on a RISING edge only, so a failure that is already hot and
+       stays hot never speaks twice. A colony can stampede in complete silence.
+
+       And the old filler SKIPPED ANY ELEMENT FLAGGED `countered`, then ranked what was
+       left by heat alone. So the moment the player answered correctly, the very sources
+       of new incidents were suppressed and the screen went quiet. Getting better at
+       something must never be paid for with less of it.
+
+     BOTH ARE ANSWERED THE SAME WAY: EVERY GAP IS FILLED FROM LIVE STRUCTURAL DISTRESS
+     READ STRAIGHT OFF THE NEST, and `countered` is not consulted at all. An institution
+     suppresses a detector's NUMBER; it does not make the three workers standing on one
+     crumb with no progress in a hundred and twenty ticks stop standing there. The nest is
+     the evidence, so the nest is what gets asked about.
+
+     THE THREE COMPLAINTS, all measured off live state, none invented:
+       CLAIMS   a crumb with three or more claimants and net-zero progress over 120 ticks
+       PASSAGE  a passage with a head-on block, or two or more queued at its mouths
+       FALLING  a crumb whose progress is LOWER than it was 120 ticks ago
+     ============================================================================ */
+  var PROG_EVERY = 20, PROG_WIN = 120, PROG_KEEP = 10, PROG_EPS = 0.6;
+
+  /* "net-zero progress over the last 120 ticks" has to be a measurement, so the crumbs
+     are sampled on a slow beat and compared against themselves. */
+  function logProgress(st) {
+    if (st.tick % PROG_EVERY) return;
+    var m = {}, i;
+    for (i = 0; i < st.jobs.length; i++) m[st.jobs[i].id] = st.jobs[i].progress;
+    progLog.push({ t: st.tick, m: m });
+    while (progLog.length > PROG_KEEP) progLog.shift();
+  }
+  function progThen(st, id) {
+    for (var i = 0; i < progLog.length; i++) {
+      if (st.tick - progLog[i].t > PROG_WIN) continue;
+      var v = progLog[i].m[id];
+      if (v != null) return v;
+    }
+    return null;
+  }
+  function headOnIn(st, e) {
+    var n = 0;
+    for (var i = 0; i < e.occ.length; i++) { var a = agentOf(st, e.occ[i]); if (a && a.headOn) n++; }
+    return n;
+  }
+  function claimsOn(j) {
+    return j.claims ? (j.claims.size != null ? j.claims.size : (j.claims.length || 0)) : 0;
+  }
+
+  /* which failures a given complaint can honestly be an instance of, best first. Every
+     sentence on each list is TRUE of the situation that signal describes; the pick below
+     then takes whichever of them the colony is warmest on. */
+  var SIG_SYMS = {
+    /* this file's own reader */
+    claims: ['Co', 'Fl', 'Mc', 'Tw', 'Cl', 'In', 'Ow'],
+    queue: ['In', 'Cf', 'Fl', 'Im', 'Sp', 'Dp', 'Mm'],
+    fell: ['Sa', 'Lo', 'Cl', 'Mc', 'Dp', 'Pt'],
+    /* SIM's `why` vocabulary, widened. SIM lists the most specific names for a situation;
+       this is the longer honest list, used when a chapter has none of the specific ones
+       live. Every name here is still TRUE of the physical fact it is keyed to. */
+    apart: ['Sa', 'Mc', 'Co', 'Cl', 'Lo'],
+    contested: ['Co', 'Mc', 'In', 'Tw', 'Fl', 'Cl', 'Ow'],
+    held: ['Lo', 'Cl', 'Ow', 'In', 'Co', 'Fl'],
+    queued: ['Fl', 'Im', 'Cf', 'In', 'Dp', 'Lo', 'Sp', 'Mm'],
+    sealed: ['Si', 'Dp', 'Mm', 'Di'],
+    packed: ['Fl', 'Im', 'Cf', 'In', 'Co', 'Ow'],
+    blocked: ['Dp', 'Si', 'Mm'],
+    hazard: ['Hi', 'Sf', 'Mm', 'Cs'],
+    ignored: ['Pt', 'My', 'Cs', 'Di', 'Si', 'Mo'],
+    headon: ['Tw', 'Es', 'In', 'Co', 'Cf', 'Im'],
+    jammed: ['Fl', 'In', 'Cf', 'Im', 'Sp'],
+    face: ['Dp', 'Si', 'Mm'],
+  };
+
+  /* every complaint the nest is making this instant.
+
+     SIM COMPUTES THIS NOW, every tick, off the nest and the crumbs (`S.distress`, and
+     read its header in 40-sim.js). It is strictly better than anything this file can
+     work out from the outside: it carries j.net120 and j.claimN and e.head and e.qd
+     already sampled, a stable coordinate per site, a severity comparable across kinds,
+     and the candidate names each physical situation could honestly be called. So that
+     is the first source and the only one used in practice.
+
+     The reader below it is kept as a fallback for a build where SIM has not shipped the
+     surface — a headless harness, an older part file. It measures the same three facts
+     the verdict named, the hard way. */
+  function distress(st) {
+    var out = [], i, j, e, cl, then;
+    var D = st.distress, seen = {};
+    if (D && D.sites && D.sites.length && D.tick === st.tick) {
+      for (i = 0; i < D.sites.length; i++) {
+        var sd = D.sites[i];
+        seen[(sd.kind === 'crumb' ? 'c' : 'p') + sd.ref] = 1;
+        out.push({
+          kind: sd.why || sd.kind, ref: sd.ref, x: sd.x, y: sd.y,
+          syms: (sd.syms && sd.syms.length) ? sd.syms.slice() : null,
+          job: sd.kind === 'crumb' ? sd.ref : null,
+          edge: sd.kind === 'passage' ? sd.ref : null,
+          w: (sd.sev || 0) * 100,
+        });
+      }
+    }
+    /* and this file's own reader underneath it, ranked below anything SIM listed. SIM is
+       deliberately strict — four bodies in a room, not three — and a chapter narrowed to
+       two live failures can run out of things SIM will name while the floor is still
+       visibly wrong. Nothing here is invented either; it is the same nest, read looser. */
+    var lo = seen;
+    for (i = 0; i < st.jobs.length; i++) {
+      j = st.jobs[i];
+      if (j.done) continue;
+      cl = claimsOn(j);
+      then = progThen(st, j.id);
+      if (lo['c' + j.id]) continue;
+      if (cl >= 3 && then != null && Math.abs(j.progress - then) <= PROG_EPS) {
+        out.push({ kind: 'claims', job: j.id, node: j.node, w: 20 + cl * 2 });
+      }
+      if (then != null && j.progress < then - PROG_EPS) {
+        out.push({ kind: 'fell', job: j.id, node: j.node, w: 16 + (then - j.progress) });
+      }
+    }
+    var E = edgesOf(st);
+    for (i = 0; i < E.length; i++) {
+      e = E[i];
+      if (!e.dug || lo['p' + e.id]) continue;
+      var q = e.qa.length + e.qb.length;
+      if (headOnIn(st, e) >= 1) out.push({ kind: 'headon', edge: e.id, w: 22 });
+      else if (q >= 2 || e.occ.length >= e.cap) out.push({ kind: 'queue', edge: e.id, w: 13 + q * 2 });
+    }
+    /* and a room packed to its walls. Not a number on a meter: bodies you can count,
+       standing in a space that does not fit them. */
+    var N = nodesOf(st);
+    for (i = 0; i < N.length; i++) {
+      var n = N[i];
+      if (n.kind === 'surface') continue;
+      if (n.occ.length >= 3) out.push({ kind: 'packed', node: n.id, w: 10 + n.occ.length * 2 });
+    }
+    return out;
+  }
+  /* is the complaint this incident was opened on STILL being made? */
+  function sigLive(o, st) {
+    var g = o.sig, i;
+    if (!g) return false;
+    /* SIM recomputes the whole list every tick, so the honest question is simply
+       whether this site is still on it. */
+    var D = st.distress;
+    if (D && D.sites && D.tick === st.tick) {
+      var want = g.job != null ? 'crumb' : (g.edge != null ? 'passage' : null);
+      if (want) {
+        for (i = 0; i < D.sites.length; i++) {
+          if (D.sites[i].kind === want && D.sites[i].ref === g.ref) return true;
+        }
+        if (g.ref != null) return false;
+      }
+    }
+    if (g.kind === 'packed') {
+      var pn = nodesOf(st)[g.node];
+      return !!pn && pn.occ.length >= 3;
+    }
+    if (g.job != null) {
+      for (i = 0; i < st.jobs.length; i++) {
+        var j = st.jobs[i];
+        if (j.id !== g.job) continue;
+        if (j.done) return false;
+        if (g.kind === 'claims') return claimsOn(j) >= 3;
+        var then = progThen(st, j.id);
+        return (j.unmake || 0) > 0.05 || (then != null && j.progress < then - PROG_EPS);
+      }
+      return false;
+    }
+    var e = edgesOf(st)[g.edge];
+    if (!e || !e.dug) return false;
+    if (g.kind === 'headon') return headOnIn(st, e) >= 2;
+    return e.qa.length + e.qb.length >= 2 || e.occ.length >= e.cap;
+  }
+  /* the ground the complaint is standing on, as a site a ring can hold */
+  function sigSite(g, st) {
+    var N = nodesOf(st), i;
+    if (g.job != null && g.node == null) {
+      /* SIM names the crumb; the ring holds the ROOM the crumb is in, because a room is
+         a thing with walls and a coordinate is not. */
+      for (i = 0; i < st.jobs.length; i++) {
+        if (st.jobs[i].id !== g.job) continue;
+        var jn = N[st.jobs[i].node];
+        if (jn) return atNode(st, jn, 34);
+      }
+      return (g.x != null) ? snapTo(st, g.x, g.y) : null;
+    }
+    if (g.node != null) {
+      var n = N[g.node];
+      return n ? atNode(st, n, g.job != null ? 34 : 28) : null;
+    }
+    var e = edgesOf(st)[g.edge];
+    if (!e) return (g.x != null) ? snapTo(st, g.x, g.y) : null;
+    var pts = edgeBodies(st, e);
+    if (!pts.length) return atEdge(st, e);
+    var sx = 0, sy = 0;
+    for (i = 0; i < pts.length; i++) { sx += pts[i].x; sy += pts[i].y; }
+    return atEdge(st, e, sx / pts.length, sy / pts.length);
+  }
+  /* the failure this complaint is an instance of: the warmest of the honest candidates
+     the chapter has live, that the player holds an instrument for, and is not already
+     being asked. `countered` is deliberately NOT consulted. */
+  function sigSym(g, st) {
+    var C = SIG_SYMS[g.kind] || [], en = FZ.sim ? FZ.sim.enabled : null;
+    if (g.syms && g.syms.length) {
+      var W = g.syms.slice();
+      for (var q = 0; q < C.length; q++) if (W.indexOf(C[q]) < 0) W.push(C[q]);
+      C = W;
+    }
+    var best = null, bs = -Infinity;
+    for (var i = 0; i < C.length; i++) {
+      var sym = C[i];
+      if (en && en.has && !en.has(sym)) continue;
+      if (cool[sym] > st.tick + (COOL_OK - COOL_SIG) || findBurning(sym)) continue;
+      if (!answerable(sym, st)) continue;
+      var e = el(sym);
+      var s = (C.length - i) + (e ? e.heat * 4 : 0);
+      if (s > bs) { bs = s; best = sym; }
+    }
+    return best;
+  }
+
   function pull(st) {
     if (cap <= 0 || burningCount() > 0) { quietSince = st.tick; return; }
     if (FZ.chapters && FZ.chapters.phase && FZ.chapters.phase() !== 'play') { quietSince = st.tick; return; }
     if (st.tick - quietSince < quietGap) return;
+
+    /* 1. THE NEST'S OWN COMPLAINTS, loudest first, rotated so one crumb is not the whole
+          chapter. The site comes from the complaint, so the ring lands on the thing that
+          is actually wrong rather than on the highest number. */
+    var D = distress(st), i;
+    if (D.length) {
+      D.sort(function (a, b) { return b.w - a.w; });
+      var start = (sigTurn++) % D.length;
+      for (i = 0; i < D.length; i++) {
+        var g = D[(start + i) % D.length];
+        var sym = sigSym(g, st);
+        if (!sym) continue;
+        var site = sigSite(g, st);
+        if (!site || !holds(st, site, sym)) continue;
+        var n0 = list.length;
+        open({
+          sym: sym, at: { x: site.x, y: site.y }, site: site,
+          who: idsNear(st, site.x, site.y, site.r), say: fireLine(sym), sig: g,
+        }, true);
+        if (list.length > n0) { quietSince = st.tick; return; }
+      }
+    }
+
+    /* 2. nothing structural to point at: the hottest failure the player holds an
+          instrument for, as before — and still with no countered guard, so answering
+          well never switches the sources of trouble off. */
     var E = FZ.EL || [], en = FZ.sim ? FZ.sim.enabled : null, best = null, bh = PULL_HOT;
-    for (var i = 0; i < E.length; i++) {
+    for (i = 0; i < E.length; i++) {
       var e = E[i];
       if (!e || (en && en.has && !en.has(e.sym))) continue;
-      if (e.countered || cool[e.sym] > st.tick || findBurning(e.sym)) continue;
+      if (cool[e.sym] > st.tick || findBurning(e.sym)) continue;
       if (!answerable(e.sym, st)) continue;
       if (e.heat > bh) { bh = e.heat; best = e; }
     }
@@ -1352,7 +1815,11 @@ FZ.outbreak = (function () {
       focusId = 0;
       var st = S();
       lastW = st ? st.w : 0; lastH = st ? st.h : 0;
-      quietSince = st ? st.tick : 0; quietGap = GAP;
+      /* the taught chapters run a tighter clock than the sandbox: a player who is
+         good at this must be given MORE colony, never less. */
+      gapOk = (scenario && scenario.all) ? GAP : GAP_FAST;
+      quietSince = st ? st.tick : 0; quietGap = gapOk;
+      progLog.length = 0; sigTurn = 0;
       cap = (scenario && scenario.outbreakCap != null) ? scenario.outbreakCap : 1;
       /* THE SANDBOX KEEPS ITS CLOCK. It was measured at one decision every three seconds
          and that is the target the rest of the game is being tuned toward; re-cutting it
@@ -1387,6 +1854,21 @@ FZ.outbreak = (function () {
     /* fraction of fuse remaining, 1 -> 0, for whoever needs to draw a clock */
     left: function (o) { var st = S(); return (st && o) ? clamp(left(o, st), 0, 1) : 0; },
 
+    /* the ring that burst in the last beat, while a right answer aimed at it is still
+       heard (LAND_GRACE). CONTROLS keeps the instrument in hand for exactly this long,
+       so a thumb already in the air is not disarmed out from under the player. */
+    grace: function () {
+      var st = S();
+      if (!st) return null;
+      for (var i = 0; i < list.length; i++) {
+        var o = list[i];
+        if (o.state === 'burning') continue;
+        var when = o.landAt || o.gone || 0;
+        if (when && st.tick - when <= LAND_GRACE) return o;
+      }
+      return null;
+    },
+
     /* the one a tap should be judged against when the instrument is untargeted:
        whichever is closest to landing. */
     urgent: function () {
@@ -1413,6 +1895,19 @@ FZ.outbreak = (function () {
        Never a two-letter code — that is the guide's, and only the guide's. */
     phen: phen,
     answersFor: answersFor,
+
+    /* a read-only window on why the screen is or is not quiet. Every critic who has
+       looked at this piece has wanted it; it costs nothing and mutates nothing. */
+    debug: function () {
+      var st = S(), c = {}, k;
+      for (k in cool) if (cool[k] > (st ? st.tick : 0)) c[k] = cool[k] - st.tick;
+      return {
+        tick: st ? st.tick : 0, cap: cap, burning: burningCount(),
+        quietFor: st ? st.tick - quietSince : 0, gap: quietGap,
+        cooling: c, waiting: waiting.length,
+        distress: st ? distress(st).map(function (g) { return g.kind; }) : [],
+      };
+    },
   };
   return api;
 })();

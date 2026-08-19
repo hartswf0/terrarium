@@ -93,6 +93,13 @@
    force.monoculture    Every worker is one lineage. Guarantees Mo and Lv immediately.
    force.silo           Knowledge sharing is off and awareness radius is 90px, so most of
                         the colony never hears about most jobs. Guarantees Si and Di.
+   force.walled         THE ROOM NOTHING CAN REACH. One good crumb is placed in a chamber
+                        with NO TUNNEL TO IT and the whole colony is told about it, so
+                        within seconds a worker is standing at a face cutting a way in and
+                        the player watches siloing being answered with infrastructure.
+                        Guarantees Si with a wall rather than a number, and Dp behind it.
+                        This is the key a "dig to the unreachable chamber" chapter needs;
+                        pair it with teach:['Si'] and the LENS or a shovel-less passage.
    force.hidden         One worker is told which job is poison and never tells anyone.
                         Guarantees Hi (its victims take the hit it could have prevented).
    force.overload       Workers may hold up to 5 jobs at once. Guarantees Ow.
@@ -218,6 +225,79 @@
      S.scars     [{x,y,sym,tick}] where misses landed. Wear on the architecture, kept.
      S.works     [{kind,x,y,tick}] where institutions were built. History as architecture.
 
+   ============================================================================
+   STRUCTURAL DISTRESS — S.distress. READ THIS BEFORE WRITING AN INCIDENT.
+   ============================================================================
+   Round-5 verdict: "once the player answers correctly, elements get flagged countered,
+   the incident filler skips them, and the screen goes empty." The filler was selecting
+   from `heat` — a decayed scalar owned by the detectors — so a colony whose detectors
+   had all been cooled had nothing to point at even while a passage was solid with
+   bodies and three crumbs had not moved in four seconds.
+
+   Heat is an OPINION about the colony. Distress is a FACT about the colony. It is
+   recomputed from the nest and the crumbs every tick, it does not decay, it cannot be
+   flagged countered, and every entry carries a stable coordinate so an incident can be
+   opened exactly on the thing that is wrong.
+
+   S.distress = {
+     tick,                  the tick this was computed (it is always this tick)
+     sites: [ … ],          live distress, WORST FIRST, capped at DIS_MAX
+     n,                     sites.length
+     worst,                 sites[0] or null
+     load,                  summed severity, uncapped — the raw weight of what is wrong
+     health,                0..1. 1 = nothing structurally wrong anywhere in the nest.
+     crumbs, passages,      how many sites of each kind
+   }
+
+   A SITE. Reused objects from a pool — read it this tick, do not keep it.
+     kind      'crumb' | 'passage'
+     ref       job id (crumb) or edge id (passage)
+     x, y      THE STABLE SITE COORDINATE. A crumb's is its chamber's centre; a
+               passage's is its midpoint. Open the incident here and it lands on bodies.
+     sev       0..1 how bad, comparable across kinds. sites are sorted by this.
+     since     ticks this site has been in distress without a break. Age, not heat.
+     why       one word naming the physical fact, for a build that wants to branch:
+               crumb:   'apart' | 'contested' | 'held' | 'queued' | 'sealed' | 'packed'
+                        | 'blocked' | 'hazard' | 'ignored'
+               passage: 'headon' | 'queued' | 'jammed' | 'face'
+     syms      candidate element symbols whose BODY this physical situation is, most
+               specific first. The incident layer picks the first one that is enabled,
+               uncountered and answerable with the tools in hand. Nothing here asserts
+               that an element fired — it says "if you want to name this, these are the
+               names that fit what is actually on the floor."
+
+   ON A CRUMB, every tick, whether or not it is in distress:
+     j.claimN    how many workers hold a claim on it RIGHT NOW.
+     j.net120    net progress over the last ~120 ticks, in progress units. Negative means
+                 the work is going BACKWARDS. Near zero with claimants means stalled.
+                 Sampled every DIS_STEP ticks into a DIS_SLOTS ring, so it costs nothing.
+     j.win       how many ticks that window actually covers yet (< 120 for a young crumb).
+     j.stallT    consecutive ticks with no meaningful forward progress.
+   A crumb site also carries: claims, net, queue, crowd, stalled, back, sealed.
+
+   ON A PASSAGE, every tick:
+     e.head      how many bodies are nose-to-nose in it right now (§16.1 head-on blocks).
+     e.qd        queue depth: qa.length + qb.length, the bodies that cannot get in.
+     e.mx, e.my  midpoint. Stable while the graph is; recomputed if the phone rotates.
+     e.stopT     consecutive ticks with bodies inside it and nothing moving.
+   A passage site also carries: head, queue, jam.
+
+   ------------------------------------------------------------
+   AND IF NOTHING IS WRONG, THE PACE RISES
+   ------------------------------------------------------------
+   The other half of the same verdict: competence must not be rewarded with an empty
+   screen. So health is not just a readout — it is the throttle.
+
+     S.health   0..1 from the distress load above.
+     S.vigor    0..1, eases toward health over ~4s. A colony nobody is failing gets
+                worked harder: S.speedMul = base * (1 + VIGOR_GAIN * S.vigor), which
+                raises throughput AND aggression through S.aggro (§15.4), shortens every
+                fuse (the incident layer scales on S.speedMul), and collapses the pacer's
+                quiet window so the next provocation arrives sooner.
+
+   The player who answers everything does not run out of game. They earn a faster one.
+   ============================================================================
+
    ------------------------------------------------------------
    WHAT A MISS COSTS — strain, and why it no longer evaporates
    ------------------------------------------------------------
@@ -242,14 +322,21 @@
    Balance is MEASURED, not asserted, and measured through the real loop: __FZ.balance()
    runs the sandbox headless with FZ.outbreak live inside the tick, and a synthetic player
    who answers a given fraction of incidents correctly — committing ONCE per incident, as
-   a person does. The audit prints it. Measured, 14k ticks of the sandbox:
+   a person does. The audit prints it. RE-MEASURED at the round-6 tempo and density —
+   the health throttle below is live, and the incident layer now fills the gap from
+   structural distress rather than from heat, so both ends of the curve moved and both
+   were re-proven rather than assumed. 14k ticks of the sandbox:
 
-     p=100%  survives 4/4   strain mean  0   scar  0
-     p= 85%  survives 4/4   strain mean 16   scar 16
-     p= 70%  survives 4/4   strain mean 40   scar 39      <- the 30-70 band, as specified
-     p= 50%  LOSES  2/4     strain mean 63   scar 77      (4/6 over 16k ticks)
+     p=100%  survives 4/4   strain mean  0   scar  0    145 crumbs banked
+     p= 85%  survives 4/4   strain mean  9   scar 10
+     p= 70%  survives 4/4   strain mean 34   scar 39      <- the 30-70 band, as specified
+     p= 60%  LOSES  1/4     strain mean 44   scar 38      <- the knee is here now
+     p= 50%  LOSES  3/4     strain mean 45   scar 51
      p= 30%  LOSES  4/4
      p=  0%  LOSES  4/4     inside two minutes
+
+   The curve still discriminates and it discriminates HARDER: high accuracy survives
+   comfortably, half accuracy loses outright, and the knee sits between them at 60%.
 
    Change any constant in this section and re-run `node formicary/tools/balance.js`.
 
@@ -306,6 +393,9 @@ FZ.sim = (function () {
     /* ---- THE BODIES: colony-wide observables, rebuilt each tick in bodies() ---- */
     column: null, lineage: [], fell: null, bigJob: 0, arb: false,
     weather: { frantic: 0, dark: 0, crowd: 0, scarce: 0 },
+    /* ---- STRUCTURAL DISTRESS: what is physically wrong, and the throttle it drives ---- */
+    distress: { tick: 0, sites: [], n: 0, worst: null, load: 0, health: 1, crumbs: 0, passages: 0 },
+    health: 1, vigor: 0, baseSpeed: 1,
     _g: null, _silent: false, _said: null,
   };
   function freshStat() {
@@ -399,7 +489,9 @@ FZ.sim = (function () {
     const e = { id: NEST.edges.length, a: a, b: b, cap: cap,
                 len: Math.max(20, Math.sqrt(dx * dx + dy * dy)),
                 dug: !!dug, prog: dug ? 1 : 0, diggers: [], occ: [], qa: [], qb: [],
-                wear: dug ? 0.10 : 0, jam: 0, spoil: 0 };
+                wear: dug ? 0.10 : 0, jam: 0, spoil: 0,
+                /* ---- structural distress, recomputed every tick in distress() ---- */
+                head: 0, qd: 0, stopT: 0, mx: (A.x + B.x) / 2, my: (A.y + B.y) / 2 };
     NEST.edges.push(e);
     A.edges.push(e.id); B.edges.push(e.id);
     return e;
@@ -1044,6 +1136,10 @@ FZ.sim = (function () {
       crowd: 0, queue: [], tug: [], trail: 0, dark: 1, rot: 0,
       unmake: 0, undone: false, split: 0, hazard: false, lone: false,
       seenProg: 0,
+      /* ---- STRUCTURAL DISTRESS. A stalled or backsliding crumb is a fact, not a heat
+         reading, so it survives every detector being countered. See the header. ---- */
+      claimN: 0, ph: [0,0,0,0,0,0,0,0,0,0,0,0], phi: 0, phn: 0,
+      net120: 0, win: 0, stallT: 0, disT: 0,
     };
     if (home) home.job = j.id;
     return j;
@@ -1076,8 +1172,15 @@ FZ.sim = (function () {
     S.conflicts = []; S.stat = freshStat(); S._said = {};
     S.calm = 0; S.urge = 0; S.stirAt = 0; S._due = {};
     S.scar = 0; S.scars = []; S.works = []; S.waiting = 0;
-    S.column = null; S.lineage = []; S.fell = null; S.bigJob = 0; S.arb = false;
+    S.column = null; S.lineage = []; S.fell = null; S.bigJob = 0; S.arb = false; S._walled = 0;
     S.weather = { frantic: 0, dark: 0, crowd: 0, scarce: 0 };
+    disList.length = 0; disN = 0;
+    S.distress = { tick: 0, sites: disList, n: 0, worst: null, load: 0, health: 1, crumbs: 0, passages: 0 };
+    S.health = 1; S.vigor = 0;
+    /* cfg.noVigor pins the tempo throttle at its base. It exists for the CONTROLLED
+       EXPERIMENTS in __FZ.tradeoffs(): a trade-off claim is about the instrument, so
+       both arms must be run at the same tempo. Never set it on a played scenario. */
+    S.noVigor = !!cfg.noVigor;
     S.copyBias = F.stampede ? 0.85 : 0.06;
     S.budget = cfg.budget == null ? 6 : cfg.budget;
     /* the ceiling is the scenario's own opening hand, not a flat fourteen. A budget that
@@ -1211,12 +1314,39 @@ FZ.sim = (function () {
       for (let i = 1; i < S.jobs.length; i += 3) S.jobs[i].prereq = S.jobs[i - 1].id;
     }
 
+    /* --- force.walled: THE ROOM NOTHING CAN REACH ---------------------------------
+       Round-5 critic: "the dashed-outline chamber that nothing can reach is the most
+       valuable idea in the world model and no chapter names it." The behaviour is
+       already here — a worker whose goal the network does not reach walks to the end
+       of the line and CUTS — but nothing guaranteed the situation, so no teaching
+       chapter could be built on it. This key does: one good crumb is placed in a room
+       with no tunnel to it, and the colony is told about it, so within seconds somebody
+       is standing at a face with a shovel and the player can watch siloing be solved by
+       infrastructure. CHAPTERS only has to set force.walled and enable Si. */
+    if (F.walled) {
+      const C = chamberNodes(), walled = [];
+      for (let i = 0; i < C.length; i++) if (C[i].comp !== NEST.main && !C[i].job) walled.push(C[i]);
+      if (walled.length) {
+        const nd = walled[Math.floor(rnd() * walled.length)];
+        const j = S.jobs.length ? S.jobs[S.jobs.length - 1] : null;
+        if (j) {
+          clearRoom(j);
+          j.node = nd.id; j.x = nd.x; j.y = nd.y; j.value = 5;
+          j.need = 40 + j.value * 22; nd.job = j.id;
+        } else S.jobs.push(makeJob({ value: 5 }, nd.x, nd.y));
+        S._walled = S.jobs.length ? S.jobs[S.jobs.length - 1].id : 0;
+      }
+    }
+
     /* --- who knows what --- */
     const aware = F.silo ? 90 : 1e6;
     A.forEach(a => {
       a.known.clear();
       S.jobs.forEach(j => { if (d2(a.x, a.y, j.x, j.y) < aware * aware) a.known.add(j.id); });
       if (!a.known.size && S.jobs.length) a.known.add(S.jobs[Math.floor(rnd() * S.jobs.length)].id);
+      /* everybody has heard about the walled room. Hearing about it is not the same as
+         being able to get to it, and that gap IS the lesson. */
+      if (S._walled) a.known.add(S._walled);
     });
 
     /* --- elements --- */
@@ -1479,16 +1609,27 @@ FZ.sim = (function () {
            ever land in the gap AFTER an incident closed, never on top of one. */
         REANNOUNCE = 470;
 
+  /* THE BUG THAT EMPTIED THE SCREEN. `live` used to count any enabled element that was
+     hot — INCLUDING ONES THE PLAYER HAD ALREADY COUNTERED. A countered element keeps its
+     heat for a while after the institution lands, the incident layer refuses to ask about
+     a countered element, and so the pacer sat at zero urge, stirred nothing, and the
+     colony went silent for exactly as long as the player's own good answer was working.
+     Competence turned the game off. A failure the player cannot be asked about is not a
+     live failure, and it does not buy the colony quiet. */
   function pace() {
     let live = false;
     const els = FZ.EL, en = FZ.sim.enabled;
     for (let i = 0; i < els.length; i++) {
       const e = els[i];
-      if (!en.has(e.sym)) continue;
+      if (!en.has(e.sym) || e.countered) continue;
       if (e.on || e.heat > 0.22) { live = true; break; }
     }
     S.calm = live ? 0 : S.calm + 1;
-    S.urge = clamp((S.calm - QUIET_FREE) / QUIET_RAMP, 0, 1);
+    /* and a colony with nothing wrong with it is overdue SOONER. Vigor collapses both
+       the earned quiet and the ramp, so a player who is answering everything meets the
+       pacer within about a second instead of two and a half. */
+    const v = S.vigor || 0;
+    S.urge = clamp((S.calm - QUIET_FREE * (1 - 0.70 * v)) / (QUIET_RAMP * (1 - 0.55 * v)), 0, 1);
   }
   /* a scheduled guarantee, pulled forward by how quiet it has been */
   function due(key, every, first) {
@@ -1815,6 +1956,8 @@ FZ.sim = (function () {
     { sym: 'Tw', key: 'rivals', run: stirRivals },
     { sym: 'Ow', key: 'overload', run: stirPile },
     { sym: 'Si', key: 'silo', run: stirSeal },
+    { sym: 'Si', key: 'walled', run: stirSeal },
+    { sym: 'Dp', key: 'walled', run: stirSeal },
     { sym: 'Dp', key: 'dependency', run: stirDep },
   ];
   function stir() {
@@ -1834,11 +1977,13 @@ FZ.sim = (function () {
       let armed = 0;
       const ans = e.answers || [];
       for (let k = 0; k < ans.length; k++) if (tools.indexOf(ans[k]) > -1) { armed = 1; break; }
-      pool.push({ run: s.run, armed: armed, heat: e.heat });
+      pool.push({ run: s.run, armed: armed, cnt: e.countered ? 1 : 0, heat: e.heat });
     }
     if (!pool.length) return false;
-    /* the coldest failure the player can actually answer goes first */
-    pool.sort((p, q) => (q.armed - p.armed) || (p.heat - q.heat));
+    /* the coldest failure the player can actually be ASKED about goes first: armed with
+       an instrument, not already countered (a countered element cannot open an incident,
+       so stirring one is a provocation the player never sees), then coldest. */
+    pool.sort((p, q) => (q.armed - p.armed) || (p.cnt - q.cnt) || (p.heat - q.heat));
     for (let i = 0; i < pool.length; i++) if (pool[i].run()) return true;
     return false;
   }
@@ -1890,7 +2035,14 @@ FZ.sim = (function () {
     S.lensOn = S.tick < S.lensUntil;
     S.ledgerOn = S.tick < S.ledgerUntil;
     const slowed = S.tick < S.slowUntil;
-    if (F.speed) S.speedMul = Math.min(F.speedmax || 2.4, S.baseSpeed + S.tick / (F.speedrate || 2200));
+    /* §15.4 machine speed, and on top of it THE VIGOR TERM: a colony with nothing
+       structurally wrong with it is worked harder, so answering well raises the tempo
+       instead of emptying the screen. S.vigor is eased in distress(), at the end of the
+       previous tick, from S.health. */
+    const baseSpd = F.speed
+      ? Math.min(F.speedmax || 2.4, S.baseSpeed + S.tick / (F.speedrate || 2200))
+      : S.baseSpeed;
+    S.speedMul = baseSpd * (1 + VIGOR_GAIN * S.vigor);
     S.tempo = S.speedMul * (slowed ? 0.5 : 1);
     const T = S.tempo;
     S.varMul = 1; S.monoMul = 1; S.blind = 0;   /* detectors re-raise these each tick */
@@ -2314,6 +2466,9 @@ FZ.sim = (function () {
 
     /* ---- give every failure a body the eye can find ---- */
     bodies();
+    /* ---- and publish what is PHYSICALLY wrong, so the game always has something to
+           point at even when every detector in the chapter has been countered ---- */
+    distress();
 
     /* ---- strain ---- */
     strain();
@@ -2451,6 +2606,223 @@ FZ.sim = (function () {
     W.dark = S.lensOn ? 0 : (S.blind ? 1 : 0.55);
     W.crowd = clamp(crowdMax / Math.max(3, n * 0.4), 0, 1);
     W.scarce = clamp(1 - (G ? G.open.length : 0) / Math.max(1, S.maxJobs), 0, 1);
+  }
+
+  /* ============================================================
+     STRUCTURAL DISTRESS — the facts, and the throttle they drive.
+     Full shape in the header of this file. Two rules govern everything below:
+
+       1. NOTHING HERE READS `heat`, `fires`, `on` OR `countered`. Distress is what the
+          nest and the crumbs are physically doing. That is the entire point: a player
+          who has countered every detector in the chapter can still have three crumbs
+          that have not moved in four seconds and a lateral solid with bodies, and the
+          incident layer must be able to find them and ask about them.
+       2. EVERY SITE CARRIES A STABLE COORDINATE. A crumb's is its chamber centre; a
+          passage's is its midpoint. Both survive the phone rotating. An incident opened
+          on a site lands on bodies, which is the difference between a decision and a
+          ring drawn in the middle of the screen.
+
+     Cost: one pass over the crumbs, one over the edges, both tiny, plus one progress
+     sample per crumb every ten ticks. Site objects come from a pool and are rewritten
+     in place, so a tick allocates nothing.
+     ============================================================ */
+  const DIS_STEP = 10,        /* one progress sample per crumb every ten ticks … */
+        DIS_SLOTS = 12,       /* … twelve of them, so the window is ~120 ticks */
+        DIS_MAX = 8,          /* how many sites are published, worst first */
+        DIS_MIN = 0.18,       /* below this a site is not worth pointing at */
+        /* A COMPLAINT THE COLONY HAS BEEN MAKING FOR FORTY SECONDS IS A CONDITION, NOT AN
+           EVENT. Measured: a chamber with no tunnel to it, and a crumb behind an unfinished
+           face, are permanently true — so without this taper they pin health at zero for
+           the whole run and the throttle below never moves. They stay on the list (they
+           are still the worst thing in a quiet colony) but they stop drowning fresh
+           trouble, and a build that wants acute distress first gets it by reading sev. */
+        DIS_OLD = 2400, DIS_TAPER = 0.45,
+        /* health reads the WORST thing happening and HOW MUCH is happening, in that order.
+           A sum alone saturates instantly in a colony that always has five things wrong
+           with it, which is every colony in this game. */
+        DIS_WORST = 0.55, DIS_SPREAD = 4.0,
+        /* how hard a colony with nothing wrong with it gets worked. The other half of
+           the round-5 verdict: competence must not be paid in an empty screen. */
+        VIGOR_GAIN = 0.40,
+        VIGOR_EASE = 0.004;   /* ~4s to swing between calm and pushed */
+
+  const disPool = [], disList = [];
+  let disN = 0;
+  function disSite(kind, ref, x, y) {
+    let s = disPool[disN];
+    if (!s) s = disPool[disN] = { kind: '', ref: 0, x: 0, y: 0, sev: 0, since: 0, why: '', syms: [],
+                                  claims: 0, net: 0, queue: 0, crowd: 0, head: 0, jam: 0,
+                                  stalled: false, back: false, sealed: false };
+    disN++;
+    s.kind = kind; s.ref = ref; s.x = x; s.y = y;
+    s.sev = 0; s.since = 0; s.why = ''; s.syms.length = 0;
+    s.claims = 0; s.net = 0; s.queue = 0; s.crowd = 0; s.head = 0; s.jam = 0;
+    s.stalled = false; s.back = false; s.sealed = false;
+    return s;
+  }
+
+  function distress() {
+    const sample = S.tick % DIS_STEP === 0, G = S._g;
+    disN = 0; disList.length = 0;
+    let load = 0, crumbs = 0, passages = 0;
+
+    /* ---------- EVERY CRUMB: how many hands are on it, and has it MOVED ---------- */
+    for (let i = 0; i < S.jobs.length; i++) {
+      const j = S.jobs[i];
+      if (j.done) continue;
+      j.claimN = j.claims.size;
+      if (sample) {
+        j.ph[j.phi] = j.progress;
+        j.phi = (j.phi + 1) % DIS_SLOTS;
+        if (j.phn < DIS_SLOTS) j.phn++;
+      }
+      if (j.phn) {
+        j.net120 = j.progress - j.ph[(j.phi - j.phn + DIS_SLOTS) % DIS_SLOTS];
+        j.win = j.phn * DIS_STEP;
+      } else { j.net120 = 0; j.win = 0; }
+      /* a crumb that is genuinely being worked gains roughly its whole self in two
+         seconds, so anything under a couple of units of progress in that window is a
+         crumb somebody is standing next to and not working. */
+      const young = j.win < 40;
+      const moving = young || j.net120 > 2.5;
+      j.stallT = moving ? 0 : j.stallT + 1;
+
+      const hands = j.claimN, q = j.queue.length, stalled = j.stallT > 45;
+      const back = !young && j.net120 < -1.5;
+      let sev = 0, why = '';
+      const syms = [];
+      /* worst first: whichever fact is most visible on the floor names the site */
+      if (back) {
+        why = 'apart'; sev = 0.58 + Math.min(0.35, -j.net120 / 26);
+        syms.push('Sa', 'Mc', 'Co');
+      } else if (j.sealed) {
+        why = 'sealed'; sev = 0.46 + (j.value >= 3 ? 0.18 : 0) + Math.min(0.2, j.stallT / 900);
+        syms.push('Si', 'Dp', 'Mm');
+      } else if (hands >= 2) {
+        why = 'contested'; sev = 0.40 + 0.11 * (hands - 2) + (stalled ? 0.22 : 0);
+        syms.push('Co', 'Mc', 'In', 'Tw');
+      } else if (j.locked !== false && stalled) {
+        why = 'held'; sev = 0.46 + 0.06 * q;
+        syms.push('Lo', 'Cl', 'Ow');
+      } else if (j.crowd >= 4) {
+        why = 'packed'; sev = 0.34 + 0.08 * (j.crowd - 4);
+        syms.push('Fl', 'Im', 'Cf');
+      } else if (q >= 2) {
+        why = 'queued'; sev = 0.30 + 0.09 * (q - 2) + (stalled ? 0.15 : 0);
+        syms.push('Lo', 'Dp', 'In', 'Fl');
+      } else if (j.prereq != null && (function () { const p = jobById(j.prereq); return p && !p.done; })()) {
+        why = 'blocked'; sev = 0.34 + Math.min(0.2, j.stallT / 700);
+        syms.push('Dp', 'Si');
+      } else if (j.hazard) {
+        why = 'hazard'; sev = 0.36 + 0.2 * (j.crowd > 0 ? 1 : 0);
+        syms.push('Hi', 'Sf', 'Mm');
+      } else if (stalled && !hands && j.value >= 3) {
+        why = 'ignored'; sev = 0.24 + 0.28 * j.rot + 0.16 * j.dark;
+        syms.push('Pt', 'My', 'Cs', 'Di', 'Si');
+      }
+      /* AND WHO IS STANDING IN IT. Measured: passage four teaches Mo, Lv and Sf and
+         nothing else, and every one of its distress signals named an element the chapter
+         had never heard of — so a colony visibly falling over had nothing it could be
+         asked about, which is the same empty screen by another road. If every body on
+         this crumb is the same lineage and that lineage is most of the colony, then "one
+         kind of worker is doing all of this" is a TRUE description of what is on the
+         floor, and it is exactly what Mo and Lv name. Lowest priority: it is a weaker
+         reading than the physical fact above it, and it only survives if the chapter has
+         nothing better. */
+      if (sev > 0 && G && G.hueDistinct > 0 && (hands + q) >= 2) {
+        let hue = -1, mono = true;
+        const look = id => {
+          const a = agentById(id); if (!a) return;
+          if (hue < 0) hue = a.hue; else if (a.hue !== hue) mono = false;
+        };
+        j.claims.forEach(look);
+        for (let k = 0; k < j.queue.length && mono; k++) look(j.queue[k]);
+        if (mono && hue === G.topHue && G.topHueFrac > 0.6) syms.push('Mo', 'Lv', 'Sf');
+      }
+      if (sev > 0) {
+        j.disT++;
+        sev *= 1 - DIS_TAPER * clamp(j.disT / DIS_OLD, 0, 1);
+      } else j.disT = 0;
+      if (sev >= DIS_MIN) {
+        load += sev; crumbs++;
+        const s = disSite('crumb', j.id, j.x, j.y);
+        s.sev = clamp(sev, 0, 1); s.why = why; s.since = j.disT;
+        s.claims = hands; s.net = j.net120; s.queue = q; s.crowd = j.crowd;
+        s.stalled = stalled; s.back = back; s.sealed = j.sealed;
+        for (let k = 0; k < syms.length; k++) s.syms.push(syms[k]);
+        disList.push(s);
+      }
+    }
+
+    /* ---------- EVERY PASSAGE: head-on blocks and queue depth ---------- */
+    for (let i = 0; i < NEST.edges.length; i++) {
+      const e = NEST.edges[i];
+      const A = NEST.nodes[e.a], B = NEST.nodes[e.b];
+      e.mx = (A.x + B.x) / 2; e.my = (A.y + B.y) / 2;
+      let head = 0;
+      for (let k = 0; k < e.occ.length; k++) { const o = agentById(e.occ[k]); if (o && o.headOn) head++; }
+      e.head = head;
+      e.qd = e.qa.length + e.qb.length;
+      e.stopT = (head > 0 || e.qd > 0) ? e.stopT + 1 : 0;
+
+      let sev = 0, why = '';
+      const syms = [];
+      if (head > 0) {
+        why = 'headon'; sev = 0.48 + 0.10 * (head - 1) + Math.min(0.26, e.stopT / 420);
+        syms.push('Tw', 'Es', 'In', 'Co');
+      } else if (e.qd >= 2) {
+        why = 'queued'; sev = 0.30 + 0.09 * (e.qd - 2) + 0.20 * e.jam;
+        syms.push('Fl', 'Im', 'Cf', 'In');
+      } else if (e.jam > 0.5 && e.occ.length) {
+        why = 'jammed'; sev = 0.26 + 0.32 * e.jam;
+        syms.push('Fl', 'In', 'Cf');
+      } else if (!e.dug && e.prog > 0.05 && !e.diggers.length) {
+        /* A FACE SOMEBODY OPENED AND WALKED AWAY FROM, WITH WORK BEHIND IT. This is the
+           only signal in the list that is about a place the colony CANNOT GET TO, and
+           it is the one the critic wants a chapter built on. Its severity is deliberately
+           modest and it tapers with e.stopT-independent age below, because a wall is a
+           standing condition — but in a colony where nothing else is wrong it is the
+           worst thing there is, which is exactly the right time to be asked about it. */
+        const far = NEST.nodes[A.comp === NEST.main ? e.b : e.a];
+        if (far && far.job) { why = 'face'; sev = 0.24 + 0.14 * (1 - e.prog); syms.push('Dp', 'Si'); }
+      }
+      /* the same taper as a crumb: a passage that has been stopped for forty seconds is
+         a condition. Fresh head-on trouble outranks an old jam of the same depth. */
+      if (sev > 0) sev *= 1 - DIS_TAPER * clamp(e.stopT / DIS_OLD, 0, 1);
+      if (sev >= DIS_MIN) {
+        load += sev; passages++;
+        const s = disSite('passage', e.id, e.mx, e.my);
+        s.sev = clamp(sev, 0, 1); s.why = why; s.since = e.stopT;
+        s.head = head; s.queue = e.qd; s.jam = e.jam;
+        for (let k = 0; k < syms.length; k++) s.syms.push(syms[k]);
+        disList.push(s);
+      }
+    }
+
+    disList.sort((p, q) => q.sev - p.sev);
+    if (disList.length > DIS_MAX) disList.length = DIS_MAX;
+
+    const D = S.distress;
+    D.tick = S.tick; D.sites = disList; D.n = disList.length;
+    D.worst = disList.length ? disList[0] : null;
+    D.load = load; D.crumbs = crumbs; D.passages = passages;
+    /* HEALTH READS THE WORST THING FIRST AND THE SPREAD SECOND. Measured before this
+       line existed: a plain sum saturated at zero within seconds in every scenario in
+       the game, because a colony of sixteen ants always has five things wrong with it,
+       so the throttle below never moved and the whole idea was inert. One bad crumb is
+       a problem; six mild ones are a bad afternoon; they are not the same number. */
+    const worstSev = D.worst ? D.worst.sev : 0;
+    S.health = D.health = clamp(
+      1 - (DIS_WORST * worstSev + (1 - DIS_WORST) * Math.min(1, load / DIS_SPREAD)), 0, 1);
+
+    /* ---------- AND IF NOTHING IS WRONG, THE PACE RISES ----------
+       A colony nobody is failing gets worked harder. Throughput up, aggression up
+       (§15.4 rides S.aggro off the same number), fuses shorter, the pacer's quiet
+       window collapsed. The player who answers everything earns a faster game
+       instead of an empty one. */
+    if (S.noVigor) { S.vigor = 0; return; }
+    S.vigor += (S.health - S.vigor) * VIGOR_EASE * Math.min(2, S.tempo || 1);
+    S.vigor = clamp(S.vigor, 0, 1);
   }
 
   /* ============================================================
@@ -2969,6 +3341,18 @@ FZ.sim.defaults = [
       /* THE PACER, for whoever measures the incident rate next: how long this colony has
          had nothing to say, and how overdue it is. urge=1 means the pacer is stirring. */
       calm: S.calm, urge: +S.urge.toFixed(2),
+      /* STRUCTURAL DISTRESS — what is physically wrong right now, worst first, and the
+         health that throttles the tempo. This is what the incident layer selects from,
+         so if `distress.n` is zero for long stretches the game has nothing to ask. */
+      distress: {
+        n: S.distress.n, health: +S.health.toFixed(2), vigor: +S.vigor.toFixed(2),
+        load: +S.distress.load.toFixed(2),
+        crumbs: S.distress.crumbs, passages: S.distress.passages,
+        sites: S.distress.sites.slice(0, 4).map(s => ({
+          kind: s.kind, why: s.why, sev: +s.sev.toFixed(2),
+          x: Math.round(s.x), y: Math.round(s.y), syms: s.syms.slice(0, 3),
+        })),
+      },
       conflict: { force: S.stat.force, passivity: S.stat.passivity, truce: S.stat.truce, unsettled: S.stat.unsettled },
       /* THE BODIES, as a census: proof the failures are things happening on the field and
          not numbers in a table. If `queued` is zero while Lo is hot, the body is missing. */
@@ -3221,13 +3605,18 @@ FZ.sim.defaults = [
       const c = Object.assign({}, base, { collapseMax: Infinity, budget: 0, tools: [] }, extra || {});
       c.force = Object.assign({}, base.force || {}, forceExtra || {});
       c.goal = { jobs: 1e9 };
+      /* a trade-off claim is about the INSTRUMENT. Both arms run at the same tempo, so
+         the health throttle is pinned; otherwise the arm that is doing better is also
+         running faster and the comparison is measuring two things at once. */
+      c.noVigor = true;
       return c;
     }
     /* an isolated world, built from scratch rather than from the sandbox, for the claims
        that need one specific failure to be reliably observable rather than everything at once */
     function iso(agents, jobs, force) {
       return { id: 'ch9', all: true, tools: [], budget: 0, collapseMax: Infinity,
-               speed: 1, goal: { jobs: 1e9 }, agents: agents, jobs: jobs, force: force };
+               speed: 1, goal: { jobs: 1e9 }, noVigor: true,
+               agents: agents, jobs: jobs, force: force };
     }
     function measure(conf, arm, syms, seeds, ticks) {
       const SEEDS = seeds || SEED3, RUNT = ticks || RUN;

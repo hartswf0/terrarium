@@ -44,7 +44,7 @@ FZ.render = (function () {
   var mem = null, mx = null;          /* permanent memory: scars, stamps, stains */
   var mix = null, mxx = null;         /* scratch for masking */
   var earth = null, floor2 = null, vign = null;  /* painted once: earth, floor, darkness */
-  var wired = false, now = 0, lastNow = 0, sx = 1, sy = 1, frames = 0, nestDirty = true;
+  var wired = false, now = 0, lastNow = 0, dtms = 16, sx = 1, sy = 1, frames = 0, nestDirty = true;
   var fit = 1, fitShown = -1, MINFIT = 0.58;   /* how much room the action bar needs */
   var L = null;                       /* the nest layout */
   var beats = [];
@@ -268,7 +268,7 @@ FZ.render = (function () {
     mx.setTransform(1, 0, 0, 1, 0, 0); mx.globalCompositeOperation = 'source-over';
     mx.globalAlpha = 1; mx.clearRect(0, 0, W, H);
     beats.length = 0; bodies.clear(); peak.clear(); hurtAt.clear(); doneAt.clear();
-    stamped.clear(); compWas.clear(); joins = 0;
+    stamped.clear(); compWas.clear(); sealFall.clear(); sealAlpha.clear(); joins = 0;
     floodMark = 0; spursMade = false; L = null; nestDirty = true;
   }
 
@@ -527,9 +527,16 @@ FZ.render = (function () {
       if (e.dug) continue;
       var pr = clamp(e.prog || 0, 0, 1) * 0.96;
       var from = le.from;
-      var t = from === e.b ? 1 - pr : pr;
+      /* A FACE STANDS IN A DOORWAY, NOT IN THE MIDDLE OF A ROOM. A passage
+         nobody has started on is a wall across the mouth of the chamber it
+         would leave from — so the face never sits closer to the centre than
+         that node's own wall, and the earth already cut always stops behind
+         it. */
+      var rimA = clamp((le.A.rr + 1) / le.len, 0, 0.42);
+      var rimB = clamp((le.B.rr + 1) / le.len, 0, 0.42);
+      var t = from === e.b ? 1 - Math.max(pr, rimB) : Math.max(pr, rimA);
       var f = edgePt(le, t);
-      var mouth = edgePt(le, from === e.b ? 1 : 0);
+      var mouth = edgePt(le, from === e.b ? 1 - rimB : rimA);
       var ang = Math.atan2(le.B.y - le.A.y, le.B.x - le.A.x) + (from === e.b ? Math.PI : 0);
       var live = e.diggers && e.diggers.length;
       var hw = le.w * 0.78;
@@ -614,7 +621,10 @@ FZ.render = (function () {
     return null;
   }
   function drawIntent(S, agents) {
-    ctx.setLineDash([2, 4]); ctx.lineWidth = 1.3; ctx.strokeStyle = SIG.blue;
+    /* a route is one continuous line, because the walk is continuous. It is
+       told apart from the scent already laid on the floor by weight and
+       strength alone — nothing in the nest means anything by being broken. */
+    ctx.lineWidth = 1.1; ctx.strokeStyle = SIG.blue; ctx.lineJoin = 'round';
     for (var i = 0; i < agents.length; i++) {
       var a = agents[i], r = a.route;
       if (!r || !r.length) continue;
@@ -624,7 +634,7 @@ FZ.render = (function () {
         if (e0) cur = a.dir > 0 ? e0.b : e0.a;
       }
       if (cur == null) continue;
-      A(0.7);
+      A(0.55);
       ctx.beginPath();
       ctx.moveTo(AX(a), AY(a));
       var n0 = L.nodes[cur];
@@ -640,57 +650,135 @@ FZ.render = (function () {
       }
       ctx.stroke();
     }
-    ctx.setLineDash([]);
+    ctx.lineJoin = 'miter';
     ctx.globalAlpha = 1;
   }
 
   /* ------------------------------------------------ what the passages are like
      Wear is a road the colony has chosen; a jam is a road it cannot get down.
-     Both are drawn on the floor, in earth, and neither has a number. */
-  /* A JAMMED PASSAGE NEEDS NO OVERLAY: the bodies wedged in it, shoulder to
+     Both are drawn on the floor, in earth, and neither has a number.
+
+     A JAMMED PASSAGE NEEDS NO OVERLAY: the bodies wedged in it, shoulder to
      shoulder and not moving, ARE the jam — AESTHETIC §0.
 
-     A chamber with no way in is the one thing the bodies cannot say, because
-     the whole point is that there are no bodies there. So it gets the one
-     drawn convention in this file: DASHED MEANS NO TUNNEL REACHES THIS.
-     The dashes march, slowly, the way a surveyor's pending line does.
+     A ROOM NOTHING CAN REACH is the one thing the bodies cannot say, because
+     the whole point of it is that there are no bodies there. It used to be a
+     marching dashed outline — which is a code, and a code has to be taught.
 
-     And because a convention is only learned at the moment it changes, the
-     dashes closing into one solid line is a BEAT — a small, clear, one-shot
-     event wherever on screen it happens. That is the whole lesson of §16.2
-     delivered in about a second, with nothing written down. */
+     It is now a WALL. Every doorway that room would have is stopped with a
+     slab of packed earth, tamped flat on the inside, with spoil chevrons
+     pressed against it: the same pick marks a live dig face carries, mirrored,
+     because this earth was rammed in rather than cut out. And the room behind
+     it is dark, because nothing has ever walked in there to disturb it.
+
+     Break a tunnel through and the slabs drop, rubble scatters at the mouth
+     that gave, and daylight runs down the new passage into the room. A wall
+     coming down is a thing anybody reads with no convention at all — which is
+     what makes the single most valuable idea in the world model teachable. */
+  var sealFall = new Map();          /* id -> 0..1, how far the wall has fallen */
+  var sealAlpha = new Map();         /* id -> 0..1, how solidly it stands */
+
+  /* one stopped doorway: a slab across the passage mouth, on the room's floor,
+     where a tunnel would come in if there were one */
+  function sealPlug(n, le, al, fall) {
+    var far = le.A === n ? le.B : le.A;
+    var vx = far.x - n.x, vy = far.y - n.y;
+    var vl = Math.sqrt(vx * vx + vy * vy) || 1;
+    var ux = vx / vl, uy = vy / vl;
+    var d = Math.max(7, n.rr - 5), hw = le.w * 1.02, dep = 9;
+    var e = ease(clamp(fall, 0, 1));
+    ctx.save();
+    ctx.translate(n.x + ux * d, n.y + uy * d + e * 17);
+    ctx.rotate(Math.atan2(uy, ux) + e * 0.6);
+    /* the slab itself: deep soil, rough on the far side where it meets earth */
+    A(0.98 * al); ctx.fillStyle = MAT.soil3;
+    ctx.beginPath();
+    ctx.moveTo(-2, -hw);
+    for (var q = -1; q <= 1.001; q += 0.25) {
+      ctx.lineTo(dep + hash(le.id * 4.1 + q * 3.7 + n.id) * 5, q * hw);
+    }
+    ctx.lineTo(-2, hw); ctx.closePath(); ctx.fill();
+    /* the lit face of a built wall: the room's own floor catches the near edge */
+    A(0.45 * al); ctx.strokeStyle = MAT.sand2; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(0.4, -hw * 0.92); ctx.lineTo(0.4, hw * 0.92); ctx.stroke();
+    /* tamped flat on the room side — one hard, unbroken line, no gaps in it */
+    A(0.95 * al); ctx.strokeStyle = MAT.ink; ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.moveTo(-2, -hw); ctx.lineTo(-2, hw); ctx.stroke();
+    /* spoil pressed against the inside: a dig face's pick marks, mirrored, so
+       they point INTO the room instead of out of it */
+    A(0.7 * al); ctx.strokeStyle = MAT.ink; ctx.lineWidth = 1.3; ctx.lineJoin = 'round';
+    for (var m = -1; m <= 1; m++) {
+      var my3 = m * hw * 0.58;
+      ctx.beginPath();
+      ctx.moveTo(-3.2, my3 - 2.9); ctx.lineTo(-7.8, my3); ctx.lineTo(-3.2, my3 + 2.9);
+      ctx.stroke();
+    }
+    ctx.lineJoin = 'miter';
+    ctx.restore();
+  }
+
   function drawRoads(S) {
     if (!L) return;
     var main = (S.nest && S.nest.main !== undefined) ? S.nest.main : null;
+    var ek = 1 - Math.exp(-clamp(dtms, 0, 140) / 130);
     for (var i = 0; i < L.nodes.length; i++) {
-      var n = L.nodes[i];
+      var n = L.nodes[i], q, le;
       if (!n.ref || n.ref.comp === undefined || n.ref.kind === 'surface') continue;
       var cut = !!(L.edges.length && main !== null && n.ref.comp !== main);
       var was = compWas.get(n.id);
       compWas.set(n.id, cut);
       if (was === true && !cut) {
         joins++;
+        sealFall.set(n.id, 0.0001);
         /* which passage got here — the answer to "why is it connected now" is a
-           tunnel, so the light runs down that tunnel and into the room */
-        var ce = null;
-        for (var q = 0; q < L.edges.length; q++) {
-          var le = L.edges[q];
+           tunnel, so the wall drops at that mouth and the light runs down it */
+        for (q = 0; q < L.edges.length; q++) {
+          le = L.edges[q];
           if (!le.ref.dug || (le.A !== n && le.B !== n)) continue;
           var far = le.A === n ? le.B : le.A;
-          ce = { x: far.x / sx, y: far.y / sy, tx: n.x / sx, ty: n.y / sy };
+          var fvx = far.x - n.x, fvy = far.y - n.y;
+          var fvl = Math.sqrt(fvx * fvx + fvy * fvy) || 1;
+          push({ k: 'way', x: far.x / sx, y: far.y / sy, tx: n.x / sx, ty: n.y / sy, life: 620 });
+          push({
+            k: 'fell', life: 860,
+            x: (n.x + fvx / fvl * (n.rr - 2)) / sx,
+            y: (n.y + fvy / fvl * (n.rr - 2)) / sy
+          });
           break;
         }
-        if (ce) push({ k: 'way', x: ce.x, y: ce.y, tx: ce.tx, ty: ce.ty, life: 620 });
-        push({ k: 'join', x: n.x / sx, y: n.y / sy, r: n.rr + 3, life: 1150 });
         push({ k: 'holed', x: n.x / sx, y: n.y / sy, life: 760 });
       }
-      if (!cut) continue;
-      A(0.6); ctx.strokeStyle = MAT.ink; ctx.lineWidth = 1.3;
-      ctx.setLineDash([2, 4]);
-      ctx.lineDashOffset = -(now * 0.009) % 6;
-      ctx.beginPath(); ctx.arc(n.x, n.y, n.rr + 3, 0, TAU); ctx.stroke();
-      ctx.setLineDash([]); ctx.lineDashOffset = 0;
+
+      var known = sealAlpha.has(n.id);
+      var a = sealAlpha.get(n.id) || 0;
+      var fall = sealFall.get(n.id) || 0;
+      /* a wall that was already standing when the player arrived is standing,
+         not fading up; only one built during play eases in */
+      if (cut) { a = known ? a + (1 - a) * ek : 1; fall = 0; sealFall.delete(n.id); }
+      else if (a > 0.004) {
+        fall = clamp(fall + clamp(dtms, 0, 140) / 540, 0, 1);
+        sealFall.set(n.id, fall);
+        a = 1 - fall;
+        if (fall >= 1) { a = 0; sealFall.delete(n.id); }
+      }
+      sealAlpha.set(n.id, a);
+      if (a < 0.02) continue;
+
+      /* nothing has ever walked in here, so nothing has ever lit it. The dark
+         holds while the wall is coming down and lifts after it, so the beat
+         reads in the right order: the wall goes, THEN the light gets in. */
+      A(0.38 * (1 - clamp((fall - 0.3) / 0.7, 0, 1)) * (cut ? a : 1)); ctx.fillStyle = MAT.ink;
+      blobPath(ctx, n.x, n.y, n.rr, L.seed + i * 3, 0.2); ctx.fill();
+
+      for (q = 0; q < L.edges.length; q++) {
+        le = L.edges[q];
+        if (le.A !== n && le.B !== n) continue;
+        if (cut) { if (le.ref && le.ref.dug) continue; le.walled = 1; }
+        else if (!le.walled) continue;
+        sealPlug(n, le, a, fall);
+      }
     }
+    ctx.globalAlpha = 1;
   }
 
 
@@ -1081,12 +1169,12 @@ FZ.render = (function () {
     }
     ctx.restore();
 
-    /* --- possession: a scratched line around what it has decided is its --- */
+    /* --- possession: a line scored into the floor around what it has decided
+       is its. One unbroken scratch, drawn by a body dragging a leg round in a
+       circle — the wobble is the hand that made it, not a code. --- */
     if (own && taught('Ow')) {
-      A(0.3 * dim); ctx.strokeStyle = MAT.ink; ctx.lineWidth = 1.2;
-      ctx.setLineDash([2, 4]);
-      ctx.beginPath(); ctx.arc(x, y, 15 * sc, 0, TAU); ctx.stroke();
-      ctx.setLineDash([]);
+      A(0.34 * dim); ctx.strokeStyle = MAT.ink; ctx.lineWidth = 1.1;
+      blobPath(ctx, x, y, 15 * sc, a.id * 3.7 + 11, 0.07); ctx.stroke();
     }
     /* --- struck. The BLOW is red, for the second it lands. Being down is not:
        a worker on its side with its legs pulled in, among workers that are
@@ -1190,15 +1278,6 @@ FZ.render = (function () {
       A(0.75 * a); ctx.fillStyle = MAT.sand2;
       ctx.beginPath(); ctx.ellipse(x + Math.cos(an) * rr, y + Math.sin(an) * rr, 1.9, 1.5, an, 0, TAU); ctx.fill();
     }
-    /* the ghost of grain that was carried and then rolled back */
-    var pk = peak.get(j.id);
-    if (pk !== undefined && pk > p + 0.05) {
-      A(0.5 * a); ctx.strokeStyle = MAT.ink; ctx.lineWidth = 1;
-      ctx.setLineDash([2, 3]);
-      ctx.beginPath(); ctx.arc(x, y, r0 * (1 - 0.42 * pk), 0, TAU); ctx.stroke();
-      ctx.setLineDash([]);
-    }
-
     /* the seed itself */
     A(0.2 * a); ctx.fillStyle = MAT.ink;
     ctx.beginPath(); ctx.ellipse(jx + 1.4, jy + 2, r * 0.95, r * 0.72, 0.4, 0, TAU); ctx.fill();
@@ -1217,6 +1296,26 @@ FZ.render = (function () {
     A(0.45 * a); ctx.strokeStyle = MAT.paper; ctx.lineWidth = 1.1;
     ctx.beginPath(); ctx.moveTo(r * 0.3, -r * 0.5); ctx.quadraticCurveTo(-r * 0.3, -r * 0.62, -r * 0.62, -r * 0.3); ctx.stroke();
     ctx.restore();
+
+    /* WORK THAT WAS DONE AND CAME BACK. The crumb was eaten down to the inner
+       line and has grown out past it again. The line is solid and scored into
+       the seed; the little ticks show which way the edge travelled — outward,
+       the wrong way. Nothing about it is broken, and nothing is written. */
+    var pk = peak.get(j.id);
+    if (pk !== undefined && pk > p + 0.05) {
+      var gr = r0 * (1 - 0.42 * pk);
+      A(0.55 * a); ctx.strokeStyle = MAT.ink; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(jx, jy, gr, 0, TAU); ctx.stroke();
+      A(0.4 * a); ctx.lineWidth = 1.2;
+      for (var bk = 0; bk < 4; bk++) {
+        var ba = (bk / 4) * TAU + 0.6;
+        var cs = Math.cos(ba), sn2 = Math.sin(ba);
+        ctx.beginPath();
+        ctx.moveTo(jx + cs * gr, jy + sn2 * gr);
+        ctx.lineTo(jx + cs * (r - 0.5), jy + sn2 * (r - 0.5));
+        ctx.stroke();
+      }
+    }
 
     /* left alone too long: it goes mouldy where it lies */
     var neg = Math.min(1, (j.neglect || 0) / 260);
@@ -1552,10 +1651,8 @@ FZ.render = (function () {
          and a small dial, and nothing else: it is legible from what is happening
          in it, which is the whole point of the grammar. */
       if (lead) {
-        A(0.22 * bl); ctx.strokeStyle = col; ctx.lineWidth = 1.4;
-        ctx.setLineDash([3, 5]);
+        A(0.24 * bl); ctx.strokeStyle = col; ctx.lineWidth = 1.4;
         ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.stroke();
-        ctx.setLineDash([]);
       }
       /* the time left, on a compact dial — the wide dashed ring is how far an
          answer may land, the dial is how long it has. The dial is nudged clear
@@ -1673,25 +1770,33 @@ FZ.render = (function () {
       ctx.lineCap = 'butt';
       return true;
     }
-    if (b.k === 'join') {
-      /* THE DASHES CLOSE. Since the chapter began this outline has been saying
-         "no tunnel reaches this chamber". A face has just broken through into
-         it, so the gaps shut, one at a time, into a single solid line — and
-         then the line lets go in one ring. Say nothing. */
-      var jr = b.r || 20;
-      var close = clamp(k / 0.5, 0, 1);
-      var hold = k < 0.5 ? 1 : 1 - (k - 0.5) / 0.5;
-      A(0.9 * hold); ctx.strokeStyle = MAT.ink; ctx.lineWidth = 1.3 + close * 1.6;
-      if (close > 0.985) ctx.setLineDash([]);
-      else {
-        ctx.setLineDash([2 + close * 13, 4 * (1 - close) + 0.4]);
-        ctx.lineDashOffset = -now * 0.02 * (1 - close);
+    if (b.k === 'fell') {
+      /* THE WALL COMES DOWN. Since the chapter began, packed earth has stood
+         across every doorway of this room. A face has just broken through, so
+         the slab at that mouth breaks up and tumbles onto the floor of a room
+         nobody has ever stood in. Say nothing; it is a wall falling over. */
+      var fq, fa, fr;
+      A((1 - k) * 0.95); ctx.fillStyle = MAT.soil3;
+      for (fq = 0; fq < 10; fq++) {
+        fa = hash(b.t + fq * 2.7);
+        fr = 3 + fa * 4.2;
+        ctx.save();
+        ctx.translate(x + (fa - 0.5) * 26 * (0.35 + e),
+          y + (hash(b.t + fq * 1.3) - 0.5) * 15 + e * e * 22);
+        ctx.rotate(fa * 6.2 + e * 3.4);
+        ctx.beginPath();
+        ctx.moveTo(-fr, -fr * 0.7); ctx.lineTo(fr, -fr * 0.5);
+        ctx.lineTo(fr * 0.6, fr * 0.85); ctx.lineTo(-fr * 0.8, fr * 0.6);
+        ctx.closePath(); ctx.fill();
+        ctx.restore();
       }
-      ctx.beginPath(); ctx.arc(x, y, jr, 0, TAU); ctx.stroke();
-      ctx.setLineDash([]); ctx.lineDashOffset = 0;
-      if (k > 0.42) {
-        var ee = ease((k - 0.42) / 0.58);
-        ring(x, y, jr + 4 + ee * 24, MAT.ink, 2.4 * (1 - ee), (1 - ee) * 0.55);
+      A((1 - k) * 0.55); ctx.fillStyle = MAT.sand2;
+      for (fq = 0; fq < 7; fq++) {
+        var fan = hash(b.t + fq * 5.1) * TAU;
+        ctx.beginPath();
+        ctx.arc(x + Math.cos(fan) * (4 + e * 20), y + Math.sin(fan) * (3 + e * 13) + e * e * 9,
+          1.9 * (1 - k), 0, TAU);
+        ctx.fill();
       }
       return true;
     }
@@ -1740,13 +1845,56 @@ FZ.render = (function () {
       return true;
     }
     if (b.k === 'end') {
-      /* how a fight ended, in one mark: held, broken, walked away, still burning */
+      /* HOW A FIGHT ENDED, AS FOUR PICTURES. An arch was raised over it; one of
+         them bricked the other out; one of them lay down; or neither gave way
+         and they are still shoving. Four drawn things, no code between them. */
       var col2 = b.mode === 'truce' ? SIG.teal : b.mode === 'unsettled' ? SIG.amber : SIG.red;
-      A((1 - k) * 0.85); ctx.strokeStyle = col2; ctx.lineWidth = 2;
-      if (b.mode === 'truce') { ctx.beginPath(); ctx.arc(x, y - 2, 9, Math.PI, 0); ctx.stroke(); }
-      else if (b.mode === 'force') { ctx.beginPath(); ctx.moveTo(x - 9, y + 8); ctx.lineTo(x - 9, y - 8); ctx.lineTo(x + 9, y - 8); ctx.stroke(); }
-      else if (b.mode === 'passivity') { ctx.beginPath(); ctx.moveTo(x - 9, y + 6); ctx.lineTo(x + 9, y + 6); ctx.stroke(); }
-      else { ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.arc(x, y, 9, 0, TAU); ctx.stroke(); ctx.setLineDash([]); }
+      var em, ea = (1 - k) * 0.88;
+      A(ea); ctx.strokeStyle = col2; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+      if (b.mode === 'truce') {
+        /* the arch stands over both of them: the one silhouette that arbitrates */
+        ctx.beginPath(); ctx.arc(x, y - 1, 9, Math.PI, 0); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x - 9, y - 1); ctx.lineTo(x - 9, y + 8);
+        ctx.moveTo(x + 9, y - 1); ctx.lineTo(x + 9, y + 8); ctx.stroke();
+      } else if (b.mode === 'force') {
+        /* one of them WALLED THE OTHER OUT — the same slab of packed earth that
+           stops a doorway anywhere else in the nest, dropped between the two */
+        A(ea); ctx.fillStyle = MAT.soil3;
+        ctx.fillRect(x - 3, y - 11, 7, 22);
+        A(ea); ctx.strokeStyle = col2; ctx.lineWidth = 2.4;
+        ctx.beginPath(); ctx.moveTo(x - 3, y - 11); ctx.lineTo(x - 3, y + 11); ctx.stroke();
+        ctx.lineWidth = 1.4;
+        for (em = -1; em <= 1; em++) {
+          ctx.beginPath();
+          ctx.moveTo(x - 5.5, y + em * 6.5 - 2.6);
+          ctx.lineTo(x - 9.5, y + em * 6.5);
+          ctx.lineTo(x - 5.5, y + em * 6.5 + 2.6);
+          ctx.stroke();
+        }
+      } else if (b.mode === 'passivity') {
+        /* one of them simply stopped: a body on its back on the floor, legs up */
+        ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.moveTo(x - 11, y + 8); ctx.lineTo(x + 11, y + 8); ctx.stroke();
+        A(ea); ctx.fillStyle = col2;
+        ctx.beginPath(); ctx.ellipse(x - 3.4, y + 4, 5, 3, 0, 0, TAU); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(x + 4.6, y + 4.4, 2.8, 2.4, 0, 0, TAU); ctx.fill();
+        A(ea); ctx.strokeStyle = col2; ctx.lineWidth = 1.2;
+        for (em = -1; em <= 1; em++) {
+          ctx.beginPath();
+          ctx.moveTo(x - 5 + em * 3.2, y + 2); ctx.lineTo(x - 6.4 + em * 3.2, y - 3.4); ctx.stroke();
+        }
+      } else {
+        /* nobody gave way: two shoulders still braced against each other, and
+           the gap between them that never closed */
+        ctx.beginPath();
+        ctx.moveTo(x - 11, y - 7); ctx.lineTo(x - 3.5, y); ctx.lineTo(x - 11, y + 7);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x + 11, y - 7); ctx.lineTo(x + 3.5, y); ctx.lineTo(x + 11, y + 7);
+        ctx.stroke();
+      }
+      ctx.lineJoin = 'miter';
       return true;
     }
     return true;
@@ -1760,10 +1908,8 @@ FZ.render = (function () {
     var pulse = 0.7 + Math.sin(now * 0.006) * 0.2;
     if (am.kind === 'charter') {
       var r = ((FZ.sim && FZ.sim.charterR) || 82) * sx;
-      A(0.5 * pulse); ctx.strokeStyle = SIG.teal; ctx.lineWidth = 2;
-      ctx.setLineDash([6, 6]);
+      A(0.4 * pulse); ctx.strokeStyle = SIG.teal; ctx.lineWidth = 1.4;
       ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.stroke();
-      ctx.setLineDash([]);
       A(0.8 * pulse); ctx.strokeStyle = SIG.teal; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(x, y - 2, 8, Math.PI, 0); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(x - 8, y - 2); ctx.lineTo(x - 8, y + 7);
@@ -1772,10 +1918,8 @@ FZ.render = (function () {
     }
     if (am.kind === 'vary') {
       var vr = ((FZ.sim && FZ.sim.varyR) || 95) * sx;
-      A(pulse * 0.8); ctx.strokeStyle = SIG.teal; ctx.lineWidth = 2;
-      ctx.setLineDash([6, 5]);
+      A(pulse * 0.45); ctx.strokeStyle = SIG.teal; ctx.lineWidth = 1.4;
       ctx.beginPath(); ctx.arc(x, y, vr, 0, TAU); ctx.stroke();
-      ctx.setLineDash([]);
       var ags = S.agents || [];
       for (var i = 0; i < ags.length; i++) {
         var ddx = AX(ags[i]) - x, ddy = AY(ags[i]) - y;
@@ -1805,7 +1949,7 @@ FZ.render = (function () {
     if (!ctx) return;
     now = performance.now();
     var dt = lastNow ? now - lastNow : 16;
-    lastNow = now;
+    lastNow = now; dtms = dt;
     frames++;
     wire();
     fitStep(dt);
@@ -1924,10 +2068,8 @@ FZ.render = (function () {
     /* the rumour: a bright, confident scent to a chamber with nothing in it */
     if (S.rumor && taught('Gu')) {
       var rx = X(S.rumor.x), ry = Y(S.rumor.y), rp = 0.5 + Math.sin(now * 0.005) * 0.3;
-      A(rp * 0.7); ctx.strokeStyle = SIG.blue; ctx.lineWidth = 1.6;
-      ctx.setLineDash([3, 4]);
+      A(rp * 0.45); ctx.strokeStyle = SIG.blue; ctx.lineWidth = 1;
       blobPath(ctx, rx, ry, 10, 5.5, 0.16); ctx.stroke();
-      ctx.setLineDash([]);
       A(rp); ctx.strokeStyle = SIG.blue; ctx.lineWidth = 1.6;
       ctx.beginPath(); ctx.arc(rx, ry, 15 + Math.sin(now * 0.005) * 3, 0, TAU); ctx.stroke();
     }

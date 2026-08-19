@@ -250,10 +250,16 @@ FZ.controls = (function () {
     return true;
   }
 
+  /* THE INSTRUMENT DOES NOT FALL OUT OF THE HAND WHEN THE RING BURSTS.
+     A fuse can run out in the third of a second between deciding and placing. The damage
+     lands and stands — but if the surface vanished at that instant the player's tap would
+     go into an empty nest, and PLAY still hears a right answer for a beat afterwards
+     (LAND_GRACE). So the action surface, the tag and the armed instrument survive exactly
+     that beat, and the answer she already committed to still arrives somewhere. */
   function burning() {
     var o = ob();
     if (!o) return null;
-    try { return o.current() || o.urgent(); } catch (e) { return null; }
+    try { return o.current() || o.urgent() || (o.grace ? o.grace() : null); } catch (e) { return null; }
   }
 
   function press(kind) {
