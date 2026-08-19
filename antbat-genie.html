@@ -137,6 +137,7 @@ button,input,select{font:inherit;color:inherit}
     <button class="b on" id="btn-bat">Bat</button>
     <button class="b" id="btn-ants">Ants 10</button>
     <button class="b" id="btn-view">View</button>
+    <button class="b" id="btn-study">Study</button>
     <label class="b" for="file-in">Import</label>
     <input id="file-in" type="file" accept=".json" class="hidden">
     <label class="b" for="prior-in">Prior</label>
@@ -243,6 +244,11 @@ function boot(){
   try{
     renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
     renderer.setPixelRatio(Math.min(2,window.devicePixelRatio||1));
+    /* Six hundred emitters add up. Without tone mapping a well-foraged building
+       reads as a white silhouette, which is the opposite of showing the work. */
+    renderer.toneMapping=THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure=0.95;
+    if(THREE.sRGBEncoding!==undefined) renderer.outputEncoding=THREE.sRGBEncoding;
     host.insertBefore(renderer.domElement,host.firstChild);
     $('#worldFallback').classList.add('hidden');
   }catch(e){ $('#booterr').innerHTML='<code>'+e.message+'</code>'; return false; }
@@ -674,10 +680,17 @@ function antStep(ant){
 function dominant(mem){ let b='wander',v=-1; for(const c of CASTES) if(mem[c]>v){v=mem[c];b=c} return b; }
 function colorOf(mem){
   /* fuzzy blend of all four castes. an unresolved mixture is a colour with no
-     name, and that is correct. never a switch on the dominant caste. */
+     name, and that is correct. never a switch on the dominant caste.
+     But a four-way average lands near white, so the hue the mixture implies is
+     kept and the saturation is pushed back to where it can be seen. The mixture
+     is not resolved — only made visible. */
   let r=0,g=0,b=0,t=0;
-  for(const c of CASTES){ const w=mem[c]+0.02; const k=CASTE_RGB[c]; r+=k[0]*w; g+=k[1]*w; b+=k[2]*w; t+=w }
-  return new THREE.Color(r/t,g/t,b/t);
+  for(const c of CASTES){ const w=Math.pow(mem[c]+0.02,1.8); const k=CASTE_RGB[c];
+    r+=k[0]*w; g+=k[1]*w; b+=k[2]*w; t+=w }
+  const col=new THREE.Color(r/t,g/t,b/t);
+  const hsl={}; col.getHSL(hsl);
+  col.setHSL(hsl.h,Math.max(0.72,hsl.s),clamp(hsl.l,0.42,0.68));
+  return col;
 }
 
 /* ---- frontier -------------------------------------------------------------
@@ -836,7 +849,7 @@ function batTick(){
 }
 
 /* ============================== RENDER ==================================== */
-let interiorTicks,stallPoints,disagreePoints,batLines,batRing,cavityPoints;
+let interiorTicks,stallPoints,disagreePoints,batLines,batRing,cavityPoints,antTrails,antHalo;
 function disposeGroup(g){
   while(g.children.length){
     const o=g.children.pop();
@@ -853,18 +866,21 @@ function initFx(){
   const empty=()=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute([],3));return g};
 
   pointCloud=new THREE.Points(empty(),mk(R*0.012,0.95,true));
-  emitterPoints=new THREE.Points(empty(),mk(R*0.030,1.0,true));
+  emitterPoints=new THREE.Points(empty(),mk(R*0.016,0.85,true));
   stallPoints=new THREE.Points(empty(),mk(R*0.016,0.8,false)); stallPoints.material.color=new THREE.Color(0xff8f6a);
   disagreePoints=new THREE.Points(empty(),mk(R*0.026,0.9,false)); disagreePoints.material.color=new THREE.Color(0xffffff);
   cavityPoints=new THREE.Points(empty(),mk(R*0.030,0.30,false)); cavityPoints.material.color=new THREE.Color(0x7fb2ff);
   const lm=()=>new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.5,
     blending:THREE.AdditiveBlending});
-  trailLine=new THREE.LineSegments(empty(),lm());
+  trailLine=new THREE.LineSegments(empty(),lm()); trailLine.material.opacity=0.85;
   interiorTicks=new THREE.LineSegments(empty(),new THREE.LineBasicMaterial({color:0xd85ce5,transparent:true,
     opacity:0.65,blending:THREE.AdditiveBlending}));
   batLines=new THREE.LineSegments(empty(),lm());
   batRing=new THREE.Points(empty(),mk(R*0.014,0.8,false)); batRing.material.color=new THREE.Color(0x7fb2ff);
-  fxGroup.add(pointCloud,emitterPoints,stallPoints,disagreePoints,cavityPoints,trailLine,interiorTicks,batLines,batRing);
+  antTrails=new THREE.LineSegments(empty(),new THREE.LineBasicMaterial({vertexColors:true,
+    transparent:true,opacity:0.95,blending:THREE.AdditiveBlending,linewidth:2}));
+  antHalo=new THREE.Points(empty(),mk(R*0.09,0.8,true));
+  fxGroup.add(pointCloud,emitterPoints,stallPoints,disagreePoints,cavityPoints,trailLine,interiorTicks,batLines,batRing,antTrails,antHalo);
 
   const bg=new THREE.SphereGeometry(R*0.03,8,6);
   const bm=new THREE.MeshBasicMaterial({color:0x7fb2ff});
@@ -873,9 +889,11 @@ function initFx(){
   for(let i=0;i<ants.length;i++){
     const g=new THREE.Group();
     const m=new THREE.MeshBasicMaterial({color:0x2de2d0});
-    const body=new THREE.Mesh(new THREE.SphereGeometry(R*0.014,6,4),m);
-    const head=new THREE.Mesh(new THREE.SphereGeometry(R*0.009,6,4),m);
-    head.position.x=R*0.019; g.add(body,head); g.userData.mat=m;
+    const body=new THREE.Mesh(new THREE.SphereGeometry(R*0.040,8,6),m);
+    const head=new THREE.Mesh(new THREE.SphereGeometry(R*0.026,8,6),m);
+    const gaster=new THREE.Mesh(new THREE.SphereGeometry(R*0.031,8,6),m);
+    head.position.x=R*0.056; gaster.position.x=-R*0.054;
+    g.add(body,head,gaster); g.userData.mat=m;
     antGroup.add(g); ants[i].mesh=g;
   }
 }
@@ -924,7 +942,7 @@ function renderFx(){
     ep.push(e.pos.x,e.pos.y,e.pos.z);
     ec.push(1,0.93,0.78);
   }
-  if(heavy){ setPos(emitterPoints,ep); setCol(emitterPoints,ec); assignLights(); }
+  if(heavy){ setPos(emitterPoints,ep); setCol(emitterPoints,ec); assignLights(state.lightNear); }
 
   /* trail */
   const tp=[],tc=[];
@@ -954,21 +972,64 @@ function renderFx(){
     batLines.visible=batRing.visible=cavityPoints.visible=state.batOn;
   }
 
+  /* apparent size, not world size: an ant framed against a whole pagoda and an
+     ant framed against one lantern base should read as the same animal. */
+  const antScale=clamp(cam.rad/(R*2.5),0.10,1.8);
   for(const a of ants){
     if(!a.mesh)continue;
     a.mesh.position.copy(NODES[a.idx].point);
+    a.mesh.scale.setScalar(antScale);
     a.mesh.userData.mat.color.copy(colorOf(a.mem));
+    const nb=(GRAPH.neighbors[a.idx]||[])[0];
+    if(nb) a.mesh.lookAt(NODES[nb.idx].point);
   }
+  const tp2=[],tc2=[];
+  for(const a of ants){
+    const path=[...a.recent,a.idx];
+    for(let i=1;i<path.length;i++){
+      const p1=NODES[path[i-1]],p2=NODES[path[i]];
+      if(!p1||!p2)continue;
+      const c=colorOf(a.mem),f=i/path.length;
+      tp2.push(p1.point.x,p1.point.y,p1.point.z,p2.point.x,p2.point.y,p2.point.z);
+      tc2.push(c.r*f*0.7,c.g*f*0.7,c.b*f*0.7,c.r*f,c.g*f,c.b*f);
+    }
+  }
+  setPos(antTrails,tp2); setCol(antTrails,tc2);
+  const hp=[],hc=[];
+  for(const a of ants){ const n=NODES[a.idx]; if(!n)continue;
+    const c=colorOf(a.mem); hp.push(n.point.x,n.point.y,n.point.z); hc.push(c.r,c.g,c.b) }
+  setPos(antHalo,hp); setCol(antHalo,hc);
+  antHalo.material.size=R*0.13*antScale;
+  const zoom=clamp(antScale,0.10,1.8);
+  pointCloud.material.size    = R*0.012*zoom*1.4;
+  emitterPoints.material.size = R*0.016*zoom;
+  stallPoints.material.size   = R*0.016*zoom;
+  disagreePoints.material.size= R*0.020*zoom;
+  cavityPoints.material.size  = R*0.030*zoom;
+  batRing.material.size       = R*0.014*zoom;
 }
 
 /* farthest-point selection so the whole lattice contributes, not just the
    newest emitters. instrument density was allocated by curiosity; the light
    follows it. */
-function assignLights(){
+function assignLights(near){
   const E=state.ledger.emitters;
   for(const l of lightPool){l.visible=false;l.intensity=0}
   if(!E.length)return;
   const R=state.bounds.radius,pick=[];
+  if(near){
+    /* looking closely at something: light it with the emitters the ants planted
+       there. what you can see of a part is exactly how much has been walked. */
+    const sorted=E.slice().sort((a,b)=>a.pos.distanceToSquared(near)-b.pos.distanceToSquared(near));
+    sorted.slice(0,lightPool.length).forEach((e,i)=>{
+      const l=lightPool[i];
+      l.position.copy(e.pos); l.visible=true; l.color.setRGB(1,0.94,0.82);
+      /* reach has to follow the framing: a big subject is photographed from
+         further back and needs its emitters to carry that far. */
+      l.intensity=e.intensity*2.0; l.distance=Math.max(R*0.45,cam.rad*1.35); l.decay=2;
+    });
+    return;
+  }
   /* farthest-first over the whole lattice: the light follows the curiosity that
      placed the emitters, not merely the newest ones. */
   const seed=E[E.length-1]; pick.push(seed);
@@ -986,7 +1047,7 @@ function assignLights(){
     const l=lightPool[i];
     l.position.copy(e.pos); l.visible=true;
     l.color.setRGB(1,0.94,0.82);
-    l.intensity=e.intensity*2.6; l.distance=R*1.7; l.decay=2;
+    l.intensity=e.intensity*1.15; l.distance=R*1.5; l.decay=2;
   });
 }
 
@@ -1592,6 +1653,264 @@ function showWish(wishes,novelty){
   $('#wishmeta').textContent='generation '+state.generation+' · novelty vs its own lineage '+
     fx(novelty,3)+' · never compared to anything outside it';
 }
+/* =============================== STUDY ==================================
+   Pictures of the ants working, rather than pictures of a building.
+
+   Each frame is one subject: a part carrying a defect species, framed close,
+   lit only by the emitters the ants planted on it, with the scouts for that
+   species dispatched to it and the reading printed beside them. Nothing here
+   changes the world — the study is a camera and a caption.
+   ======================================================================== */
+let studyMarks=null;
+function clearMarks(){
+  if(studyMarks){ fxGroup.remove(studyMarks);
+    studyMarks.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose()});
+    studyMarks=null }
+}
+function markPart(partId,colorHex){
+  clearMarks();
+  const m=worldMeshes().find(x=>x.userData.partId===partId); if(!m)return null;
+  const box=new THREE.Box3().setFromObject(m);
+  studyMarks=new THREE.Group();
+  const helper=new THREE.Box3Helper(box,new THREE.Color(colorHex));
+  helper.material.transparent=true; helper.material.opacity=0.85;
+  helper.material.depthTest=false;
+  studyMarks.add(helper);
+  fxGroup.add(studyMarks);
+  return box;
+}
+function frameOn(box,pull){
+  const c=box.getCenter(new THREE.Vector3()),sz=box.getSize(new THREE.Vector3());
+  cam.target.copy(c);
+  cam.rad=clamp(sz.length()*(pull||2.1),state.bounds.radius*0.14,state.bounds.radius*1.05);
+  /* a three-quarter view from slightly above: the subject has to be seen
+     against whatever it is, or is not, attached to. */
+  const out=c.clone().sub(state.bounds.center);
+  if(out.lengthSq()>1e-6) cam.az=Math.atan2(out.x,out.z)+0.55;
+  cam.pol=1.02;
+  state.lightNear=c.clone();
+  updateCamera();
+}
+/* Dispatch: the scouts for a species are sent to the part that carries most of
+   it. This is what a prior that values a species actually does — it moves ants. */
+function dispatchScouts(partId,species,count){
+  /* Its OWN nodes, and nothing else. Spilling onto the k-nearest neighbours
+     sends the crew to whatever happens to be geometrically closest, which for a
+     two-node finial is the island forty feet below it. */
+  const own=NODES.map((n,i)=>i).filter(i=>NODES[i].partId===partId);
+  if(!own.length)return 0;
+  const room=Math.min(count||6,Math.max(2,own.length*2));
+  let sent=0;
+  for(const a of ants){
+    if(sent>=room)break;
+    a.affinity=species; a.idx=own[sent%own.length]; a.recent=[]; a.baseline=null;
+    a.dossier={species,found:0,parts:new Map(),firstAt:null};
+    sent++;
+  }
+  return sent;
+}
+/* A part with two sampled points can be marked but cannot be photographed with a
+   crew on it. Prefer a subject big enough to show the work, unless the worst
+   case is much worse — then take the worst and say it is too small. */
+function subjectFor(sp){
+  const all=[...partReport.values()].filter(r=>r.mem[sp]>0.15)
+    .sort((a,b)=>b.mem[sp]-a.mem[sp]);
+  if(!all.length)return null;
+  const top=all[0];
+  const roomy=all.find(r=>r.nodes>=6);
+  if(roomy&&roomy.mem[sp]>=top.mem[sp]-0.15) return {rep:roomy,tiny:false};
+  return {rep:top,tiny:top.nodes<6};
+}
+function wrapText(x,text,maxW){
+  const words=String(text).split(/\s+/),lines=[];let line='';
+  for(const w of words){
+    const t=line?line+' '+w:w;
+    if(x.measureText(t).width>maxW&&line){lines.push(line);line=w}else line=t;
+  }
+  if(line)lines.push(line);
+  return lines;
+}
+/* Composite: the render, then a caption panel that says what is being looked at
+   and what the reading of it is. The memberships are drawn as bars because they
+   are memberships and a number would imply a verdict. */
+function annotate(title,subtitle,body,mems,footer){
+  const W=1000,H=700,cv=document.createElement('canvas');
+  cv.width=W;cv.height=H;const x=cv.getContext('2d');
+  x.fillStyle='#05070a';x.fillRect(0,0,W,H);
+  const imgH=H-190;
+  x.drawImage(renderer.domElement,0,0,W,imgH);
+  const g=x.createLinearGradient(0,imgH-70,0,imgH);
+  g.addColorStop(0,'rgba(5,7,10,0)');g.addColorStop(1,'rgba(5,7,10,.92)');
+  x.fillStyle=g;x.fillRect(0,imgH-70,W,70);
+  x.fillStyle='#05070a';x.fillRect(0,imgH,W,H-imgH);
+  x.strokeStyle='#242c35';x.lineWidth=1;x.beginPath();x.moveTo(0,imgH+.5);x.lineTo(W,imgH+.5);x.stroke();
+
+  x.fillStyle='#edf1f4';x.font='800 21px ui-monospace,SFMono-Regular,Menlo,monospace';
+  x.fillText(title,26,imgH+34);
+  x.fillStyle='#7fb2ff';x.font='700 12px ui-monospace,monospace';
+  let sub=String(subtitle);
+  while(sub.length>8&&x.measureText(sub).width>W-360) sub=sub.slice(0,-2);
+  if(sub!==subtitle) sub=sub.replace(/[ ·—-]+$/,'')+'…';
+  x.fillText(sub,26,imgH+55);
+  x.fillStyle='#a7b1bb';x.font='13px ui-monospace,monospace';
+  wrapText(x,body,W-360).slice(0,4).forEach((l,i)=>x.fillText(l,26,imgH+80+i*19));
+
+  const bx=W-306;
+  x.fillStyle='#5f6a76';x.font='700 10px ui-monospace,monospace';
+  x.fillText('READING',bx,imgH+30);
+  const COL={NO_DOOR:'#ffd166',DOOR_NO_ARRIVAL:'#ffa94d',BELOW_GRADE:'#8a7fd8',FLOATING:'#ff5b4d',
+    BAD_SUPPORT:'#ff8fb0',ORPHAN:'#efbd4d',EXHAUSTED:'#ff8f6a',BURIED:'#d85ce5',
+    CONTESTED:'#f3f4f2',UNREACHED_HOT:'#2de2d0'};
+  (mems||[]).slice(0,6).forEach(([k,v],i)=>{
+    const y=imgH+48+i*20;
+    x.fillStyle='#8b959f';x.font='11px ui-monospace,monospace';x.fillText(k,bx,y+9);
+    x.fillStyle='#161d25';x.fillRect(bx+128,y,140,9);
+    x.fillStyle=COL[k]||'#9be08a';x.fillRect(bx+128,y,140*clamp(v,0,1),9);
+    x.fillStyle='#c3ccd4';x.font='700 10px ui-monospace,monospace';
+    x.fillText(v.toFixed(2),bx+274,y+9);
+  });
+  const legend=[['#2de2d0','ant'],['#ffe6b0','emitter it planted'],['#7fb2ff','bat / its delay rays'],
+                ['#ff5b4d','the subject'],['#d85ce5','reads as inside something']];
+  let lx=26;
+  x.font='10px ui-monospace,monospace';
+  for(const [col,txt] of legend){
+    x.fillStyle=col; x.beginPath(); x.arc(lx+4,H-40,4,0,Math.PI*2); x.fill();
+    x.fillStyle='#7d8791'; x.fillText(txt,lx+13,H-36);
+    lx+=13+x.measureText(txt).width+20;
+  }
+  x.fillStyle='#4d5761';x.font='10px ui-monospace,monospace';
+  x.fillText(footer||'',26,H-16);
+  return cv.toDataURL('image/png');
+}
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)) }
+async function settle(steps){ for(let i=0;i<steps;i++){ tick(); if(i%12===0){renderFx();await sleep(0)} }
+  renderFx(); renderer.render(scene,camera); await sleep(30); }
+
+async function runStudy(){
+  if(state.studyBusy||!NODES.length)return [];
+  state.studyBusy=true;
+  const wasRunning=state.running; state.running=false;
+  const saveCam={az:cam.az,pol:cam.pol,rad:cam.rad,target:cam.target.clone()};
+  const frames=[];
+  try{
+    readPartsGeometrically(); readNodesFuzzy();
+    const b=state.bounds;
+    const crewWas=state.antCount;
+    if(ants.length<24){ state.antCount=24; makeAnts(24); assignScouts(); initFx(); await settle(40); }
+
+    /* 1 — the whole world, lit by wherever the ants have been */
+    state.lightNear=null;
+    cam.target.copy(b.center); cam.rad=b.radius*1.85; cam.az=0.9; cam.pol=1.05; updateCamera();
+    await settle(70);
+    frames.push({label:'THE COLONY AT WORK',data:annotate(
+      'THE COLONY AT WORK',
+      state.house.parts.length+' parts · '+ants.length+' ants · '+state.ledger.emitters.length+' emitters planted',
+      'Nothing lights this building except the emitters the ants planted where they walked. '+
+      'How much of it you can see is how much of it has been foraged. The blue cone is the bat, '+
+      'reading delay into the dark it has not been told about yet.',
+      SPECIES.map(k=>[k,clamp((census&&census[k]?census[k].total:0)/Math.max(1,state.house.parts.length)*4,0,1)])
+        .filter(([,v])=>v>0.02).sort((a,c)=>c[1]-a[1]),
+      'antbat-genie · no score · prior: '+PRIOR.source)});
+
+    /* 2..n — one subject per species that this building actually carries */
+    const live=SPECIES.filter(sp=>census&&census[sp].total>0.4&&census[sp].worst)
+      .sort((a,c)=>census[c].total-census[a].total).slice(0,5);
+    for(const sp of live){
+      /* NO_DOOR and DOOR_NO_ARRIVAL are properties of the whole world, not of
+         a part. Pinning them to whichever part happens to sort first would be a
+         picture of the wrong thing. */
+      const worldLevel=(sp==='NO_DOOR'||sp==='DOOR_NO_ARRIVAL');
+      if(worldLevel){
+        state.lightNear=null;
+        cam.target.copy(b.center); cam.rad=b.radius*1.7; cam.pol=1.30; cam.az=0.15; updateCamera();
+        await settle(60);
+        const doors=state.house.parts.filter(q=>/\b(door|entry|entrance|gate|hatch|airlock)\b/i
+          .test((q.id||'')+' '+(q.role||'')+' '+(q.kind||''))).length;
+        const arrivals=state.house.parts.filter(q=>/\b(stair|step|path|ramp|walk|ladder|porch|landing|deck)\b/i
+          .test((q.id||'')+' '+(q.role||''))).length;
+        frames.push({label:sp+' · the whole world',data:annotate(
+          sp+'  ·  the whole world',
+          state.house.parts.length+' parts · '+doors+' read as a door · '+arrivals+' read as an arrival',
+          sp==='NO_DOOR'
+            ? 'Nothing here matches a door, entry, gate or hatch. This is a linter, not a judgement — '+
+              'it needs no reference and no model, and it is the accusation the correspondence loop never made '+
+              'about this building in seven cycles.'
+            : 'A door exists and nothing arrives at it: no stair, path, ramp or step anywhere in the world.',
+          SPECIES.map(k=>[k,clamp((census&&census[k]?census[k].total:0)/Math.max(1,state.house.parts.length)*4,0,1)])
+            .filter(([,v])=>v>0.02).sort((a,c)=>c[1]-a[1]),
+          'a property of the world, so the world is the subject')});
+        continue;
+      }
+      const pick=subjectFor(sp); if(!pick)continue;
+      const rep2=pick.rep, worst=rep2.id;
+      const box=markPart(worst,{NO_DOOR:0xffd166,DOOR_NO_ARRIVAL:0xffa94d,BELOW_GRADE:0x8a7fd8,
+        FLOATING:0xff5b4d,BAD_SUPPORT:0xff8fb0,ORPHAN:0xefbd4d,EXHAUSTED:0xff8f6a,
+        BURIED:0xd85ce5,CONTESTED:0xf3f4f2,UNREACHED_HOT:0x2de2d0}[sp]||0x9be08a);
+      if(!box)continue;
+      frameOn(box,2.0);
+      await settle(70);                                    // let the reading catch up
+      const sent=dispatchScouts(worst,sp,Math.max(6,Math.floor(ants.length*0.7)));
+      await settle(14);                                    // long enough to be working it
+
+      const found=ants.filter(a=>a.affinity===sp).reduce((n,a)=>n+a.dossier.found,0);
+      const mem=Object.entries(rep2.mem).filter(([,v])=>v>0.02).sort((a,c)=>c[1]-a[1]);
+      frames.push({label:sp+' · '+worst,data:annotate(
+        sp+'  ·  '+worst,
+        sent+' scouts on it · '+found+' sightings · '+rep2.nodes+' sampled points'+
+          (pick.tiny?' — too few to hold a crew, so the marker is the evidence':''),
+        SPECIES_NOTE[sp]+'. '+(sp==='FLOATING'&&rep2.probes
+          ? 'Here: '+rep2.unheld+' of '+rep2.probes+' probes dropped from its footprint found nothing underneath.'
+          : sp==='ORPHAN'&&rep2.clearance!=null
+          ? 'Here: the nearest other part is '+rep2.clearance.toFixed(2)+'m away'+
+            (rep2.nearestPart?' ('+rep2.nearestPart+').':'.')
+          : sp==='BURIED'
+          ? 'Here: every one of its '+rep2.nodes+' sampled points reads as inside something else.'
+          : sp==='NO_DOOR'
+          ? 'Here: nothing in '+state.house.parts.length+' parts matches a door, entry, gate or hatch.'
+          : ''),
+        mem, 'the box is the subject · the crawling points are ants, coloured by the mixture they carry')});
+      clearMarks();
+    }
+  }finally{
+    clearMarks(); state.lightNear=null;
+    Object.assign(cam,{az:saveCam.az,pol:saveCam.pol,rad:saveCam.rad});
+    cam.target.copy(saveCam.target); updateCamera();
+    state.running=wasRunning; state.studyBusy=false;
+  }
+  state.lastStudy=frames;
+  return frames;
+}
+async function contactSheet(frames,title){
+  const cols=2,tw=760,th=532,pad=16,head=56;
+  const rows=Math.ceil(frames.length/cols);
+  const cv=document.createElement('canvas');
+  cv.width=cols*tw+pad*(cols+1); cv.height=head+rows*th+pad*(rows+1);
+  const x=cv.getContext('2d');
+  x.fillStyle='#05070a';x.fillRect(0,0,cv.width,cv.height);
+  x.fillStyle='#edf1f4';x.font='800 24px ui-monospace,monospace';
+  x.fillText(title,pad+6,38);
+  const titleW=x.measureText(title).width;      // measure in the title's own font
+  x.fillStyle='#5f6a76';x.font='700 12px ui-monospace,monospace';
+  x.fillText('what the ants are doing · '+new Date().toISOString().slice(0,19).replace('T',' '),
+    pad+6+titleW+26,38);
+  for(let i=0;i<frames.length;i++){
+    const im=new Image(); im.src=frames[i].data;
+    await new Promise(r=>{im.onload=r;im.onerror=r});
+    const c=i%cols,r2=Math.floor(i/cols);
+    x.drawImage(im,pad+c*(tw+pad),head+pad+r2*(th+pad),tw,th);
+  }
+  return cv.toDataURL('image/png');
+}
+async function studyAndDownload(){
+  toast('studying — dispatching scouts to each species');
+  const frames=await runStudy();
+  if(!frames.length){toast('nothing to study yet');return}
+  const sheet=await contactSheet(frames,'ANTBAT STUDY');
+  const a=document.createElement('a');
+  a.href=sheet; a.download='antbat-study-'+nowISO().replace(/[:.]/g,'')+'.png'; a.click();
+  toast(frames.length+' frames · sheet downloaded');
+}
+
 function thumbnail(){
   const c=document.createElement('canvas');c.width=184;c.height=124;
   const x=c.getContext('2d');
@@ -1906,6 +2225,7 @@ function wire(){
     state.lineage=[]; $('#wishcard').classList.remove('on');
     respawn(false); toast('seeded — a house with things worth finding in it');
   });
+  $('#btn-study').addEventListener('click',studyAndDownload);
   $('#btn-export').addEventListener('click',exportRun);
   $('#prior-in').addEventListener('change',e=>{
     const f=e.target.files&&e.target.files[0]; if(!f)return;

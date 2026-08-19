@@ -761,6 +761,13 @@ before reporting.
 | `NO_DOOR` | — | — | **44 of 44 parts** |
 | `ORPHAN` | 5.2 over 8 | 1.2 over 3 | 0.07 |
 
+Photographed in `agora/studies/` — one contact sheet per building, produced by
+the **Study** button, which frames each species on the part that carries most of
+it, dispatches that species' scouts onto it, and prints the reading beside them.
+Nothing in a study frame is lit except by the emitters the ants planted, so how
+much of a building you can see in one of these pictures is how much of it has
+been walked.
+
 The cabin is the one worth stopping on. Seven cycles, four builds, a final suck
 of 98, and the accusation the loop never made: **a tiny house with no door.** The
 word "door" appears three times in that log's entire critic output and never as
