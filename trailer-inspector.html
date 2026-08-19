@@ -1,0 +1,454 @@
+<title>Ingold Trailer Survey</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<style>
+:root{
+  --paper:#f2efe9; --sheet:#faf8f4; --rule:#d6d0c4; --rule-soft:#e6e1d6;
+  --ink:#1b1d21; --ink-2:#4c5158; --ink-3:#7d8189;
+  --accent:#0f8f96; --accent-soft:#0f8f9622;
+  --unbuildable:#c8452e; --illegal:#b8830f; --unusable:#7b5ea7; --uncomfortable:#4b6b8a;
+  --chassis:#8a6a3f; --structure:#4b6b8a; --envelope:#5b7a52; --opening:#a2683c;
+  --roof:#7b5ea7; --circulation:#0f8f96;
+  --sh:0 1px 2px #1b1d2110, 0 8px 24px #1b1d210c;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#101315; --sheet:#161a1d; --rule:#2b3238; --rule-soft:#222831;
+    --ink:#e8e6e1; --ink-2:#a2a8ae; --ink-3:#6f767d;
+    --accent:#3fc9cf; --accent-soft:#3fc9cf22;
+    --unbuildable:#e8674c; --illegal:#dda43a; --unusable:#a98cd4; --uncomfortable:#7ba0c4;
+    --chassis:#c39b62; --structure:#7ba0c4; --envelope:#8fb083; --opening:#d0975f;
+    --roof:#a98cd4; --circulation:#3fc9cf;
+    --sh:0 1px 2px #0006, 0 8px 24px #0004;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#101315; --sheet:#161a1d; --rule:#2b3238; --rule-soft:#222831;
+  --ink:#e8e6e1; --ink-2:#a2a8ae; --ink-3:#6f767d;
+  --accent:#3fc9cf; --accent-soft:#3fc9cf22;
+  --unbuildable:#e8674c; --illegal:#dda43a; --unusable:#a98cd4; --uncomfortable:#7ba0c4;
+  --chassis:#c39b62; --structure:#7ba0c4; --envelope:#8fb083; --opening:#d0975f;
+  --roof:#a98cd4; --circulation:#3fc9cf;
+  --sh:0 1px 2px #0006, 0 8px 24px #0004;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;font-size:14px;line-height:1.5}
+h1,h2,h3,.lab{font-family:"IBM Plex Sans Condensed","IBM Plex Sans",sans-serif}
+.mono,td.num,.num{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.lab{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.sheet{max-width:1500px;margin:0 auto;padding:20px 18px 64px;display:grid;gap:14px;min-width:0}
+.sheet>*{min-width:0}
+header{border-bottom:1.5px solid var(--ink);padding-bottom:12px;
+  display:flex;gap:20px;align-items:baseline;flex-wrap:wrap}
+header h1{margin:0;font-size:26px;font-weight:700;letter-spacing:-.01em}
+header .sub{color:var(--ink-2);font-size:13px;max-width:58ch}
+
+.states{display:flex;gap:0;border:1px solid var(--rule);border-radius:3px;overflow:hidden;width:fit-content}
+.states button{padding:8px 14px;font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:600;
+  font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);
+  border-right:1px solid var(--rule);background:var(--sheet)}
+.states button:last-child{border-right:0}
+.states button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+
+.main{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:14px;align-items:start;min-width:0}
+.main>*{min-width:0}
+@media (max-width:1080px){.main{grid-template-columns:minmax(0,1fr)}}
+
+.frame{border:1px solid var(--rule);background:var(--sheet);border-radius:3px;box-shadow:var(--sh);
+  position:relative;overflow:hidden}
+.frame .bar{display:flex;gap:2px;padding:7px 9px;border-bottom:1px solid var(--rule-soft);
+  align-items:center;flex-wrap:wrap}
+.frame .bar button{padding:4px 9px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+  font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:600;color:var(--ink-3);border-radius:2px}
+.frame .bar button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent)}
+svg.draw{display:block;width:100%;height:auto;background:transparent;touch-action:none}
+svg.draw polygon{cursor:pointer}
+.hint{position:absolute;right:10px;bottom:10px;font-size:10.5px;color:var(--ink-3);
+  background:var(--sheet);padding:3px 7px;border:1px solid var(--rule-soft);border-radius:2px}
+
+.side{display:grid;gap:12px}
+.card{border:1px solid var(--rule);background:var(--sheet);border-radius:3px;padding:11px 12px;
+  box-shadow:var(--sh)}
+.card h3{margin:0 0 8px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:700}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:12.5px}
+.kv dt{color:var(--ink-3);font-size:11px;letter-spacing:.04em;padding-top:1px}
+.kv dd{margin:0;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-size:12px}
+
+.fail{display:grid;gap:0;border:1px solid var(--rule);border-radius:3px;overflow:hidden}
+.fail button{display:grid;grid-template-columns:4px 1fr;gap:0;text-align:left;width:100%;
+  border-bottom:1px solid var(--rule-soft);background:var(--sheet)}
+.fail button:last-child{border-bottom:0}
+.fail button:hover,.fail button[aria-pressed="true"]{background:var(--accent-soft)}
+.fail .stripe{width:4px;height:100%}
+.fail .body{padding:8px 10px;display:grid;gap:3px}
+.fail .top{display:flex;gap:7px;align-items:baseline;flex-wrap:wrap}
+.fail .sev{font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;font-weight:700}
+.fail .sys{font-size:10px;letter-spacing:.06em;color:var(--ink-3);
+  font-family:"IBM Plex Mono",monospace}
+.fail .id{font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:700;font-size:13px}
+.fail .txt{font-size:12px;color:var(--ink-2);line-height:1.45}
+.fail .at{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--ink-3)}
+
+.legend{display:flex;gap:5px;flex-wrap:wrap}
+.legend button{display:flex;gap:5px;align-items:center;border:1px solid var(--rule);
+  border-radius:2px;padding:3px 7px;font-size:11px}
+.legend button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.legend i{width:9px;height:9px;border-radius:1px;display:block}
+.legend .n{color:var(--ink-3);font-family:"IBM Plex Mono",monospace;font-size:10px}
+
+.history{border:1px solid var(--rule);background:var(--sheet);border-radius:3px;box-shadow:var(--sh);
+  overflow:hidden;min-width:0}
+.history .hd{padding:9px 12px;border-bottom:1px solid var(--rule-soft);display:flex;
+  justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.track{display:flex;gap:0;overflow-x:auto;padding:10px 12px;scrollbar-width:thin;max-width:100%}
+.step{flex:0 0 236px;border-left:2px solid var(--rule);padding:0 12px;display:grid;gap:5px;
+  align-content:start;text-align:left;background:none}
+.step:hover,.step[aria-pressed="true"]{background:var(--accent-soft)}
+.step.agentA{border-left-color:var(--unbuildable)}
+.step.agentB{border-left-color:var(--accent)}
+.step .n{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--ink-3);letter-spacing:.06em}
+.step .who{font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:700;font-size:12px}
+.step .say{font-size:11.5px;color:var(--ink-2);line-height:1.4}
+.step .delta{font-family:"IBM Plex Mono",monospace;font-size:11px}
+.up{color:var(--unbuildable)}.down{color:var(--envelope)}.flat{color:var(--ink-3)}
+
+.titleblock{border:1.5px solid var(--ink);border-radius:2px;display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(150px,1fr));background:var(--sheet)}
+.titleblock div{padding:9px 12px;border-right:1px solid var(--rule)}
+.titleblock div:last-child{border-right:0}
+.titleblock b{display:block;font-family:"IBM Plex Sans Condensed",sans-serif;font-size:15px;
+  font-weight:700;margin-top:2px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);
+  font-weight:600;padding:4px 6px;border-bottom:1px solid var(--rule)}
+td{padding:4px 6px;border-bottom:1px solid var(--rule-soft)}
+td.num{text-align:right}
+.scroll{max-height:230px;overflow:auto}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="sheet">
+<header>
+  <div>
+    <h1>Ingold Trailer Survey</h1>
+    <div class="sub">Every part, every defect, and every move the agents made &#8212; three states of the same
+      trailer, drawn from the part data rather than photographed.</div>
+  </div>
+  <div style="margin-left:auto" class="states" id="states"></div>
+</header>
+
+<div class="main">
+  <div>
+    <div class="frame">
+      <div class="bar" id="views"></div>
+      <svg class="draw" id="draw" viewBox="0 0 1000 620" role="img" aria-label="Trailer drawing"></svg>
+      <div class="hint" id="hint">click any part</div>
+    </div>
+    <div style="height:12px"></div>
+    <div class="card">
+      <h3>Systems</h3>
+      <div class="legend" id="legend"></div>
+    </div>
+  </div>
+
+  <div class="side">
+    <div class="card"><h3 id="failhd">Failures</h3><div class="fail" id="fails"></div></div>
+    <div class="card" id="inspector"></div>
+    <div class="card"><h3>Measured</h3><div id="measured"></div></div>
+  </div>
+</div>
+
+<div class="history">
+  <div class="hd">
+    <div><span class="lab">Build history</span>
+      <div id="histnote" style="font-size:12px;color:var(--ink-2);max-width:80ch"></div></div>
+    <div class="legend" id="histtabs"></div>
+  </div>
+  <div class="track" id="track"></div>
+</div>
+
+<div class="titleblock" id="titleblock"></div>
+</div>
+<script type="application/json" id="bundle">
+{"states":{"correspondence":{"label":"as the correspondence loop left it","caption":"44 parts \u00b7 seven cycles \u00b7 suck 98 \u00b7 12 API calls \u00b7 28 MB of input","file":"agora/trailer.json","parts":[{"id":"deck","kind":"box","position":[0,0.63,0],"size":[6.096,0.16,2.591],"rotation":[0,0,0],"color":"#7f725f","role":"structure","locked":true,"opacity":1,"system":"chassis"},{"id":"rail-L","kind":"box","position":[0,0.47,-1.06],"size":[6.2,0.13,0.1],"rotation":[0,0,0],"color":"#34383c","role":"structure","locked":true,"opacity":1,"system":"chassis"},{"id":"rail-R","kind":"box","position":[0,0.47,1.06],"size":[6.2,0.13,0.1],"rotation":[0,0,0],"color":"#34383c","role":"structure","locked":true,"opacity":1,"system":"chassis"},{"id":"tongue-L","kind":"box","position":[-3.65,0.46,-0.43],"size":[1.55,0.1,0.09],"rotation":[0,18,0],"color":"#34383c","role":"structure","locked":true,"opacity":1,"system":"chassis"},{"id":"tongue-R","kind":"box","position":[-3.65,0.46,0.43],"size":[1.55,0.1,0.09],"rotation":[0,-18,0],"color":"#34383c","role":"structure","locked":true,"opacity":1,"system":"chassis"},{"id":"wheel-1","kind":"cylinder","position":[0.45,0.43,-1.36],"size":[0.39,0.18,24],"rotation":[90,0,0],"color":"#17191b","role":"chassis","locked":true,"opacity":1,"system":"chassis"},{"id":"wheel-2","kind":"cylinder","position":[0.45,0.43,1.36],"size":[0.39,0.18,24],"rotation":[90,0,0],"color":"#17191b","role":"chassis","locked":true,"opacity":1,"system":"chassis"},{"id":"wheel-3","kind":"cylinder","position":[1.35,0.43,-1.36],"size":[0.39,0.18,24],"rotation":[90,0,0],"color":"#17191b","role":"chassis","locked":true,"opacity":1,"system":"chassis"},{"id":"wheel-4","kind":"cylinder","position":[1.35,0.43,1.36],"size":[0.39,0.18,24],"rotation":[90,0,0],"color":"#17191b","role":"chassis","locked":true,"opacity":1,"system":"chassis"},{"id":"wall-sill-front","kind":"box","position":[0,0.77,-1.2],"size":[5.88,0.12,0.1],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-sill-rear","kind":"box","position":[0,0.77,1.2],"size":[5.88,0.12,0.1],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-sill-left","kind":"box","position":[-2.94,0.77,0],"size":[0.1,0.12,2.5],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-sill-right","kind":"box","position":[2.94,0.77,0],"size":[0.1,0.12,2.5],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-post-left-front","kind":"box","position":[-2.89,1.98,-1.15],"size":[0.12,2.3,0.12],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-post-left-rear","kind":"box","position":[-2.89,1.98,1.15],"size":[0.12,2.3,0.12],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-post-right-front","kind":"box","position":[2.89,1.98,-1.15],"size":[0.12,2.3,0.12],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-post-right-rear","kind":"box","position":[2.89,1.98,1.15],"size":[0.12,2.3,0.12],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-plate-front","kind":"box","position":[0,3.19,-1.2],"size":[5.88,0.12,0.1],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-plate-rear","kind":"box","position":[0,3.19,1.2],"size":[5.88,0.12,0.1],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-plate-left","kind":"box","position":[-2.94,3.19,0],"size":[0.1,0.12,2.5],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-plate-right","kind":"box","position":[2.94,3.19,0],"size":[0.1,0.12,2.5],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"rear-cladding-left","kind":"box","position":[2.99,1.98,-0.955],"size":[0.1,2.3,0.39],"rotation":[0,0,0],"color":"#292c2e","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-cladding-right","kind":"box","position":[2.99,1.98,0.955],"size":[0.1,2.3,0.39],"rotation":[0,0,0],"color":"#292c2e","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-cladding-lower","kind":"box","position":[2.99,1.2,0],"size":[0.1,0.74,1.52],"rotation":[0,0,0],"color":"#292c2e","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-cladding-upper","kind":"box","position":[2.99,2.83,0],"size":[0.1,0.6,1.52],"rotation":[0,0,0],"color":"#292c2e","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-window-glass","kind":"box","position":[3.055,2.05,0],"size":[0.035,0.72,1.28],"rotation":[0,0,0],"color":"#26363c","role":"window-glazing","locked":false,"opacity":0.72,"system":"opening"},{"id":"rear-window-trim-left","kind":"box","position":[3.075,2.05,-0.7],"size":[0.1,0.96,0.12],"rotation":[0,0,0],"color":"#a66f3d","role":"window-trim","locked":false,"opacity":1,"system":"opening"},{"id":"rear-window-trim-right","kind":"box","position":[3.075,2.05,0.7],"size":[0.1,0.96,0.12],"rotation":[0,0,0],"color":"#a66f3d","role":"window-trim","locked":false,"opacity":1,"system":"opening"},{"id":"rear-window-trim-bottom","kind":"box","position":[3.075,1.63,0],"size":[0.1,0.12,1.52],"rotation":[0,0,0],"color":"#a66f3d","role":"window-trim","locked":false,"opacity":1,"system":"opening"},{"id":"rear-window-trim-top","kind":"box","position":[3.075,2.47,0],"size":[0.1,0.12,1.52],"rotation":[0,0,0],"color":"#a66f3d","role":"window-trim","locked":false,"opacity":1,"system":"opening"},{"id":"rear-course-lower-1","kind":"box","position":[3.046,1.04,0],"size":[0.018,0.025,2.3],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-lower-2","kind":"box","position":[3.046,1.28,0],"size":[0.018,0.025,2.3],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-lower-3","kind":"box","position":[3.046,1.52,0],"size":[0.018,0.025,2.3],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-side-l-1","kind":"box","position":[3.046,1.76,-0.955],"size":[0.018,0.025,0.39],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-side-r-1","kind":"box","position":[3.046,1.76,0.955],"size":[0.018,0.025,0.39],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-side-l-2","kind":"box","position":[3.046,2,-0.955],"size":[0.018,0.025,0.39],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-side-r-2","kind":"box","position":[3.046,2,0.955],"size":[0.018,0.025,0.39],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-side-l-3","kind":"box","position":[3.046,2.24,-0.955],"size":[0.018,0.025,0.39],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-side-r-3","kind":"box","position":[3.046,2.24,0.955],"size":[0.018,0.025,0.39],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-side-l-4","kind":"box","position":[3.046,2.48,-0.955],"size":[0.018,0.025,0.39],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-side-r-4","kind":"box","position":[3.046,2.48,0.955],"size":[0.018,0.025,0.39],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-upper-1","kind":"box","position":[3.046,2.62,0],"size":[0.018,0.025,2.3],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-upper-2","kind":"box","position":[3.046,2.86,0],"size":[0.018,0.025,2.3],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-upper-3","kind":"box","position":[3.046,3.1,0],"size":[0.018,0.025,2.3],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"}],"failures":[{"id":"WHEELS_OFF_GROUND","severity":"unbuildable","system":"chassis","text":"the trailer floats: its lowest wheel is 0.215m above grade, so nothing it carries reaches the road","parts":["wheel-1","wheel-2","wheel-3","wheel-4"],"where":{"min":[0.255,0.215,-1.528],"max":[1.545,0.645,1.528],"centre":[0.9,0.43,0]}},{"id":"NO_LOAD_PATH","severity":"unbuildable","system":"chassis / structure / envelope / opening","text":"44 parts have no contact chain to the ground: deck, rail-L, rail-R, tongue-L, tongue-R, wheel-1","parts":["deck","rail-L","rail-R","tongue-L","tongue-R","wheel-1","wheel-2","wheel-3","wheel-4","wall-sill-front","wall-sill-rear","wall-sill-left"],"where":{"min":[-4.196,0.215,-1.528],"max":[3.125,3.25,1.528],"centre":[-0.535,1.733,0]}},{"id":"OVER_WIDTH","severity":"illegal","system":"chassis","text":"\u200d3.06m wide, 0.47m over the towing limit \u2014 widest element wheel-1","parts":["wheel-1","wheel-2","wheel-3","wheel-4"],"where":{"min":[0.255,0.215,-1.528],"max":[1.545,0.645,1.528],"centre":[0.9,0.43,0]}},{"id":"UNCLIMBABLE","severity":"unusable","system":"chassis","text":"rise to the floor is 0.71m in 0 riser(s); max riser is 0.1969m","parts":["deck"],"where":{"min":[-3.048,0.55,-1.296],"max":[3.048,0.71,1.296],"centre":[0,0.63,0]}},{"id":"DOOR_TOO_SMALL","severity":"unusable","system":"\u2014","text":"clear opening 0 \u00d7 0m against 0.813 \u00d7 1.981","parts":[],"where":null},{"id":"NOT_ENCLOSED","severity":"unusable","system":"envelope","text":"outside air reaches 39.08 m\u00b3 of what should be indoors","parts":[],"where":{"min":[-3.041,0.81,-1.283],"max":[2.979,3.26,1.237],"centre":[-0.031,2.035,-0.023]}},{"id":"LOW_HEADROOM","severity":"uncomfortable","system":"structure","text":"0% of the floor has 2.134m over it","parts":["wall-plate-front","wall-plate-rear","wall-plate-left","wall-plate-right"],"where":{"min":[-2.99,3.13,-1.25],"max":[2.99,3.25,1.25],"centre":[0,3.19,0]}}],"report":{"collisions":{"gross":0,"moderate":10,"tolerance":12,"worst":[{"a":"rear-window-trim-left","b":"rear-window-trim-bottom","volume":0.00144,"fractionOfSmaller":0.125},{"a":"rear-window-trim-left","b":"rear-window-trim-top","volume":0.00144,"fractionOfSmaller":0.125},{"a":"rear-window-trim-right","b":"rear-window-trim-bottom","volume":0.00144,"fractionOfSmaller":0.125},{"a":"rear-window-trim-right","b":"rear-window-trim-top","volume":0.00144,"fractionOfSmaller":0.125},{"a":"rear-cladding-lower","b":"rear-course-lower-1","volume":0.000114,"fractionOfSmaller":0.1101},{"a":"rear-cladding-lower","b":"rear-course-lower-2","volume":0.000114,"fractionOfSmaller":0.1101},{"a":"rear-cladding-lower","b":"rear-course-lower-3","volume":0.000114,"fractionOfSmaller":0.1101},{"a":"rear-cladding-upper","b":"rear-course-upper-1","volume":0.000114,"fractionOfSmaller":0.1101}]},"envelope":{"enclosed":0,"leak":39.077,"box":{"min":[-3.041,0.81,-1.283],"max":[2.979,3.26,1.237]}},"wheels":{"count":4,"lowest":0.215,"clearance":0.215,"touching":0,"passes":false},"road":{"width":3.056,"height":3.25,"length":7.321,"widthLimit":2.591,"heightLimit":4.115,"passesWidth":false,"passesHeight":true,"widthOver":0.465,"heightOver":0,"exempt":0,"exemptNote":"steps and treads are excluded: the towing envelope measures what travels","widest":"wheel-1","tallest":"wall-plate-front","overWidthParts":["wheel-1","wheel-2","wheel-3","wheel-4"]},"step":{"count":0,"totalRise":0.71,"risers":0,"riserHeight":0.71,"passes":false},"door":{"id":null,"passesWidth":false,"passesHeight":false},"headroom":{"interiorFloorArea":0,"meanClear":0,"minClear":0,"medianClear":0,"areaOverFull":0,"areaOverRelaxed":0,"fractionFull":0},"floor":{"standableArea":0,"fractionOfInterior":0},"window":{"panes":1,"glazingArea":0.922,"floorArea":0,"ratio":null,"passesLight":null,"note":"undecidable: there is no enclosed floor to light","sillHeights":[0.98]},"loadPath":{"grounded":0,"total":44,"ungrounded":["deck","rail-L","rail-R","tongue-L","tongue-R","wheel-1","wheel-2","wheel-3","wheel-4","wall-sill-front","wall-sill-rear","wall-sill-left","wall-sill-right","wall-post-left-front","wall-post-left-rear","wall-post-right-front","wall-post-right-rear","wall-plate-front","wall-plate-rear","wall-plate-left","wall-plate-right","rear-cladding-left","rear-cladding-right","rear-cladding-lower","rear-cladding-upper","rear-window-glass","rear-window-trim-left","rear-window-trim-right","rear-window-trim-bottom","rear-window-trim-top","rear-course-lower-1","rear-course-lower-2","rear-course-lower-3","rear-course-side-l-1","rear-course-side-r-1","rear-course-side-l-2","rear-course-side-r-2","rear-course-side-l-3","rear-course-side-r-3","rear-course-side-l-4","rear-course-side-r-4","rear-course-upper-1","rear-course-upper-2","rear-course-upper-3"]}},"bySystem":{"chassis":{"parts":9,"ids":["deck","rail-L","rail-R","tongue-L","tongue-R","wheel-1","wheel-2","wheel-3","wheel-4"],"failures":["WHEELS_OFF_GROUND","NO_LOAD_PATH","OVER_WIDTH","UNCLIMBABLE"]},"structure":{"parts":12,"ids":["wall-sill-front","wall-sill-rear","wall-sill-left","wall-sill-right","wall-post-left-front","wall-post-left-rear","wall-post-right-front","wall-post-right-rear","wall-plate-front","wall-plate-rear","wall-plate-left","wall-plate-right"],"failures":["NO_LOAD_PATH","LOW_HEADROOM"]},"envelope":{"parts":18,"ids":["rear-cladding-left","rear-cladding-right","rear-cladding-lower","rear-cladding-upper","rear-course-lower-1","rear-course-lower-2","rear-course-lower-3","rear-course-side-l-1","rear-course-side-r-1","rear-course-side-l-2","rear-course-side-r-2","rear-course-side-l-3","rear-course-side-r-3","rear-course-side-l-4","rear-course-side-r-4","rear-course-upper-1","rear-course-upper-2","rear-course-upper-3"],"failures":["NO_LOAD_PATH","NOT_ENCLOSED"]},"opening":{"parts":5,"ids":["rear-window-glass","rear-window-trim-left","rear-window-trim-right","rear-window-trim-bottom","rear-window-trim-top"],"failures":["NO_LOAD_PATH"]}}},"completed":{"label":"structurally completed by hand","caption":"62 parts \u00b7 18 added from the frame\u2019s own coordinates","file":"agora/trailer-finished.json","parts":[{"id":"deck","kind":"box","position":[0,0.63,0],"size":[6.096,0.16,2.591],"rotation":[0,0,0],"color":"#7f725f","role":"structure","locked":true,"opacity":1,"system":"chassis"},{"id":"rail-L","kind":"box","position":[0,0.47,-1.06],"size":[6.2,0.13,0.1],"rotation":[0,0,0],"color":"#34383c","role":"structure","locked":true,"opacity":1,"system":"chassis"},{"id":"rail-R","kind":"box","position":[0,0.47,1.06],"size":[6.2,0.13,0.1],"rotation":[0,0,0],"color":"#34383c","role":"structure","locked":true,"opacity":1,"system":"chassis"},{"id":"tongue-L","kind":"box","position":[-3.65,0.46,-0.43],"size":[1.55,0.1,0.09],"rotation":[0,18,0],"color":"#34383c","role":"structure","locked":true,"opacity":1,"system":"chassis"},{"id":"tongue-R","kind":"box","position":[-3.65,0.46,0.43],"size":[1.55,0.1,0.09],"rotation":[0,-18,0],"color":"#34383c","role":"structure","locked":true,"opacity":1,"system":"chassis"},{"id":"wheel-1","kind":"cylinder","position":[0.45,0.43,-1.36],"size":[0.39,0.18,24],"rotation":[90,0,0],"color":"#17191b","role":"chassis","locked":true,"opacity":1,"system":"chassis"},{"id":"wheel-2","kind":"cylinder","position":[0.45,0.43,1.36],"size":[0.39,0.18,24],"rotation":[90,0,0],"color":"#17191b","role":"chassis","locked":true,"opacity":1,"system":"chassis"},{"id":"wheel-3","kind":"cylinder","position":[1.35,0.43,-1.36],"size":[0.39,0.18,24],"rotation":[90,0,0],"color":"#17191b","role":"chassis","locked":true,"opacity":1,"system":"chassis"},{"id":"wheel-4","kind":"cylinder","position":[1.35,0.43,1.36],"size":[0.39,0.18,24],"rotation":[90,0,0],"color":"#17191b","role":"chassis","locked":true,"opacity":1,"system":"chassis"},{"id":"wall-sill-front","kind":"box","position":[0,0.77,-1.2],"size":[5.88,0.12,0.1],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-sill-rear","kind":"box","position":[0,0.77,1.2],"size":[5.88,0.12,0.1],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-sill-left","kind":"box","position":[-2.94,0.77,0],"size":[0.1,0.12,2.5],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-sill-right","kind":"box","position":[2.94,0.77,0],"size":[0.1,0.12,2.5],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-post-left-front","kind":"box","position":[-2.89,1.98,-1.15],"size":[0.12,2.3,0.12],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-post-left-rear","kind":"box","position":[-2.89,1.98,1.15],"size":[0.12,2.3,0.12],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-post-right-front","kind":"box","position":[2.89,1.98,-1.15],"size":[0.12,2.3,0.12],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-post-right-rear","kind":"box","position":[2.89,1.98,1.15],"size":[0.12,2.3,0.12],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-plate-front","kind":"box","position":[0,3.19,-1.2],"size":[5.88,0.12,0.1],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-plate-rear","kind":"box","position":[0,3.19,1.2],"size":[5.88,0.12,0.1],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-plate-left","kind":"box","position":[-2.94,3.19,0],"size":[0.1,0.12,2.5],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-plate-right","kind":"box","position":[2.94,3.19,0],"size":[0.1,0.12,2.5],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"rear-cladding-left","kind":"box","position":[2.99,1.98,-0.955],"size":[0.1,2.3,0.39],"rotation":[0,0,0],"color":"#292c2e","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-cladding-right","kind":"box","position":[2.99,1.98,0.955],"size":[0.1,2.3,0.39],"rotation":[0,0,0],"color":"#292c2e","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-cladding-lower","kind":"box","position":[2.99,1.2,0],"size":[0.1,0.74,1.52],"rotation":[0,0,0],"color":"#292c2e","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-cladding-upper","kind":"box","position":[2.99,2.83,0],"size":[0.1,0.6,1.52],"rotation":[0,0,0],"color":"#292c2e","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-window-glass","kind":"box","position":[3.055,2.05,0],"size":[0.035,0.72,1.28],"rotation":[0,0,0],"color":"#26363c","role":"window-glazing","locked":false,"opacity":0.72,"system":"opening"},{"id":"rear-window-trim-left","kind":"box","position":[3.075,2.05,-0.7],"size":[0.1,0.96,0.12],"rotation":[0,0,0],"color":"#a66f3d","role":"window-trim","locked":false,"opacity":1,"system":"opening"},{"id":"rear-window-trim-right","kind":"box","position":[3.075,2.05,0.7],"size":[0.1,0.96,0.12],"rotation":[0,0,0],"color":"#a66f3d","role":"window-trim","locked":false,"opacity":1,"system":"opening"},{"id":"rear-window-trim-bottom","kind":"box","position":[3.075,1.63,0],"size":[0.1,0.12,1.52],"rotation":[0,0,0],"color":"#a66f3d","role":"window-trim","locked":false,"opacity":1,"system":"opening"},{"id":"rear-window-trim-top","kind":"box","position":[3.075,2.47,0],"size":[0.1,0.12,1.52],"rotation":[0,0,0],"color":"#a66f3d","role":"window-trim","locked":false,"opacity":1,"system":"opening"},{"id":"rear-course-lower-1","kind":"box","position":[3.046,1.04,0],"size":[0.018,0.025,2.3],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-lower-2","kind":"box","position":[3.046,1.28,0],"size":[0.018,0.025,2.3],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-lower-3","kind":"box","position":[3.046,1.52,0],"size":[0.018,0.025,2.3],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-side-l-1","kind":"box","position":[3.046,1.76,-0.955],"size":[0.018,0.025,0.39],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-side-r-1","kind":"box","position":[3.046,1.76,0.955],"size":[0.018,0.025,0.39],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-side-l-2","kind":"box","position":[3.046,2,-0.955],"size":[0.018,0.025,0.39],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-side-r-2","kind":"box","position":[3.046,2,0.955],"size":[0.018,0.025,0.39],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-side-l-3","kind":"box","position":[3.046,2.24,-0.955],"size":[0.018,0.025,0.39],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-side-r-3","kind":"box","position":[3.046,2.24,0.955],"size":[0.018,0.025,0.39],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-side-l-4","kind":"box","position":[3.046,2.48,-0.955],"size":[0.018,0.025,0.39],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-side-r-4","kind":"box","position":[3.046,2.48,0.955],"size":[0.018,0.025,0.39],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-upper-1","kind":"box","position":[3.046,2.62,0],"size":[0.018,0.025,2.3],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-upper-2","kind":"box","position":[3.046,2.86,0],"size":[0.018,0.025,2.3],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-upper-3","kind":"box","position":[3.046,3.1,0],"size":[0.018,0.025,2.3],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"front-clad-left","kind":"box","position":[-2.455,1.98,-1.25],"size":[0.97,2.3,0.1],"rotation":[0,0,0],"color":"#2f2b27","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"front-clad-right","kind":"box","position":[0.905,1.98,-1.25],"size":[4.07,2.3,0.1],"rotation":[0,0,0],"color":"#2f2b27","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"front-clad-header","kind":"box","position":[-1.55,2.97,-1.25],"size":[0.84,0.32,0.1],"rotation":[0,0,0],"color":"#2f2b27","role":"wall-cladding","locked":false,"opacity":1,"system":"opening"},{"id":"front-door","kind":"box","position":[-1.55,1.7,-1.28],"size":[0.78,1.98,0.06],"rotation":[0,0,0],"color":"#8a6a3f","role":"door","locked":false,"opacity":1,"system":"opening"},{"id":"arrival-step","kind":"box","position":[-1.55,0.355,-1.61],"size":[1.14,0.71,0.62],"rotation":[0,0,0],"color":"#6f6a63","role":"stair","locked":false,"opacity":1,"system":"circulation"},{"id":"back-clad-lower","kind":"box","position":[0,1.19,1.25],"size":[5.88,0.72,0.1],"rotation":[0,0,0],"color":"#2f2b27","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"back-clad-upper","kind":"box","position":[0,2.84,1.25],"size":[5.88,0.58,0.1],"rotation":[0,0,0],"color":"#2f2b27","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"back-clad-pier-left","kind":"box","position":[-2.045,2.05,1.25],"size":[1.79,1,0.1],"rotation":[0,0,0],"color":"#2f2b27","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"back-clad-pier-right","kind":"box","position":[2.045,2.05,1.25],"size":[1.79,1,0.1],"rotation":[0,0,0],"color":"#2f2b27","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"back-window-glass","kind":"box","position":[0,2.05,1.25],"size":[2.3,1,0.04],"rotation":[0,0,0],"color":"#9fb6c4","role":"window-glazing","locked":false,"opacity":0.5,"system":"opening"},{"id":"back-window-sill","kind":"box","position":[0,1.61,1.3],"size":[2.54,0.12,0.16],"rotation":[0,0,0],"color":"#6f6a63","role":"window-trim","locked":false,"opacity":1,"system":"opening"},{"id":"back-window-head","kind":"box","position":[0,2.49,1.3],"size":[2.54,0.12,0.16],"rotation":[0,0,0],"color":"#6f6a63","role":"window-trim","locked":false,"opacity":1,"system":"opening"},{"id":"left-clad","kind":"box","position":[-2.99,1.98,0],"size":[0.1,2.3,2.5],"rotation":[0,0,0],"color":"#2f2b27","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"roof-front","kind":"box","position":[0,3.66,-0.785],"size":[6.32,0.1,1.7272],"rotation":[-0.429981577338787,0,0],"color":"#4a463f","role":"roof","locked":false,"opacity":1,"system":"roof"},{"id":"roof-back","kind":"box","position":[0,3.66,0.785],"size":[6.32,0.1,1.7272],"rotation":[0.429981577338787,0,0],"color":"#4a463f","role":"roof","locked":false,"opacity":1,"system":"roof"},{"id":"roof-ridge","kind":"box","position":[0,4.06,0],"size":[6.38,0.1,0.16],"rotation":[0,0,0],"color":"#6f6a63","role":"roof","locked":false,"opacity":1,"system":"roof"},{"id":"gable-left","kind":"box","position":[-2.96,3.575,0],"size":[0.1,0.89,2.5],"rotation":[0,0,0],"color":"#2f2b27","role":"wall-cladding","locked":false,"opacity":1,"system":"roof"},{"id":"gable-right","kind":"box","position":[2.96,3.575,0],"size":[0.1,0.89,2.5],"rotation":[0,0,0],"color":"#2f2b27","role":"wall-cladding","locked":false,"opacity":1,"system":"roof"}],"failures":[{"id":"INTERPENETRATION","severity":"unbuildable","system":"structure / roof","text":"2 pairs grossly interpenetrate (worst: wall-plate-left \u2229 gable-left, 80% of the smaller part); 22 more overlap 5\u201325%","parts":["wall-plate-left","gable-left","wall-plate-right","gable-right"],"where":{"min":[-3.01,3.13,-1.25],"max":[3.01,4.02,1.25],"centre":[0,3.575,0]}},{"id":"WHEELS_OFF_GROUND","severity":"unbuildable","system":"chassis","text":"the trailer floats: its lowest wheel is 0.215m above grade, so nothing it carries reaches the road","parts":["wheel-1","wheel-2","wheel-3","wheel-4"],"where":{"min":[0.255,0.215,-1.528],"max":[1.545,0.645,1.528],"centre":[0.9,0.43,0]}},{"id":"OVER_WIDTH","severity":"illegal","system":"chassis / envelope / opening / roof","text":"\u200d3.18m wide, 0.59m over the towing limit \u2014 widest element roof-front","parts":["wheel-1","wheel-2","wheel-3","wheel-4","front-clad-left","front-clad-right","front-clad-header","front-door","back-clad-lower","back-clad-upper","back-clad-pier-left","back-clad-pier-right"],"where":{"min":[-3.16,0.215,-1.591],"max":[3.16,4.065,1.591],"centre":[0,2.14,0]}},{"id":"UNCLIMBABLE","severity":"unusable","system":"circulation / chassis","text":"rise to the floor is 0.71m in 1 riser(s); max riser is 0.1969m","parts":["arrival-step","deck"],"where":{"min":[-3.048,0,-1.92],"max":[3.048,0.71,1.296],"centre":[0,0.355,-0.312]}},{"id":"DOOR_TOO_SMALL","severity":"unusable","system":"opening","text":"clear opening 0.78 \u00d7 1.98m against 0.813 \u00d7 1.981","parts":["front-door"],"where":{"min":[-1.94,0.71,-1.31],"max":[-1.16,2.69,-1.25],"centre":[-1.55,1.7,-1.28]}},{"id":"NOT_ENCLOSED","severity":"unusable","system":"envelope","text":"outside air reaches 50.5 m\u00b3 of what should be indoors","parts":[],"where":{"min":[-3.041,0.805,-1.255],"max":[2.979,4.165,1.335],"centre":[-0.031,2.485,0.04]}},{"id":"LOW_HEADROOM","severity":"uncomfortable","system":"structure / roof","text":"0% of the floor has 2.134m over it","parts":["wall-plate-front","wall-plate-rear","wall-plate-left","wall-plate-right","roof-front","roof-back","roof-ridge"],"where":{"min":[-3.19,3.13,-1.591],"max":[3.19,4.11,1.591],"centre":[0,3.62,0]}}],"report":{"collisions":{"gross":2,"moderate":22,"tolerance":29,"worst":[{"a":"wall-plate-left","b":"gable-left","volume":0.024,"fractionOfSmaller":0.8},{"a":"wall-plate-right","b":"gable-right","volume":0.024,"fractionOfSmaller":0.8},{"a":"back-window-glass","b":"back-window-sill","volume":0.01104,"fractionOfSmaller":0.2264},{"a":"back-window-glass","b":"back-window-head","volume":0.01104,"fractionOfSmaller":0.2264},{"a":"roof-front","b":"roof-ridge","volume":0.019629,"fractionOfSmaller":0.1923},{"a":"roof-back","b":"roof-ridge","volume":0.019629,"fractionOfSmaller":0.1923},{"a":"rear-window-trim-left","b":"rear-window-trim-bottom","volume":0.00144,"fractionOfSmaller":0.125},{"a":"rear-window-trim-left","b":"rear-window-trim-top","volume":0.00144,"fractionOfSmaller":0.125}]},"envelope":{"enclosed":0,"leak":50.501,"box":{"min":[-3.041,0.805,-1.255],"max":[2.979,4.165,1.335]}},"wheels":{"count":4,"lowest":0.215,"clearance":0.215,"touching":0,"passes":false},"road":{"width":3.182,"height":4.11,"length":7.386,"widthLimit":2.591,"heightLimit":4.115,"passesWidth":false,"passesHeight":true,"widthOver":0.591,"heightOver":0,"exempt":1,"exemptNote":"steps and treads are excluded: the towing envelope measures what travels","widest":"roof-front","tallest":"roof-ridge","overWidthParts":["wheel-1","wheel-2","wheel-3","wheel-4","front-clad-left","front-clad-right","front-clad-header","front-door","back-clad-lower","back-clad-upper","back-clad-pier-left","back-clad-pier-right","back-window-sill","back-window-head","roof-front","roof-back"]},"step":{"count":1,"ids":["arrival-step"],"risers":1,"rises":[0.71],"maxRise":0.71,"treads":[0.62],"minTread":0.62,"totalRise":0.71,"passes":false},"door":{"id":"front-door","clearWidth":0.78,"clearHeight":1.98,"thickness":0.06,"sillY":0.71,"passesWidth":false,"passesHeight":false},"headroom":{"interiorFloorArea":0,"meanClear":0,"minClear":0,"medianClear":0,"areaOverFull":0,"areaOverRelaxed":0,"fractionFull":0},"floor":{"standableArea":0,"fractionOfInterior":0},"window":{"panes":2,"glazingArea":3.222,"floorArea":0,"ratio":null,"passesLight":null,"note":"undecidable: there is no enclosed floor to light","sillHeights":[0.98,0.84]},"loadPath":{"grounded":62,"total":62,"ungrounded":[]}},"bySystem":{"chassis":{"parts":9,"ids":["deck","rail-L","rail-R","tongue-L","tongue-R","wheel-1","wheel-2","wheel-3","wheel-4"],"failures":["WHEELS_OFF_GROUND","OVER_WIDTH","UNCLIMBABLE"]},"structure":{"parts":12,"ids":["wall-sill-front","wall-sill-rear","wall-sill-left","wall-sill-right","wall-post-left-front","wall-post-left-rear","wall-post-right-front","wall-post-right-rear","wall-plate-front","wall-plate-rear","wall-plate-left","wall-plate-right"],"failures":["INTERPENETRATION","LOW_HEADROOM"]},"envelope":{"parts":25,"ids":["rear-cladding-left","rear-cladding-right","rear-cladding-lower","rear-cladding-upper","rear-course-lower-1","rear-course-lower-2","rear-course-lower-3","rear-course-side-l-1","rear-course-side-r-1","rear-course-side-l-2","rear-course-side-r-2","rear-course-side-l-3","rear-course-side-r-3","rear-course-side-l-4","rear-course-side-r-4","rear-course-upper-1","rear-course-upper-2","rear-course-upper-3","front-clad-left","front-clad-right","back-clad-lower","back-clad-upper","back-clad-pier-left","back-clad-pier-right","left-clad"],"failures":["OVER_WIDTH","NOT_ENCLOSED"]},"opening":{"parts":10,"ids":["rear-window-glass","rear-window-trim-left","rear-window-trim-right","rear-window-trim-bottom","rear-window-trim-top","front-clad-header","front-door","back-window-glass","back-window-sill","back-window-head"],"failures":["OVER_WIDTH","DOOR_TOO_SMALL"]},"circulation":{"parts":1,"ids":["arrival-step"],"failures":["UNCLIMBABLE"]},"roof":{"parts":5,"ids":["roof-front","roof-back","roof-ridge","gable-left","gable-right"],"failures":["INTERPENETRATION","OVER_WIDTH","LOW_HEADROOM"]}}},"ingold":{"label":"after the Ingold loop","caption":"66 parts \u00b7 17 cycles \u00b7 7 failures to 5, and four refusals","file":"agora/trailer-ingold.json","parts":[{"id":"deck","kind":"box","position":[0,0.415,0],"size":[6.096,0.16,2.591],"rotation":[0,0,0],"color":"#7f725f","role":"structure","locked":true,"opacity":1,"system":"chassis"},{"id":"rail-L","kind":"box","position":[0,0.255,-1.06],"size":[6.2,0.13,0.1],"rotation":[0,0,0],"color":"#34383c","role":"structure","locked":true,"opacity":1,"system":"chassis"},{"id":"rail-R","kind":"box","position":[0,0.255,1.06],"size":[6.2,0.13,0.1],"rotation":[0,0,0],"color":"#34383c","role":"structure","locked":true,"opacity":1,"system":"chassis"},{"id":"tongue-L","kind":"box","position":[-3.65,0.245,-0.43],"size":[1.55,0.1,0.09],"rotation":[0,18,0],"color":"#34383c","role":"structure","locked":true,"opacity":1,"system":"chassis"},{"id":"tongue-R","kind":"box","position":[-3.65,0.245,0.43],"size":[1.55,0.1,0.09],"rotation":[0,-18,0],"color":"#34383c","role":"structure","locked":true,"opacity":1,"system":"chassis"},{"id":"wheel-1","kind":"cylinder","position":[0.45,0.215,-1.36],"size":[0.39,0.18,24],"rotation":[90,0,0],"color":"#17191b","role":"chassis","locked":true,"opacity":1,"system":"chassis"},{"id":"wheel-2","kind":"cylinder","position":[0.45,0.215,1.36],"size":[0.39,0.18,24],"rotation":[90,0,0],"color":"#17191b","role":"chassis","locked":true,"opacity":1,"system":"chassis"},{"id":"wheel-3","kind":"cylinder","position":[1.35,0.215,-1.36],"size":[0.39,0.18,24],"rotation":[90,0,0],"color":"#17191b","role":"chassis","locked":true,"opacity":1,"system":"chassis"},{"id":"wheel-4","kind":"cylinder","position":[1.35,0.215,1.36],"size":[0.39,0.18,24],"rotation":[90,0,0],"color":"#17191b","role":"chassis","locked":true,"opacity":1,"system":"chassis"},{"id":"wall-sill-front","kind":"box","position":[0,0.555,-1.2],"size":[5.88,0.12,0.1],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-sill-rear","kind":"box","position":[0,0.555,1.2],"size":[5.88,0.12,0.1],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-sill-left","kind":"box","position":[-2.94,0.555,0],"size":[0.1,0.12,2.5],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-sill-right","kind":"box","position":[2.94,0.555,0],"size":[0.1,0.12,2.5],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-post-left-front","kind":"box","position":[-2.89,1.765,-1.15],"size":[0.12,2.3,0.12],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-post-left-rear","kind":"box","position":[-2.89,1.765,1.15],"size":[0.12,2.3,0.12],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-post-right-front","kind":"box","position":[2.89,1.765,-1.15],"size":[0.12,2.3,0.12],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-post-right-rear","kind":"box","position":[2.89,1.765,1.15],"size":[0.12,2.3,0.12],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-plate-front","kind":"box","position":[0,2.975,-1.2],"size":[5.88,0.12,0.1],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-plate-rear","kind":"box","position":[0,2.975,1.2],"size":[5.88,0.12,0.1],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-plate-left","kind":"box","position":[-2.8584,2.975,0],"size":[0.1,0.12,2.5],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"wall-plate-right","kind":"box","position":[2.8584,2.975,0],"size":[0.1,0.12,2.5],"rotation":[0,0,0],"color":"#9b6a3c","role":"wall-frame","locked":false,"opacity":1,"system":"structure"},{"id":"rear-cladding-left","kind":"box","position":[2.99,1.765,-0.955],"size":[0.1,2.3,0.39],"rotation":[0,0,0],"color":"#292c2e","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-cladding-right","kind":"box","position":[2.99,1.765,0.955],"size":[0.1,2.3,0.39],"rotation":[0,0,0],"color":"#292c2e","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-cladding-lower","kind":"box","position":[2.99,0.985,0],"size":[0.1,0.74,1.52],"rotation":[0,0,0],"color":"#292c2e","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-cladding-upper","kind":"box","position":[2.99,2.615,0],"size":[0.1,0.6,1.52],"rotation":[0,0,0],"color":"#292c2e","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-window-glass","kind":"box","position":[3.055,1.835,0],"size":[0.035,0.72,1.28],"rotation":[0,0,0],"color":"#26363c","role":"window-glazing","locked":false,"opacity":0.72,"system":"opening"},{"id":"rear-window-trim-left","kind":"box","position":[3.075,1.835,-0.7],"size":[0.1,0.96,0.12],"rotation":[0,0,0],"color":"#a66f3d","role":"window-trim","locked":false,"opacity":1,"system":"opening"},{"id":"rear-window-trim-right","kind":"box","position":[3.075,1.835,0.7],"size":[0.1,0.96,0.12],"rotation":[0,0,0],"color":"#a66f3d","role":"window-trim","locked":false,"opacity":1,"system":"opening"},{"id":"rear-window-trim-bottom","kind":"box","position":[3.075,1.415,0],"size":[0.1,0.12,1.52],"rotation":[0,0,0],"color":"#a66f3d","role":"window-trim","locked":false,"opacity":1,"system":"opening"},{"id":"rear-window-trim-top","kind":"box","position":[3.075,2.255,0],"size":[0.1,0.12,1.52],"rotation":[0,0,0],"color":"#a66f3d","role":"window-trim","locked":false,"opacity":1,"system":"opening"},{"id":"rear-course-lower-1","kind":"box","position":[3.046,0.825,0],"size":[0.018,0.025,2.3],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-lower-2","kind":"box","position":[3.046,1.065,0],"size":[0.018,0.025,2.3],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-lower-3","kind":"box","position":[3.046,1.305,0],"size":[0.018,0.025,2.3],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-side-l-1","kind":"box","position":[3.046,1.545,-0.955],"size":[0.018,0.025,0.39],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-side-r-1","kind":"box","position":[3.046,1.545,0.955],"size":[0.018,0.025,0.39],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-side-l-2","kind":"box","position":[3.046,1.785,-0.955],"size":[0.018,0.025,0.39],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-side-r-2","kind":"box","position":[3.046,1.785,0.955],"size":[0.018,0.025,0.39],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-side-l-3","kind":"box","position":[3.046,2.025,-0.955],"size":[0.018,0.025,0.39],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-side-r-3","kind":"box","position":[3.046,2.025,0.955],"size":[0.018,0.025,0.39],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-side-l-4","kind":"box","position":[3.046,2.265,-0.955],"size":[0.018,0.025,0.39],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-side-r-4","kind":"box","position":[3.046,2.265,0.955],"size":[0.018,0.025,0.39],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-upper-1","kind":"box","position":[3.046,2.405,0],"size":[0.018,0.025,2.3],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-upper-2","kind":"box","position":[3.046,2.645,0],"size":[0.018,0.025,2.3],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"rear-course-upper-3","kind":"box","position":[3.046,2.885,0],"size":[0.018,0.025,2.3],"rotation":[0,0,0],"color":"#151719","role":"cladding-joint","locked":false,"opacity":1,"system":"envelope"},{"id":"front-clad-left","kind":"box","position":[-2.4865,1.765,-0.7773],"size":[0.9385,2.3,0.1],"rotation":[0,0,0],"color":"#2f2b27","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"front-clad-right","kind":"box","position":[0.9365,1.765,-0.7773],"size":[4.0385,2.3,0.1],"rotation":[0,0,0],"color":"#2f2b27","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"front-clad-header","kind":"box","position":[-1.55,2.755,-0.7773],"size":[0.84,0.32,0.1],"rotation":[0,0,0],"color":"#2f2b27","role":"wall-cladding","locked":false,"opacity":1,"system":"opening"},{"id":"front-door","kind":"box","position":[-1.55,1.485,-0.7773],"size":[0.843,1.991,0.06],"rotation":[0,0,0],"color":"#8a6a3f","role":"door","locked":false,"opacity":1,"system":"opening"},{"id":"back-clad-lower","kind":"box","position":[0,0.975,0.7773],"size":[5.88,0.72,0.1],"rotation":[0,0,0],"color":"#2f2b27","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"back-clad-upper","kind":"box","position":[0,2.625,0.7773],"size":[5.88,0.58,0.1],"rotation":[0,0,0],"color":"#2f2b27","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"back-clad-pier-left","kind":"box","position":[-2.045,1.835,0.7773],"size":[1.79,1,0.1],"rotation":[0,0,0],"color":"#2f2b27","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"back-clad-pier-right","kind":"box","position":[2.045,1.835,0.7773],"size":[1.79,1,0.1],"rotation":[0,0,0],"color":"#2f2b27","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"back-window-glass","kind":"box","position":[0,1.835,1.25],"size":[2.3,1,0.04],"rotation":[0,0,0],"color":"#9fb6c4","role":"window-glazing","locked":false,"opacity":0.5,"system":"opening"},{"id":"back-window-sill","kind":"box","position":[0,1.395,0.7773],"size":[2.54,0.12,0.16],"rotation":[0,0,0],"color":"#6f6a63","role":"window-trim","locked":false,"opacity":1,"system":"opening"},{"id":"back-window-head","kind":"box","position":[0,2.275,0.7773],"size":[2.54,0.12,0.16],"rotation":[0,0,0],"color":"#6f6a63","role":"window-trim","locked":false,"opacity":1,"system":"opening"},{"id":"left-clad","kind":"box","position":[-2.99,1.765,0],"size":[0.1,2.3,2.5],"rotation":[0,0,0],"color":"#2f2b27","role":"wall-cladding","locked":false,"opacity":1,"system":"envelope"},{"id":"roof-front","kind":"box","position":[0,3.445,-0.785],"size":[6.32,0.1,1.0942],"rotation":[-0.429981577338787,0,0],"color":"#4a463f","role":"roof","locked":false,"opacity":1,"system":"roof"},{"id":"roof-back","kind":"box","position":[0,3.445,0.785],"size":[6.32,0.1,1.0942],"rotation":[0.429981577338787,0,0],"color":"#4a463f","role":"roof","locked":false,"opacity":1,"system":"roof"},{"id":"roof-ridge","kind":"box","position":[0,3.845,0],"size":[6.38,0.1,0.16],"rotation":[0,0,0],"color":"#6f6a63","role":"roof","locked":false,"opacity":1,"system":"roof"},{"id":"gable-left","kind":"box","position":[-2.96,3.36,0],"size":[0.1,0.89,2.5],"rotation":[0,0,0],"color":"#2f2b27","role":"wall-cladding","locked":false,"opacity":1,"system":"roof"},{"id":"gable-right","kind":"box","position":[2.96,3.36,0],"size":[0.1,0.89,2.5],"rotation":[0,0,0],"color":"#2f2b27","role":"wall-cladding","locked":false,"opacity":1,"system":"roof"},{"id":"tread-1-i7","kind":"box","position":[-1.55,0.0825,-1.5073],"size":[1.08,0.165,0.28],"rotation":[0,0,0],"color":"#6f6a63","role":"stair","locked":false,"opacity":1,"system":"circulation"},{"id":"tread-2-i7","kind":"box","position":[-1.55,0.165,-1.2273],"size":[1.08,0.33,0.28],"rotation":[0,0,0],"color":"#6f6a63","role":"stair","locked":false,"opacity":1,"system":"circulation"},{"id":"tread-3-i7","kind":"box","position":[-1.55,0.0843,-0.9473],"size":[1.08,0.495,0.28],"rotation":[0,0,0],"color":"#6f6a63","role":"stair","locked":false,"opacity":1,"system":"circulation"},{"id":"eave-block-front","kind":"box","position":[0,3.2282,-1.2],"size":[5.88,0.3865,0.1],"rotation":[0,0,0],"color":"#2f2b27","role":"wall-cladding","locked":false,"opacity":1,"system":"roof"},{"id":"eave-block-rear","kind":"box","position":[0,3.2282,1.2],"size":[5.88,0.3865,0.1],"rotation":[0,0,0],"color":"#2f2b27","role":"wall-cladding","locked":false,"opacity":1,"system":"roof"}],"failures":[{"id":"INTERPENETRATION","severity":"unbuildable","system":"roof","text":"2 pairs grossly interpenetrate (worst: roof-front \u2229 eave-block-front, 29% of the smaller part); 17 more overlap 5\u201325%","parts":["roof-front","eave-block-front","roof-back","eave-block-rear"],"where":{"min":[-3.16,3.035,-1.303],"max":[3.16,3.719,1.303],"centre":[0,3.377,0]}},{"id":"NO_LOAD_PATH","severity":"unbuildable","system":"opening","text":"2 parts have no contact chain to the ground: front-clad-header, back-window-glass","parts":["front-clad-header","back-window-glass"],"where":{"min":[-1.97,1.335,-0.827],"max":[1.15,2.915,1.27],"centre":[-0.41,2.125,0.221]}},{"id":"OVER_WIDTH","severity":"illegal","system":"chassis / roof","text":"\u200d3.06m wide, 0.47m over the towing limit \u2014 widest element wheel-1","parts":["wheel-1","wheel-2","wheel-3","wheel-4","roof-front","roof-back"],"where":{"min":[-3.16,0,-1.528],"max":[3.16,3.719,1.528],"centre":[0,1.859,0]}},{"id":"NOT_ENCLOSED","severity":"unusable","system":"envelope","text":"outside air reaches 49.07 m\u00b3 of what should be indoors","parts":[],"where":{"min":[-3.041,0.572,-1.262],"max":[2.979,3.932,1.258],"centre":[-0.031,2.252,-0.002]}},{"id":"LOW_HEADROOM","severity":"uncomfortable","system":"structure / roof","text":"0% of the floor has 2.134m over it","parts":["wall-plate-front","wall-plate-rear","wall-plate-left","wall-plate-right","roof-front","roof-back","roof-ridge"],"where":{"min":[-3.19,2.915,-1.303],"max":[3.19,3.895,1.303],"centre":[0,3.405,0]}}],"report":{"collisions":{"gross":2,"moderate":17,"tolerance":32,"worst":[{"a":"roof-front","b":"eave-block-front","volume":0.065323,"fractionOfSmaller":0.2874},{"a":"roof-back","b":"eave-block-rear","volume":0.065323,"fractionOfSmaller":0.2874},{"a":"rail-L","b":"tread-3-i7","volume":0.010853,"fractionOfSmaller":0.1347},{"a":"rear-window-trim-left","b":"rear-window-trim-bottom","volume":0.00144,"fractionOfSmaller":0.125},{"a":"rear-window-trim-left","b":"rear-window-trim-top","volume":0.00144,"fractionOfSmaller":0.125},{"a":"rear-window-trim-right","b":"rear-window-trim-bottom","volume":0.00144,"fractionOfSmaller":0.125},{"a":"rear-window-trim-right","b":"rear-window-trim-top","volume":0.00144,"fractionOfSmaller":0.125},{"a":"rear-cladding-lower","b":"rear-course-lower-1","volume":0.000114,"fractionOfSmaller":0.1101}]},"envelope":{"enclosed":0,"leak":49.065,"box":{"min":[-3.041,0.572,-1.262],"max":[2.979,3.932,1.258]}},"wheels":{"count":4,"lowest":0,"clearance":0,"touching":4,"passes":true},"road":{"width":3.056,"height":3.895,"length":7.386,"widthLimit":2.591,"heightLimit":4.115,"passesWidth":false,"passesHeight":true,"widthOver":0.465,"heightOver":0,"exempt":3,"exemptNote":"steps and treads are excluded: the towing envelope measures what travels","widest":"wheel-1","tallest":"roof-ridge","overWidthParts":["wheel-1","wheel-2","wheel-3","wheel-4","roof-front","roof-back"]},"step":{"count":3,"ids":["tread-1-i7","tread-2-i7","tread-3-i7"],"risers":4,"rises":[0.165,0.165,0.002,0.163],"maxRise":0.165,"treads":[0.28,0.28,0.28],"minTread":0.28,"totalRise":0.495,"passes":true},"door":{"id":"front-door","clearWidth":0.843,"clearHeight":1.991,"thickness":0.06,"sillY":0.49,"passesWidth":true,"passesHeight":true},"headroom":{"interiorFloorArea":0,"meanClear":0,"minClear":0,"medianClear":0,"areaOverFull":0,"areaOverRelaxed":0,"fractionFull":0},"floor":{"standableArea":0,"fractionOfInterior":0},"window":{"panes":2,"glazingArea":3.222,"floorArea":0,"ratio":null,"passesLight":null,"note":"undecidable: there is no enclosed floor to light","sillHeights":[0.98,0.84]},"loadPath":{"grounded":64,"total":66,"ungrounded":["front-clad-header","back-window-glass"]}},"bySystem":{"chassis":{"parts":9,"ids":["deck","rail-L","rail-R","tongue-L","tongue-R","wheel-1","wheel-2","wheel-3","wheel-4"],"failures":["OVER_WIDTH"]},"structure":{"parts":12,"ids":["wall-sill-front","wall-sill-rear","wall-sill-left","wall-sill-right","wall-post-left-front","wall-post-left-rear","wall-post-right-front","wall-post-right-rear","wall-plate-front","wall-plate-rear","wall-plate-left","wall-plate-right"],"failures":["LOW_HEADROOM"]},"envelope":{"parts":25,"ids":["rear-cladding-left","rear-cladding-right","rear-cladding-lower","rear-cladding-upper","rear-course-lower-1","rear-course-lower-2","rear-course-lower-3","rear-course-side-l-1","rear-course-side-r-1","rear-course-side-l-2","rear-course-side-r-2","rear-course-side-l-3","rear-course-side-r-3","rear-course-side-l-4","rear-course-side-r-4","rear-course-upper-1","rear-course-upper-2","rear-course-upper-3","front-clad-left","front-clad-right","back-clad-lower","back-clad-upper","back-clad-pier-left","back-clad-pier-right","left-clad"],"failures":["NOT_ENCLOSED"]},"opening":{"parts":10,"ids":["rear-window-glass","rear-window-trim-left","rear-window-trim-right","rear-window-trim-bottom","rear-window-trim-top","front-clad-header","front-door","back-window-glass","back-window-sill","back-window-head"],"failures":["NO_LOAD_PATH"]},"roof":{"parts":7,"ids":["roof-front","roof-back","roof-ridge","gable-left","gable-right","eave-block-front","eave-block-rear"],"failures":["INTERPENETRATION","OVER_WIDTH","LOW_HEADROOM"]},"circulation":{"parts":3,"ids":["tread-1-i7","tread-2-i7","tread-3-i7"],"failures":[]}}}},"ingoldTrace":[{"cycle":1,"failure":"INTERPENETRATION","repair":{"op":"SEPARATE","part":"wall-plate-left","from":"gable-left","axis":"x","by":0.08,"text":"moved wall-plate-left 0.080m in x clear of gable-left"},"after":["INTERPENETRATION","WHEELS_OFF_GROUND","OVER_WIDTH","UNCLIMBABLE","DOOR_TOO_SMALL","NOT_ENCLOSED","LOW_HEADROOM"],"parts":62},{"cycle":2,"failure":"INTERPENETRATION","repair":{"op":"SEPARATE","part":"wall-plate-right","from":"gable-right","axis":"x","by":-0.08,"text":"moved wall-plate-right -0.080m in x clear of gable-right"},"after":["WHEELS_OFF_GROUND","OVER_WIDTH","UNCLIMBABLE","DOOR_TOO_SMALL","NOT_ENCLOSED","LOW_HEADROOM"],"parts":62},{"cycle":3,"failure":"WHEELS_OFF_GROUND","repair":{"op":"SET_DOWN","by":0.215,"text":"set the whole assembly down 0.215m so the wheels reach the road"},"after":["OVER_WIDTH","UNCLIMBABLE","DOOR_TOO_SMALL","NOT_ENCLOSED","LOW_HEADROOM"],"parts":62},{"cycle":4,"failure":"OVER_WIDTH","repair":{"op":"TRIM_TO_ENVELOPE","parts":["front-clad-left moved 0.47m inboard","front-clad-right moved 0.47m inboard","front-clad-header moved 0.47m inboard","front-door moved 0.50m inboard","back-clad-lower moved -0.47m inboard","back-clad-upper moved -0.47m inboard","back-clad-pier-left moved -0.47m inboard","back-clad-pier-right moved -0.47m inboard","back-window-sill moved -0.52m inboard","back-window-head moved -0.52m inboard","roof-front narrowed \u00d70.63","roof-back narrowed \u00d70.63"],"text":"brought 12 element(s) inside the 2.591m towing width: front-clad-left moved 0.47m inboard; front-clad-right moved 0.47m inboard; front-clad-header moved 0.47m inboard; front-door moved 0.50m inboard; back-clad-lower moved -0.47m inboard; back-clad-upper moved -0.47m inboard; back-clad-pier-left moved -0.47m inboard; back-clad-pier-right moved -0.47m inboard; back-window-sill moved -0.52m inboard; back-window-head moved -0.52m inboard; roof-front narrowed \u00d70.63; roof-back narrowed \u00d70.63"},"after":["NO_LOAD_PATH","OVER_WIDTH","UNCLIMBABLE","DOOR_TOO_SMALL","NOT_ENCLOSED","LOW_HEADROOM"],"parts":62},{"cycle":5,"failure":"NO_LOAD_PATH","refusedId":"NO_LOAD_PATH","note":"no repair available"},{"cycle":6,"failure":"OVER_WIDTH","refusedId":"OVER_WIDTH","refused":"the widest element in transit is wheel-1, locked chassis geometry at 3.06m across against a 2.591m limit. The given trailer is over width before anything is built on it. That is a finding about the premise, and no repair here can reach it."},{"cycle":7,"failure":"UNCLIMBABLE","repair":{"op":"BUILD_STAIR","risers":3,"riser":0.165,"tread":0.28,"text":"replaced 1 step with 3 risers of 0.165m and 0.28m treads"},"after":["INTERPENETRATION","NO_LOAD_PATH","OVER_WIDTH","DOOR_TOO_SMALL","NOT_ENCLOSED","LOW_HEADROOM"],"parts":64},{"cycle":8,"failure":"INTERPENETRATION","repair":{"op":"SEPARATE","part":"tread-3-i7","from":"deck","axis":"y","by":-0.16,"text":"moved tread-3-i7 -0.160m in y clear of deck"},"after":["NO_LOAD_PATH","OVER_WIDTH","DOOR_TOO_SMALL","NOT_ENCLOSED","LOW_HEADROOM"],"parts":64},{"cycle":9,"failure":"DOOR_TOO_SMALL","repair":{"op":"WIDEN_DOOR","by":0.063,"text":"widened front-door by 0.063m and pulled the flanking cladding back with it"},"after":["NO_LOAD_PATH","OVER_WIDTH","NOT_ENCLOSED","LOW_HEADROOM"],"parts":64},{"cycle":10,"failure":"NOT_ENCLOSED","repair":{"op":"CLOSE_ENVELOPE","added":["eave-block-front","eave-block-rear"],"text":"closed the shell: eave-block-front, eave-block-rear"},"after":["INTERPENETRATION","NO_LOAD_PATH","OVER_WIDTH","NOT_ENCLOSED","LOW_HEADROOM"],"parts":66},{"cycle":11,"failure":"INTERPENETRATION","repair":{"op":"SEPARATE","part":"eave-block-front","from":"roof-front","axis":"z","by":-0.153,"text":"moved eave-block-front -0.153m in z clear of roof-front"},"after":["INTERPENETRATION","NO_LOAD_PATH","OVER_WIDTH","NOT_ENCLOSED","LOW_HEADROOM"],"parts":66},{"cycle":12,"failure":"INTERPENETRATION","repair":{"op":"SEPARATE","part":"eave-block-rear","from":"roof-back","axis":"z","by":0.153,"text":"moved eave-block-rear 0.153m in z clear of roof-back"},"after":["NO_LOAD_PATH","OVER_WIDTH","NOT_ENCLOSED","LOW_HEADROOM"],"parts":66},{"cycle":13,"failure":"NOT_ENCLOSED","repair":{"op":"CLOSE_ENVELOPE","added":["eave-block-front (resized)","eave-block-rear (resized)"],"text":"closed the shell: eave-block-front (resized), eave-block-rear (resized)"},"after":["INTERPENETRATION","NO_LOAD_PATH","OVER_WIDTH","NOT_ENCLOSED","LOW_HEADROOM"],"parts":66},{"cycle":14,"failure":"INTERPENETRATION","refusedId":"INTERPENETRATION","refused":"roof-front and eave-block-front have already been separated once and are overlapping again \u2014 moving either one drives it into the other. Two parts want the same place and a repair cannot decide which of them is wrong."},{"cycle":15,"failure":"NOT_ENCLOSED","refusedId":"NOT_ENCLOSED","refused":"two attempts at closing the shell have not reduced the leak below 49.065m\u00b3. The gap spans x -3.041..2.979, y 0.572..3.932, z -1.262..1.258 \u2014 the shell is open along its whole length, which is a missing design decision about how wall meets roof, not a gap to plug."},{"cycle":16,"failure":"LOW_HEADROOM","refusedId":"LOW_HEADROOM","refused":"headroom cannot be judged until the shell is closed; nothing to raise yet"}],"correspondence":{"name":"cabin","exported":"03:04Z","reference":"1000061583.png","threshold":15,"finalSuck":98,"cycles":7,"parts":44,"connections":60,"locked":9,"focusAttempts":1,"repeatSimilarity":0.14583333333333334,"escalationCount":0,"machinery":{"focus":true,"cameraRotation":true,"targetedBuild":true},"roles":["chassis","cladding-joint","structure","wall-cladding","wall-frame","window-glazing","window-trim"],"kinds":["box","cylinder"],"cyclesLog":[{"cycle":1,"mode":"BUILD","view":"front 3/4","state":"SURVIVED","focus":"Left long-wall frame","suck":10,"killer":"The entire long wall is an undifferentiated rectangular void. The reference establishes a solid, low fa\u00e7ade with a precisely spaced door and window; this empty perimeter frame captures none of that defining elevation, so the build reads as a generic trailer cage rather than the reference cabin.","build":{"changed":12,"whole":false,"summary":"Established the first inspectable tiny-house wall-frame perimeter on the trailer deck."}},{"cycle":2,"mode":"LOOK","view":"left side","state":"SURVIVED","focus":"Left long-wall frame","suck":10,"killer":"This target remains completely uncontrolled: it is still one enormous skeletal opening with no fa\u00e7ade definition whatsoever. The reference establishes a low, fully enclosed long wall articulated by precisely placed door and window openings; this empty cage destroys the cabin\u2019s defining side elevation and reads as unfinished framing, not the reference structure.","build":null},{"cycle":3,"mode":"LOOK","view":"rear 3/4","state":"LOCKED","focus":"Rear end-wall frame","suck":98,"killer":"The rear end is a completely empty rectangular frame. The reference establishes a solid, dark-clad end wall punctuated by one centered, trimmed window; this total absence of enclosure erases the cabin\u2019s rear fa\u00e7ade and leaves the build reading as a bare trailer cage.","build":null},{"cycle":4,"mode":"BUILD","view":"rear 3/4","state":"LOCKED","focus":"Rear end-wall cladding","suck":99,"killer":"This target remains uncontrolled: the rear end is still a fully open frame with no visible enclosure. The reference establishes a solid dark-clad end fa\u00e7ade surrounding a centered window; leaving the entire plane absent obliterates the cabin volume and makes the build read as an exposed trailer skeleton.","build":{"changed":9,"whole":false,"summary":"Enclosed the rear frame with dark fa\u00e7ade panels and a centered trimmed window opening."}},{"cycle":5,"mode":"BUILD","view":"rear 3/4","state":"LOCKED","focus":"Rear end-wall cladding","suck":94,"killer":"This target remains uncontrolled: it has changed from absent enclosure into a monolithic pale-yellow slab. The reference establishes a dark, horizontally coursed rear fa\u00e7ade surrounding the centered window; the current blank panel has none of that cladding rhythm or material identity, so the end still reads as a crude placeholder rather than the cabin.","build":{"changed":9,"whole":false,"summary":"Relocated the rear cladding and its centered window from the long wall to the open trailer end, creating a solid dark end fa\u00e7ade."}},{"cycle":6,"mode":"BUILD","view":"rear 3/4","state":"LOCKED","focus":"Left long-wall enclosure","suck":98,"killer":"This target remains completely uncontrolled: the entire long elevation is still a gigantic translucent void bounded by timber rails. The reference establishes an opaque, dark, horizontally clad fa\u00e7ade articulated by a door and window; the current open cage eliminates the cabin\u2019s primary elevation and makes the build read as an unfinished trailer frame.","build":{"changed":18,"whole":false,"summary":"Added dark horizontal course joints across the rear cladding, preserving the centered window opening and trim."}}],"transitions":[{"from_cycle":3,"to_cycle":4,"gesture":"ENCLOSE","changed":9,"whole":false,"focus_before":"Rear end-wall frame","focus_after":"Rear end-wall cladding","focus_repeated":false,"suck_before":98,"suck_after":99,"delta":1,"summary":"Enclosed the rear frame with dark fa\u00e7ade panels and a centered trimmed window opening."},{"from_cycle":4,"to_cycle":5,"gesture":"RELOCATE","changed":9,"whole":false,"focus_before":"Rear end-wall cladding","focus_after":"Rear end-wall cladding","focus_repeated":true,"suck_before":99,"suck_after":94,"delta":-5,"summary":"Relocated the rear cladding and its centered window from the long wall to the open trailer end, creating a solid dark end fa\u00e7ade."},{"from_cycle":5,"to_cycle":6,"gesture":"ARTICULATE","changed":18,"whole":false,"focus_before":"Rear end-wall cladding","focus_after":"Left long-wall enclosure","focus_repeated":false,"suck_before":94,"suck_after":98,"delta":4,"summary":"Added dark horizontal course joints across the rear cladding, preserving the centered window opening and trim."}]},"cost":{"perLog":[{"log":"pagoda","cycles":7,"apiCalls":10,"inputKB":2711,"apiSeconds":363},{"log":"lander","cycles":16,"apiCalls":28,"inputKB":14647,"apiSeconds":442},{"log":"castle","cycles":6,"apiCalls":10,"inputKB":13211,"apiSeconds":190},{"log":"cabin","cycles":7,"apiCalls":12,"inputKB":28972,"apiSeconds":164}],"total":{"apiCalls":60,"inputKB":59541,"apiSeconds":1158}}}
+</script>
+<script>
+'use strict';
+const D=JSON.parse(document.getElementById('bundle').textContent);
+const $=s=>document.querySelector(s);
+const fx=(v,n=2)=>Number.isFinite(+v)?(+v).toFixed(n):'\u2014';
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const SYS=['chassis','structure','envelope','opening','roof','circulation'];
+const SEV=['unbuildable','illegal','unusable','uncomfortable'];
+const cssv=n=>getComputedStyle(document.documentElement).getPropertyValue('--'+n).trim();
+
+let stateKey='ingold', view='AXON', sel=null, selFail=null, sysFilter=null,
+    histTrack='ingold', histStep=null;
+const S=()=>D.states[stateKey];
+
+/* ---- projection: parts are drawn as their oriented boxes, which is what a
+   survey drawing is \u2014 an outline you can measure, not a render ------------- */
+function corners(p){
+  const s=p.size||[1,1,1], q=p.position||[0,0,0], r=p.rotation||[0,0,0];
+  const k=(p.kind||'box').toLowerCase();
+  let hx=s[0]/2,hy=s[1]/2,hz=s[2]/2;
+  if(k==='cylinder'||k==='cone'){hx=hz=s[0]/2;hy=s[1]/2}
+  if(k==='sphere'){const rr=Math.max(s[0],s[1],s[2])/2;hx=hy=hz=rr}
+  const c=[Math.cos(r[0]||0),Math.cos(r[1]||0),Math.cos(r[2]||0)];
+  const n=[Math.sin(r[0]||0),Math.sin(r[1]||0),Math.sin(r[2]||0)];
+  const R=[[c[1]*c[2],-c[1]*n[2],n[1]],
+           [n[0]*n[1]*c[2]+c[0]*n[2],-n[0]*n[1]*n[2]+c[0]*c[2],-n[0]*c[1]],
+           [-c[0]*n[1]*c[2]+n[0]*n[2],c[0]*n[1]*n[2]+n[0]*c[2],c[0]*c[1]]];
+  const out=[];
+  for(const sx of[-hx,hx])for(const sy of[-hy,hy])for(const sz of[-hz,hz])
+    out.push([q[0]+R[0][0]*sx+R[0][1]*sy+R[0][2]*sz,
+              q[1]+R[1][0]*sx+R[1][1]*sy+R[1][2]*sz,
+              q[2]+R[2][0]*sx+R[2][1]*sy+R[2][2]*sz]);
+  return out;
+}
+const C30=Math.cos(Math.PI/6), S30=Math.sin(Math.PI/6);
+const PROJ={
+  AXON:{p:v=>[(v[0]-v[2])*C30,(v[0]+v[2])*S30-v[1]], d:v=>v[0]+v[1]+v[2], name:'axonometric'},
+  FRONT:{p:v=>[v[0],-v[1]], d:v=>-v[2], name:'front elevation \u00b7 looking north'},
+  SIDE:{p:v=>[-v[2],-v[1]], d:v=>-v[0], name:'end elevation \u00b7 looking east'},
+  PLAN:{p:v=>[v[0],v[2]], d:v=>v[1], name:'plan \u00b7 looking down'}
+};
+function hull(pts){
+  const P=pts.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+  const cr=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);
+  const lo=[],up=[];
+  for(const p of P){while(lo.length>=2&&cr(lo[lo.length-2],lo[lo.length-1],p)<=0)lo.pop();lo.push(p)}
+  for(let i=P.length-1;i>=0;i--){const p=P[i];
+    while(up.length>=2&&cr(up[up.length-2],up[up.length-1],p)<=0)up.pop();up.push(p)}
+  lo.pop();up.pop();return lo.concat(up);
+}
+
+function drawSheet(){
+  const st=S(), pr=PROJ[view], W=1000,H=620,pad=54;
+  const shapes=st.parts.map(p=>{
+    const cs=corners(p), pts=cs.map(pr.p);
+    return {p,hull:hull(pts),depth:Math.max(...cs.map(pr.d))};
+  });
+  const all=shapes.flatMap(s=>s.hull);
+  const xs=all.map(a=>a[0]), ys=all.map(a=>a[1]);
+  const x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+  const k=Math.min((W-pad*2)/Math.max(1e-6,x1-x0),(H-pad*2)/Math.max(1e-6,y1-y0));
+  const ox=(W-(x1-x0)*k)/2-x0*k, oy=(H-(y1-y0)*k)/2-y0*k;
+  const T=a=>[a[0]*k+ox,a[1]*k+oy];
+  shapes.sort((a,b)=>a.depth-b.depth);
+
+  const failParts=new Set(selFail?selFail.parts:[]);
+  const sevCol=selFail?cssv(selFail.severity):null;
+  let svg='';
+  /* ground line, because the whole question is what touches it */
+  if(view!=='PLAN'){
+    const g0=T(pr.p([x0/k,0,0])), g1=T(pr.p([x1/k,0,0]));
+    const gy=T(view==='AXON'?pr.p([0,0,0]):[0,0])[1];
+    svg+=`<line x1="20" y1="${T(pr.p([0,0,0]))[1]}" x2="${W-20}" y2="${T(pr.p([0,0,0]))[1]}"
+      stroke="${cssv('rule')}" stroke-width="1.5" stroke-dasharray="6 4"/>`;
+  }
+  for(const s of shapes){
+    const p=s.p, d=s.hull.map(T).map(a=>a[0].toFixed(1)+','+a[1].toFixed(1)).join(' ');
+    const dim=sysFilter&&p.system!==sysFilter;
+    const isSel=sel&&sel.id===p.id, inFail=failParts.has(p.id);
+    const base=cssv(p.system);
+    const fill=inFail?sevCol:base;
+    const op=dim?0.06:inFail?0.42:isSel?0.5:0.18;
+    const stroke=isSel?cssv('accent'):inFail?sevCol:dim?cssv('rule-soft'):cssv('ink-3');
+    svg+=`<polygon points="${d}" fill="${fill}" fill-opacity="${op}" stroke="${stroke}"
+      stroke-width="${isSel?2.4:inFail?1.6:0.8}" stroke-linejoin="round"
+      data-id="${esc(p.id)}"><title>${esc(p.id)} \u00b7 ${esc(p.system)}</title></polygon>`;
+  }
+  if(selFail&&selFail.where){
+    const w=selFail.where, box=[];
+    for(const sx of[w.min[0],w.max[0]])for(const sy of[w.min[1],w.max[1]])for(const sz of[w.min[2],w.max[2]])
+      box.push(pr.p([sx,sy,sz]));
+    const h=hull(box).map(T).map(a=>a[0].toFixed(1)+','+a[1].toFixed(1)).join(' ');
+    svg+=`<polygon points="${h}" fill="none" stroke="${sevCol}" stroke-width="1.4"
+      stroke-dasharray="7 5" opacity=".85"/>`;
+  }
+  svg+=`<text x="20" y="${H-16}" font-family="IBM Plex Mono, monospace" font-size="11"
+    fill="${cssv('ink-3')}" letter-spacing="1">${pr.name.toUpperCase()} \u00b7 1 unit = 1 m \u00b7 parts drawn as oriented boxes</text>`;
+  $('#draw').innerHTML=svg;
+  $('#draw').querySelectorAll('polygon[data-id]').forEach(el=>
+    el.addEventListener('click',()=>{ sel=S().parts.find(p=>p.id===el.dataset.id); render() }));
+}
+
+function severityDot(s){ return `<i style="background:${cssv(s)}"></i>` }
+
+function render(){
+  const st=S();
+  $('#states').innerHTML=Object.entries(D.states).map(([k,v])=>
+    `<button aria-pressed="${k===stateKey}" data-k="${k}">${k==='correspondence'?'as built by the loop'
+      :k==='completed'?'hand-completed':'after the ingold loop'}</button>`).join('');
+  $('#states').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    stateKey=b.dataset.k; sel=null; selFail=null;
+    histTrack = stateKey==='correspondence'?'correspondence':'ingold'; histStep=null; render();});
+
+  $('#views').innerHTML=Object.keys(PROJ).map(v=>
+    `<button aria-pressed="${v===view}" data-v="${v}">${v}</button>`).join('')+
+    `<span style="margin-left:auto;font-size:11px;color:var(--ink-3)" class="mono">${st.parts.length} parts \u00b7 ${esc(st.caption)}</span>`;
+  $('#views').querySelectorAll('button[data-v]').forEach(b=>b.onclick=()=>{view=b.dataset.v;render()});
+
+  const counts={}; for(const p of st.parts) counts[p.system]=(counts[p.system]||0)+1;
+  $('#legend').innerHTML=SYS.filter(s=>counts[s]).map(s=>{
+    const fs=st.failures.filter(f=>String(f.system).split(' / ').includes(s)).length;
+    return `<button aria-pressed="${sysFilter===s}" data-s="${s}">
+      <i style="background:${cssv(s)}"></i>${s}<span class="n">${counts[s]}${fs?' \u00b7 '+fs+'\u2691':''}</span></button>`;
+  }).join('');
+  $('#legend').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    sysFilter=sysFilter===b.dataset.s?null:b.dataset.s; render()});
+
+  $('#failhd').textContent=st.failures.length?st.failures.length+' failures, worst first':'no failures';
+  $('#fails').innerHTML=st.failures.map((f,i)=>
+    `<button data-i="${i}" aria-pressed="${selFail&&selFail.id===f.id}">
+      <span class="stripe" style="background:${cssv(f.severity)}"></span>
+      <span class="body">
+        <span class="top"><span class="sev" style="color:${cssv(f.severity)}">${f.severity}</span>
+          <span class="id">${f.id}</span><span class="sys">${esc(f.system)}</span></span>
+        <span class="txt">${esc(f.text)}</span>
+        ${f.where?`<span class="at">x ${f.where.min[0]}\u2026${f.where.max[0]}  y ${f.where.min[1]}\u2026${f.where.max[1]}  z ${f.where.min[2]}\u2026${f.where.max[2]}</span>`:''}
+      </span></button>`).join('')||'<div style="padding:10px;color:var(--ink-3)">nothing fails</div>';
+  $('#fails').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    const f=st.failures[+b.dataset.i];
+    selFail=(selFail&&selFail.id===f.id)?null:f; sel=null; render()});
+
+  /* inspector */
+  let ins='';
+  if(sel){
+    const touching=st.failures.filter(f=>(f.parts||[]).includes(sel.id));
+    ins=`<h3>${esc(sel.id)}</h3><dl class="kv">
+      <dt>system</dt><dd>${esc(sel.system)}</dd>
+      <dt>role</dt><dd>${esc(sel.role||'\u2014')}</dd>
+      <dt>kind</dt><dd>${esc(sel.kind)}</dd>
+      <dt>position</dt><dd>${sel.position.map(v=>fx(v)).join('  ')}</dd>
+      <dt>size</dt><dd>${sel.size.map(v=>fx(v)).join('  ')}</dd>
+      <dt>rotation</dt><dd>${sel.rotation.map(v=>fx(v,3)).join('  ')}</dd>
+      <dt>locked</dt><dd>${sel.locked?'yes \u2014 given chassis':'no'}</dd></dl>`;
+    ins+=touching.length
+      ? `<div style="margin-top:9px" class="lab">implicated in</div>`+
+        touching.map(f=>`<div style="font-size:12px;margin-top:3px">
+          <span style="color:${cssv(f.severity)}">\u25cf</span> ${f.id} <span class="mono"
+          style="color:var(--ink-3);font-size:11px">${esc(f.system)}</span></div>`).join('')
+      : `<div style="margin-top:9px;font-size:12px;color:var(--ink-3)">no failure names this part</div>`;
+  } else if(selFail){
+    ins=`<h3 style="color:${cssv(selFail.severity)}">${selFail.id}</h3>
+      <div style="font-size:12.5px;color:var(--ink-2)">${esc(selFail.text)}</div>
+      <div style="margin-top:9px" class="lab">system</div><div class="mono">${esc(selFail.system)}</div>`;
+    if(selFail.where) ins+=`<div style="margin-top:9px" class="lab">extent</div>
+      <div class="mono" style="font-size:11.5px">x ${selFail.where.min[0]} \u2026 ${selFail.where.max[0]}<br>
+      y ${selFail.where.min[1]} \u2026 ${selFail.where.max[1]}<br>
+      z ${selFail.where.min[2]} \u2026 ${selFail.where.max[2]}</div>`;
+    if(selFail.parts.length) ins+=`<div style="margin-top:9px" class="lab">parts</div>
+      <div class="mono" style="font-size:11.5px;line-height:1.7">${selFail.parts.map(esc).join('<br>')}</div>`;
+  } else if(histStep){ ins=histStep; }
+  else ins=`<h3>Inspector</h3><div style="font-size:12.5px;color:var(--ink-2)">
+    Pick a part in the drawing, a failure above, or a step in the history. Selecting a failure outlines
+    where it happens and stains the parts it names.</div>`;
+  $('#inspector').innerHTML=ins;
+
+  /* measured */
+  const r=st.report;
+  $('#measured').innerHTML=`<table><tbody>
+    <tr><td>wheels on the road</td><td class="num">${r.wheels.touching}/${r.wheels.count}</td></tr>
+    <tr><td>lowest wheel above grade</td><td class="num">${fx(r.wheels.clearance)} m</td></tr>
+    <tr><td>towing width</td><td class="num" style="color:${r.road.passesWidth?'':cssv('illegal')}">${fx(r.road.width)} m / 2.59</td></tr>
+    <tr><td>towing height</td><td class="num">${fx(r.road.height)} m / 4.12</td></tr>
+    <tr><td>door clear</td><td class="num" style="color:${r.door.passesWidth&&r.door.passesHeight?'':cssv('unusable')}">${fx(r.door.clearWidth)} \u00d7 ${fx(r.door.clearHeight)} m</td></tr>
+    <tr><td>rise to floor</td><td class="num" style="color:${r.step.passes?'':cssv('unusable')}">${fx(r.step.totalRise)} m in ${r.step.risers||0}</td></tr>
+    <tr><td>enclosed volume</td><td class="num" style="color:${r.envelope.enclosed>0?'':cssv('unusable')}">${fx(r.envelope.enclosed)} m\u00b3</td></tr>
+    <tr><td>air reaching indoors</td><td class="num">${fx(r.envelope.leak)} m\u00b3</td></tr>
+    <tr><td>parts reaching ground</td><td class="num">${r.loadPath.grounded}/${r.loadPath.total}</td></tr>
+    <tr><td>gross interpenetrations</td><td class="num" style="color:${r.collisions.gross?cssv('unbuildable'):''}">${r.collisions.gross}</td></tr>
+    <tr><td>moderate overlaps</td><td class="num">${r.collisions.moderate}</td></tr>
+    </tbody></table>`;
+
+  renderHistory();
+  drawSheet();
+}
+
+/* ---- the back and forth ---------------------------------------------------
+   Two histories, because two different loops made this thing. The
+   correspondence loop is an argument between a critic and a builder about a
+   photograph. The Ingold loop is a program arguing with a tape measure. ---- */
+function renderHistory(){
+  const tracks={correspondence:'critic \u2194 builder \u00b7 7 cycles',ingold:'read \u2194 repair \u00b7 17 cycles'};
+  $('#histtabs').innerHTML=Object.entries(tracks).map(([k,v])=>
+    `<button aria-pressed="${histTrack===k}" data-h="${k}">${k}<span class="n">${v.split('\u00b7')[1]}</span></button>`).join('');
+  $('#histtabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    histTrack=b.dataset.h; histStep=null; render()});
+
+  let steps=[];
+  if(histTrack==='correspondence'){
+    $('#histnote').textContent='The cabin session, 03:04Z. A critic names one worst thing in one view; '+
+      'the builder patches only that. A low score does not mean good \u2014 it means this target survived '+
+      'this look, so move the camera.';
+    const L=D.correspondence.cyclesLog;
+    L.forEach((c,i)=>{
+      if(c.build) steps.push({cls:'agentB',n:'cycle '+c.cycle+' \u00b7 builder',
+        who:(c.build.changed!=null?c.build.changed+' parts changed':'whole world rebuilt'),
+        say:c.build.summary,
+        detail:`<h3>Builder \u00b7 cycle ${c.cycle}</h3>
+          <div class="lab">it was told</div><div style="font-size:12.5px;color:var(--ink-2)">\u201c${esc(L[i-1]?L[i-1].killer:'no critic message yet')}\u201d</div>
+          <div class="lab" style="margin-top:9px">it did</div><div style="font-size:12.5px">${esc(c.build.summary)}</div>
+          <dl class="kv" style="margin-top:9px"><dt>changed</dt><dd>${c.build.changed==null?'whole world':c.build.changed+' parts'}</dd></dl>`});
+      steps.push({cls:'agentA',n:'cycle '+c.cycle+' \u00b7 critic \u00b7 '+esc(c.view||''),
+        who:c.state==='LOCKED'?'TARGET LOCKED \u00b7 suck '+c.suck:'target survived \u00b7 suck '+c.suck,
+        say:c.focus,
+        detail:`<h3>Critic \u00b7 cycle ${c.cycle}</h3>
+          <dl class="kv"><dt>view</dt><dd>${esc(c.view||'\u2014')}</dd><dt>suck</dt><dd>${c.suck}</dd>
+          <dt>verdict</dt><dd>${esc(c.state)}</dd><dt>target</dt><dd>${esc(c.focus)}</dd></dl>
+          <div class="lab" style="margin-top:9px">accusation, verbatim</div>
+          <div style="font-size:12.5px;color:var(--ink-2)">\u201c${esc(c.killer||'')}\u201d</div>
+          <div style="margin-top:9px;font-size:11.5px;color:var(--ink-3)">
+            ${c.state==='LOCKED'?'High score means a target was found. The builder runs next.'
+              :'Low score means this target survived this look. The camera moves; the builder does not run.'}</div>`});
+    });
+  } else {
+    $('#histnote').textContent='The Ingold loop reads the geometry, names the worst failure with its '+
+      'system and its coordinates, makes one deterministic repair, and reads again. It refuses when the '+
+      'problem is upstream of any repair.';
+    D.ingoldTrace.forEach(t=>{
+      const ref=!!t.refused;
+      steps.push({cls:ref?'agentA':'agentB',n:'cycle '+t.cycle+' \u00b7 '+t.failure,
+        who:ref?'REFUSED':(t.repair?t.repair.op:'no repair available'),
+        say:ref?t.refused:(t.repair?t.repair.text:t.note||''),
+        delta:t.after?t.after.length:null,
+        detail:`<h3>${ref?'Refused':'Repair'} \u00b7 cycle ${t.cycle}</h3>
+          <div class="lab">failure</div><div class="mono">${esc(t.failure)}</div>
+          ${t.repair?`<div class="lab" style="margin-top:9px">operation</div>
+            <div class="mono">${esc(t.repair.op)}</div>
+            <div style="font-size:12.5px;color:var(--ink-2);margin-top:4px">${esc(t.repair.text)}</div>`:''}
+          ${ref?`<div style="font-size:12.5px;color:var(--ink-2);margin-top:6px">${esc(t.refused)}</div>`:''}
+          ${t.after?`<div class="lab" style="margin-top:9px">left standing</div>
+            <div class="mono" style="font-size:11.5px;line-height:1.7">${t.after.map(esc).join('<br>')||'nothing'}</div>`:''}`});
+    });
+  }
+  $('#track').innerHTML=steps.map((s,i)=>
+    `<button class="step ${s.cls}" data-i="${i}" aria-pressed="${histStep===s.detail}">
+      <span class="n">${s.n}</span><span class="who">${esc(s.who)}</span>
+      <span class="say">${esc(String(s.say||'').slice(0,150))}</span>
+      ${s.delta!=null?`<span class="delta ${s.delta>0?'up':'flat'}">${s.delta} failures left</span>`:''}
+    </button>`).join('');
+  $('#track').querySelectorAll('.step').forEach(b=>b.onclick=()=>{
+    const d=steps[+b.dataset.i].detail;
+    histStep=histStep===d?null:d; sel=null; selFail=null; render()});
+}
+
+function boot(){
+  const st=D.states.ingold, c=D.cost.total;
+  $('#titleblock').innerHTML=`
+    <div><span class="lab">Subject</span><b>Tiny house on a 6.1 m trailer</b></div>
+    <div><span class="lab">Chassis</span><b>9 locked parts, given</b></div>
+    <div><span class="lab">Correspondence loop</span><b>${D.cost.perLog.find(l=>l.log==='cabin').apiCalls} calls \u00b7 ${D.cost.perLog.find(l=>l.log==='cabin').inputKB} KB</b></div>
+    <div><span class="lab">Ingold loop</span><b>0 calls \u00b7 17 cycles</b></div>
+    <div><span class="lab">Verdict</span><b style="color:var(--unbuildable)">${st.failures.length} failures</b></div>`;
+  render();
+}
+boot();
+</script>

@@ -32,6 +32,34 @@ const STD = {
   collisionTol: 1e-4
 };
 
+/* ---- SYSTEMS -------------------------------------------------------------
+   "This build sucks" is not a usable accusation. "The envelope leaks along the
+   eave from x -3.0 to 3.0" is. Every part belongs to a system, every failure
+   names one, and every failure carries the place it happens. A loop that says
+   where can be pointed; a loop that says what cannot.
+   -------------------------------------------------------------------------- */
+const SYSTEMS=[
+  ['chassis',      /wheel|axle|tongue|hitch|rail-[LR]|\bdeck\b|frame-rail/i],
+  ['circulation',  /stair|step|tread|ramp|landing|porch|path/i],
+  ['opening',      /door|window|glaz|sill(?!-)|head|trim|jamb|lintel|header/i],
+  ['roof',         /roof|ridge|eave|gable|rafter|purlin/i],
+  ['envelope',     /clad|sheath|panel|skin|course|siding|block/i],
+  ['structure',    /post|plate|sill|beam|column|stud|brace|member|joist/i],
+];
+function systemOf(part){
+  const t=(part.id||'')+' '+(part.role||'');
+  for(const [name,rx] of SYSTEMS) if(rx.test(t)) return name;
+  return 'structure';
+}
+function whereIs(parts,ids){
+  const bs=(ids||[]).map(id=>parts.find(p=>p.id===id)).filter(Boolean).map(aabb);
+  if(!bs.length) return null;
+  const mn=[0,1,2].map(i=>Math.min(...bs.map(b=>b.min[i])));
+  const mx=[0,1,2].map(i=>Math.max(...bs.map(b=>b.max[i])));
+  return {min:mn.map(v=>+v.toFixed(3)),max:mx.map(v=>+v.toFixed(3)),
+    centre:[0,1,2].map(i=>+((mn[i]+mx[i])/2).toFixed(3))};
+}
+
 /* ---- point-in-part, per primitive; a wheel is not its bounding box -------- */
 function inv(rot){ return [-rot[0]||0,-rot[1]||0,-rot[2]||0] }
 function rotY_XYZ(p,r){                     // apply Rz Ry Rx inverse (XYZ order)
@@ -360,14 +388,47 @@ function assess(parts,opts){
   if(out.window.passesLight===false) f.push({id:'TOO_DARK',severity:'uncomfortable',
     text:'glazing is '+(out.window.ratio*100).toFixed(1)+'% of floor area, against '+
       (STD.glazingRatio*100)+'% required'});
+  /* localise: which system, which parts, and where in the world */
+  const LOC={
+    INTERPENETRATION:()=>out.collisions.worst.filter(w=>w.fractionOfSmaller>0.25)
+      .flatMap(w=>[w.a,w.b]),
+    NO_LOAD_PATH:()=>out.loadPath.ungrounded,
+    WHEELS_OFF_GROUND:()=>parts.filter(p=>/wheel/i.test(p.id)).map(p=>p.id),
+    OVER_WIDTH:()=>(out.road.overWidthParts||[]).concat(out.road.widest?[out.road.widest]:[]),
+    OVER_HEIGHT:()=>out.road.tallest?[out.road.tallest]:[],
+    UNCLIMBABLE:()=>(out.step.ids||[]).concat(parts.filter(p=>/\bdeck\b/i.test(p.id)).map(p=>p.id)),
+    DOOR_TOO_SMALL:()=>out.door.id?[out.door.id]:[],
+    NOT_ENCLOSED:()=>[],
+    LOW_HEADROOM:()=>parts.filter(p=>/plate|roof/i.test(p.id)).map(p=>p.id),
+    TOO_DARK:()=>glaz.map(p=>p.id)
+  };
+  for(const x of f){
+    const ids=[...new Set((LOC[x.id]?LOC[x.id]():[]).filter(Boolean))];
+    x.parts=ids.slice(0,12);
+    const sys=[...new Set(ids.map(id=>{const q=parts.find(y=>y.id===id);return q?systemOf(q):null})
+      .filter(Boolean))];
+    x.system=sys.length?sys.join(' / '):(x.id==='NOT_ENCLOSED'?'envelope':'—');
+    x.where=ids.length?whereIs(parts,ids)
+      :(x.id==='NOT_ENCLOSED'&&out.envelope.leakBox?
+        {...out.envelope.leakBox,
+         centre:[0,1,2].map(i=>+((out.envelope.leakBox.min[i]+out.envelope.leakBox.max[i])/2).toFixed(3))}
+        :null);
+  }
   const RANK={unbuildable:0,illegal:1,unusable:2,uncomfortable:3};
   f.sort((a,b)=>RANK[a.severity]-RANK[b.severity]);
   out.failures=f;
+  out.bySystem=(()=>{
+    const m={};
+    for(const p of parts){ const k=systemOf(p); (m[k]=m[k]||{parts:0,ids:[],failures:[]}).parts++;
+      if(m[k].ids.length<40) m[k].ids.push(p.id) }
+    for(const x of f) for(const k of String(x.system).split(' / ')) if(m[k]) m[k].failures.push(x.id);
+    return m;
+  })();
   out.habitable=f.length===0;
   return out;
 }
 
-global.INHABIT={assess,collisions,voxelize,aabb,inside,volumeOf,STD};
+global.INHABIT={assess,collisions,voxelize,aabb,inside,volumeOf,systemOf,whereIs,STD,SYSTEMS};
 if(typeof module!=='undefined'&&module.exports) module.exports=global.INHABIT;
 })(typeof window!=='undefined'?window:globalThis);
 
@@ -406,5 +467,13 @@ if(typeof process!=='undefined'&&process.argv&&process.argv[1]&&/inhabit\.js$/.t
     'm  width '+(r.road.passesWidth?'ok':'OVER by '+r.road.widthOver+'m ('+r.road.widest+')')+
     ' · height '+(r.road.passesHeight?'ok':'OVER by '+r.road.heightOver+'m'));
   console.log('\n  VERDICT: '+(r.habitable?'habitable':r.failures.length+' failures'));
-  for(const x of r.failures) console.log('    ['+x.severity.toUpperCase()+'] '+x.id+' — '+x.text);
+  for(const x of r.failures){
+    console.log('    ['+x.severity.toUpperCase()+'] '+x.system+' · '+x.id+' — '+x.text);
+    if(x.where) console.log('        at  x '+x.where.min[0]+'..'+x.where.max[0]+
+      '   y '+x.where.min[1]+'..'+x.where.max[1]+'   z '+x.where.min[2]+'..'+x.where.max[2]+
+      (x.parts.length?'   ('+x.parts.slice(0,5).join(', ')+(x.parts.length>5?' …':'')+')':''));
+  }
+  console.log('\n  by system:');
+  for(const [k,v] of Object.entries(r.bySystem))
+    console.log('    '+k.padEnd(13)+v.parts+' parts'+(v.failures.length?'   '+[...new Set(v.failures)].join(' '):''));
 }
