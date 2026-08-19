@@ -1,0 +1,37 @@
+{
+ "perLog": [
+  {
+   "log": "pagoda",
+   "cycles": 7,
+   "apiCalls": 10,
+   "inputKB": 2711,
+   "apiSeconds": 363
+  },
+  {
+   "log": "lander",
+   "cycles": 16,
+   "apiCalls": 28,
+   "inputKB": 14647,
+   "apiSeconds": 442
+  },
+  {
+   "log": "castle",
+   "cycles": 6,
+   "apiCalls": 10,
+   "inputKB": 13211,
+   "apiSeconds": 190
+  },
+  {
+   "log": "cabin",
+   "cycles": 7,
+   "apiCalls": 12,
+   "inputKB": 28972,
+   "apiSeconds": 164
+  }
+ ],
+ "total": {
+  "apiCalls": 60,
+  "inputKB": 59541,
+  "apiSeconds": 1158
+ }
+}

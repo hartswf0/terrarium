@@ -911,3 +911,59 @@ read rather than compared is the actual experiment, and it has not been run.
 caught it existed, in a sibling program, in the same archive, on the same day.
 Nothing connected them. That is the interesting failure in this collection, and
 it is not a technical one.
+
+---
+
+## 13. The proof, and what it cost to get it
+
+`do the antbats actually make each of these better` — tested, in
+`agora/EXPERIMENT.md`, judged by `lintWorld()` ported verbatim out of the brutal
+loop, against a control that makes the identical edits in random places.
+
+**Run 1 was negative.** The antbats were indistinguishable from random and the
+lint count went up in both arms. The per-rule table diagnosed it: every additive
+operation put unsupported geometry into the air — `ENCLOSE_CAVITY` alone adds
+five posts, hanging — so **the genie was manufacturing the exact defect class the
+ants exist to find**, and `FLOATING`, the commonest finding any outside linter
+makes about these buildings (88 on the pagoda), had no operation at all.
+
+Three changes: `GROUND_FLOATING`, which lowers the worst offender until something
+is beneath it and is a move rather than an addition; posts that run from grade to
+the cavity so they hold something up; a clamp against relocating below grade.
+
+**Run 2: the antbats beat the matched random control 7 of 8 on the strict lint
+and 6 of 7 on the geometric lint.** Same operations, same counts, different
+targets. The one metric that cannot be written into — `declared`, the original
+`supportId`-only rule — has them ahead on all four buildings.
+
+Against *standing still* it is mixed and that is the honest headline: the cabin
+clearly better (6 → 3 findings, `NO_DOOR` gone), the pagoda better at the same
+part count under move-only (88 → 83 strict, 18 → 13 geometric), the lander better
+on one lint and worse on the other, the seed worse in raw count and better per
+part and on visibility.
+
+So the claim that survives is narrow and real: **where an edit goes is worth
+something, and the amount is measurable by a program that is not this one.**
+
+Two things this does not show. It does not show the buildings are good. And it
+does not show that an LLM builder does better when handed
+`wall-n-a floats 2.10m with nothing under it` instead of
+`the entire long elevation is still a gigantic translucent void` — that needs an
+API key and a re-run of the correspondence loop, and it is the next experiment.
+
+What is measured on cost: the four logs spent **60 API calls, 59,541 KB of input
+and 1,158 seconds of model time**, and the cabin still had no door. The antbat
+reading is zero API calls and names it on all 44 parts in the first pass.
+
+### 13.1 What run 1 was actually worth
+
+The negative result is the most useful thing in this document. Nothing in the
+theory predicted that the repair operations would manufacture their own defect
+class; the corpus predicted only that additions do worse than moves, which is a
+weaker claim and was easy to read as taste. An external judge turned it into a
+count, the count pointed at `ENCLOSE_CAVITY`'s posts, and the fix was obvious
+once the table existed. Section 12 asked whether the seed prior survives contact
+with real evidence. On this evidence the ordering held — the move-family
+operation is the one that worked — and the reason it held turned out to be
+mechanical rather than aesthetic: an addition is a new part, and a new part
+starts unsupported unless something is done about it.

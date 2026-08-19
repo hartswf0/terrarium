@@ -1,0 +1,2699 @@
+{
+ "generatedAt": "2026-08-19T09:08:41.887Z",
+ "generations": 3,
+ "antSteps": 150,
+ "randomRepeats": 3,
+ "buildings": {
+  "seed": {
+   "before": {
+    "parts": 11,
+    "strict": {
+     "findings": 5,
+     "bySeverity": {
+      "critical": 0,
+      "high": 5,
+      "medium": 0,
+      "low": 0
+     },
+     "byRule": {
+      "NO_DOOR": 1,
+      "FLOATING": 4
+     },
+     "floor": 75,
+     "perPart": 0.4545
+    },
+    "declared": {
+     "findings": 5,
+     "byRule": {
+      "NO_DOOR": 1,
+      "FLOATING": 4
+     },
+     "floor": 75,
+     "perPart": 0.4545
+    },
+    "geometric": {
+     "findings": 1,
+     "bySeverity": {
+      "critical": 0,
+      "high": 1,
+      "medium": 0,
+      "low": 0
+     },
+     "byRule": {
+      "NO_DOOR": 1
+     },
+     "floor": 75,
+     "perPart": 0.0909
+    },
+    "visibility": {
+     "seen": 10,
+     "total": 11,
+     "fraction": 0.9091,
+     "perView": {
+      "FRONT": 8,
+      "BACK": 7,
+      "LEFT": 8,
+      "RIGHT": 9,
+      "TOP": 4,
+      "ENTRY": 8
+     },
+     "pixelShare": {
+      "FRONT": 0.2702,
+      "BACK": 0.2764,
+      "LEFT": 0.2567,
+      "RIGHT": 0.2405,
+      "TOP": 0.338,
+      "ENTRY": 0.3151
+     },
+     "unseen": [
+      "part-a"
+     ]
+    }
+   },
+   "arms": {
+    "full": {
+     "antbat": {
+      "parts": 27,
+      "strict": {
+       "findings": 9,
+       "bySeverity": {
+        "critical": 0,
+        "high": 9,
+        "medium": 0,
+        "low": 0
+       },
+       "byRule": {
+        "FLOATING": 9
+       },
+       "floor": 75,
+       "perPart": 0.3333
+      },
+      "declared": {
+       "findings": 9,
+       "byRule": {
+        "FLOATING": 9
+       },
+       "floor": 75,
+       "perPart": 0.3333
+      },
+      "geometric": {
+       "findings": 2,
+       "bySeverity": {
+        "critical": 0,
+        "high": 2,
+        "medium": 0,
+        "low": 0
+       },
+       "byRule": {
+        "FLOATING": 2
+       },
+       "floor": 75,
+       "perPart": 0.0741
+      },
+      "visibility": {
+       "seen": 27,
+       "total": 27,
+       "fraction": 1,
+       "perView": {
+        "FRONT": 24,
+        "BACK": 26,
+        "LEFT": 22,
+        "RIGHT": 24,
+        "TOP": 18,
+        "ENTRY": 21
+       },
+       "pixelShare": {
+        "FRONT": 0.143,
+        "BACK": 0.1169,
+        "LEFT": 0.1046,
+        "RIGHT": 0.1334,
+        "TOP": 0.1831,
+        "ENTRY": 0.1689
+       },
+       "unseen": []
+      }
+     },
+     "ops": [
+      {
+       "applied": true,
+       "ops": [
+        "ADD_DOOR",
+        "APERTURE",
+        "BUILD_THE_AMBIGUITY",
+        "ENCLOSE_CAVITY",
+        "THICKEN"
+       ],
+       "refused": 0
+      },
+      {
+       "applied": true,
+       "ops": [
+        "ADD_ARRIVAL",
+        "GROUND_FLOATING",
+        "BUILD_THE_AMBIGUITY",
+        "ENCLOSE_CAVITY",
+        "THICKEN"
+       ],
+       "refused": 0
+      },
+      {
+       "applied": true,
+       "ops": [
+        "APERTURE",
+        "GROUND_FLOATING",
+        "THICKEN"
+       ],
+       "refused": 0
+      }
+     ],
+     "random": {
+      "runs": [
+       {
+        "parts": 26,
+        "strict": {
+         "findings": 16,
+         "bySeverity": {
+          "critical": 0,
+          "high": 16,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 16
+         },
+         "floor": 75,
+         "perPart": 0.6154
+        },
+        "declared": {
+         "findings": 16,
+         "byRule": {
+          "FLOATING": 16
+         },
+         "floor": 75,
+         "perPart": 0.6154
+        },
+        "geometric": {
+         "findings": 8,
+         "bySeverity": {
+          "critical": 0,
+          "high": 8,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 8
+         },
+         "floor": 75,
+         "perPart": 0.3077
+        },
+        "visibility": {
+         "seen": 24,
+         "total": 26,
+         "fraction": 0.9231,
+         "perView": {
+          "FRONT": 22,
+          "BACK": 16,
+          "LEFT": 20,
+          "RIGHT": 22,
+          "TOP": 9,
+          "ENTRY": 20
+         },
+         "pixelShare": {
+          "FRONT": 0.2849,
+          "BACK": 0.2512,
+          "LEFT": 0.2885,
+          "RIGHT": 0.2386,
+          "TOP": 0.2909,
+          "ENTRY": 0.3221
+         },
+         "unseen": [
+          "door-rnd-0wdi",
+          "contested-rnd-z0q6"
+         ]
+        }
+       },
+       {
+        "parts": 27,
+        "strict": {
+         "findings": 16,
+         "bySeverity": {
+          "critical": 0,
+          "high": 16,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 16
+         },
+         "floor": 75,
+         "perPart": 0.5926
+        },
+        "declared": {
+         "findings": 16,
+         "byRule": {
+          "FLOATING": 16
+         },
+         "floor": 75,
+         "perPart": 0.5926
+        },
+        "geometric": {
+         "findings": 6,
+         "bySeverity": {
+          "critical": 0,
+          "high": 6,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 6
+         },
+         "floor": 75,
+         "perPart": 0.2222
+        },
+        "visibility": {
+         "seen": 27,
+         "total": 27,
+         "fraction": 1,
+         "perView": {
+          "FRONT": 24,
+          "BACK": 22,
+          "LEFT": 26,
+          "RIGHT": 24,
+          "TOP": 12,
+          "ENTRY": 23
+         },
+         "pixelShare": {
+          "FRONT": 0.2646,
+          "BACK": 0.1973,
+          "LEFT": 0.237,
+          "RIGHT": 0.2129,
+          "TOP": 0.2562,
+          "ENTRY": 0.3149
+         },
+         "unseen": []
+        }
+       },
+       {
+        "parts": 27,
+        "strict": {
+         "findings": 16,
+         "bySeverity": {
+          "critical": 0,
+          "high": 16,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 16
+         },
+         "floor": 75,
+         "perPart": 0.5926
+        },
+        "declared": {
+         "findings": 16,
+         "byRule": {
+          "FLOATING": 16
+         },
+         "floor": 75,
+         "perPart": 0.5926
+        },
+        "geometric": {
+         "findings": 8,
+         "bySeverity": {
+          "critical": 0,
+          "high": 8,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 8
+         },
+         "floor": 75,
+         "perPart": 0.2963
+        },
+        "visibility": {
+         "seen": 27,
+         "total": 27,
+         "fraction": 1,
+         "perView": {
+          "FRONT": 22,
+          "BACK": 25,
+          "LEFT": 22,
+          "RIGHT": 23,
+          "TOP": 13,
+          "ENTRY": 17
+         },
+         "pixelShare": {
+          "FRONT": 0.2737,
+          "BACK": 0.2428,
+          "LEFT": 0.2328,
+          "RIGHT": 0.2347,
+          "TOP": 0.2713,
+          "ENTRY": 0.3112
+         },
+         "unseen": []
+        }
+       }
+      ],
+      "mean": {
+       "parts": 26.667,
+       "strictFindings": 16,
+       "strictPerPart": 0.6,
+       "declaredFindings": 16,
+       "geoFindings": 7.333,
+       "visibility": 0.974
+      }
+     }
+    },
+    "move": {
+     "antbat": {
+      "parts": 13,
+      "strict": {
+       "findings": 7,
+       "bySeverity": {
+        "critical": 0,
+        "high": 7,
+        "medium": 0,
+        "low": 0
+       },
+       "byRule": {
+        "NO_DOOR": 1,
+        "FLOATING": 6
+       },
+       "floor": 75,
+       "perPart": 0.5385
+      },
+      "declared": {
+       "findings": 7,
+       "byRule": {
+        "NO_DOOR": 1,
+        "FLOATING": 6
+       },
+       "floor": 75,
+       "perPart": 0.5385
+      },
+      "geometric": {
+       "findings": 1,
+       "bySeverity": {
+        "critical": 0,
+        "high": 1,
+        "medium": 0,
+        "low": 0
+       },
+       "byRule": {
+        "NO_DOOR": 1
+       },
+       "floor": 75,
+       "perPart": 0.0769
+      },
+      "visibility": {
+       "seen": 12,
+       "total": 13,
+       "fraction": 0.9231,
+       "perView": {
+        "FRONT": 10,
+        "BACK": 8,
+        "LEFT": 10,
+        "RIGHT": 10,
+        "TOP": 6,
+        "ENTRY": 10
+       },
+       "pixelShare": {
+        "FRONT": 0.2706,
+        "BACK": 0.2785,
+        "LEFT": 0.2623,
+        "RIGHT": 0.247,
+        "TOP": 0.3355,
+        "ENTRY": 0.3165
+       },
+       "unseen": [
+        "part-a"
+       ]
+      }
+     },
+     "ops": [
+      {
+       "applied": true,
+       "ops": [
+        "APERTURE",
+        "THICKEN"
+       ],
+       "refused": 0
+      },
+      {
+       "applied": true,
+       "ops": [
+        "THICKEN"
+       ],
+       "refused": 0
+      },
+      {
+       "applied": true,
+       "ops": [
+        "APERTURE",
+        "THICKEN"
+       ],
+       "refused": 0
+      }
+     ],
+     "random": {
+      "runs": [
+       {
+        "parts": 13,
+        "strict": {
+         "findings": 5,
+         "bySeverity": {
+          "critical": 0,
+          "high": 5,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "NO_DOOR": 1,
+          "FLOATING": 4
+         },
+         "floor": 75,
+         "perPart": 0.3846
+        },
+        "declared": {
+         "findings": 5,
+         "byRule": {
+          "NO_DOOR": 1,
+          "FLOATING": 4
+         },
+         "floor": 75,
+         "perPart": 0.3846
+        },
+        "geometric": {
+         "findings": 2,
+         "bySeverity": {
+          "critical": 0,
+          "high": 2,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "NO_DOOR": 1,
+          "FLOATING": 1
+         },
+         "floor": 75,
+         "perPart": 0.1538
+        },
+        "visibility": {
+         "seen": 10,
+         "total": 13,
+         "fraction": 0.7692,
+         "perView": {
+          "FRONT": 8,
+          "BACK": 7,
+          "LEFT": 8,
+          "RIGHT": 9,
+          "TOP": 4,
+          "ENTRY": 8
+         },
+         "pixelShare": {
+          "FRONT": 0.2811,
+          "BACK": 0.2835,
+          "LEFT": 0.2672,
+          "RIGHT": 0.2496,
+          "TOP": 0.3411,
+          "ENTRY": 0.322
+         },
+         "unseen": [
+          "part-a-rb",
+          "part-a-ra-rb",
+          "part-a-ra-ra"
+         ]
+        }
+       },
+       {
+        "parts": 12,
+        "strict": {
+         "findings": 5,
+         "bySeverity": {
+          "critical": 0,
+          "high": 5,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "NO_DOOR": 1,
+          "FLOATING": 4
+         },
+         "floor": 75,
+         "perPart": 0.4167
+        },
+        "declared": {
+         "findings": 5,
+         "byRule": {
+          "NO_DOOR": 1,
+          "FLOATING": 4
+         },
+         "floor": 75,
+         "perPart": 0.4167
+        },
+        "geometric": {
+         "findings": 2,
+         "bySeverity": {
+          "critical": 0,
+          "high": 2,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "NO_DOOR": 1,
+          "FLOATING": 1
+         },
+         "floor": 75,
+         "perPart": 0.1667
+        },
+        "visibility": {
+         "seen": 12,
+         "total": 12,
+         "fraction": 1,
+         "perView": {
+          "FRONT": 9,
+          "BACK": 7,
+          "LEFT": 8,
+          "RIGHT": 9,
+          "TOP": 4,
+          "ENTRY": 10
+         },
+         "pixelShare": {
+          "FRONT": 0.2792,
+          "BACK": 0.2857,
+          "LEFT": 0.2677,
+          "RIGHT": 0.2528,
+          "TOP": 0.3411,
+          "ENTRY": 0.3228
+         },
+         "unseen": []
+        }
+       },
+       {
+        "parts": 13,
+        "strict": {
+         "findings": 6,
+         "bySeverity": {
+          "critical": 0,
+          "high": 6,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "NO_DOOR": 1,
+          "FLOATING": 5
+         },
+         "floor": 75,
+         "perPart": 0.4615
+        },
+        "declared": {
+         "findings": 6,
+         "byRule": {
+          "NO_DOOR": 1,
+          "FLOATING": 5
+         },
+         "floor": 75,
+         "perPart": 0.4615
+        },
+        "geometric": {
+         "findings": 2,
+         "bySeverity": {
+          "critical": 0,
+          "high": 2,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "NO_DOOR": 1,
+          "FLOATING": 1
+         },
+         "floor": 75,
+         "perPart": 0.1538
+        },
+        "visibility": {
+         "seen": 13,
+         "total": 13,
+         "fraction": 1,
+         "perView": {
+          "FRONT": 9,
+          "BACK": 9,
+          "LEFT": 11,
+          "RIGHT": 10,
+          "TOP": 5,
+          "ENTRY": 10
+         },
+         "pixelShare": {
+          "FRONT": 0.2785,
+          "BACK": 0.2827,
+          "LEFT": 0.2633,
+          "RIGHT": 0.2477,
+          "TOP": 0.3411,
+          "ENTRY": 0.3207
+         },
+         "unseen": []
+        }
+       }
+      ],
+      "mean": {
+       "parts": 12.667,
+       "strictFindings": 5.333,
+       "strictPerPart": 0.421,
+       "declaredFindings": 5.333,
+       "geoFindings": 2,
+       "visibility": 0.923
+      }
+     }
+    }
+   }
+  },
+  "pagoda": {
+   "before": {
+    "parts": 92,
+    "strict": {
+     "findings": 88,
+     "bySeverity": {
+      "critical": 0,
+      "high": 88,
+      "medium": 0,
+      "low": 0
+     },
+     "byRule": {
+      "FLOATING": 88
+     },
+     "floor": 75,
+     "perPart": 0.9565
+    },
+    "declared": {
+     "findings": 88,
+     "byRule": {
+      "FLOATING": 88
+     },
+     "floor": 75,
+     "perPart": 0.9565
+    },
+    "geometric": {
+     "findings": 18,
+     "bySeverity": {
+      "critical": 0,
+      "high": 18,
+      "medium": 0,
+      "low": 0
+     },
+     "byRule": {
+      "FLOATING": 18
+     },
+     "floor": 75,
+     "perPart": 0.1957
+    },
+    "visibility": {
+     "seen": 91,
+     "total": 92,
+     "fraction": 0.9891,
+     "perView": {
+      "FRONT": 86,
+      "BACK": 47,
+      "LEFT": 74,
+      "RIGHT": 73,
+      "TOP": 69,
+      "ENTRY": 89
+     },
+     "pixelShare": {
+      "FRONT": 0.1095,
+      "BACK": 0.1423,
+      "LEFT": 0.1108,
+      "RIGHT": 0.1117,
+      "TOP": 0.1097,
+      "ENTRY": 0.139
+     },
+     "unseen": [
+      "roof-lower-eave"
+     ]
+    }
+   },
+   "arms": {
+    "full": {
+     "antbat": {
+      "parts": 112,
+      "strict": {
+       "findings": 88,
+       "bySeverity": {
+        "critical": 0,
+        "high": 88,
+        "medium": 0,
+        "low": 0
+       },
+       "byRule": {
+        "FLOATING": 88
+       },
+       "floor": 75,
+       "perPart": 0.7857
+      },
+      "declared": {
+       "findings": 91,
+       "byRule": {
+        "FLOATING": 91
+       },
+       "floor": 75,
+       "perPart": 0.8125
+      },
+      "geometric": {
+       "findings": 18,
+       "bySeverity": {
+        "critical": 0,
+        "high": 18,
+        "medium": 0,
+        "low": 0
+       },
+       "byRule": {
+        "FLOATING": 18
+       },
+       "floor": 75,
+       "perPart": 0.1607
+      },
+      "visibility": {
+       "seen": 109,
+       "total": 112,
+       "fraction": 0.9732,
+       "perView": {
+        "FRONT": 101,
+        "BACK": 59,
+        "LEFT": 85,
+        "RIGHT": 72,
+        "TOP": 74,
+        "ENTRY": 88
+       },
+       "pixelShare": {
+        "FRONT": 0.1209,
+        "BACK": 0.0997,
+        "LEFT": 0.1073,
+        "RIGHT": 0.1041,
+        "TOP": 0.1983,
+        "ENTRY": 0.1405
+       },
+       "unseen": [
+        "top-corner-right",
+        "mid-post-right",
+        "upper-post-right"
+       ]
+      }
+     },
+     "ops": [
+      {
+       "applied": true,
+       "ops": [
+        "RELOCATE_ORPHAN",
+        "EXPOSE_BURIED",
+        "GROUND_FLOATING",
+        "BUILD_THE_AMBIGUITY",
+        "ENCLOSE_CAVITY",
+        "THICKEN"
+       ],
+       "refused": 0
+      },
+      {
+       "applied": true,
+       "ops": [
+        "RELOCATE_ORPHAN",
+        "EXPOSE_BURIED",
+        "APERTURE",
+        "GROUND_FLOATING",
+        "BUILD_THE_AMBIGUITY",
+        "ENCLOSE_CAVITY",
+        "THICKEN"
+       ],
+       "refused": 0
+      },
+      {
+       "applied": true,
+       "ops": [
+        "RELOCATE_ORPHAN",
+        "EXPOSE_BURIED",
+        "APERTURE",
+        "GROUND_FLOATING",
+        "BUILD_THE_AMBIGUITY",
+        "ENCLOSE_CAVITY",
+        "THICKEN"
+       ],
+       "refused": 0
+      }
+     ],
+     "random": {
+      "runs": [
+       {
+        "parts": 112,
+        "strict": {
+         "findings": 108,
+         "bySeverity": {
+          "critical": 0,
+          "high": 106,
+          "medium": 2,
+          "low": 0
+         },
+         "byRule": {
+          "BELOW_GRADE": 2,
+          "FLOATING": 106
+         },
+         "floor": 75,
+         "perPart": 0.9643
+        },
+        "declared": {
+         "findings": 108,
+         "byRule": {
+          "BELOW_GRADE": 2,
+          "FLOATING": 106
+         },
+         "floor": 75,
+         "perPart": 0.9643
+        },
+        "geometric": {
+         "findings": 27,
+         "bySeverity": {
+          "critical": 0,
+          "high": 25,
+          "medium": 2,
+          "low": 0
+         },
+         "byRule": {
+          "BELOW_GRADE": 2,
+          "FLOATING": 25
+         },
+         "floor": 75,
+         "perPart": 0.2411
+        },
+        "visibility": {
+         "seen": 107,
+         "total": 112,
+         "fraction": 0.9554,
+         "perView": {
+          "FRONT": 92,
+          "BACK": 61,
+          "LEFT": 79,
+          "RIGHT": 70,
+          "TOP": 25,
+          "ENTRY": 96
+         },
+         "pixelShare": {
+          "FRONT": 0.0727,
+          "BACK": 0.0781,
+          "LEFT": 0.0793,
+          "RIGHT": 0.0604,
+          "TOP": 0.0898,
+          "ENTRY": 0.0909
+         },
+         "unseen": [
+          "path-1",
+          "roof-lower-eave",
+          "roof-mid-eave",
+          "finial-lower",
+          "shrub-left-back"
+         ]
+        }
+       },
+       {
+        "parts": 112,
+        "strict": {
+         "findings": 108,
+         "bySeverity": {
+          "critical": 0,
+          "high": 107,
+          "medium": 1,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 107,
+          "BELOW_GRADE": 1
+         },
+         "floor": 75,
+         "perPart": 0.9643
+        },
+        "declared": {
+         "findings": 108,
+         "byRule": {
+          "FLOATING": 107,
+          "BELOW_GRADE": 1
+         },
+         "floor": 75,
+         "perPart": 0.9643
+        },
+        "geometric": {
+         "findings": 30,
+         "bySeverity": {
+          "critical": 0,
+          "high": 29,
+          "medium": 1,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 29,
+          "BELOW_GRADE": 1
+         },
+         "floor": 75,
+         "perPart": 0.2679
+        },
+        "visibility": {
+         "seen": 109,
+         "total": 112,
+         "fraction": 0.9732,
+         "perView": {
+          "FRONT": 100,
+          "BACK": 66,
+          "LEFT": 85,
+          "RIGHT": 90,
+          "TOP": 56,
+          "ENTRY": 102
+         },
+         "pixelShare": {
+          "FRONT": 0.1346,
+          "BACK": 0.1584,
+          "LEFT": 0.1656,
+          "RIGHT": 0.1467,
+          "TOP": 0.2189,
+          "ENTRY": 0.1746
+         },
+         "unseen": [
+          "roof-lower-eave",
+          "main-door",
+          "contested-rnd-4n5j"
+         ]
+        }
+       },
+       {
+        "parts": 111,
+        "strict": {
+         "findings": 106,
+         "bySeverity": {
+          "critical": 0,
+          "high": 105,
+          "medium": 1,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 105,
+          "BELOW_GRADE": 1
+         },
+         "floor": 75,
+         "perPart": 0.955
+        },
+        "declared": {
+         "findings": 106,
+         "byRule": {
+          "FLOATING": 105,
+          "BELOW_GRADE": 1
+         },
+         "floor": 75,
+         "perPart": 0.955
+        },
+        "geometric": {
+         "findings": 29,
+         "bySeverity": {
+          "critical": 0,
+          "high": 28,
+          "medium": 1,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 28,
+          "BELOW_GRADE": 1
+         },
+         "floor": 75,
+         "perPart": 0.2613
+        },
+        "visibility": {
+         "seen": 110,
+         "total": 111,
+         "fraction": 0.991,
+         "perView": {
+          "FRONT": 105,
+          "BACK": 77,
+          "LEFT": 97,
+          "RIGHT": 92,
+          "TOP": 61,
+          "ENTRY": 101
+         },
+         "pixelShare": {
+          "FRONT": 0.0773,
+          "BACK": 0.0957,
+          "LEFT": 0.0741,
+          "RIGHT": 0.0804,
+          "TOP": 0.0748,
+          "ENTRY": 0.0871
+         },
+         "unseen": [
+          "path-4"
+         ]
+        }
+       }
+      ],
+      "mean": {
+       "parts": 111.667,
+       "strictFindings": 107.333,
+       "strictPerPart": 0.961,
+       "declaredFindings": 107.333,
+       "geoFindings": 28.667,
+       "visibility": 0.973
+      }
+     }
+    },
+    "move": {
+     "antbat": {
+      "parts": 92,
+      "strict": {
+       "findings": 83,
+       "bySeverity": {
+        "critical": 0,
+        "high": 83,
+        "medium": 0,
+        "low": 0
+       },
+       "byRule": {
+        "FLOATING": 83
+       },
+       "floor": 75,
+       "perPart": 0.9022
+      },
+      "declared": {
+       "findings": 85,
+       "byRule": {
+        "FLOATING": 85
+       },
+       "floor": 75,
+       "perPart": 0.9239
+      },
+      "geometric": {
+       "findings": 13,
+       "bySeverity": {
+        "critical": 0,
+        "high": 13,
+        "medium": 0,
+        "low": 0
+       },
+       "byRule": {
+        "FLOATING": 13
+       },
+       "floor": 75,
+       "perPart": 0.1413
+      },
+      "visibility": {
+       "seen": 91,
+       "total": 92,
+       "fraction": 0.9891,
+       "perView": {
+        "FRONT": 87,
+        "BACK": 47,
+        "LEFT": 72,
+        "RIGHT": 72,
+        "TOP": 68,
+        "ENTRY": 89
+       },
+       "pixelShare": {
+        "FRONT": 0.1108,
+        "BACK": 0.1424,
+        "LEFT": 0.1116,
+        "RIGHT": 0.108,
+        "TOP": 0.1117,
+        "ENTRY": 0.1394
+       },
+       "unseen": [
+        "roof-lower-eave"
+       ]
+      }
+     },
+     "ops": [
+      {
+       "applied": true,
+       "ops": [
+        "RELOCATE_ORPHAN",
+        "GROUND_FLOATING",
+        "THICKEN"
+       ],
+       "refused": 0
+      },
+      {
+       "applied": true,
+       "ops": [
+        "RELOCATE_ORPHAN",
+        "GROUND_FLOATING",
+        "THICKEN"
+       ],
+       "refused": 0
+      },
+      {
+       "applied": true,
+       "ops": [
+        "RELOCATE_ORPHAN",
+        "GROUND_FLOATING",
+        "THICKEN"
+       ],
+       "refused": 0
+      }
+     ],
+     "random": {
+      "runs": [
+       {
+        "parts": 92,
+        "strict": {
+         "findings": 88,
+         "bySeverity": {
+          "critical": 0,
+          "high": 88,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 88
+         },
+         "floor": 75,
+         "perPart": 0.9565
+        },
+        "declared": {
+         "findings": 88,
+         "byRule": {
+          "FLOATING": 88
+         },
+         "floor": 75,
+         "perPart": 0.9565
+        },
+        "geometric": {
+         "findings": 17,
+         "bySeverity": {
+          "critical": 0,
+          "high": 17,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 17
+         },
+         "floor": 75,
+         "perPart": 0.1848
+        },
+        "visibility": {
+         "seen": 91,
+         "total": 92,
+         "fraction": 0.9891,
+         "perView": {
+          "FRONT": 86,
+          "BACK": 48,
+          "LEFT": 74,
+          "RIGHT": 74,
+          "TOP": 72,
+          "ENTRY": 89
+         },
+         "pixelShare": {
+          "FRONT": 0.1124,
+          "BACK": 0.1468,
+          "LEFT": 0.1142,
+          "RIGHT": 0.1149,
+          "TOP": 0.11,
+          "ENTRY": 0.1426
+         },
+         "unseen": [
+          "roof-lower-eave"
+         ]
+        }
+       },
+       {
+        "parts": 92,
+        "strict": {
+         "findings": 88,
+         "bySeverity": {
+          "critical": 0,
+          "high": 88,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 88
+         },
+         "floor": 75,
+         "perPart": 0.9565
+        },
+        "declared": {
+         "findings": 88,
+         "byRule": {
+          "FLOATING": 88
+         },
+         "floor": 75,
+         "perPart": 0.9565
+        },
+        "geometric": {
+         "findings": 17,
+         "bySeverity": {
+          "critical": 0,
+          "high": 17,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 17
+         },
+         "floor": 75,
+         "perPart": 0.1848
+        },
+        "visibility": {
+         "seen": 92,
+         "total": 92,
+         "fraction": 1,
+         "perView": {
+          "FRONT": 87,
+          "BACK": 55,
+          "LEFT": 75,
+          "RIGHT": 75,
+          "TOP": 71,
+          "ENTRY": 89
+         },
+         "pixelShare": {
+          "FRONT": 0.1082,
+          "BACK": 0.1397,
+          "LEFT": 0.1109,
+          "RIGHT": 0.111,
+          "TOP": 0.1066,
+          "ENTRY": 0.1351
+         },
+         "unseen": []
+        }
+       },
+       {
+        "parts": 92,
+        "strict": {
+         "findings": 88,
+         "bySeverity": {
+          "critical": 0,
+          "high": 88,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 88
+         },
+         "floor": 75,
+         "perPart": 0.9565
+        },
+        "declared": {
+         "findings": 88,
+         "byRule": {
+          "FLOATING": 88
+         },
+         "floor": 75,
+         "perPart": 0.9565
+        },
+        "geometric": {
+         "findings": 18,
+         "bySeverity": {
+          "critical": 0,
+          "high": 18,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 18
+         },
+         "floor": 75,
+         "perPart": 0.1957
+        },
+        "visibility": {
+         "seen": 91,
+         "total": 92,
+         "fraction": 0.9891,
+         "perView": {
+          "FRONT": 86,
+          "BACK": 47,
+          "LEFT": 73,
+          "RIGHT": 73,
+          "TOP": 70,
+          "ENTRY": 89
+         },
+         "pixelShare": {
+          "FRONT": 0.1098,
+          "BACK": 0.1428,
+          "LEFT": 0.1112,
+          "RIGHT": 0.112,
+          "TOP": 0.1097,
+          "ENTRY": 0.1391
+         },
+         "unseen": [
+          "roof-lower-eave"
+         ]
+        }
+       }
+      ],
+      "mean": {
+       "parts": 92,
+       "strictFindings": 88,
+       "strictPerPart": 0.957,
+       "declaredFindings": 88,
+       "geoFindings": 17.333,
+       "visibility": 0.993
+      }
+     }
+    }
+   }
+  },
+  "lander": {
+   "before": {
+    "parts": 81,
+    "strict": {
+     "findings": 12,
+     "bySeverity": {
+      "critical": 0,
+      "high": 12,
+      "medium": 0,
+      "low": 0
+     },
+     "byRule": {
+      "FLOATING": 12
+     },
+     "floor": 75,
+     "perPart": 0.1481
+    },
+    "declared": {
+     "findings": 74,
+     "byRule": {
+      "FLOATING": 74
+     },
+     "floor": 75,
+     "perPart": 0.9136
+    },
+    "geometric": {
+     "findings": 1,
+     "bySeverity": {
+      "critical": 0,
+      "high": 1,
+      "medium": 0,
+      "low": 0
+     },
+     "byRule": {
+      "FLOATING": 1
+     },
+     "floor": 75,
+     "perPart": 0.0123
+    },
+    "visibility": {
+     "seen": 81,
+     "total": 81,
+     "fraction": 1,
+     "perView": {
+      "FRONT": 72,
+      "BACK": 41,
+      "LEFT": 59,
+      "RIGHT": 50,
+      "TOP": 57,
+      "ENTRY": 68
+     },
+     "pixelShare": {
+      "FRONT": 0.0881,
+      "BACK": 0.0913,
+      "LEFT": 0.0647,
+      "RIGHT": 0.079,
+      "TOP": 0.1616,
+      "ENTRY": 0.1314
+     },
+     "unseen": []
+    }
+   },
+   "arms": {
+    "full": {
+     "antbat": {
+      "parts": 102,
+      "strict": {
+       "findings": 18,
+       "bySeverity": {
+        "critical": 0,
+        "high": 17,
+        "medium": 1,
+        "low": 0
+       },
+       "byRule": {
+        "FLOATING": 17,
+        "BELOW_GRADE": 1
+       },
+       "floor": 75,
+       "perPart": 0.1765
+      },
+      "declared": {
+       "findings": 80,
+       "byRule": {
+        "FLOATING": 79,
+        "BELOW_GRADE": 1
+       },
+       "floor": 75,
+       "perPart": 0.7843
+      },
+      "geometric": {
+       "findings": 6,
+       "bySeverity": {
+        "critical": 0,
+        "high": 5,
+        "medium": 1,
+        "low": 0
+       },
+       "byRule": {
+        "FLOATING": 5,
+        "BELOW_GRADE": 1
+       },
+       "floor": 75,
+       "perPart": 0.0588
+      },
+      "visibility": {
+       "seen": 101,
+       "total": 102,
+       "fraction": 0.9902,
+       "perView": {
+        "FRONT": 87,
+        "BACK": 61,
+        "LEFT": 76,
+        "RIGHT": 54,
+        "TOP": 59,
+        "ENTRY": 81
+       },
+       "pixelShare": {
+        "FRONT": 0.1288,
+        "BACK": 0.1276,
+        "LEFT": 0.1136,
+        "RIGHT": 0.12,
+        "TOP": 0.2778,
+        "ENTRY": 0.1869
+       },
+       "unseen": [
+        "lander-antenna-mast"
+       ]
+      }
+     },
+     "ops": [
+      {
+       "applied": true,
+       "ops": [
+        "RELOCATE_ORPHAN",
+        "EXPOSE_BURIED",
+        "APERTURE",
+        "GROUND_FLOATING",
+        "BUILD_THE_AMBIGUITY",
+        "ENCLOSE_CAVITY",
+        "THICKEN"
+       ],
+       "refused": 0
+      },
+      {
+       "applied": true,
+       "ops": [
+        "RELOCATE_ORPHAN",
+        "EXPOSE_BURIED",
+        "APERTURE",
+        "GROUND_FLOATING",
+        "BUILD_THE_AMBIGUITY",
+        "ENCLOSE_CAVITY",
+        "THICKEN"
+       ],
+       "refused": 0
+      },
+      {
+       "applied": true,
+       "ops": [
+        "RELOCATE_ORPHAN",
+        "EXPOSE_BURIED",
+        "APERTURE",
+        "GROUND_FLOATING",
+        "BUILD_THE_AMBIGUITY",
+        "ENCLOSE_CAVITY",
+        "THICKEN"
+       ],
+       "refused": 0
+      }
+     ],
+     "random": {
+      "runs": [
+       {
+        "parts": 99,
+        "strict": {
+         "findings": 30,
+         "bySeverity": {
+          "critical": 0,
+          "high": 30,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 30
+         },
+         "floor": 75,
+         "perPart": 0.303
+        },
+        "declared": {
+         "findings": 92,
+         "byRule": {
+          "FLOATING": 92
+         },
+         "floor": 75,
+         "perPart": 0.9293
+        },
+        "geometric": {
+         "findings": 11,
+         "bySeverity": {
+          "critical": 0,
+          "high": 11,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 11
+         },
+         "floor": 75,
+         "perPart": 0.1111
+        },
+        "visibility": {
+         "seen": 97,
+         "total": 99,
+         "fraction": 0.9798,
+         "perView": {
+          "FRONT": 85,
+          "BACK": 53,
+          "LEFT": 75,
+          "RIGHT": 59,
+          "TOP": 40,
+          "ENTRY": 71
+         },
+         "pixelShare": {
+          "FRONT": 0.1343,
+          "BACK": 0.1521,
+          "LEFT": 0.1338,
+          "RIGHT": 0.1293,
+          "TOP": 0.2305,
+          "ENTRY": 0.1685
+         },
+         "unseen": [
+          "lander-descent-frame-rear-left-cross",
+          "lander-descent-center-bay-rib"
+         ]
+        }
+       },
+       {
+        "parts": 99,
+        "strict": {
+         "findings": 31,
+         "bySeverity": {
+          "critical": 0,
+          "high": 30,
+          "medium": 1,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 30,
+          "BELOW_GRADE": 1
+         },
+         "floor": 75,
+         "perPart": 0.3131
+        },
+        "declared": {
+         "findings": 93,
+         "byRule": {
+          "FLOATING": 92,
+          "BELOW_GRADE": 1
+         },
+         "floor": 75,
+         "perPart": 0.9394
+        },
+        "geometric": {
+         "findings": 12,
+         "bySeverity": {
+          "critical": 0,
+          "high": 11,
+          "medium": 1,
+          "low": 0
+         },
+         "byRule": {
+          "BELOW_GRADE": 1,
+          "FLOATING": 11
+         },
+         "floor": 75,
+         "perPart": 0.1212
+        },
+        "visibility": {
+         "seen": 89,
+         "total": 99,
+         "fraction": 0.899,
+         "perView": {
+          "FRONT": 80,
+          "BACK": 50,
+          "LEFT": 54,
+          "RIGHT": 51,
+          "TOP": 37,
+          "ENTRY": 74
+         },
+         "pixelShare": {
+          "FRONT": 0.0167,
+          "BACK": 0.008,
+          "LEFT": 0.0146,
+          "RIGHT": 0.0064,
+          "TOP": 0.0224,
+          "ENTRY": 0.0132
+         },
+         "unseen": [
+          "lander-antenna-mast",
+          "lander-foot-left",
+          "lander-foot-front",
+          "lander-ladder-mount-left",
+          "lander-antenna-bracket",
+          "lander-antenna-feed",
+          "lander-descent-center-bay-rib",
+          "lander-foot-front-ankle",
+          "lander-foot-rear-ankle",
+          "contested-rnd-yzwt"
+         ]
+        }
+       },
+       {
+        "parts": 101,
+        "strict": {
+         "findings": 31,
+         "bySeverity": {
+          "critical": 0,
+          "high": 31,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 31
+         },
+         "floor": 75,
+         "perPart": 0.3069
+        },
+        "declared": {
+         "findings": 94,
+         "byRule": {
+          "FLOATING": 94
+         },
+         "floor": 75,
+         "perPart": 0.9307
+        },
+        "geometric": {
+         "findings": 12,
+         "bySeverity": {
+          "critical": 0,
+          "high": 12,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 12
+         },
+         "floor": 75,
+         "perPart": 0.1188
+        },
+        "visibility": {
+         "seen": 101,
+         "total": 101,
+         "fraction": 1,
+         "perView": {
+          "FRONT": 88,
+          "BACK": 54,
+          "LEFT": 75,
+          "RIGHT": 68,
+          "TOP": 34,
+          "ENTRY": 86
+         },
+         "pixelShare": {
+          "FRONT": 0.132,
+          "BACK": 0.1153,
+          "LEFT": 0.106,
+          "RIGHT": 0.1243,
+          "TOP": 0.1801,
+          "ENTRY": 0.1725
+         },
+         "unseen": []
+        }
+       }
+      ],
+      "mean": {
+       "parts": 99.667,
+       "strictFindings": 30.667,
+       "strictPerPart": 0.308,
+       "declaredFindings": 93,
+       "geoFindings": 11.667,
+       "visibility": 0.96
+      }
+     }
+    },
+    "move": {
+     "antbat": {
+      "parts": 83,
+      "strict": {
+       "findings": 11,
+       "bySeverity": {
+        "critical": 0,
+        "high": 11,
+        "medium": 0,
+        "low": 0
+       },
+       "byRule": {
+        "FLOATING": 11
+       },
+       "floor": 75,
+       "perPart": 0.1325
+      },
+      "declared": {
+       "findings": 74,
+       "byRule": {
+        "FLOATING": 74
+       },
+       "floor": 75,
+       "perPart": 0.8916
+      },
+      "geometric": {
+       "findings": 7,
+       "bySeverity": {
+        "critical": 0,
+        "high": 7,
+        "medium": 0,
+        "low": 0
+       },
+       "byRule": {
+        "FLOATING": 7
+       },
+       "floor": 75,
+       "perPart": 0.0843
+      },
+      "visibility": {
+       "seen": 83,
+       "total": 83,
+       "fraction": 1,
+       "perView": {
+        "FRONT": 77,
+        "BACK": 46,
+        "LEFT": 67,
+        "RIGHT": 54,
+        "TOP": 59,
+        "ENTRY": 72
+       },
+       "pixelShare": {
+        "FRONT": 0.0986,
+        "BACK": 0.1019,
+        "LEFT": 0.0681,
+        "RIGHT": 0.0958,
+        "TOP": 0.1461,
+        "ENTRY": 0.1436
+       },
+       "unseen": []
+      }
+     },
+     "ops": [
+      {
+       "applied": true,
+       "ops": [
+        "RELOCATE_ORPHAN",
+        "APERTURE",
+        "GROUND_FLOATING",
+        "THICKEN"
+       ],
+       "refused": 0
+      },
+      {
+       "applied": true,
+       "ops": [
+        "RELOCATE_ORPHAN",
+        "APERTURE",
+        "GROUND_FLOATING",
+        "THICKEN"
+       ],
+       "refused": 0
+      },
+      {
+       "applied": true,
+       "ops": [
+        "RELOCATE_ORPHAN",
+        "GROUND_FLOATING",
+        "THICKEN"
+       ],
+       "refused": 0
+      }
+     ],
+     "random": {
+      "runs": [
+       {
+        "parts": 81,
+        "strict": {
+         "findings": 12,
+         "bySeverity": {
+          "critical": 0,
+          "high": 12,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 12
+         },
+         "floor": 75,
+         "perPart": 0.1481
+        },
+        "declared": {
+         "findings": 74,
+         "byRule": {
+          "FLOATING": 74
+         },
+         "floor": 75,
+         "perPart": 0.9136
+        },
+        "geometric": {
+         "findings": 1,
+         "bySeverity": {
+          "critical": 0,
+          "high": 1,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 1
+         },
+         "floor": 75,
+         "perPart": 0.0123
+        },
+        "visibility": {
+         "seen": 81,
+         "total": 81,
+         "fraction": 1,
+         "perView": {
+          "FRONT": 71,
+          "BACK": 41,
+          "LEFT": 61,
+          "RIGHT": 50,
+          "TOP": 57,
+          "ENTRY": 67
+         },
+         "pixelShare": {
+          "FRONT": 0.0882,
+          "BACK": 0.0912,
+          "LEFT": 0.0645,
+          "RIGHT": 0.0788,
+          "TOP": 0.1615,
+          "ENTRY": 0.1313
+         },
+         "unseen": []
+        }
+       },
+       {
+        "parts": 83,
+        "strict": {
+         "findings": 12,
+         "bySeverity": {
+          "critical": 0,
+          "high": 12,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 12
+         },
+         "floor": 75,
+         "perPart": 0.1446
+        },
+        "declared": {
+         "findings": 76,
+         "byRule": {
+          "FLOATING": 76
+         },
+         "floor": 75,
+         "perPart": 0.9157
+        },
+        "geometric": {
+         "findings": 1,
+         "bySeverity": {
+          "critical": 0,
+          "high": 1,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 1
+         },
+         "floor": 75,
+         "perPart": 0.012
+        },
+        "visibility": {
+         "seen": 82,
+         "total": 83,
+         "fraction": 0.988,
+         "perView": {
+          "FRONT": 73,
+          "BACK": 39,
+          "LEFT": 60,
+          "RIGHT": 51,
+          "TOP": 55,
+          "ENTRY": 68
+         },
+         "pixelShare": {
+          "FRONT": 0.0881,
+          "BACK": 0.0914,
+          "LEFT": 0.0652,
+          "RIGHT": 0.0793,
+          "TOP": 0.1617,
+          "ENTRY": 0.1321
+         },
+         "unseen": [
+          "lander-antenna-bracket"
+         ]
+        }
+       },
+       {
+        "parts": 82,
+        "strict": {
+         "findings": 12,
+         "bySeverity": {
+          "critical": 0,
+          "high": 12,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 12
+         },
+         "floor": 75,
+         "perPart": 0.1463
+        },
+        "declared": {
+         "findings": 75,
+         "byRule": {
+          "FLOATING": 75
+         },
+         "floor": 75,
+         "perPart": 0.9146
+        },
+        "geometric": {
+         "findings": 2,
+         "bySeverity": {
+          "critical": 0,
+          "high": 2,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "FLOATING": 2
+         },
+         "floor": 75,
+         "perPart": 0.0244
+        },
+        "visibility": {
+         "seen": 81,
+         "total": 82,
+         "fraction": 0.9878,
+         "perView": {
+          "FRONT": 72,
+          "BACK": 41,
+          "LEFT": 59,
+          "RIGHT": 51,
+          "TOP": 58,
+          "ENTRY": 68
+         },
+         "pixelShare": {
+          "FRONT": 0.0882,
+          "BACK": 0.0914,
+          "LEFT": 0.0646,
+          "RIGHT": 0.0789,
+          "TOP": 0.1613,
+          "ENTRY": 0.1314
+         },
+         "unseen": [
+          "lander-window-left"
+         ]
+        }
+       }
+      ],
+      "mean": {
+       "parts": 82,
+       "strictFindings": 12,
+       "strictPerPart": 0.146,
+       "declaredFindings": 75,
+       "geoFindings": 1.333,
+       "visibility": 0.992
+      }
+     }
+    }
+   }
+  },
+  "cabin": {
+   "before": {
+    "parts": 44,
+    "strict": {
+     "findings": 6,
+     "bySeverity": {
+      "critical": 0,
+      "high": 6,
+      "medium": 0,
+      "low": 0
+     },
+     "byRule": {
+      "NO_DOOR": 1,
+      "FLOATING": 5
+     },
+     "floor": 75,
+     "perPart": 0.1364
+    },
+    "declared": {
+     "findings": 41,
+     "byRule": {
+      "NO_DOOR": 1,
+      "FLOATING": 40
+     },
+     "floor": 75,
+     "perPart": 0.9318
+    },
+    "geometric": {
+     "findings": 1,
+     "bySeverity": {
+      "critical": 0,
+      "high": 1,
+      "medium": 0,
+      "low": 0
+     },
+     "byRule": {
+      "NO_DOOR": 1
+     },
+     "floor": 75,
+     "perPart": 0.0227
+    },
+    "visibility": {
+     "seen": 44,
+     "total": 44,
+     "fraction": 1,
+     "perView": {
+      "FRONT": 36,
+      "BACK": 36,
+      "LEFT": 26,
+      "RIGHT": 36,
+      "TOP": 27,
+      "ENTRY": 40
+     },
+     "pixelShare": {
+      "FRONT": 0.1137,
+      "BACK": 0.113,
+      "LEFT": 0.0983,
+      "RIGHT": 0.1702,
+      "TOP": 0.2178,
+      "ENTRY": 0.1608
+     },
+     "unseen": []
+    }
+   },
+   "arms": {
+    "full": {
+     "antbat": {
+      "parts": 48,
+      "strict": {
+       "findings": 3,
+       "bySeverity": {
+        "critical": 0,
+        "high": 3,
+        "medium": 0,
+        "low": 0
+       },
+       "byRule": {
+        "DOOR_NO_ARRIVAL": 1,
+        "FLOATING": 2
+       },
+       "floor": 75,
+       "perPart": 0.0625
+      },
+      "declared": {
+       "findings": 41,
+       "byRule": {
+        "DOOR_NO_ARRIVAL": 1,
+        "FLOATING": 40
+       },
+       "floor": 75,
+       "perPart": 0.8542
+      },
+      "geometric": {
+       "findings": 1,
+       "bySeverity": {
+        "critical": 0,
+        "high": 1,
+        "medium": 0,
+        "low": 0
+       },
+       "byRule": {
+        "DOOR_NO_ARRIVAL": 1
+       },
+       "floor": 75,
+       "perPart": 0.0208
+      },
+      "visibility": {
+       "seen": 48,
+       "total": 48,
+       "fraction": 1,
+       "perView": {
+        "FRONT": 33,
+        "BACK": 41,
+        "LEFT": 34,
+        "RIGHT": 39,
+        "TOP": 34,
+        "ENTRY": 47
+       },
+       "pixelShare": {
+        "FRONT": 0.1189,
+        "BACK": 0.1313,
+        "LEFT": 0.1004,
+        "RIGHT": 0.1828,
+        "TOP": 0.2019,
+        "ENTRY": 0.1611
+       },
+       "unseen": []
+      }
+     },
+     "ops": [
+      {
+       "applied": true,
+       "ops": [
+        "ADD_DOOR",
+        "APERTURE",
+        "GROUND_FLOATING",
+        "THICKEN"
+       ],
+       "refused": 0
+      },
+      {
+       "applied": true,
+       "ops": [
+        "RELOCATE_ORPHAN",
+        "APERTURE",
+        "GROUND_FLOATING",
+        "THICKEN"
+       ],
+       "refused": 0
+      },
+      {
+       "applied": true,
+       "ops": [
+        "RELOCATE_ORPHAN",
+        "EXPOSE_BURIED",
+        "APERTURE",
+        "GROUND_FLOATING"
+       ],
+       "refused": 0
+      }
+     ],
+     "random": {
+      "runs": [
+       {
+        "parts": 46,
+        "strict": {
+         "findings": 7,
+         "bySeverity": {
+          "critical": 0,
+          "high": 7,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "DOOR_NO_ARRIVAL": 1,
+          "FLOATING": 6
+         },
+         "floor": 75,
+         "perPart": 0.1522
+        },
+        "declared": {
+         "findings": 42,
+         "byRule": {
+          "DOOR_NO_ARRIVAL": 1,
+          "FLOATING": 41
+         },
+         "floor": 75,
+         "perPart": 0.913
+        },
+        "geometric": {
+         "findings": 2,
+         "bySeverity": {
+          "critical": 0,
+          "high": 2,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "DOOR_NO_ARRIVAL": 1,
+          "FLOATING": 1
+         },
+         "floor": 75,
+         "perPart": 0.0435
+        },
+        "visibility": {
+         "seen": 46,
+         "total": 46,
+         "fraction": 1,
+         "perView": {
+          "FRONT": 39,
+          "BACK": 37,
+          "LEFT": 27,
+          "RIGHT": 34,
+          "TOP": 30,
+          "ENTRY": 41
+         },
+         "pixelShare": {
+          "FRONT": 0.0892,
+          "BACK": 0.0771,
+          "LEFT": 0.0681,
+          "RIGHT": 0.1273,
+          "TOP": 0.1618,
+          "ENTRY": 0.1307
+         },
+         "unseen": []
+        }
+       },
+       {
+        "parts": 47,
+        "strict": {
+         "findings": 7,
+         "bySeverity": {
+          "critical": 0,
+          "high": 7,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "DOOR_NO_ARRIVAL": 1,
+          "FLOATING": 6
+         },
+         "floor": 75,
+         "perPart": 0.1489
+        },
+        "declared": {
+         "findings": 43,
+         "byRule": {
+          "DOOR_NO_ARRIVAL": 1,
+          "FLOATING": 42
+         },
+         "floor": 75,
+         "perPart": 0.9149
+        },
+        "geometric": {
+         "findings": 3,
+         "bySeverity": {
+          "critical": 0,
+          "high": 3,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "DOOR_NO_ARRIVAL": 1,
+          "FLOATING": 2
+         },
+         "floor": 75,
+         "perPart": 0.0638
+        },
+        "visibility": {
+         "seen": 47,
+         "total": 47,
+         "fraction": 1,
+         "perView": {
+          "FRONT": 40,
+          "BACK": 30,
+          "LEFT": 30,
+          "RIGHT": 37,
+          "TOP": 31,
+          "ENTRY": 44
+         },
+         "pixelShare": {
+          "FRONT": 0.0574,
+          "BACK": 0.0565,
+          "LEFT": 0.0658,
+          "RIGHT": 0.0669,
+          "TOP": 0.1115,
+          "ENTRY": 0.083
+         },
+         "unseen": []
+        }
+       },
+       {
+        "parts": 47,
+        "strict": {
+         "findings": 8,
+         "bySeverity": {
+          "critical": 0,
+          "high": 8,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "DOOR_NO_ARRIVAL": 1,
+          "FLOATING": 7
+         },
+         "floor": 75,
+         "perPart": 0.1702
+        },
+        "declared": {
+         "findings": 43,
+         "byRule": {
+          "DOOR_NO_ARRIVAL": 1,
+          "FLOATING": 42
+         },
+         "floor": 75,
+         "perPart": 0.9149
+        },
+        "geometric": {
+         "findings": 2,
+         "bySeverity": {
+          "critical": 0,
+          "high": 2,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "DOOR_NO_ARRIVAL": 1,
+          "FLOATING": 1
+         },
+         "floor": 75,
+         "perPart": 0.0426
+        },
+        "visibility": {
+         "seen": 47,
+         "total": 47,
+         "fraction": 1,
+         "perView": {
+          "FRONT": 41,
+          "BACK": 40,
+          "LEFT": 28,
+          "RIGHT": 38,
+          "TOP": 31,
+          "ENTRY": 45
+         },
+         "pixelShare": {
+          "FRONT": 0.0802,
+          "BACK": 0.0711,
+          "LEFT": 0.0656,
+          "RIGHT": 0.12,
+          "TOP": 0.1361,
+          "ENTRY": 0.1204
+         },
+         "unseen": []
+        }
+       }
+      ],
+      "mean": {
+       "parts": 46.667,
+       "strictFindings": 7.333,
+       "strictPerPart": 0.157,
+       "declaredFindings": 42.667,
+       "geoFindings": 2.333,
+       "visibility": 1
+      }
+     }
+    },
+    "move": {
+     "antbat": {
+      "parts": 47,
+      "strict": {
+       "findings": 3,
+       "bySeverity": {
+        "critical": 0,
+        "high": 3,
+        "medium": 0,
+        "low": 0
+       },
+       "byRule": {
+        "NO_DOOR": 1,
+        "FLOATING": 2
+       },
+       "floor": 75,
+       "perPart": 0.0638
+      },
+      "declared": {
+       "findings": 41,
+       "byRule": {
+        "NO_DOOR": 1,
+        "FLOATING": 40
+       },
+       "floor": 75,
+       "perPart": 0.8723
+      },
+      "geometric": {
+       "findings": 1,
+       "bySeverity": {
+        "critical": 0,
+        "high": 1,
+        "medium": 0,
+        "low": 0
+       },
+       "byRule": {
+        "NO_DOOR": 1
+       },
+       "floor": 75,
+       "perPart": 0.0213
+      },
+      "visibility": {
+       "seen": 47,
+       "total": 47,
+       "fraction": 1,
+       "perView": {
+        "FRONT": 32,
+        "BACK": 42,
+        "LEFT": 33,
+        "RIGHT": 38,
+        "TOP": 32,
+        "ENTRY": 46
+       },
+       "pixelShare": {
+        "FRONT": 0.1287,
+        "BACK": 0.1309,
+        "LEFT": 0.1071,
+        "RIGHT": 0.1911,
+        "TOP": 0.2071,
+        "ENTRY": 0.1698
+       },
+       "unseen": []
+      }
+     },
+     "ops": [
+      {
+       "applied": true,
+       "ops": [
+        "APERTURE",
+        "GROUND_FLOATING",
+        "THICKEN"
+       ],
+       "refused": 0
+      },
+      {
+       "applied": true,
+       "ops": [
+        "RELOCATE_ORPHAN",
+        "APERTURE",
+        "GROUND_FLOATING",
+        "THICKEN"
+       ],
+       "refused": 0
+      },
+      {
+       "applied": true,
+       "ops": [
+        "RELOCATE_ORPHAN",
+        "APERTURE",
+        "GROUND_FLOATING",
+        "THICKEN"
+       ],
+       "refused": 0
+      }
+     ],
+     "random": {
+      "runs": [
+       {
+        "parts": 46,
+        "strict": {
+         "findings": 6,
+         "bySeverity": {
+          "critical": 0,
+          "high": 6,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "NO_DOOR": 1,
+          "FLOATING": 5
+         },
+         "floor": 75,
+         "perPart": 0.1304
+        },
+        "declared": {
+         "findings": 43,
+         "byRule": {
+          "NO_DOOR": 1,
+          "FLOATING": 42
+         },
+         "floor": 75,
+         "perPart": 0.9348
+        },
+        "geometric": {
+         "findings": 1,
+         "bySeverity": {
+          "critical": 0,
+          "high": 1,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "NO_DOOR": 1
+         },
+         "floor": 75,
+         "perPart": 0.0217
+        },
+        "visibility": {
+         "seen": 46,
+         "total": 46,
+         "fraction": 1,
+         "perView": {
+          "FRONT": 37,
+          "BACK": 38,
+          "LEFT": 28,
+          "RIGHT": 37,
+          "TOP": 29,
+          "ENTRY": 44
+         },
+         "pixelShare": {
+          "FRONT": 0.11,
+          "BACK": 0.11,
+          "LEFT": 0.0949,
+          "RIGHT": 0.163,
+          "TOP": 0.2155,
+          "ENTRY": 0.158
+         },
+         "unseen": []
+        }
+       },
+       {
+        "parts": 46,
+        "strict": {
+         "findings": 7,
+         "bySeverity": {
+          "critical": 0,
+          "high": 7,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "NO_DOOR": 1,
+          "FLOATING": 6
+         },
+         "floor": 75,
+         "perPart": 0.1522
+        },
+        "declared": {
+         "findings": 43,
+         "byRule": {
+          "NO_DOOR": 1,
+          "FLOATING": 42
+         },
+         "floor": 75,
+         "perPart": 0.9348
+        },
+        "geometric": {
+         "findings": 1,
+         "bySeverity": {
+          "critical": 0,
+          "high": 1,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "NO_DOOR": 1
+         },
+         "floor": 75,
+         "perPart": 0.0217
+        },
+        "visibility": {
+         "seen": 46,
+         "total": 46,
+         "fraction": 1,
+         "perView": {
+          "FRONT": 37,
+          "BACK": 38,
+          "LEFT": 31,
+          "RIGHT": 36,
+          "TOP": 34,
+          "ENTRY": 42
+         },
+         "pixelShare": {
+          "FRONT": 0.1073,
+          "BACK": 0.1068,
+          "LEFT": 0.0931,
+          "RIGHT": 0.166,
+          "TOP": 0.214,
+          "ENTRY": 0.1571
+         },
+         "unseen": []
+        }
+       },
+       {
+        "parts": 45,
+        "strict": {
+         "findings": 6,
+         "bySeverity": {
+          "critical": 0,
+          "high": 6,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "NO_DOOR": 1,
+          "FLOATING": 5
+         },
+         "floor": 75,
+         "perPart": 0.1333
+        },
+        "declared": {
+         "findings": 42,
+         "byRule": {
+          "NO_DOOR": 1,
+          "FLOATING": 41
+         },
+         "floor": 75,
+         "perPart": 0.9333
+        },
+        "geometric": {
+         "findings": 1,
+         "bySeverity": {
+          "critical": 0,
+          "high": 1,
+          "medium": 0,
+          "low": 0
+         },
+         "byRule": {
+          "NO_DOOR": 1
+         },
+         "floor": 75,
+         "perPart": 0.0222
+        },
+        "visibility": {
+         "seen": 45,
+         "total": 45,
+         "fraction": 1,
+         "perView": {
+          "FRONT": 37,
+          "BACK": 37,
+          "LEFT": 27,
+          "RIGHT": 35,
+          "TOP": 28,
+          "ENTRY": 42
+         },
+         "pixelShare": {
+          "FRONT": 0.1129,
+          "BACK": 0.1122,
+          "LEFT": 0.0993,
+          "RIGHT": 0.1662,
+          "TOP": 0.2185,
+          "ENTRY": 0.1623
+         },
+         "unseen": []
+        }
+       }
+      ],
+      "mean": {
+       "parts": 45.667,
+       "strictFindings": 6.333,
+       "strictPerPart": 0.139,
+       "declaredFindings": 42.667,
+       "geoFindings": 1,
+       "visibility": 1
+      }
+     }
+    }
+   }
+  }
+ },
+ "errors": []
+}

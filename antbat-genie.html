@@ -1381,7 +1381,7 @@ function grantWishes(){
          cladding moved from the long wall to the open end, 99 -> 94. Every
          addition and articulation on a repeated accusation went flat or worse.
          So the genie moves the thing before it builds a new thing. */
-      const relocate = priorGesture('RELOCATE_ORPHAN') >= priorGesture('ADD_MEMBER');
+      const relocate = state.moveOnly || priorGesture('RELOCATE_ORPHAN') >= priorGesture('ADD_MEMBER');
       const block=grindBlocked(relocate?'RELOCATE_ORPHAN':'ADD_MEMBER',me.id,'ORPHAN');
       if(block){ refused.push(block); }
       else if(relocate){
@@ -1417,8 +1417,42 @@ function grantWishes(){
     }
   }
 
+  /* GROUND_FLOATING — the single most common finding an outside linter makes
+     about these buildings is FLOATING, and until now the genie had no operation
+     for it: 88 findings on the pagoda alone. This lowers the worst offender
+     until something is actually underneath it. A move, not an addition, which is
+     the only gesture family the corpus has ever seen work. */
+  if(!state.moveOnlyOff){
+    const flo=[...partReport.values()].filter(r=>r.mem.FLOATING>0.5)
+      .sort((a,b)=>b.mem.FLOATING-a.mem.FLOATING)[0];
+    const fblock=flo?grindBlocked('GROUND_FLOATING',flo.id,'FLOATING'):null;
+    if(fblock) refused.push(fblock);
+    else if(flo){
+      const mesh=worldMeshes().find(m=>m.userData.partId===flo.id);
+      const q=parts.find(x=>x.id===flo.id);
+      if(mesh&&q&&q.position){
+        const box=new THREE.Box3().setFromObject(mesh);
+        const c=box.getCenter(new THREE.Vector3()),sz=box.getSize(new THREE.Vector3());
+        let drop=box.min.y;                                  // grade, unless something is nearer
+        const others=worldMeshes().filter(m=>m!==mesh);
+        for(const [ux,uz] of [[0,0],[-0.35,-0.35],[0.35,0.35],[-0.35,0.35],[0.35,-0.35]]){
+          const o=new THREE.Vector3(c.x+ux*sz.x,box.min.y-Math.max(1e-4,R*1e-3),c.z+uz*sz.z);
+          raycaster.set(o,new THREE.Vector3(0,-1,0)); raycaster.far=box.min.y+R*0.05;
+          const hs=raycaster.intersectObjects(others,false);
+          if(hs.length) drop=Math.min(drop,hs[0].distance+Math.max(1e-4,R*1e-3));
+        }
+        if(drop>R*0.004){
+          q.position=[q.position[0],q.position[1]-drop,q.position[2]];
+          wishes.push('to stand on something — '+flo.id+' floats '+fx(box.min.y,2)+
+            'm with nothing under it, and is lowered '+fx(drop,2)+'m onto whatever is');
+          ops.push({op:'GROUND_FLOATING',part:flo.id,drop:+drop.toFixed(3),species:'FLOATING'});
+        }
+      }
+    }
+  }
+
   /* what the reading says about the world as a whole, in the linter's own terms */
-  if(census){
+  if(census&&!state.moveOnly){
     if(census.NO_DOOR.total>0.5){
       const front=S.parts.slice().sort((a,b)=>a.center.z-b.center.z)[0];
       if(front){
@@ -1474,7 +1508,8 @@ function grantWishes(){
         const ownMin=-support(ownBox,dir.clone().negate());
         const needed=hostMax-ownMin+Math.max(0.02,R*0.01);
         const travel=clamp(needed,R*0.005,R*0.22);
-        q.position=[pos[0]+dir.x*travel,pos[1]+dir.y*travel,pos[2]+dir.z*travel];
+        const ny=pos[1]+dir.y*travel;
+        q.position=[pos[0]+dir.x*travel,Math.max(ny,(q.size?q.size[1]:0)/2),pos[2]+dir.z*travel];
         wishes.push('to be visible at all — every point of '+buried.id+' is inside '+
           (hostId?hostId:'other solid')+', so it is moved '+fx(travel,2)+'m out — far enough to clear it, no further');
         ops.push({op:'EXPOSE_BURIED',part:buried.id,travel:+travel.toFixed(3),
@@ -1483,14 +1518,17 @@ function grantWishes(){
     }
   }
 
-  if(S.cavity){
+  if(S.cavity&&!state.moveOnly){
     const c=S.cavity.p,r=clamp(S.cavity.r*0.72,R*0.08,R*0.45),t=Math.max(0.1,R*0.03);
+    /* posts that start in mid-air are the very defect the ants are sent to find.
+       They run from grade to the top of the cavity, so they hold something up. */
+    const top=c.y+r*0.95, h=Math.max(r*0.4,top), yMid=h/2;
     const corners=[[1,1],[1,-1],[-1,1],[-1,-1]];
     for(const [sx,sz] of corners)
-      parts.push({id:nid('post'),kind:'box',position:[c.x+sx*r,c.y,c.z+sz*r],
-        size:[t*2,r*1.9,t*2],rotation:[0,0,0],color:'#7e8892',role:'structure',
+      parts.push({id:nid('post'),kind:'box',position:[c.x+sx*r,yMid,c.z+sz*r],
+        size:[t*2,h,t*2],rotation:[0,0,0],color:'#7e8892',role:'column',
         opacity:1,metalness:0.05,roughness:0.85,connections:[]});
-    parts.push({id:nid('lid'),kind:'box',position:[c.x,c.y+r*0.95,c.z],
+    parts.push({id:nid('lid'),kind:'box',position:[c.x,top,c.z],
       size:[r*2.2,t*2,r*2.2],rotation:[0,0,0],color:'#6f7a85',role:'structure',
       opacity:1,metalness:0.05,roughness:0.85,connections:[]});
     wishes.push('to have a room where the air already is — the bat measured '+fx(S.cavity.r,2)+
@@ -1535,7 +1573,7 @@ function grantWishes(){
     }
   }
 
-  if(S.disagree){
+  if(S.disagree&&!state.moveOnly){
     const p=S.disagree.p,t=Math.max(0.08,R*0.02);
     parts.push({id:nid('contested'),kind:'box',position:[p.x,p.y,p.z],
       size:[R*0.16,t,R*0.16],rotation:[0,0,0],color:'#e6e2f2',role:'ambiguity',
