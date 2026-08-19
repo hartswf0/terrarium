@@ -602,6 +602,62 @@ caste with no defect to look for, and naming it now would give it one.
 
 ---
 
+## 10. What the build found that the theory did not
+
+`antbat-genie.html` now exists. Naur's loop only closes if the text is allowed to
+correct the theory, so: three things this document got wrong.
+
+**`lostMoves` was never a metric that could fire.** §3.3 called it a boundary
+detector wearing a failure costume. It is worse than that. In v14:
+
+```js
+function chooseAntMove(current, graph, diag, pheromone, visited, recent){
+  const opts = graph.neighbors[current] || [];
+  if (!opts.length) return current;
+  let best = current, bestScore = -1e9;
+  for (const e of opts){ ... if (score > bestScore){ bestScore = score; best = idx } }
+  return best
+}
+```
+
+`best` starts as `current` with a score of `-1e9`, so the first option always
+displaces it, and `buildSurfaceNeighborhood` excludes `i === j`, so the winner is
+never the current node. The only path returning `current` is the empty-neighbour
+guard, and `neighbors[i] = arr.slice(0, 7)` is non-empty for any two samples.
+**`lostMoves` is structurally zero in every run the clinic ever did**, and
+`lostMovePercent` has been printed on contact sheets as `0.00` for four versions.
+The stepping stone was not being misread. It was never switched on.
+
+Rebuilding it required abandoning the comparison the name implies. An ant has no
+way to know what a good score is anywhere but here, so **promise** is measured
+against the ant's own running average: the best neighbour's score over an EMA of
+what this ant has been getting, mapped through a shape parameter into [0,1]. The
+ant then stalls in proportion to the shortfall, and the *degree* is what the
+ledger stores. Scale-free, no absolute threshold, no stuck/not-stuck. It fires
+where a component is exhausted — which on the seed house is the member attached
+to nothing, exactly where §3.3 predicted, by a mechanism §3.3 did not describe.
+
+**Sampling by triangle count puts the ant's whole world on the ornaments.** A box
+is twelve triangles and a sphere is several hundred. Distributing a node budget
+per-triangle — which is what the clinic's `buildDiagnosticSurfaceGraph` does with
+its `Math.min(190, budget/meshes.length)` per mesh — gives a wall a dozen nodes
+and a finial two hundred. Nodes are now allocated by surface area under one
+global density with a hard cap, since the neighbourhood graph is O(n²) and an
+ant that cannot be scheduled is not an ant. On the archived pagoda this is the
+difference between 6,416 nodes and 638 covering all 92 parts.
+
+**The bat calls open sky a cavity.** §4 said the bat measures air rather than
+skin, which is true and insufficient: outside the building every direction is
+air, and the largest void the bat can report is the sky. A cavity claim now
+requires *enclosure* — most rays answered — so the reading means "I am inside the
+thing I am measuring." Without that gate the genie's first wish on the seed house
+was to enclose a 33 m void, which is not a room; it is the outdoors.
+
+None of the three changes the direction of the theory. All three are places where
+the document was confident about a mechanism it had read but not run.
+
+---
+
 The archive contains four buildings that a number called failures at 96, 98, 99,
 and 100. This document does not argue that the number was wrong. It argues that
 the number was answering a question nobody needed answered, while

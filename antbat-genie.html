@@ -1,0 +1,1543 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#080a0d">
+<title>ANTBAT-GENIE — no score, no target, no threshold</title>
+<link rel="icon" href="favicon.svg">
+<style>
+:root{
+  --bg:#080a0d;--panel:#0d1116f5;--panel2:#131820;--line:#2a323c;--fg:#edf1f4;--dim:#8b959f;
+  --seam:#efbd4d;--clash:#ff514b;--verify:#d85ce5;--wander:#2de2d0;
+  --bat:#7fb2ff;--genie:#9be08a;--frontier:#ff8f6a;
+  --safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px);
+  --panelH:46dvh;
+}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;height:100dvh;overflow:hidden;background:var(--bg);color:var(--fg);
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;-webkit-font-smoothing:antialiased;
+  -webkit-tap-highlight-color:transparent}
+button,input,select{font:inherit;color:inherit}
+.hidden{display:none!important}
+
+#world{position:absolute;inset:0 0 var(--panelH) 0;background:#05070a;touch-action:none;overflow:hidden}
+#world canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#worldFallback{position:absolute;inset:0;display:grid;place-items:center;color:#5c6773;font-size:12px;
+  text-align:center;padding:28px;line-height:1.6}
+
+/* ---- refusal strip: the program says what it will not do, permanently ---- */
+#refusals{position:absolute;z-index:12;top:calc(6px + var(--safe-top));left:8px;right:8px;
+  display:flex;gap:5px;flex-wrap:wrap;pointer-events:none}
+#refusals span{font-size:9px;letter-spacing:.09em;padding:3px 6px;border:1px solid #2b333d;border-radius:999px;
+  background:#080a0dcc;color:#6f7a85;text-transform:uppercase}
+
+/* ---- live counters. none of these is a score. ---- */
+#hud{position:absolute;z-index:12;left:8px;bottom:8px;display:grid;gap:3px;
+  grid-template-columns:repeat(2,minmax(0,1fr));width:min(64vw,300px);pointer-events:none}
+.hudcell{border:1px solid #262e37;border-radius:8px;background:#080a0dcc;padding:4px 6px}
+.hudcell b{display:block;font-size:8px;letter-spacing:.11em;color:#697480;font-weight:700}
+.hudcell i{font-style:normal;font-size:13px;font-weight:800;color:var(--fg)}
+.hudcell.grow i{color:var(--frontier)}
+.hudcell small{display:block;font-size:8px;color:#5f6a75;letter-spacing:.04em}
+
+#wishcard{position:absolute;z-index:13;right:8px;top:calc(30px + var(--safe-top));width:min(52vw,270px);
+  border:1px solid #2c3a2c;border-radius:11px;background:#0a0f0bee;padding:7px 8px;display:none;
+  max-height:52%;overflow:auto;-webkit-overflow-scrolling:touch}
+#wishcard.on{display:block}
+#wishcard.folded p,#wishcard.folded em{display:none}
+#wishcard b::after{content:' ▾';color:#4f5c4f}
+#wishcard.folded b::after{content:' ▸'}
+#wishcard b{display:block;font-size:8px;letter-spacing:.12em;color:var(--genie);margin-bottom:3px}
+#wishcard p{margin:0;font-size:11px;line-height:1.45;color:#d6e2d4}
+#wishcard em{display:block;margin-top:5px;font-style:normal;font-size:9px;color:#7d8b7c}
+
+#panel{position:absolute;left:0;right:0;bottom:0;height:var(--panelH);background:var(--panel);
+  border-top:1px solid var(--line);display:flex;flex-direction:column;
+  padding-bottom:var(--safe-bottom)}
+
+#bar{display:flex;gap:4px;padding:6px;border-bottom:1px solid #1c232b;overflow-x:auto;scrollbar-width:none}
+#bar::-webkit-scrollbar{display:none}
+.b{flex:0 0 auto;border:1px solid #333c47;background:#151b23;border-radius:8px;padding:6px 9px;
+  font-size:10px;letter-spacing:.07em;font-weight:700;text-transform:uppercase;white-space:nowrap}
+.b:active{transform:translateY(1px)}
+.b.on{background:#1d2b23;border-color:#3f6f52;color:var(--genie)}
+.b.run{background:#221a1a;border-color:#6d3b38;color:#ff8c86}
+.b.genie{border-color:#3f6f52;color:var(--genie)}
+.b:disabled{opacity:.4}
+
+#tabs{display:flex;gap:0;border-bottom:1px solid #1c232b;overflow-x:auto;scrollbar-width:none}
+#tabs::-webkit-scrollbar{display:none}
+.t{flex:0 0 auto;background:transparent;border:0;border-bottom:2px solid transparent;padding:7px 9px;
+  font-size:9.5px;letter-spacing:.09em;color:#6c7783;text-transform:uppercase;font-weight:700}
+.t.on{color:var(--fg);border-bottom-color:var(--wander)}
+.t u{text-decoration:none;color:#4d5761;margin-left:4px}
+
+#ledger{flex:1;overflow-y:auto;overflow-x:hidden;padding:7px 8px 12px;-webkit-overflow-scrolling:touch}
+.row{border-bottom:1px solid #171d24;padding:5px 2px;font-size:10.5px;line-height:1.5;color:#c3ccd4;
+  display:grid;grid-template-columns:auto 1fr;gap:8px}
+.row .k{color:#5f6a76;font-size:9px;letter-spacing:.06em;white-space:nowrap;padding-top:1px}
+.row .v{word-break:break-word}
+.row .v u{text-decoration:none;color:#78838f}
+.tag{display:inline-block;padding:1px 5px;border-radius:999px;font-size:8.5px;letter-spacing:.06em;
+  border:1px solid currentColor;margin-right:4px;font-weight:700}
+.c-seam{color:var(--seam)}.c-clash{color:var(--clash)}.c-verify{color:var(--verify)}.c-wander{color:var(--wander)}
+.c-bat{color:var(--bat)}.c-genie{color:var(--genie)}.c-front{color:var(--frontier)}.c-dim{color:#6b7681}
+
+/* fuzzy bars: membership is shown as a length, never as a verdict */
+.mem{display:flex;align-items:center;gap:5px;margin:2px 0}
+.mem span{font-size:8.5px;letter-spacing:.07em;color:#6c7783;width:74px;flex:0 0 auto}
+.mem div{height:5px;border-radius:3px;background:#1b222b;flex:1;overflow:hidden}
+.mem div i{display:block;height:100%;border-radius:3px}
+.mem b{font-size:8.5px;color:#8b959f;font-weight:600;width:30px;text-align:right;flex:0 0 auto}
+
+.note{font-size:10px;color:#6f7a85;line-height:1.55;padding:6px 2px 2px}
+.note strong{color:#9aa5b0;font-weight:700}
+#lineage{display:flex;gap:6px;overflow-x:auto;padding:4px 2px 8px;scrollbar-width:none}
+#lineage::-webkit-scrollbar{display:none}
+.lin{flex:0 0 auto;width:92px;border:1px solid #262e37;border-radius:8px;overflow:hidden;background:#0b0f14}
+.lin img{display:block;width:100%;height:62px;object-fit:cover;background:#05070a}
+.lin b{display:block;font-size:8px;letter-spacing:.07em;color:#7d8791;padding:3px 4px 0}
+.lin i{display:block;font-style:normal;font-size:9px;color:var(--genie);padding:0 4px 4px}
+.lin.on{border-color:var(--genie)}
+
+#toast{position:absolute;z-index:40;left:50%;transform:translateX(-50%);bottom:calc(var(--panelH) + 12px);
+  background:#0e141bf2;border:1px solid #35404c;border-radius:9px;padding:7px 11px;font-size:10.5px;
+  color:#dfe6ec;opacity:0;transition:opacity .18s;pointer-events:none;max-width:80vw;text-align:center}
+#toast.on{opacity:1}
+#boot{position:absolute;inset:0;z-index:60;background:#05070a;display:grid;place-items:center;padding:24px;
+  text-align:center;color:#8b959f;font-size:11px;line-height:1.7}
+#boot.gone{display:none}
+#boot b{display:block;color:var(--fg);font-size:13px;letter-spacing:.14em;margin-bottom:8px}
+#boot code{color:var(--clash)}
+</style>
+</head>
+<body>
+<div id="world">
+  <div id="worldFallback">world offline — three.js did not load</div>
+  <div id="refusals">
+    <span>no score</span><span>no target</span><span>no threshold</span>
+    <span>no critic</span><span>no reference</span><span>no stopping condition</span>
+  </div>
+  <div id="hud">
+    <div class="hudcell grow"><b>frontier</b><i id="h-frontier">0</i><small>unreached &amp; interesting — growing is alive</small></div>
+    <div class="hudcell"><b>labels alive</b><i id="h-labels">0</i><small>half-life 86.3 steps</small></div>
+    <div class="hudcell"><b>emitters</b><i id="h-emitters">0</i><small>placed on routes</small></div>
+    <div class="hudcell"><b>disagreements</b><i id="h-disagree">0</i><small>ant solid / bat air</small></div>
+  </div>
+  <div id="wishcard"><b>THE WISH THIS HOUSE IMPLIES</b><p id="wishtext"></p><em id="wishmeta"></em></div>
+</div>
+
+<div id="panel">
+  <div id="bar">
+    <button class="b run" id="btn-run">Run</button>
+    <button class="b" id="btn-step">Step ×60</button>
+    <button class="b genie" id="btn-genie">Genie</button>
+    <button class="b on" id="btn-bat">Bat</button>
+    <button class="b" id="btn-ants">Ants 10</button>
+    <button class="b" id="btn-view">View</button>
+    <label class="b" for="file-in">Import</label>
+    <input id="file-in" type="file" accept=".json" class="hidden">
+    <button class="b" id="btn-export">Export</button>
+    <button class="b" id="btn-reseed">Reseed</button>
+  </div>
+  <div id="tabs">
+    <button class="t on" data-tab="frontier">frontier<u id="n-frontier">0</u></button>
+    <button class="t" data-tab="labels">labels<u id="n-labels">0</u></button>
+    <button class="t" data-tab="transfers">transfers<u id="n-transfers">0</u></button>
+    <button class="t" data-tab="emitters">emitters<u id="n-emitters">0</u></button>
+    <button class="t" data-tab="delays">delays<u id="n-delays">0</u></button>
+    <button class="t" data-tab="parity">parity<u id="n-parity">0</u></button>
+    <button class="t" data-tab="stalls">stalls<u id="n-stalls">0</u></button>
+    <button class="t" data-tab="disagree">disagree<u id="n-disagree">0</u></button>
+    <button class="t" data-tab="lineage">lineage<u id="n-lineage">0</u></button>
+    <button class="t" data-tab="theory">theory</button>
+  </div>
+  <div id="ledger"></div>
+</div>
+
+<div id="toast"></div>
+<div id="boot"><b>ANTBAT-GENIE</b>loading the world…<br><span id="booterr"></span></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script>
+if(!window.THREE){
+  document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');
+}
+</script>
+<script>
+'use strict';
+/* ============================================================================
+   ANTBAT-GENIE — built against ANTBAT-GENIE.md
+   Three animals. One ledger. No score anywhere in this file.
+
+   ANT   deposits — walks the surface, novelty first, drops labelled findings
+                    that decay on a half-life, plants emitters on its route,
+                    learns interiority by parity, marks stalls as boundaries.
+   BAT   interrogates — flies the dark, reads delay, hunts surprise, measures
+                    the air rather than the skin.
+   GENIE grants — takes a house and returns the wish that house implies, then
+                    builds it. house -> wish -> house'. No fixed point.
+
+   Rule carried everywhere: memberships stay in [0,1] to the render.
+   Nothing is crisp-ified into a verdict. AMBIGUOUS is a terminal state.
+   ========================================================================== */
+
+const $ = s => document.querySelector(s);
+const clamp = (v,a,b) => v<a?a:v>b?b:v;
+const lerp = (a,b,t) => a+(b-a)*t;
+const uid = p => p+'-'+Math.random().toString(36).slice(2,8);
+const nowISO = () => new Date().toISOString();
+const fx = (v,n=2) => Number.isFinite(v) ? (+v).toFixed(n) : '—';
+
+/* ---- decay ---------------------------------------------------------------
+   0.992 per step. Solve 0.992^n = 0.5 -> n = 86.296. This is the constant the
+   ant-lidar clinic ran for four versions under the name "evaporation". Named
+   here for what it is. Findings fade unless couriers keep re-depositing them.
+   -------------------------------------------------------------------------- */
+const DECAY = 0.992;
+const HALF_LIFE = Math.log(0.5)/Math.log(DECAY);   // 86.296 steps
+
+const CASTES = ['seam','clash','verify','wander'];
+const CASTE_RGB = {
+  seam:   [0.937,0.741,0.302],
+  clash:  [1.000,0.318,0.294],
+  verify: [0.847,0.361,0.898],
+  wander: [0.176,0.886,0.816]   // the caste with no defect to look for
+};
+
+const state = {
+  house: null,            // {id,parent,parts[],wishIn}
+  lineage: [],            // {house_id,parent_id,implied_wish,novelty,features,thumb}
+  step: 0,
+  generation: 0,
+  running: false,
+  batOn: true,
+  antCount: 10,
+  viewIdx: 0,
+  tab: 'frontier',
+  ledger: {
+    labels:new Map(),     // label_id -> {label_id,origin,activity,born,kind{},strength}
+    transfers:[],         // {label_id,from,to,step,caste{}}
+    emitters:[],          // {node,by,step,mutual[]}
+    delays:[],            // {from,dir,predicted,measured,surprise}
+    parity:[],            // {node,crossings,interior}
+    stalls:[],            // {node,step,pinned}
+    frontier:new Map(),   // node -> {node,why{},reached,firstSeen}
+    disagree:new Map()    // node -> {node,count,lastStep}
+  }
+};
+
+/* ============================ THREE BOOT ================================= */
+let renderer,scene,camera,raycaster,worldGroup,fxGroup,antGroup,batGroup,pointCloud,trailLine,emitterPoints;
+let lightPool=[],ambient,W=1,H=1;
+let cam={az:0.9,pol:1.05,rad:12,target:null};
+
+function boot(){
+  const host=$('#world');
+  try{
+    renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+    renderer.setPixelRatio(Math.min(2,window.devicePixelRatio||1));
+    host.insertBefore(renderer.domElement,host.firstChild);
+    $('#worldFallback').classList.add('hidden');
+  }catch(e){ $('#booterr').innerHTML='<code>'+e.message+'</code>'; return false; }
+  cam.target=new THREE.Vector3();
+  scene=new THREE.Scene();
+  scene.background=new THREE.Color(0x05070a);
+  scene.fog=new THREE.FogExp2(0x05070a,0.012);
+  camera=new THREE.PerspectiveCamera(52,1,0.05,4000);
+  raycaster=new THREE.Raycaster();
+  worldGroup=new THREE.Group(); fxGroup=new THREE.Group();
+  antGroup=new THREE.Group(); batGroup=new THREE.Group();
+  scene.add(worldGroup,fxGroup,antGroup,batGroup);
+
+  /* The world starts dark on purpose. Nothing here lights the building except
+     the emitters the ants will plant. Coverage is not a percentage; it is how
+     much of the model you can see. */
+  ambient=new THREE.AmbientLight(0xffffff,0.055);
+  scene.add(ambient);
+  for(let i=0;i<24;i++){
+    const l=new THREE.PointLight(0xffffff,0,1);
+    l.visible=false; scene.add(l); lightPool.push(l);
+  }
+  resize(); window.addEventListener('resize',resize);
+  attachGestures(host);
+  return true;
+}
+function resize(){
+  const host=$('#world'); W=host.clientWidth||1; H=host.clientHeight||1;
+  renderer.setSize(W,H,false); camera.aspect=W/H; camera.updateProjectionMatrix();
+}
+function updateCamera(){
+  cam.pol=clamp(cam.pol,0.12,Math.PI-0.12);
+  camera.position.set(
+    cam.target.x+cam.rad*Math.sin(cam.pol)*Math.sin(cam.az),
+    cam.target.y+cam.rad*Math.cos(cam.pol),
+    cam.target.z+cam.rad*Math.sin(cam.pol)*Math.cos(cam.az));
+  camera.lookAt(cam.target);
+}
+function attachGestures(el){
+  let drag=false,lx=0,ly=0,pinch=0;
+  el.addEventListener('pointerdown',e=>{drag=true;lx=e.clientX;ly=e.clientY;el.setPointerCapture(e.pointerId)});
+  el.addEventListener('pointermove',e=>{
+    if(!drag)return;
+    cam.az-=(e.clientX-lx)*0.008; cam.pol-=(e.clientY-ly)*0.008; lx=e.clientX; ly=e.clientY; updateCamera();
+  });
+  el.addEventListener('pointerup',()=>{drag=false});
+  el.addEventListener('pointercancel',()=>{drag=false});
+  el.addEventListener('wheel',e=>{e.preventDefault();cam.rad=clamp(cam.rad*(1+Math.sign(e.deltaY)*0.09),0.6,600);updateCamera()},{passive:false});
+  el.addEventListener('touchmove',e=>{
+    if(e.touches.length!==2)return; e.preventDefault();
+    const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    if(pinch)cam.rad=clamp(cam.rad*(pinch/d),0.6,600); pinch=d; updateCamera();
+  },{passive:false});
+  el.addEventListener('touchend',()=>{pinch=0});
+}
+
+/* ============================ HOUSE ======================================
+   Part format is deliberately the correspondence scene format, so any export
+   from the Focus/Build/Sucks or Depot Clinic line loads straight in — with the
+   reference stripped of authority and the score never read.
+   ======================================================================== */
+function geomFor(p){
+  const s=p.size||[1,1,1];
+  switch((p.kind||'box').toLowerCase()){
+    case 'cylinder': return new THREE.CylinderGeometry(s[0]/2,s[0]/2,s[1],18,1);
+    case 'cone':     return new THREE.ConeGeometry(s[0]/2,s[1],18,1);
+    case 'sphere':   return new THREE.SphereGeometry(Math.max(s[0],s[1],s[2])/2,18,12);
+    case 'extrude':  return new THREE.BoxGeometry(s[0],s[1],s[2]);
+    default:         return new THREE.BoxGeometry(s[0]||1,s[1]||1,s[2]||1);
+  }
+}
+function buildWorld(house){
+  while(worldGroup.children.length){
+    const m=worldGroup.children.pop();
+    if(m.geometry)m.geometry.dispose(); if(m.material)m.material.dispose();
+    worldGroup.remove(m);
+  }
+  for(const p of house.parts){
+    let col=0x9aa3ad; try{ col=new THREE.Color(p.color||'#9aa3ad').getHex(); }catch(e){}
+    const mat=new THREE.MeshStandardMaterial({
+      color:col, roughness:clamp(p.roughness==null?0.86:p.roughness,0.05,1),
+      metalness:clamp(p.metalness==null?0.05:p.metalness,0,1),
+      transparent:(p.opacity!=null&&p.opacity<1), opacity:p.opacity==null?1:p.opacity,
+      side:THREE.DoubleSide
+    });
+    const m=new THREE.Mesh(geomFor(p),mat);
+    const pos=p.position||[0,0,0], rot=p.rotation||[0,0,0];
+    m.position.set(pos[0]||0,pos[1]||0,pos[2]||0);
+    m.rotation.set((rot[0]||0),(rot[1]||0),(rot[2]||0));
+    m.userData.partId=p.id; m.userData.role=p.role||'part';
+    worldGroup.add(m);
+  }
+  worldGroup.updateMatrixWorld(true);
+  const box=new THREE.Box3().setFromObject(worldGroup);
+  const size=box.getSize(new THREE.Vector3()), center=box.getCenter(new THREE.Vector3());
+  const radius=Math.max(0.5,size.length()/2);
+  state.bounds={box,size,center,radius};
+  cam.target.copy(center); cam.rad=radius*2.9; updateCamera();
+  scene.fog.density=0.35/Math.max(1,radius*4);
+}
+function worldMeshes(){ return worldGroup.children.filter(o=>o.isMesh); }
+
+/* ---- the seed house -------------------------------------------------------
+   Not a good house. A house with things in it worth finding: an enclosed void
+   nothing declares, one member attached to nothing, and a shell whose parity
+   is answerable. The instruments need a world with findings, not a nice world.
+   -------------------------------------------------------------------------- */
+function seedHouse(){
+  const P=[],add=(id,kind,position,size,color,role,extra)=>P.push(
+    Object.assign({id,kind,position,size,color,role,rotation:[0,0,0],opacity:1,
+      metalness:0.05,roughness:0.88,connections:[]},extra||{}));
+  add('slab','box',[0,0.1,0],[9,0.2,7],'#5a6069','foundation');
+  add('wall-n','box',[0,1.8,-3.4],[9,3.4,0.34],'#8d8377','structure');
+  add('wall-s','box',[0,1.8,3.4],[9,3.4,0.34],'#8d8377','structure');
+  add('wall-e','box',[4.4,1.8,0],[0.34,3.4,7],'#8d8377','structure');
+  add('wall-w','box',[-4.4,1.8,0],[0.34,3.4,7],'#8d8377','structure');
+  add('roof','box',[0,3.7,0],[9.4,0.3,7.4],'#6f6a63','structure');
+  /* an interior partition that closes a volume nobody named */
+  add('part-a','box',[1.1,1.8,0],[0.28,3.4,7],'#7f7568','structure');
+  add('part-b','box',[2.8,1.8,-1.2],[3.6,3.4,0.28],'#7f7568','structure');
+  /* a member attached to nothing — the pagoda's 92 parts / 0 connections, in one piece */
+  add('orphan','cylinder',[-3.2,4.9,2.1],[0.34,2.6,0.34],'#c8a24a','ornament');
+  /* a stack with a deliberate gap: parity has something to say here */
+  add('stack','box',[-2.6,4.6,-2.2],[1.6,1.6,1.6],'#8d8377','structure');
+  add('cap','cone',[-2.6,6.1,-2.2],[1.9,1.2,1.9],'#6f6a63','ornament');
+  return {id:uid('house'),parent:null,parts:P,wishIn:'(seed — no wish preceded this)'};
+}
+
+/* ======================= SURFACE + NEIGHBOURHOOD =========================
+   The ant can only be somewhere. Everything else in the older clinics is a
+   viewpoint. So the surface is sampled into nodes and the nodes get a k=7
+   neighbourhood — the same k the ant-lidar crawl used, kept because the ant's
+   locality is the whole point of it.
+   ======================================================================== */
+let NODES=[],GRAPH={neighbors:[],meanNearest:0};
+
+function meshTriangles(m){
+  m.updateWorldMatrix(true,false);
+  const g=m.geometry,pa=g.getAttribute('position'),idx=g.index;
+  const count=Math.floor((idx?idx.count:pa.count)/3),tris=[];
+  const nm=new THREE.Matrix3().getNormalMatrix(m.matrixWorld);
+  for(let t=0;t<count;t++){
+    const vi=k=>{const i=idx?idx.getX(t*3+k):t*3+k;
+      return new THREE.Vector3().fromBufferAttribute(pa,i).applyMatrix4(m.matrixWorld)};
+    const a=vi(0),b=vi(1),c=vi(2);
+    const cross=new THREE.Vector3().crossVectors(b.clone().sub(a),c.clone().sub(a));
+    const area=cross.length()*0.5;
+    if(area<1e-12)continue;
+    tris.push({a,b,c,area,n:cross.clone().applyMatrix3(nm).normalize()});
+  }
+  return tris;
+}
+/* Budget is allocated by surface area, not by triangle count. A box is twelve
+   triangles and a sphere is hundreds; sampling per-triangle would put the ant's
+   whole world on the ornaments and leave the walls with a dozen nodes each. */
+function sampleSurface(budget){
+  const meshes=worldMeshes(); if(!meshes.length)return [];
+  const out=[];
+  const packs=meshes.map(m=>{const tris=meshTriangles(m);
+    return {m,tris,area:tris.reduce((s,t)=>s+t.area,0)}}).filter(pk=>pk.tris.length);
+  const total=packs.reduce((s,pk)=>s+pk.area,0)||1;
+  /* one global density, so a sphere's four hundred small triangles do not each
+     claim a node while a wall's two large ones get one apiece. the cap is hard:
+     the neighbourhood graph is O(n^2) and an ant that cannot be scheduled is
+     not an ant. */
+  const density=budget/total, cap=Math.round(budget*1.35);
+  let carry=0;
+  for(const pk of packs){
+    let placed=0;
+    for(const tri of pk.tris){
+      if(out.length>=cap) break;
+      const want=tri.area*density+carry;
+      let k=Math.floor(want); carry=want-k;
+      /* every part gets at least a foothold, however small it is */
+      if(k===0 && placed===0) k=1;
+      k=Math.min(k,cap-out.length);
+      for(let j=0;j<k;j++){
+        placed++;
+        /* low-discrepancy barycentric: even coverage without clumping */
+        const r1=(j+0.5)/k, r2=(j*0.6180339887)%1;
+        const su=Math.sqrt(r1), u=1-su, v=r2*su;
+        const p=tri.a.clone()
+          .addScaledVector(tri.b.clone().sub(tri.a),u)
+          .addScaledVector(tri.c.clone().sub(tri.a),v);
+        const n=tri.n;
+      out.push({
+        i:out.length, point:p, normal:n.clone(), partId:pk.m.userData.partId, role:pk.m.userData.role,
+        /* fuzzy state — every one of these is a membership in [0,1] and none of
+           them is ever compared to a threshold to become a flag. */
+        mem:{seam:0,clash:0,verify:0,wander:0.35},
+        interior:0,        // parity membership: how much this node is inside solid
+        crossings:-1,      // -1 = never probed
+        visits:0, stallsHere:0, emitters:0, label:0, disagree:0
+      });
+      }
+    }
+    if(out.length>=cap) break;
+  }
+  return out;
+}
+function buildGraph(nodes,k){
+  const N=nodes.length,neighbors=Array.from({length:N},()=>[]);let mean=0;
+  for(let i=0;i<N;i++){
+    const a=nodes[i].point,arr=[];
+    for(let j=0;j<N;j++) if(i!==j) arr.push({idx:j,dist:a.distanceTo(nodes[j].point)});
+    arr.sort((u,v)=>u.dist-v.dist);
+    neighbors[i]=arr.slice(0,k);
+    mean+=neighbors[i][0]?neighbors[i][0].dist:0;
+  }
+  return {neighbors,meanNearest:N?mean/N:0};
+}
+
+/* ---- fuzzy node reading ---------------------------------------------------
+   The v14 clinic converted this evidence to crisp flags three times over
+   (eyes===0, dot<0.55, rough>0.45, gapMarks>=2, ...). Twenty-odd thresholds
+   between a measurement and a report. Here the same evidence stays continuous
+   and the memberships are simply carried. A node is 0.8 seam and 0.3 verify at
+   the same time, and is drawn as such.
+   -------------------------------------------------------------------------- */
+function readNodesFuzzy(){
+  const mn=GRAPH.meanNearest||1;
+  for(let i=0;i<NODES.length;i++){
+    const s=NODES[i],nb=GRAPH.neighbors[i]||[];
+    let mismatch=0,crowd=0;
+    for(const e of nb){
+      const q=NODES[e.idx];
+      const dot=Math.abs(s.normal.dot(q.normal));
+      mismatch += 1-clamp(dot,0,1);                       // was: if(dot<0.55) flag
+      crowd    += clamp(1-(e.dist/(mn*0.68)),0,1);        // was: if(dist<mn*0.68) flag
+    }
+    const n=Math.max(1,nb.length);
+    const rough=mismatch/n, dense=crowd/n;
+    const unseen=1/(1+s.visits*0.55);                      // never a "visited" boolean
+    s.mem.seam   = clamp(rough*1.35,0,1);
+    s.mem.clash  = clamp(dense*1.5,0,1);
+    s.mem.verify = clamp(0.35*s.interior + 0.5*clamp(s.disagree/3,0,1) + 0.25*clamp(s.stallsHere/3,0,1),0,1);
+    s.mem.wander = clamp(unseen*0.9,0,1);
+    /* interestingness: never thresholded, never ranked into a leaderboard.
+       used only as a movement gradient and as a frontier weight. */
+    s.interest = 0.9*s.mem.wander + 0.75*s.mem.seam + 0.62*s.mem.clash + 0.5*s.mem.verify;
+  }
+}
+
+/* ---- parity ---------------------------------------------------------------
+   Rutherford's odd-crossing count was built as a mesh-integrity error metric.
+   It is a floor plan. A node whose outward ray leaves through an odd number of
+   surfaces is inside something. Interiority is discovered by whoever wandered
+   in, not declared by a room primitive — there is no room primitive here.
+   -------------------------------------------------------------------------- */
+function probeParity(node){
+  if(node.crossings>=0) return node.interior;
+  const R=state.bounds.radius, eps=Math.max(1e-5,R*1e-4);
+  const o=node.point.clone().addScaledVector(node.normal,eps*4);
+  raycaster.set(o,node.normal.clone());
+  raycaster.far=R*4;
+  const hits=raycaster.intersectObjects(worldMeshes(),false);
+  let k=0,last=-1e9;
+  for(const h of hits){ if(h.distance-last>eps){k++;last=h.distance} }
+  node.crossings=k;
+  /* fuzzy, not a flag: odd is inside-ish and more crossings is more inside-ish,
+     even is outside-ish but nested even counts stay slightly ambiguous. */
+  node.interior = k===0 ? 0
+                : (k%2===1) ? clamp(0.58+0.10*k,0,1)
+                : clamp(0.08*k,0,0.42);
+  if(state.ledger.parity.length<4000)
+    state.ledger.parity.push({node:node.i,crossings:k,interior:+node.interior.toFixed(3),part:node.partId});
+  return node.interior;
+}
+
+/* ============================== ANTS =====================================
+   chooseMove keeps the v14 weighting because the v14 weighting was already a
+   novelty-search agent: novelty 1.65 is the largest term, scent 0.22 the
+   smallest, and having just been somewhere is a penalty. Scent is one seventh
+   of novelty. It was tuned that way and then wired to a critic that had been
+   told to pick one thing. Here it steers.
+   ======================================================================== */
+const ANT_W={novelty:1.65,scent:0.22,interest:1.18,jitter:0.40,recent:1.25,frontier:0.95,
+             reach:1.35,promiseFloor:0.62};
+let ants=[],pheromone=null;
+
+function makeAnts(count){
+  ants=[]; if(!NODES.length)return;
+  const order=NODES.map((n,i)=>i).sort((a,b)=>NODES[b].interest-NODES[a].interest);
+  for(let i=0;i<count;i++){
+    const idx=order[Math.floor(i*order.length/count)]||0;
+    ants.push({
+      id:'ant-'+i, idx, recent:[], carrying:[], stalled:0, baseline:null,
+      mem:{seam:0.25,clash:0.25,verify:0.25,wander:0.25},
+      mesh:null
+    });
+  }
+  pheromone=new Float32Array(NODES.length);
+}
+function chooseMove(ant){
+  const nb=GRAPH.neighbors[ant.idx]||[];
+  if(!nb.length) return ant.idx;
+  const mn=GRAPH.meanNearest||1,cur=NODES[ant.idx];
+  /* standing still is a candidate, scored the same way. a stall is only
+     recorded when every one of the seven neighbours loses to it — which
+     happens where the surface stops and the nearest continuation is a long
+     jump onto some other part. that is a boundary, not wasted compute. */
+  let best=ant.idx,bestScore=-1e9;
+  for(const e of nb){
+    const n=NODES[e.idx];
+    const novelty = ANT_W.novelty/(1+n.visits*0.7);
+    const scent   = pheromone[e.idx]*ANT_W.scent;
+    const inter   = n.interest*ANT_W.interest;
+    const front   = state.ledger.frontier.has(e.idx)?ANT_W.frontier:0;
+    const close   = clamp(1-e.dist/(mn*3.2),0,1);
+    /* reach: a neighbour many mean-spacings away is not a step, it is a leap */
+    const reach   = ANT_W.reach*clamp(e.dist/(mn*3.5)-1,0,4);
+    const pen     = ant.recent.includes(e.idx)?ANT_W.recent:0;
+    const s = novelty+scent+inter+front+close+Math.random()*ANT_W.jitter-pen-reach;
+    if(s>bestScore){bestScore=s;best=e.idx}
+  }
+  /* PROMISE — how much this neighbourhood is still offering, in [0,1].
+     Measured against the ant's own running average rather than an absolute
+     scale, because an ant has no way to know what a good score is anywhere but
+     here. This is a fuzzy membership with a shape parameter, not a verdict: it
+     never collapses to stuck / not-stuck, and the degree is what gets recorded. */
+  if(ant.baseline==null) ant.baseline=Math.max(0.2,bestScore);
+  const ratio=bestScore/Math.max(1e-6,ant.baseline);
+  ant.baseline=lerp(ant.baseline,bestScore,0.05);
+  const promise=clamp((ratio-ANT_W.promiseFloor)/(1-ANT_W.promiseFloor),0,1);
+  return {idx:best,promise};
+}
+
+/* ---- the label ledger -----------------------------------------------------
+   Gosswald and Kloft did not follow the ants. They counted the label in ants
+   that never visited the source and recovered the sharing network from the
+   distribution of a substance nobody watched move. So the isotope here is the
+   FINDING, not the ant, and what is recorded is the transfer.
+   -------------------------------------------------------------------------- */
+function mintLabel(node,activity,kind){
+  const id=uid('L');
+  state.ledger.labels.set(id,{
+    label_id:id, origin:node.i, activity, born:state.step,
+    kind:Object.assign({},kind), strength:1, transfers:0, spread:new Set([node.i])
+  });
+  return id;
+}
+function decayLabels(){
+  const dead=[];
+  for(const [id,L] of state.ledger.labels){
+    L.strength*=DECAY;
+    if(L.strength<0.02) dead.push(id);
+  }
+  for(const id of dead) state.ledger.labels.delete(id);
+  if(pheromone) for(let i=0;i<pheromone.length;i++) pheromone[i]*=DECAY;
+  /* the building visibly forgets: node label glow is on the same half-life */
+  for(const n of NODES) n.label*=DECAY;
+}
+function antStep(ant){
+  const cur=NODES[ant.idx];
+  cur.visits++;
+  probeParity(cur);
+  pheromone[ant.idx]+=0.06+cur.interest*0.17;
+  cur.label=Math.min(4,cur.label+0.35);
+
+  /* caste membership drifts toward what this node is, fuzzily and without
+     ever resolving. an ant is a mixture and is drawn as a mixture. */
+  for(const c of CASTES) ant.mem[c]=clamp(lerp(ant.mem[c],cur.mem[c],0.12),0,1);
+
+  /* mint a label when this node says something the ant is not already carrying */
+  if(cur.interest>0.9 && ant.carrying.length<3 && Math.random()<0.3){
+    const act = cur.mem.clash>cur.mem.seam ? 'crowding'
+              : cur.interior>0.5 ? 'interior'
+              : cur.mem.seam>0.45 ? 'seam' : 'unnamed';
+    ant.carrying.push(mintLabel(cur,act,cur.mem));
+  }
+
+  const move=chooseMove(ant);
+  const next=move.idx, promise=move.promise;
+
+  /* A stall is not wasted compute. It is the ant reporting that its whole
+     neighbourhood has stopped offering anything — the surface ends here, or the
+     component it is walking is exhausted. Graded, not flagged: the ant stalls in
+     proportion to how little is on offer, so stallsHere accumulates as a
+     membership and a part outlined in it is attached to nothing. This spent four
+     versions filed under lostMovePercent as wasted compute. */
+  if(next===ant.idx || Math.random()>promise){
+    ant.stalled++; cur.stallsHere+=1-promise;
+    if(state.ledger.stalls.length<6000)
+      state.ledger.stalls.push({node:cur.i,step:state.step,part:cur.partId,
+        promise:+promise.toFixed(3),neighbors:(GRAPH.neighbors[cur.i]||[]).length});
+    markFrontier(cur,'neighbourhood offered '+promise.toFixed(2)+' — the surface stops here');
+    return;
+  }
+
+  /* transfer: every carried label moves, and the move is what gets written down */
+  const to=NODES[next];
+  for(const id of ant.carrying){
+    const L=state.ledger.labels.get(id); if(!L)continue;
+    L.transfers++; L.spread.add(next); L.strength=Math.min(1.6,L.strength+0.12);
+    to.label=Math.min(4,to.label+0.22);
+    if(state.ledger.transfers.length<12000)
+      state.ledger.transfers.push({label_id:id,from:ant.idx,to:next,step:state.step,
+        caste:dominant(ant.mem),activity:L.activity});
+  }
+  ant.carrying=ant.carrying.filter(id=>state.ledger.labels.has(id));
+
+  /* emitters on the route: the trail stops being a message to other ants and
+     becomes hardware for later. instrument density gets allocated by curiosity. */
+  if(to.emitters===0 && (to.interest>0.75 || Math.random()<0.09)){
+    to.emitters++;
+    state.ledger.emitters.push({node:next,by:ant.id,step:state.step,
+      pos:to.point.clone(),intensity:clamp(0.4+to.interest*0.5,0.2,1.2),mutual:0});
+  }
+
+  ant.recent.push(next); if(ant.recent.length>6)ant.recent.shift();
+  ant.idx=next;
+  if(state.trailSeg.length>900) state.trailSeg.splice(0,240);
+  state.trailSeg.push({a:cur.point.clone(),b:to.point.clone(),c:colorOf(ant.mem)});
+}
+function dominant(mem){ let b='wander',v=-1; for(const c of CASTES) if(mem[c]>v){v=mem[c];b=c} return b; }
+function colorOf(mem){
+  /* fuzzy blend of all four castes. an unresolved mixture is a colour with no
+     name, and that is correct. never a switch on the dominant caste. */
+  let r=0,g=0,b=0,t=0;
+  for(const c of CASTES){ const w=mem[c]+0.02; const k=CASTE_RGB[c]; r+=k[0]*w; g+=k[1]*w; b+=k[2]*w; t+=w }
+  return new THREE.Color(r/t,g/t,b/t);
+}
+
+/* ---- frontier -------------------------------------------------------------
+   unresolvedHot, promoted. Nodes the evidence calls strange and that nothing
+   has yet been able to walk to. The clinic reported this as a coverage
+   complaint and lengthened the crawl. It is the to-do list, and a run that
+   grows it is alive: finding more unreachable interesting places is the work.
+   -------------------------------------------------------------------------- */
+function markFrontier(node,why){
+  const F=state.ledger.frontier;
+  const rec=F.get(node.i)||{node:node.i,why:[],firstSeen:state.step,reached:node.visits>0,part:node.partId};
+  if(!rec.why.includes(why))rec.why.push(why);
+  rec.reached=node.visits>0; rec.lastSeen=state.step;
+  F.set(node.i,rec);
+}
+function scanFrontier(){
+  for(const n of NODES){
+    if(n.visits===0 && n.interest>1.05) markFrontier(n,'interesting and never reached');
+    else if(n.visits===0 && n.interior>0.5) markFrontier(n,'interior and never reached');
+  }
+}
+
+/* =============================== BAT =====================================
+   Every emitter in the clinic line pointed inward from a shell: twelve fixed
+   stations, six dogs pinned to R = radius*1.65, a dome, a collector. All of it
+   measures skin. Nothing measured air.
+
+   The bat is a delay epistemology, not a position one. It does not need to see
+   a room; it needs the room to take longer to answer than the wall did. Its
+   fitness is surprise per emission — the divergence between the delay the
+   current model predicts and the delay that comes back. A bat flying through a
+   well-understood building learns nothing.
+
+   The DARK ordeal in v8-v14 killed the lighting graph and called it a stress
+   test the building failed. Dark is this animal's medium. That was a request.
+   ======================================================================== */
+const BAT_RAYS=26;
+let bat=null, occupancy=null, nodeHash=null;
+
+function buildOccupancy(){
+  const b=state.bounds; const cell=Math.max(0.12,b.radius/14);
+  const grid=new Map();
+  const key=(x,y,z)=>x+'|'+y+'|'+z;
+  const put=(p,conf)=>{
+    const x=Math.floor(p.x/cell),y=Math.floor(p.y/cell),z=Math.floor(p.z/cell);
+    const k=key(x,y,z); grid.set(k,Math.max(grid.get(k)||0,conf));
+  };
+  occupancy={cell,grid,key,put,
+    at(p){const k=key(Math.floor(p.x/cell),Math.floor(p.y/cell),Math.floor(p.z/cell));return grid.get(k)||0}};
+  /* the model the bat argues with is built only from what the ants have
+     actually touched. it is wrong in exactly the places nobody has been. */
+  return occupancy;
+}
+function buildNodeHash(){
+  const cell=Math.max(0.08,(GRAPH.meanNearest||0.2)*1.6),grid=new Map();
+  const key=p=>Math.floor(p.x/cell)+'|'+Math.floor(p.y/cell)+'|'+Math.floor(p.z/cell);
+  for(const n of NODES){ const k=key(n.point); if(!grid.has(k))grid.set(k,[]); grid.get(k).push(n.i) }
+  nodeHash={cell,grid,key,
+    near(p){ return grid.get(key(p))||[] }};
+}
+function makeBat(){
+  const b=state.bounds;
+  bat={
+    pos:b.center.clone().add(new THREE.Vector3(b.radius*0.9,b.radius*0.3,b.radius*0.6)),
+    heading:new THREE.Vector3(-1,-0.1,-0.6).normalize(),
+    speed:Math.max(0.05,b.radius*0.035),
+    surprise:0, cavities:[], lastRays:[]
+  };
+}
+function fibDirs(n,around,spread){
+  const out=[],golden=Math.PI*(3-Math.sqrt(5));
+  const up=Math.abs(around.y)<0.9?new THREE.Vector3(0,1,0):new THREE.Vector3(1,0,0);
+  const u=new THREE.Vector3().crossVectors(around,up).normalize();
+  const v=new THREE.Vector3().crossVectors(around,u).normalize();
+  for(let i=0;i<n;i++){
+    const t=(i+0.5)/n, r=Math.sqrt(t)*spread, a=i*golden;
+    out.push(around.clone().addScaledVector(u,Math.cos(a)*r).addScaledVector(v,Math.sin(a)*r).normalize());
+  }
+  return out;
+}
+function predictDelay(origin,dir,maxD){
+  /* march the ant-built occupancy model. this is the prediction the bat is
+     trying to break. it knows nothing about geometry no ant has walked. */
+  if(!occupancy) return maxD;
+  const step=occupancy.cell*0.75; const p=origin.clone();
+  for(let d=step;d<maxD;d+=step){
+    p.copy(origin).addScaledVector(dir,d);
+    if(occupancy.at(p)>0.25) return d;
+  }
+  return maxD;
+}
+function batTick(){
+  if(!bat||!NODES.length)return;
+  const b=state.bounds,maxD=b.radius*3.2,meshes=worldMeshes();
+  const dirs=fibDirs(BAT_RAYS,bat.heading,0.55);
+  let bestDir=null,bestSurprise=-1,sumSurprise=0,minMeasured=maxD;
+  const rays=[];
+  for(const dir of dirs){
+    raycaster.set(bat.pos.clone(),dir); raycaster.far=maxD;
+    const hits=raycaster.intersectObjects(meshes,false);
+    const measured=hits.length?hits[0].distance:maxD;
+    const predicted=predictDelay(bat.pos,dir,maxD);
+    const surprise=Math.abs(measured-predicted)/maxD;
+    sumSurprise+=surprise; minMeasured=Math.min(minMeasured,measured);
+    rays.push({dir,measured,predicted,surprise});
+    if(surprise>bestSurprise){bestSurprise=surprise;bestDir=dir}
+    if(state.ledger.delays.length<9000 && surprise>0.02)
+      state.ledger.delays.push({step:state.step,predicted:+predicted.toFixed(3),
+        measured:+measured.toFixed(3),surprise:+surprise.toFixed(3),
+        claim: measured>predicted*1.35 ? 'air where the model said solid'
+             : measured<predicted*0.65 ? 'solid where the model said air'
+             : 'agreed'});
+    /* the bat teaches the occupancy model only where it actually hit something.
+       it never writes emptiness into the model — absence stays unclaimed. */
+    if(hits.length&&occupancy) occupancy.put(hits[0].point,0.9);
+    /* disagreement: this ray passed clean through positions where an ant is
+       standing on surface. ant says solid, bat's delay says air. no arbitration. */
+    if(nodeHash){
+      const s=nodeHash.cell*1.4;
+      for(let d=s;d<measured-s;d+=s){
+        const p=bat.pos.clone().addScaledVector(dir,d);
+        for(const ni of nodeHash.near(p)){
+          const n=NODES[ni];
+          if(n.point.distanceTo(p)<nodeHash.cell*0.5){
+            n.disagree++;
+            const D=state.ledger.disagree.get(ni)||{node:ni,count:0,part:n.partId};
+            D.count++; D.lastStep=state.step; state.ledger.disagree.set(ni,D);
+          }
+        }
+      }
+    }
+  }
+  bat.lastRays=rays;
+  bat.surprise=sumSurprise/Math.max(1,rays.length);
+
+  /* measuring air: the local void radius is the nearest wall in any direction.
+     open sky is not a room, so a cavity is only claimed when the bat is
+     answered from most directions — i.e. it is enclosed by the thing it is
+     measuring. no instrument in the clinic line reported a room's dimension. */
+  const answered=rays.filter(r=>r.measured<maxD*0.98).length/Math.max(1,rays.length);
+  bat.enclosure=answered;
+  if(answered>0.62 && minMeasured>b.radius*0.10 && minMeasured<b.radius*1.2){
+    bat.cavities.push({p:bat.pos.clone(),r:minMeasured,step:state.step,enclosure:answered});
+    if(bat.cavities.length>420)bat.cavities.shift();
+  }
+
+  /* steer toward surprise. hunting the place the model is wrong about. */
+  if(bestDir) bat.heading.lerp(bestDir,0.28).normalize();
+  const ahead=bat.pos.clone().addScaledVector(bat.heading,bat.speed*2.2);
+  raycaster.set(bat.pos.clone(),bat.heading); raycaster.far=bat.speed*3.5;
+  if(raycaster.intersectObjects(meshes,false).length){
+    bat.heading.addScaledVector(new THREE.Vector3(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5),0.9).normalize();
+  } else bat.pos.copy(ahead);
+  if(bat.pos.distanceTo(b.center)>b.radius*2.4)
+    bat.heading.copy(b.center.clone().sub(bat.pos).normalize());
+}
+
+/* ============================== RENDER ==================================== */
+let interiorTicks,stallPoints,disagreePoints,batLines,batRing,cavityPoints;
+function disposeGroup(g){
+  while(g.children.length){
+    const o=g.children.pop();
+    if(o.geometry)o.geometry.dispose();
+    if(o.material)o.material.dispose();
+    g.remove(o);
+  }
+}
+function initFx(){
+  disposeGroup(fxGroup); disposeGroup(batGroup); disposeGroup(antGroup);
+  const mk=(size,opacity,vertexColors)=>new THREE.PointsMaterial({size,sizeAttenuation:true,transparent:true,
+    opacity,depthWrite:false,vertexColors:!!vertexColors,blending:THREE.AdditiveBlending});
+  const R=state.bounds.radius;
+  const empty=()=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute([],3));return g};
+
+  pointCloud=new THREE.Points(empty(),mk(R*0.012,0.95,true));
+  emitterPoints=new THREE.Points(empty(),mk(R*0.030,1.0,true));
+  stallPoints=new THREE.Points(empty(),mk(R*0.016,0.8,false)); stallPoints.material.color=new THREE.Color(0xff8f6a);
+  disagreePoints=new THREE.Points(empty(),mk(R*0.026,0.9,false)); disagreePoints.material.color=new THREE.Color(0xffffff);
+  cavityPoints=new THREE.Points(empty(),mk(R*0.030,0.30,false)); cavityPoints.material.color=new THREE.Color(0x7fb2ff);
+  const lm=()=>new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.5,
+    blending:THREE.AdditiveBlending});
+  trailLine=new THREE.LineSegments(empty(),lm());
+  interiorTicks=new THREE.LineSegments(empty(),new THREE.LineBasicMaterial({color:0xd85ce5,transparent:true,
+    opacity:0.65,blending:THREE.AdditiveBlending}));
+  batLines=new THREE.LineSegments(empty(),lm());
+  batRing=new THREE.Points(empty(),mk(R*0.014,0.8,false)); batRing.material.color=new THREE.Color(0x7fb2ff);
+  fxGroup.add(pointCloud,emitterPoints,stallPoints,disagreePoints,cavityPoints,trailLine,interiorTicks,batLines,batRing);
+
+  const bg=new THREE.SphereGeometry(R*0.03,8,6);
+  const bm=new THREE.MeshBasicMaterial({color:0x7fb2ff});
+  batGroup.add(new THREE.Mesh(bg,bm));
+
+  for(let i=0;i<ants.length;i++){
+    const g=new THREE.Group();
+    const m=new THREE.MeshBasicMaterial({color:0x2de2d0});
+    const body=new THREE.Mesh(new THREE.SphereGeometry(R*0.014,6,4),m);
+    const head=new THREE.Mesh(new THREE.SphereGeometry(R*0.009,6,4),m);
+    head.position.x=R*0.019; g.add(body,head); g.userData.mat=m;
+    antGroup.add(g); ants[i].mesh=g;
+  }
+}
+function setPos(obj,arr){
+  obj.geometry.setAttribute('position',new THREE.Float32BufferAttribute(arr,3));
+  if(arr.length) obj.geometry.computeBoundingSphere();
+  obj.visible=arr.length>0;
+}
+function setCol(obj,arr){ obj.geometry.setAttribute('color',new THREE.Float32BufferAttribute(arr,3)) }
+
+let fxPhase=0;
+function renderFx(){
+  if(!NODES.length)return;
+  const R=state.bounds.radius;
+  fxPhase++;
+  const heavy=(fxPhase%2===0);   // node cloud / trail / emitters are slow to rebuild
+
+  /* nodes: fuzzy caste blend, brightness carried by the live label field.
+     the building visibly forgets — an unrefreshed finding fades on 86 steps. */
+  const np=[],nc=[],ip=[],sp=[],dp=[];
+  if(heavy) for(const n of NODES){
+    const c=colorOf(n.mem);
+    const glow=clamp(0.18+n.label*0.28,0.14,1);
+    np.push(n.point.x,n.point.y,n.point.z);
+    nc.push(c.r*glow,c.g*glow,c.b*glow);
+    if(n.interior>0.35){
+      /* drawn with an inward normal, literally: a tick from the surface into
+         the solid it turned out to be inside of. */
+      const L=R*0.03*(0.4+n.interior);
+      ip.push(n.point.x,n.point.y,n.point.z,
+              n.point.x-n.normal.x*L,n.point.y-n.normal.y*L,n.point.z-n.normal.z*L);
+    }
+    if(n.stallsHere>0) sp.push(n.point.x,n.point.y,n.point.z);
+    if(n.disagree>2)  dp.push(n.point.x,n.point.y,n.point.z);
+  }
+  if(heavy){
+    setPos(pointCloud,np); setCol(pointCloud,nc);
+    setPos(interiorTicks,ip);
+    setPos(stallPoints,sp);
+    setPos(disagreePoints,dp);
+  }
+
+  /* emitters. the picture of the building is made out of where the ants went. */
+  const ep=[],ec=[];
+  if(heavy) for(const e of state.ledger.emitters){
+    ep.push(e.pos.x,e.pos.y,e.pos.z);
+    ec.push(1,0.93,0.78);
+  }
+  if(heavy){ setPos(emitterPoints,ep); setCol(emitterPoints,ec); assignLights(); }
+
+  /* trail */
+  const tp=[],tc=[];
+  if(heavy) for(const s of state.trailSeg){
+    tp.push(s.a.x,s.a.y,s.a.z,s.b.x,s.b.y,s.b.z);
+    tc.push(s.c.r,s.c.g,s.c.b,s.c.r,s.c.g,s.c.b);
+  }
+  if(heavy){ setPos(trailLine,tp); setCol(trailLine,tc); }
+
+  /* bat: emission cone, return ring at the delay-implied radius, and the
+     discrepancy drawn as an assertion where the return says cavity. */
+  if(bat){
+    batGroup.children[0].position.copy(bat.pos);
+    batGroup.visible=state.batOn;
+    const bp=[],bc=[],rr=[];
+    if(state.batOn) for(const r of bat.lastRays){
+      const end=bat.pos.clone().addScaledVector(r.dir,r.measured);
+      bp.push(bat.pos.x,bat.pos.y,bat.pos.z,end.x,end.y,end.z);
+      const s=clamp(r.surprise*4,0,1);
+      bc.push(0.35,0.6,1, 0.35+0.65*s,0.6-0.3*s,1-0.4*s);
+      rr.push(end.x,end.y,end.z);
+    }
+    setPos(batLines,bp); setCol(batLines,bc); setPos(batRing,rr);
+    const cp=[];
+    for(const c of bat.cavities) cp.push(c.p.x,c.p.y,c.p.z);
+    setPos(cavityPoints,cp);
+    batLines.visible=batRing.visible=cavityPoints.visible=state.batOn;
+  }
+
+  for(const a of ants){
+    if(!a.mesh)continue;
+    a.mesh.position.copy(NODES[a.idx].point);
+    a.mesh.userData.mat.color.copy(colorOf(a.mem));
+  }
+}
+
+/* farthest-point selection so the whole lattice contributes, not just the
+   newest emitters. instrument density was allocated by curiosity; the light
+   follows it. */
+function assignLights(){
+  const E=state.ledger.emitters;
+  for(const l of lightPool){l.visible=false;l.intensity=0}
+  if(!E.length)return;
+  const R=state.bounds.radius,pick=[];
+  /* farthest-first over the whole lattice: the light follows the curiosity that
+     placed the emitters, not merely the newest ones. */
+  const seed=E[E.length-1]; pick.push(seed);
+  const pool=E.length>240?E.filter((_,i)=>i%Math.ceil(E.length/240)===0):E.slice();
+  while(pick.length<lightPool.length&&pool.length){
+    let bi=0,bd=-1;
+    for(let i=0;i<pool.length;i++){
+      let d=Infinity;
+      for(const q of pick) d=Math.min(d,pool[i].pos.distanceToSquared(q.pos));
+      if(d>bd){bd=d;bi=i}
+    }
+    pick.push(pool.splice(bi,1)[0]);
+  }
+  pick.slice(0,lightPool.length).forEach((e,i)=>{
+    const l=lightPool[i];
+    l.position.copy(e.pos); l.visible=true;
+    l.color.setRGB(1,0.94,0.82);
+    l.intensity=e.intensity*2.6; l.distance=R*1.7; l.decay=2;
+  });
+}
+
+/* ============================== GENIE ====================================
+   A genie grants exactly what was asked and never what was meant, and the
+   third wish is spent undoing the first two. That is focusAttempts:4 in the
+   castle session — four wishes on one wall.
+
+   So the wish runs backwards here. This genie does not take a wish and return
+   a house. It takes a house, and everything the ants and the bat found in it,
+   and returns THE WISH THAT HOUSE IMPLIES. Then it builds that, and the whole
+   thing runs again on the result. house -> wish -> house'. No fixed point,
+   because a fixed point would be arrival.
+
+   It does not pick one thing. There is no critic in this program.
+   ======================================================================== */
+function nodesOfPart(id){ return NODES.filter(n=>n.partId===id) }
+function partById(id){ return state.house.parts.find(p=>p.id===id) }
+function centroid(list){
+  const c=new THREE.Vector3(); for(const n of list)c.add(n.point||n);
+  return list.length?c.multiplyScalar(1/list.length):c;
+}
+
+function readSignals(){
+  const S={},mn=GRAPH.meanNearest||0.2,R=state.bounds.radius;
+
+  /* unattached: a part outlined almost entirely in stall ticks, whose nodes
+     have no neighbour belonging to anything else. the pagoda's 92 parts and
+     zero connections, found in the geometry with no reference and no English. */
+  const byPart=new Map();
+  for(const n of NODES){
+    const r=byPart.get(n.partId)||{id:n.partId,nodes:[],stalls:0,foreign:0};
+    r.nodes.push(n); r.stalls+=n.stallsHere;
+    for(const e of (GRAPH.neighbors[n.i]||[])) if(NODES[e.idx].partId!==n.partId) r.foreign++;
+    byPart.set(n.partId,r);
+  }
+  S.parts=[...byPart.values()].map(r=>({
+    id:r.id, n:r.nodes.length,
+    stallDensity:r.stalls/Math.max(1,r.nodes.length),
+    attachment:r.foreign/Math.max(1,r.nodes.length*7),
+    center:centroid(r.nodes)
+  }));
+  S.unattached=S.parts.filter(p=>p.attachment<0.035&&p.n>3).sort((a,b)=>a.attachment-b.attachment)[0]||null;
+
+  /* the air the bat measured, which nothing declares */
+  const cav=(bat&&bat.cavities||[]).slice(-160).sort((a,b)=>b.r-a.r)[0];
+  S.cavity = (cav&&cav.r>R*0.12&&cav.r<R*0.9)?cav:null;
+
+  /* frontier cluster: unreached and interesting, grouped loosely */
+  const F=[...state.ledger.frontier.values()].filter(f=>!f.reached);
+  if(F.length){
+    const seed=F.sort((a,b)=>NODES[b.node].interest-NODES[a.node].interest)[0];
+    const sp=NODES[seed.node].point;
+    const near=F.filter(f=>NODES[f.node].point.distanceTo(sp)<mn*6);
+    S.frontierCluster={center:centroid(near.map(f=>NODES[f.node])),size:near.length,
+      why:seed.why[0],part:NODES[seed.node].partId};
+  } else S.frontierCluster=null;
+
+  /* transfer hub: where the findings actually travelled through. a load path is
+     a thing many labels cross — recovered from the sharing graph, not the mesh. */
+  const through=new Map();
+  for(const t of state.ledger.transfers.slice(-4000))
+    through.set(t.to,(through.get(t.to)||0)+1);
+  let hub=null,hv=0;
+  for(const [ni,c] of through) if(c>hv){hv=c;hub=ni}
+  S.hub = hub!=null?{node:hub,count:hv,part:NODES[hub].partId,p:NODES[hub].point}:null;
+
+  const D=[...state.ledger.disagree.values()].sort((a,b)=>b.count-a.count)[0];
+  S.disagree = (D&&D.count>3)?{...D,p:NODES[D.node].point}:null;
+
+  let int=0; for(const n of NODES) int+=n.interior;
+  S.interiorFraction=int/Math.max(1,NODES.length);
+  S.frontierCount=[...state.ledger.frontier.values()].filter(f=>!f.reached).length;
+  return S;
+}
+
+function grantWishes(){
+  if(!NODES.length) return null;
+  readNodesFuzzy(); scanFrontier();
+  const S=readSignals(),R=state.bounds.radius;
+  const parts=state.house.parts.map(p=>JSON.parse(JSON.stringify(p)));
+  const wishes=[],ops=[];
+  const nid=k=>k+'-g'+state.generation+'-'+Math.random().toString(36).slice(2,5);
+
+  if(S.unattached){
+    const me=partById(S.unattached.id);
+    const others=S.parts.filter(p=>p.id!==S.unattached.id)
+      .sort((a,b)=>a.center.distanceTo(S.unattached.center)-b.center.distanceTo(S.unattached.center));
+    const to=others[0];
+    if(me&&to){
+      const a=S.unattached.center,b=to.center,mid=a.clone().add(b).multiplyScalar(0.5);
+      const len=Math.max(0.4,a.distanceTo(b));
+      const dir=b.clone().sub(a).normalize();
+      const q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),dir);
+      const e=new THREE.Euler().setFromQuaternion(q);
+      parts.push({id:nid('member'),kind:'cylinder',position:[mid.x,mid.y,mid.z],
+        size:[Math.max(0.12,R*0.035),len,Math.max(0.12,R*0.035)],
+        rotation:[e.x,e.y,e.z],color:'#b7a26a',role:'structure',
+        opacity:1,metalness:0.1,roughness:0.7,connections:[me.id,partById(to.id)?to.id:null].filter(Boolean)});
+      wishes.push('to be attached — '+me.id+' has attachment '+fx(S.unattached.attachment,3)+
+        ' (almost no neighbour belongs to anything else) and stall density '+fx(S.unattached.stallDensity,2));
+      ops.push({op:'ADD_MEMBER',from:me.id,to:to.id});
+    }
+  }
+
+  if(S.cavity){
+    const c=S.cavity.p,r=clamp(S.cavity.r*0.72,R*0.08,R*0.45),t=Math.max(0.1,R*0.03);
+    const corners=[[1,1],[1,-1],[-1,1],[-1,-1]];
+    for(const [sx,sz] of corners)
+      parts.push({id:nid('post'),kind:'box',position:[c.x+sx*r,c.y,c.z+sz*r],
+        size:[t*2,r*1.9,t*2],rotation:[0,0,0],color:'#7e8892',role:'structure',
+        opacity:1,metalness:0.05,roughness:0.85,connections:[]});
+    parts.push({id:nid('lid'),kind:'box',position:[c.x,c.y+r*0.95,c.z],
+      size:[r*2.2,t*2,r*2.2],rotation:[0,0,0],color:'#6f7a85',role:'structure',
+      opacity:1,metalness:0.05,roughness:0.85,connections:[]});
+    wishes.push('to have a room where the air already is — the bat measured '+fx(S.cavity.r,2)+
+      'm of void that nothing in this house declares');
+    ops.push({op:'ENCLOSE_CAVITY',r:+r.toFixed(3)});
+  }
+
+  if(S.frontierCluster && S.frontierCluster.part){
+    const host=partById(S.frontierCluster.part);
+    if(host && (host.kind||'box')==='box' && host.size){
+      const s=host.size.slice(),pos=(host.position||[0,0,0]).slice();
+      const ax=s[0]>=s[2]?0:2;                 // split along the long horizontal axis
+      const gap=Math.max(0.5,Math.min(s[ax]*0.34,R*0.28));
+      const half=(s[ax]-gap)/2;
+      if(half>0.15){
+        const idx=state.house.parts.findIndex(p=>p.id===host.id);
+        const mk=(sign,suffix)=>{
+          const q=JSON.parse(JSON.stringify(host));
+          q.id=host.id+'-'+suffix; q.size=s.slice(); q.size[ax]=half;
+          q.position=pos.slice(); q.position[ax]=pos[ax]+sign*(half+gap)/2;
+          return q;
+        };
+        const keep=parts.filter(p=>p.id!==host.id);
+        keep.splice(idx<0?keep.length:idx,0,mk(-1,'a'),mk(1,'b'));
+        parts.length=0; parts.push(...keep);
+        wishes.push('to be enterable at '+host.id+' — '+S.frontierCluster.size+
+          ' nodes there are interesting and nothing has reached them');
+        ops.push({op:'APERTURE',part:host.id,gap:+gap.toFixed(3)});
+      }
+    }
+  }
+
+  if(S.hub){
+    const host=partById(S.hub.part);
+    if(host&&host.size){
+      const s=host.size.slice(),thin=s.indexOf(Math.min(...s));
+      const q=parts.find(p=>p.id===host.id);
+      if(q){ q.size=s.slice(); q.size[thin]=s[thin]*1.75;
+        wishes.push('to carry what it is already carrying — '+S.hub.count+
+          ' findings travelled through '+host.id+' without it being built for that');
+        ops.push({op:'THICKEN',part:host.id,axis:thin}); }
+    }
+  }
+
+  if(S.disagree){
+    const p=S.disagree.p,t=Math.max(0.08,R*0.02);
+    parts.push({id:nid('contested'),kind:'box',position:[p.x,p.y,p.z],
+      size:[R*0.16,t,R*0.16],rotation:[0,0,0],color:'#e6e2f2',role:'ambiguity',
+      opacity:0.72,metalness:0.0,roughness:0.4,connections:[]});
+    wishes.push('to be made of the place two senses contradict — the ants stand on '+
+      S.disagree.part+' where the bat’s delay reports air ('+S.disagree.count+' passes)');
+    ops.push({op:'BUILD_THE_AMBIGUITY',node:S.disagree.node});
+  }
+
+  if(!wishes.length){
+    /* the honest verdict is not a fallthrough here. it is the normal case, and
+       its recommendation is the same one classifyInverse buried in an else. */
+    wishes.push('AMBIGUOUS — nothing this house implies is legible yet; acquire another crawl before building');
+    return {wishes,ops,parts:null,signals:S};
+  }
+  return {wishes,ops,parts,signals:S};
+}
+
+function featureVector(){
+  const S=readSignals();
+  let stall=0,inter=0,dis=0;
+  for(const n of NODES){stall+=n.stallsHere;inter+=n.interior;dis+=n.disagree}
+  const N=Math.max(1,NODES.length);
+  return [
+    state.house.parts.length/60,
+    inter/N,
+    stall/N/3,
+    dis/N/4,
+    S.frontierCount/N,
+    state.ledger.emitters.length/N,
+    (bat?bat.cavities.length:0)/200,
+    state.ledger.transfers.length/6000
+  ].map(v=>clamp(v,0,3));
+}
+function noveltyVsAncestors(f){
+  if(!state.lineage.length)return 1;
+  let min=Infinity;
+  for(const a of state.lineage){
+    let d=0; for(let i=0;i<f.length;i++){const x=f[i]-(a.features[i]||0);d+=x*x}
+    min=Math.min(min,Math.sqrt(d));
+  }
+  return min;
+}
+function runGenie(){
+  if(!state.house||!NODES.length){toast('nothing to read yet');return}
+  const g=grantWishes();
+  if(!g){toast('the genie has nothing to read');return}
+  const features=featureVector(), novelty=noveltyVsAncestors(features);
+  let thumb=''; try{ thumb=thumbnail(); }catch(e){}
+
+  state.lineage.push({
+    house_id:state.house.id, parent_id:state.house.parent,
+    implied_wish:g.wishes.join(' · '), ops:g.ops,
+    novelty:+novelty.toFixed(3), features, thumb, generation:state.generation,
+    step:state.step
+  });
+
+  showWish(g.wishes,novelty);
+
+  if(!g.parts){ renderLedger(); return; }
+
+  const next={id:uid('house'),parent:state.house.id,parts:g.parts,wishIn:g.wishes.join(' | ')};
+  state.house=next; state.generation++;
+  respawn(true);
+  toast('house '+state.generation+' · '+g.wishes.length+' wish'+(g.wishes.length>1?'es':'')+' granted');
+  renderLedger();
+}
+function showWish(wishes,novelty){
+  $('#wishcard').classList.add('on');
+  $('#wishcard').classList.remove('folded');
+  $('#wishtext').innerHTML=wishes.map(w=>'— '+esc(w)).join('<br>');
+  $('#wishmeta').textContent='generation '+state.generation+' · novelty vs its own lineage '+
+    fx(novelty,3)+' · never compared to anything outside it';
+}
+function thumbnail(){
+  const c=document.createElement('canvas');c.width=184;c.height=124;
+  const x=c.getContext('2d');
+  x.fillStyle='#05070a';x.fillRect(0,0,c.width,c.height);
+  x.drawImage(renderer.domElement,0,0,c.width,c.height);
+  return c.toDataURL('image/jpeg',0.55);
+}
+
+/* ============================== THE RUN ================================== */
+state.trailSeg=[];
+function respawn(keepLineage){
+  buildWorld(state.house);
+  NODES=sampleSurface(560);
+  GRAPH=buildGraph(NODES,7);
+  /* node indices are per-house, so the node-addressed ledgers reset with the
+     house. lineage does not: it is the genie's memory and the only thing in
+     this program that persists across generations. */
+  state.ledger.labels=new Map(); state.ledger.transfers=[]; state.ledger.emitters=[];
+  state.ledger.delays=[]; state.ledger.parity=[]; state.ledger.stalls=[];
+  state.ledger.frontier=new Map(); state.ledger.disagree=new Map();
+  state.trailSeg=[];
+  readNodesFuzzy();
+  makeAnts(state.antCount);
+  buildOccupancy(); buildNodeHash(); makeBat();
+  initFx();
+  if(!keepLineage) state.lineage=[];
+  updateHud(); renderLedger();
+}
+function tick(){
+  state.step++;
+  for(const a of ants) antStep(a);
+  decayLabels();
+  if(state.batOn) batTick();
+  if(state.step%9===0)  readNodesFuzzy();
+  if(state.step%23===0) scanFrontier();
+  /* the ants teach the model the bat argues with, but only where they stood */
+  if(state.step%5===0&&occupancy) for(const a of ants) occupancy.put(NODES[a.idx].point,0.6);
+}
+let raf=null;
+function frame(){
+  raf=requestAnimationFrame(frame);
+  if(state.running) tick();
+  renderFx();
+  if(state.step%6===0) updateHud();
+  if(state.running&&state.step%45===0&&state.tab!=='theory') renderLedger(true);
+  renderer.render(scene,camera);
+}
+
+/* ================================ UI ===================================== */
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+let toastT=null;
+function toast(msg){
+  const t=$('#toast'); t.textContent=msg; t.classList.add('on');
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),1900);
+}
+function updateHud(){
+  const unreached=[...state.ledger.frontier.values()].filter(f=>!f.reached).length;
+  $('#h-frontier').textContent=unreached;
+  $('#h-labels').textContent=state.ledger.labels.size;
+  $('#h-emitters').textContent=state.ledger.emitters.length;
+  $('#h-disagree').textContent=state.ledger.disagree.size;
+  $('#n-frontier').textContent=unreached;
+  $('#n-labels').textContent=state.ledger.labels.size;
+  $('#n-transfers').textContent=state.ledger.transfers.length;
+  $('#n-emitters').textContent=state.ledger.emitters.length;
+  $('#n-delays').textContent=state.ledger.delays.length;
+  $('#n-parity').textContent=state.ledger.parity.length;
+  $('#n-stalls').textContent=state.ledger.stalls.length;
+  $('#n-disagree').textContent=state.ledger.disagree.size;
+  $('#n-lineage').textContent=state.lineage.length;
+}
+function memBar(label,v,cls){
+  return '<div class="mem"><span>'+label+'</span><div><i class="'+cls+'" style="width:'+
+    (clamp(v,0,1)*100).toFixed(0)+'%;background:currentColor"></i></div><b>'+fx(v,2)+'</b></div>';
+}
+function row(k,v){ return '<div class="row"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>' }
+
+const TABS={
+  frontier(){
+    const F=[...state.ledger.frontier.values()].filter(f=>NODES[f.node])
+      .sort((a,b)=>(a.reached?1:0)-(b.reached?1:0)||(NODES[b.node].interest-NODES[a.node].interest));
+    let h='<div class="note"><strong>frontier</strong> is <code>unresolvedHot</code> promoted from an error bar to a destination register. '+
+      'A run that grows this is alive — finding more unreachable interesting places is the work, not a coverage complaint. '+
+      'Nothing here is ranked into a leaderboard.</div>';
+    if(!F.length) h+='<div class="note">nothing marked yet — run the ants.</div>';
+    for(const f of F.slice(0,90)){
+      const n=NODES[f.node]; if(!n)continue;
+      h+=row((f.reached?'reached':'UNREACHED'),
+        '<span class="tag c-front">node '+f.node+'</span><span class="tag c-dim">'+esc(f.part)+'</span>'+
+        esc(f.why.join(' · '))+
+        '<u> · first seen step '+f.firstSeen+'</u>'+
+        memBar('seam',n.mem.seam,'c-seam')+memBar('clash',n.mem.clash,'c-clash')+
+        memBar('verify',n.mem.verify,'c-verify')+memBar('wander',n.mem.wander,'c-wander')+
+        memBar('interior',n.interior,'c-verify'));
+    }
+    return h;
+  },
+  labels(){
+    let h='<div class="note"><strong>labels</strong> decay at 0.992/step — half-life <strong>'+fx(HALF_LIFE,1)+
+      ' steps</strong>. The isotope is the finding, not the ant. A finding nobody re-deposits fades whether or not '+
+      'it was ever disproved; what stays hot is what independent couriers keep re-finding.</div>';
+    const L=[...state.ledger.labels.values()].sort((a,b)=>b.strength-a.strength);
+    if(!L.length)h+='<div class="note">no live labels.</div>';
+    for(const l of L.slice(0,80)){
+      h+=row(fx(l.strength,2),'<span class="tag c-seam">'+esc(l.activity)+'</span>'+
+        'minted at node '+l.origin+' step '+l.born+' · <u>'+l.transfers+' transfers · reached '+l.spread.size+' nodes</u>');
+    }
+    return h;
+  },
+  transfers(){
+    let h='<div class="note"><strong>transfers</strong> are the primary datum. Gosswald and Kloft counted the label in ants '+
+      'that never visited the source and recovered the sharing network from it. A defect that stays where it was found is local; '+
+      'a label that propagates is structural — learned without anything here knowing what a structure is.</div>';
+    const T=state.ledger.transfers.slice(-120).reverse();
+    if(!T.length)h+='<div class="note">nothing has been handed on yet.</div>';
+    for(const t of T) h+=row('step '+t.step,'<span class="tag c-'+t.caste+'">'+t.caste+'</span>'+
+      esc(t.activity)+' · node '+t.from+' → '+t.to+' <u>'+esc(t.label_id)+'</u>');
+    return h;
+  },
+  emitters(){
+    let h='<div class="note"><strong>emitters</strong> are planted where the ants walked, so the lattice is densest exactly where '+
+      'the model was weakest. Every instrument in the clinic line pointed inward from a shell; these point outward from inside. '+
+      'The map of emitter density is a portrait of what this program did not know.</div>';
+    const E=state.ledger.emitters.slice(-100).reverse();
+    if(!E.length)h+='<div class="note">no emitters planted yet.</div>';
+    for(const e of E) h+=row('step '+e.step,'<span class="tag c-seam">node '+e.node+'</span>'+
+      esc(e.by)+' · intensity '+fx(e.intensity,2));
+    return h;
+  },
+  delays(){
+    let h='<div class="note"><strong>delays</strong>: predicted from the model the ants built, measured by raycast. '+
+      'Surprise is the divergence. The bat steers toward it — a bat flying through a well-understood building learns nothing. '+
+      'This is the only instrument here that measures air rather than skin.</div>';
+    if(bat) h+=row('now','mean surprise <b>'+fx(bat.surprise,3)+'</b> · '+bat.cavities.length+
+      ' cavity readings · nearest wall '+
+      (bat.lastRays.length?fx(bat.lastRays.reduce((m,r)=>Math.min(m,r.measured),Infinity),2)+'m':'—'));
+    const D=state.ledger.delays.slice(-110).reverse();
+    for(const d of D) h+=row('s'+fx(d.surprise,3),'<span class="tag c-bat">'+esc(d.claim)+'</span>'+
+      'predicted '+fx(d.predicted,2)+' · measured '+fx(d.measured,2)+' <u>step '+d.step+'</u>');
+    return h;
+  },
+  parity(){
+    let inside=0,probed=0;
+    for(const n of NODES){ if(n.crossings>=0){probed++; inside+=n.interior} }
+    let h='<div class="note"><strong>parity</strong> was built as a mesh-integrity error metric in the Rutherford scan. '+
+      'It is a floor plan. A node whose outward ray leaves through an odd number of surfaces is inside something. '+
+      'There is no room primitive in this program — interiority is walked into.</div>';
+    h+=row('probed',probed+' of '+NODES.length+' nodes · summed interiority '+fx(inside,1)+
+      ' ('+fx(100*inside/Math.max(1,NODES.length),1)+'% of the surface reads as inside something)');
+    const P=state.ledger.parity.slice(-100).reverse();
+    for(const p of P) h+=row(p.crossings+' cross','<span class="tag '+(p.interior>0.5?'c-verify':'c-dim')+'">'+
+      esc(p.part)+'</span>interior '+fx(p.interior,2)+' <u>node '+p.node+'</u>');
+    return h;
+  },
+  stalls(){
+    const byPart=new Map();
+    for(const s of state.ledger.stalls){
+      const r=byPart.get(s.part)||{n:0,promise:0};
+      r.n++; r.promise+=s.promise; byPart.set(s.part,r);
+    }
+    let h='<div class="note"><strong>stalls</strong> were <code>lostMovePercent</code> — reported as wasted compute. '+
+      'A stall means all seven neighbours were worse than standing still, i.e. the surface stops. This is a boundary '+
+      'detector that spent four versions filed as inefficiency. A part outlined entirely in these is attached to nothing.</div>';
+    for(const [p,r] of [...byPart.entries()].sort((a,b)=>b[1].n-a[1].n))
+      h+=row(r.n+'×','<span class="tag c-front">'+esc(p)+'</span>'+
+        'mean promise '+fx(r.promise/r.n,2)+' — how much its neighbourhood still offered'+
+        memBar('exhaustion',1-(r.promise/r.n),'c-front'));
+    if(!byPart.size)h+='<div class="note">no boundaries found yet.</div>';
+    return h;
+  },
+  disagree(){
+    let h='<div class="note"><strong>disagreement</strong> between the ant and the bat is not arbitrated. The ant stands on '+
+      'surface; the bat’s delay says the ray passed clean through. Both readings are kept. This field is the genie’s primary '+
+      'input, and the coordinates below are the highest-value locations the program can produce.</div>';
+    const D=[...state.ledger.disagree.values()].filter(d=>NODES[d.node]).sort((a,b)=>b.count-a.count);
+    if(!D.length)h+='<div class="note">the two senses have not contradicted each other yet.</div>';
+    for(const d of D.slice(0,60)) h+=row(d.count+' passes',
+      '<span class="tag c-verify">node '+d.node+'</span><span class="tag c-dim">'+esc(d.part)+'</span>'+
+      'ant: solid · bat: air <u>last step '+d.lastStep+'</u>');
+    return h;
+  },
+  lineage(){
+    let h='<div class="note"><strong>lineage</strong> is the genie’s memory. Novelty is measured against this house’s own '+
+      'ancestors and never against anything outside it. It is recorded, not thresholded — there is nothing in this program '+
+      'a house can fail.</div>';
+    h+='<div id="lineage">'+state.lineage.map((l,i)=>
+      '<div class="lin'+(i===state.lineage.length-1?' on':'')+'">'+
+      (l.thumb?'<img src="'+l.thumb+'">':'<img>')+
+      '<b>gen '+l.generation+'</b><i>nov '+fx(l.novelty,2)+'</i></div>').join('')+'</div>';
+    for(const l of [...state.lineage].reverse())
+      h+=row('gen '+l.generation,'<span class="tag c-genie">wish</span>'+esc(l.implied_wish)+
+        '<u> · '+l.ops.map(o=>o.op).join(', ')+' · novelty '+fx(l.novelty,3)+'</u>');
+    if(!state.lineage.length)h+='<div class="note">no generations yet — ask the genie what this house implies.</div>';
+    return h;
+  },
+  theory(){
+    return '<div class="note">'+
+      '<strong>ANT</strong> deposits. It is the only agent that can be somewhere; every other instrument in the line this '+
+      'came from is a viewpoint. Movement weights are the v14 crawl’s own: novelty 1.65, scent 0.22, being where you just '+
+      'were is a penalty of 1.25. Scent is one seventh of novelty. That agent was tuned as a novelty search and then wired '+
+      'to a critic told to pick one thing. Here it steers.<br><br>'+
+      '<strong>BAT</strong> interrogates. Emit into the dark, read delay, hunt surprise. The DARK ordeal was filed as a stress '+
+      'test the building failed; dark is this animal’s medium, and that ordeal was a request for a sensor that does not need light.<br><br>'+
+      '<strong>GENIE</strong> grants. A genie gives exactly what was asked and never what was meant, and the third wish undoes '+
+      'the first two — <code>focusAttempts: 4</code>. So it runs backwards: it takes a house and returns the wish that house '+
+      'implies, builds it, and reads the result. Better means the next house is one the previous could not have been read as '+
+      'wanting. Novelty against lineage, not against a picture.<br><br>'+
+      '<strong>Fuzzy.</strong> The clinic crisp-ified continuous evidence three times over between measurement and report — '+
+      'twenty-odd thresholds, each one a stepping stone discarded for looking like the wrong thing. Here memberships stay in '+
+      '[0,1] to the render. AMBIGUOUS is a terminal state, not a fallthrough.<br><br>'+
+      '<strong>What this will not do.</strong> No reference-as-target. No score, threshold, or critic. No single accusation, '+
+      'focus lock, or escalation ladder. No arbitration between the two senses. No defuzzification before render. No hotspot '+
+      'leaderboard. No stopping condition — a run ends when you stop watching. And no claim that the resulting house is good: '+
+      'the claim is that it is not any of the previous ones, and the ledger says exactly how.'+
+      '</div>';
+  }
+};
+function renderLedger(keepScroll){
+  const el=$('#ledger');
+  const y=keepScroll?el.scrollTop:0;
+  el.innerHTML=(TABS[state.tab]||TABS.theory)();
+  el.scrollTop=y;
+}
+
+/* ---------------------------- wiring ------------------------------------- */
+function wire(){
+  $('#btn-run').addEventListener('click',()=>{
+    state.running=!state.running;
+    $('#btn-run').textContent=state.running?'Pause':'Run';
+    $('#btn-run').classList.toggle('on',state.running);
+  });
+  $('#btn-step').addEventListener('click',()=>{ for(let i=0;i<60;i++)tick(); updateHud(); renderLedger(); });
+  $('#btn-genie').addEventListener('click',runGenie);
+  $('#btn-bat').addEventListener('click',()=>{
+    state.batOn=!state.batOn;
+    $('#btn-bat').classList.toggle('on',state.batOn);
+  });
+  $('#btn-ants').addEventListener('click',()=>{
+    const opts=[4,10,18,28];
+    state.antCount=opts[(opts.indexOf(state.antCount)+1)%opts.length];
+    $('#btn-ants').textContent='Ants '+state.antCount;
+    makeAnts(state.antCount); initFx();
+  });
+  $('#btn-view').addEventListener('click',()=>{
+    const R=state.bounds.radius;
+    const views=[
+      {az:0.9,pol:1.05,rad:R*2.9},{az:2.4,pol:0.75,rad:R*2.2},
+      {az:0.0,pol:1.45,rad:R*1.4},{az:3.6,pol:0.35,rad:R*3.4},
+      {az:1.7,pol:1.55,rad:R*0.55}   // inside, where only emitters light anything
+    ];
+    state.viewIdx=(state.viewIdx+1)%views.length;
+    Object.assign(cam,views[state.viewIdx]); updateCamera();
+    toast(state.viewIdx===4?'inside — lit only by planted emitters':'view '+(state.viewIdx+1));
+  });
+  $('#btn-reseed').addEventListener('click',()=>{
+    state.house=seedHouse(); state.generation=0; state.step=0;
+    state.lineage=[]; $('#wishcard').classList.remove('on');
+    respawn(false); toast('seeded — a house with things worth finding in it');
+  });
+  $('#btn-export').addEventListener('click',exportRun);
+  $('#file-in').addEventListener('change',e=>{
+    const f=e.target.files&&e.target.files[0]; if(!f)return;
+    const r=new FileReader();
+    r.onload=()=>{ try{ importPayload(JSON.parse(r.result),f.name) }catch(err){ toast('could not read: '+err.message) } };
+    r.readAsText(f); e.target.value='';
+  });
+  $('#wishcard').addEventListener('click',()=>$('#wishcard').classList.toggle('folded'));
+  document.querySelectorAll('.t').forEach(b=>b.addEventListener('click',()=>{
+    document.querySelectorAll('.t').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); state.tab=b.dataset.tab; renderLedger();
+  }));
+}
+
+/* ---- import ---------------------------------------------------------------
+   A correspondence export loads straight in. Its reference photograph comes
+   along as an object and is never given authority; currentScore, latestCritique,
+   focusIds, criticHistory and the threshold are read and discarded on purpose.
+   This is branch vii: the same four buildings, with nothing telling them they
+   are failing to be a cabin.
+   -------------------------------------------------------------------------- */
+function importPayload(d,name){
+  let parts=null,src='';
+  if(d && d.house && Array.isArray(d.house.parts)){ parts=d.house.parts; src='antbat run'; }
+  else if(d && d.scene && Array.isArray(d.scene.parts)){ parts=d.scene.parts; src='correspondence export'; }
+  else if(Array.isArray(d.parts)){ parts=d.parts; src='bare part list'; }
+  if(!parts||!parts.length){ toast('no parts found in '+name); return }
+  state.house={id:uid('house'),parent:null,parts:JSON.parse(JSON.stringify(parts)),
+    wishIn:'(imported — whatever it was trying to be is not this program’s business)'};
+  state.generation=0; state.step=0; state.lineage=[];
+  $('#wishcard').classList.remove('on');
+  respawn(false);
+  const dropped=[];
+  if(d.currentScore!=null)dropped.push('score '+d.currentScore);
+  if(d.settings&&d.settings.threshold!=null)dropped.push('threshold '+d.settings.threshold);
+  if(d.latestCritique)dropped.push('critique');
+  if(d.referenceName)dropped.push('reference '+d.referenceName);
+  toast(parts.length+' parts from '+src+(dropped.length?' · discarded: '+dropped.join(', '):''));
+}
+function exportRun(){
+  const payload={
+    program:'antbat-genie', exportedAt:nowISO(),
+    generation:state.generation, step:state.step, halfLife:+HALF_LIFE.toFixed(3),
+    house:state.house,
+    lineage:state.lineage.map(l=>({...l,thumb:undefined})),
+    ledger:{
+      labels:[...state.ledger.labels.values()].map(l=>({...l,spread:l.spread.size})),
+      transfers:state.ledger.transfers.slice(-4000),
+      emitters:state.ledger.emitters.map(e=>({node:e.node,by:e.by,step:e.step,
+        pos:[+e.pos.x.toFixed(4),+e.pos.y.toFixed(4),+e.pos.z.toFixed(4)],intensity:e.intensity})),
+      delays:state.ledger.delays.slice(-4000),
+      parity:state.ledger.parity.slice(-4000),
+      stalls:state.ledger.stalls.slice(-4000),
+      frontier:[...state.ledger.frontier.values()],
+      disagree:[...state.ledger.disagree.values()]
+    },
+    refusals:['no score','no target','no threshold','no critic','no reference','no stopping condition']
+  };
+  const blob=new Blob([JSON.stringify(payload,null,1)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='antbat-'+nowISO().replace(/[:.]/g,'')+'.json';
+  a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  toast('exported ledger + lineage · no score in the file');
+}
+
+/* ------------------------------ init ------------------------------------- */
+function init(){
+  if(!window.THREE){ $('#booterr').innerHTML='<code>three.js unavailable</code>'; return }
+  if(!boot()) return;
+  wire();
+  state.house=seedHouse();
+  respawn(false);
+  $('#boot').classList.add('gone');
+  frame();
+  toast('no score in this program · ask the genie what the house implies');
+}
+if(document.readyState==='loading') window.addEventListener('DOMContentLoaded',init);
+else init();
+</script>
+</body>
+</html>
