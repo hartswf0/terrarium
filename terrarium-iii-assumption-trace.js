@@ -10,7 +10,8 @@ try{
   await import('./terrarium-iii-architecture-v4-runtime.js?v=4.1.1');
   await import('./terrarium-iii-architecture-v4-orchestrator.js?v=4.1.1');
   await import('./terrarium-iii-architecture-v4-finalize.js?v=4.1.1');
-  console.info('[III ARCHITECTURE] V4.1 structure/assumption contract armed', window.III_ARCH_RUNTIME_V4?.VERSION || window.III_ARCHITECTURE?.version);
+  await import('./terrarium-iii-playtest.js?v=0.1');
+  console.info('[III ARCHITECTURE] V4.1 structure/assumption contract armed', window.III_ARCH_RUNTIME_V4?.VERSION || window.III_ARCHITECTURE?.version, 'playtest', window.III_PLAYTEST?.version);
 }catch(err){
   console.error('[III ARCHITECTURE V4.1] bootstrap failed',err);
 }
