@@ -6,7 +6,7 @@ try{
   await import('./terrarium-iii-collision-budget.js?v=4.1.1');
   await import('./terrarium-iii-architecture-v4-prompts.js?v=4.1.1');
   await import('./terrarium-iii-architecture-v4-support.js?v=4.1.1');
-  await import('./terrarium-iii-architecture-v4-observer.js?v=4.1.1');
+  await import('./terrarium-iii-architecture-v4-observer.js?v=4.1.2');
   await import('./terrarium-iii-architecture-v4-runtime.js?v=4.1.1');
   await import('./terrarium-iii-architecture-v4-orchestrator.js?v=4.1.1');
   await import('./terrarium-iii-architecture-v4-finalize.js?v=4.1.1');
