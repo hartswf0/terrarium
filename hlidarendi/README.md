@@ -48,15 +48,22 @@ GROUND dresses it: satellite imagery (© Esri) painted onto the real heights,
 roads and rivers inked from OpenStreetMap, buildings standing as real
 occupancy the body, dog and ball all answer to. The page dresses itself at
 boot too, where the network allows; the procedural moss is the honest
-fallback where it is closed. `/forget` clears the save. The chrome is Thunder Rigs' own shell law: the
-header carries ⚠ (diagnostics — it lights amber when a line closes) · ● REC
-(records the canvas, the take saves to your files) · ▶ PLAY · ≡. Default is
-PLAY MODE — a clean screen; ≡ opens the sectioned toolbars (PLAY / BUILD /
-SYSTEM, each group expanding from its toggle, III-style) together with the
-AGENT bar, and ✕ or tapping the world returns to play. The citizens announce
-themselves — **Everybody**, **Argos**, and **Ingold ▼** float as names
-projected over the actors and the dwelling through the one camera.
-FEED/JUMP/FIRE/BOOST sit bottom-right. MOVE/LOOK to travel; touch a limb control and it grows while
+fallback where it is closed. `/forget` clears the save. The chrome is Thunder Rigs' own shell law, whole:
+the header carries CAM · ▲ LAND · ● REC (records the canvas, the take saves
+to your files) · ▶ PLAY · ≡. The yellow ▲ opens THE LAND — places load like
+cartridges from a deed list (Gunnar's Hlíðarendi, Njáll's Bergþórshvoll,
+Þórsmörk, Eyjafjallajökull, TERRA HERE by name, DRESS THE LAND, SAVE LAND).
+The one line up top is SPEAK — words reach the dog and the terrarium — and
+under the lightning 🗲 it becomes AGENT, summoning structures through the
+forge; the dog's and the world's words fold beneath it as the log (▾). ≡
+opens the full sectioned toolbars (PLAY: striker, say · BUILD: AI key, agent
++ quick stand-ins, world dress/goto/place · SYSTEM: the six skies, file,
+sys, body), each group expanding from its toggle, III-style; ✕ or tapping
+the world returns to a clean PLAY MODE, and ≡ lights amber when a line
+closes. The citizens announce themselves — **Everybody**, **Argos**, and
+**Ingold ▼** float as names projected over the actors and the dwelling
+through the one camera. The travel stick lives in the drive corner,
+bottom-left; FEED/JUMP/FIRE/BOOST sit bottom-right. MOVE/LOOK to travel; touch a limb control and it grows while
 the others store; FIRE takes/throws the ball, FEED fills the bowl at the
 galley, FILE keeps the situation across reloads. Argos decides for
 himself — a throw enters his world as evidence, not as a command.

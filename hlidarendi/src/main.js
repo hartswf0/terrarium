@@ -2134,7 +2134,7 @@ const chat={
   register(fn){if(typeof fn==='function')this.handlers.push(fn);return()=>{const i=this.handlers.indexOf(fn);if(i>=0)this.handlers.splice(i,1)}},
   line(who,text){
     if(who==='world'&&/closed|refus|failed|cannot|error/i.test(text)&&!document.body.classList.contains('diag-open'))
-      $('#warnBtn')?.classList.add('live');
+      $('#menuFab')?.classList.add('live');
     const log=$('#chatLog');if(!log)return;
     const el=document.createElement('div');el.className='line '+who;el.textContent=text;
     log.appendChild(el);while(log.children.length>28)log.removeChild(log.firstChild);
@@ -2180,14 +2180,11 @@ const chat={
     return prog;
   }
 };
-{
-  const form=$('#chatForm'),input=$('#chatSay'),wrap=$('#chatWrap'),btn=$('#sayBtn');
-  if(form&&input){form.addEventListener('submit',e=>{e.preventDefault();chat.say(input.value);input.value='';if(IS_TOUCH)input.blur()})}
-  const setChat=on2=>{wrap?.classList.toggle('on',on2);btn?.classList.toggle('on',on2)};
-  if(btn)btn.onclick=()=>setChat(!wrap.classList.contains('on'));
-  setChat(!IS_TOUCH);
-  chat.line('world','HLIÐARENDI — a body, a dog, a dwelling, a place. Speak, or /help.');
-}
+// the log — the dog's and the world's words, folded under the one top line
+const setLog=v=>{document.body.classList.toggle('log-open',v);$('#sayBtn')?.classList.toggle('on',v)};
+const openLog=()=>setLog(true);
+setLog(true);
+chat.line('world','HLIÐARENDI — a body, a dog, a dwelling, a place. Speak, or /help.');
 const on=(sel,fn)=>{const el=$(sel);if(el)el.onclick=fn};
 // ---- THE SHELL — Thunder Rigs' header law: play mode vs menu mode ----------
 // Default is PLAY MODE: a clean screen, just the world and the citizens.
@@ -2196,16 +2193,31 @@ const on=(sel,fn)=>{const el=$(sel);if(el)el.onclick=fn};
 // amber when the world reports a closed line. ● REC records the canvas.
 {
   const body=document.body;
-  const enterPlay=()=>{body.classList.add('play-mode');body.classList.remove('menu-open')};
-  const openMenu=()=>{body.classList.remove('play-mode');body.classList.add('menu-open')};
+  const enterPlay=()=>{body.classList.add('play-mode');body.classList.remove('menu-open','land-open')};
+  const openMenu=()=>{body.classList.remove('play-mode','land-open');body.classList.add('menu-open')};
   enterPlay();
-  on('#menuFab',()=>{body.classList.contains('menu-open')?enterPlay():openMenu()});
+  on('#menuFab',()=>{$('#menuFab')?.classList.remove('live');body.classList.contains('menu-open')?enterPlay():openMenu()});
   on('#playFab',enterPlay);
   document.querySelectorAll('.tb-toggle').forEach(b=>b.addEventListener('click',()=>{
     const t=document.getElementById(b.dataset.target);t?.classList.toggle('collapsed');
   }));
-  $('#gl')?.addEventListener('pointerdown',()=>{if(body.classList.contains('menu-open'))enterPlay()},true);
-  on('#warnBtn',()=>{body.classList.toggle('diag-open');$('#warnBtn')?.classList.remove('live')});
+  $('#gl')?.addEventListener('pointerdown',()=>{if(body.classList.contains('menu-open')||body.classList.contains('land-open'))enterPlay()},true);
+  on('#diagBtn',()=>{body.classList.toggle('diag-open');$('#menuFab')?.classList.remove('live')});
+  // ▲ THE LAND — places load like cartridges: the deed list under the header
+  on('#landBtn',()=>{
+    if(body.classList.contains('land-open'))enterPlay();
+    else{body.classList.remove('play-mode','menu-open');body.classList.add('land-open')}
+  });
+  document.querySelectorAll('#landMenu .land-item').forEach(b=>b.addEventListener('click',()=>{
+    enterPlay();openLog();
+    const k=b.dataset.land;
+    if(b.dataset.lat)chat.say('/goto '+b.dataset.lat+' '+b.dataset.lon);
+    else if(k==='place'){const i=$('#agentSay');if(i){i.value='/place ';i.focus()}}
+    else if(k==='dress'){chat.line('world','calling on the living ground…');
+      dressWorld().then(t=>chat.line('world','dressed — '+t+' tiles · imagery © Esri · ways © OpenStreetMap'))
+        .catch(e=>chat.line('world','the imagery line is closed here — '+String(e.message||e).slice(0,40)))}
+    else if(k==='save'){saveWorld();chat.line('world','the land is kept')}
+  }));
   // ● REC — the take is real: canvas capture through MediaRecorder, saved to
   // the player's files on stop. Honest about where the browser can't record.
   const rb=$('#recBtn');let mr=null,chunks=[];
@@ -2238,27 +2250,53 @@ const on=(sel,fn)=>{const el=$(sel);if(el)el.onclick=fn};
     }catch(e){mr=null;rb.classList.remove('on');chat.line('world','recording failed — '+String(e.message||e).slice(0,50))}
   };
 }
-// ---- the AGENT bar: words become structures through the forge
+// ---- the ONE LINE: speak to the dog and the terrarium, or — under the
+// lightning — summon structures through the forge. The log folds beneath it.
 {
   const ag=$('#agentSay'),st2=$('#agentStatus');
   const refreshAI=()=>{let k=null;try{k=localStorage.getItem('hlidarendi.ai.key')}catch(e){}
-    if(st2)st2.textContent=k?'● AI ON · claude-opus-5 · say /ai off to disconnect':'● AI OFF · stand-ins · say /ai <key> to connect'};
+    if(st2)st2.textContent=k?'● AI ON · claude-opus-5 · say /ai off to disconnect':'● AI OFF · stand-ins · tap to configure'};
   refreshAI();window.__refreshAI=refreshAI;
+  let barMode='speak';
+  const setBarMode=m=>{barMode=m;
+    const tag=$('#agentTag');if(tag)tag.textContent=m==='agent'?'AGENT':'SPEAK';
+    $('#modeBtn')?.classList.toggle('on',m==='agent');
+    if(ag)ag.placeholder=m==='agent'?'summon a structure — a dragon gate, a watchtower, a bridge…':'speak — words reach the dog and the terrarium · /help';
+  };
+  setBarMode('speak');
+  on('#modeBtn',()=>setBarMode(barMode==='agent'?'speak':'agent'));
+  on('#logBtn',()=>setLog(!document.body.classList.contains('log-open')));
+  on('#sayBtn',()=>setLog(!document.body.classList.contains('log-open')));
+  if(st2)st2.onclick=()=>{setBarMode('speak');if(ag){ag.value='/ai ';ag.focus()}};
   $('#agentForm')?.addEventListener('submit',e=>{
     e.preventDefault();const t=(ag?.value||'').trim();if(!t)return;ag.value='';
-    chat.line('you','⚒ '+t);buildFromWords(t);if(IS_TOUCH)ag?.blur();
+    openLog();
+    if(barMode==='agent'&&t[0]!=='/'){chat.line('you','⚒ '+t);buildFromWords(t)}
+    else chat.say(t);
+    if(IS_TOUCH)ag?.blur();
   });
-  on('#buildBtn',()=>ag?.focus());
+  const prefill=v=>{setBarMode('speak');openLog();if(ag){ag.value=v;if(!IS_TOUCH)ag.focus()}};
+  on('#buildBtn',()=>{setBarMode('agent');ag?.focus()});
+  on('#speakBtn',()=>{setBarMode('speak');openLog();ag?.focus()});
+  on('#aiBtn',()=>prefill('/ai '));
+  on('#gotoBtn',()=>prefill('/goto 63.7422 -20.1080'));
+  on('#placeBtn',()=>prefill('/place '));
+  on('#dressBtn',()=>{openLog();chat.line('world','calling on the living ground…');
+    dressWorld().then(t=>chat.line('world','dressed — '+t+' tiles · imagery © Esri · ways © OpenStreetMap'))
+      .catch(e=>chat.line('world','the imagery line is closed here — '+String(e.message||e).slice(0,40)))});
+  document.querySelectorAll('[data-build]').forEach(b=>b.addEventListener('click',()=>{
+    openLog();chat.line('you','⚒ '+b.dataset.build);buildFromWords(b.dataset.build);
+  }));
+  document.querySelectorAll('[data-sky]').forEach(b=>b.addEventListener('click',()=>{
+    WEATHER.set(b.dataset.sky);chat.line('world','the sky turns — '+b.dataset.sky);
+  }));
+  on('#forgetBtn',()=>chat.say('/forget'));
   on('#jumpBtn',()=>gameCommand('jump'));
   const bb2=$('#boostBtn');
   if(bb2){const dn=e=>{e.preventDefault();explorer.boostHold=true;bb2.classList.add('on')};
     const up=()=>{explorer.boostHold=false;bb2.classList.remove('on')};
     bb2.addEventListener('pointerdown',dn);bb2.addEventListener('pointerup',up);bb2.addEventListener('pointercancel',up);bb2.addEventListener('pointerleave',up)}
   on('#strikerBtn',()=>chat.say('/striker'));
-  on('#aiBtn',()=>{const i=$('#chatSay');$('#chatWrap')?.classList.add('on');$('#sayBtn')?.classList.add('on');if(i){i.value='/ai ';i.focus()}});
-  on('#worldBtn',()=>{const i=$('#chatSay');$('#chatWrap')?.classList.add('on');$('#sayBtn')?.classList.add('on');if(i){i.value='/goto 63.7422 -20.1080';if(!IS_TOUCH)i.focus()}});
-  const SKYS=['day','dusk','night','fog','rain','dawn'];let skyI=0;
-  on('#skyBtn',()=>{skyI=(skyI+1)%SKYS.length;WEATHER.set(SKYS[skyI]);chat.line('world','the sky turns — '+SKYS[skyI])});
 }
 on('#saveBtn',saveWorld);
 on('#ballBtn',()=>{if(ball.state==='hero')throwBall();else takeBall();updateWorldUI()});

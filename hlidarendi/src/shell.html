@@ -202,15 +202,27 @@ body #readout{background:var(--panel)!important;color:var(--dim)!important;borde
   border:1px solid var(--edge);border-radius:7px;padding:7px 9px;min-width:0}
 #agentSay:focus{outline:none;border-color:#6d5aa8}
 #agentGo{flex:0 0 auto;width:34px;border-radius:50%;border:none;background:var(--red);color:#fff;font-size:13px;cursor:pointer}
-#agentStatus{margin-top:5px;font:10px/1.3 "IBM Plex Mono",monospace;letter-spacing:.06em;color:var(--dim);text-align:center}
+#modeBtn,#logBtn{flex:0 0 auto;width:30px;height:34px;border:none;background:transparent;color:var(--dim);font-size:14px;cursor:pointer}
+#modeBtn.on{color:var(--red)}
+body.log-open #logBtn{color:var(--teal);transform:rotate(180deg)}
+#agentStatus{margin-top:5px;font:10px/1.3 "IBM Plex Mono",monospace;letter-spacing:.06em;color:var(--dim);text-align:center;cursor:pointer}
+/* the log — the dog's and the world's words, folded under the one line */
+body #chatWrap{position:fixed!important;z-index:29;top:122px!important;bottom:auto!important;left:50%!important;transform:translateX(-50%);width:min(92vw,560px)!important;display:none!important}
+body.log-open #chatWrap{display:block!important}
 /* ═══ THE SHELL — Thunder Rigs' own header law, worn whole ═══
    [brand][⚠][●REC][▶PLAY][≡] up top; default is PLAY MODE (a clean screen);
    ≡ opens the toolbar sections, ✕ or tapping the world returns to play. */
 .tb.hb{display:flex!important;align-items:center;justify-content:center;gap:6px;min-width:46px;padding:0 12px!important;font-size:11px!important;font-weight:700;letter-spacing:.08em}
-#warnBtn{font-size:14px!important;color:var(--dim)!important}
-#warnBtn.live{color:var(--amber)!important;animation:hlblink 1.1s steps(2) infinite}
+#top #viewBtn{display:flex!important;height:100%!important;min-width:46px!important;border-left:1px solid var(--edge)!important}
+#landBtn{font-size:13px!important;color:var(--amber)!important}
+body.land-open #landBtn{background:#2a2410!important}
+#menuFab.live{color:var(--amber)!important;animation:hlblink 1.1s steps(2) infinite}
 @keyframes hlblink{50%{opacity:.35}}
-body.diag-open #warnBtn{background:#1c2126!important;color:var(--amber)!important}
+/* THE LAND — places load like cartridges: stacked deeds under the header */
+#landMenu{position:fixed;right:8px;top:54px;z-index:60;display:none;flex-direction:column;gap:6px;align-items:stretch;width:min(78vw,340px)}
+body.land-open #landMenu{display:flex}
+.land-item{font:700 10px/1.2 "IBM Plex Mono",monospace;letter-spacing:.08em;text-align:left;color:var(--amber);background:var(--panel);border:1px solid #5c4d1e;border-radius:8px!important;padding:10px 12px;cursor:pointer;backdrop-filter:blur(4px)}
+.land-item:active{background:var(--amber);color:#1a1503}
 #recBtn{color:var(--red)!important}
 #recBtn .dot{width:9px;height:9px;border-radius:999px!important;background:var(--red);display:inline-block}
 #recBtn.on{background:var(--red)!important;color:#fff!important}
@@ -223,16 +235,25 @@ body.diag-open #warnBtn{background:#1c2126!important;color:var(--amber)!importan
 body.menu-open #menuFab .bars{display:none}
 body.menu-open #menuFab .x{display:inline}
 body.menu-open #playFab{display:none!important}
-body.play-mode #agentBar,body.play-mode #readout,body.play-mode #tiltViz{display:none!important}
+body.play-mode #readout,body.play-mode #tiltViz{display:none!important}
 body.diag-open #readout{display:block!important}
+/* the travel stick lives in the drive corner, as it does in the standing world */
+#deckL{justify-content:flex-end;padding-bottom:10px}
+#driveHint{position:fixed;z-index:24;left:10px;bottom:max(8px,env(safe-area-inset-bottom,0px));font:700 8px/1 "IBM Plex Mono",monospace;letter-spacing:.08em;color:#04110d;background:var(--teal);border-radius:4px!important;padding:4px 7px;pointer-events:none;opacity:.85}
+body.navigating #driveHint,body.deck-using #driveHint{opacity:0;transition:opacity .2s}
 /* the toolbars — sectioned intents, each group expanding leftward from its toggle */
 #toolbars{position:fixed;right:8px;top:54px;z-index:26;display:none;flex-direction:column;gap:8px;align-items:flex-end;max-height:calc(100vh - 70px);overflow-y:auto;overscroll-behavior:contain;padding:2px 0 8px;scrollbar-width:none}
 body.menu-open #toolbars{display:flex;z-index:60}
 /* while the shop is open it owns the right edge — the LOOK revolver waits */
 body.menu-open #deckR{opacity:.18;pointer-events:none}
 body.menu-open #deckR *{pointer-events:none!important}
-/* the agent bar owns the top band on narrow screens — the shop moves below it */
-@media (max-width:900px){#toolbars{top:126px;max-height:calc(100vh - 140px)}}
+/* the agent bar owns the top band on narrow screens — the shop moves below it,
+   and while a shop is open it borrows the log's space */
+@media (max-width:900px){
+  #toolbars{top:126px;max-height:calc(100vh - 140px)}
+  #landMenu{top:126px}
+  body.menu-open #chatWrap,body.land-open #chatWrap{display:none!important}
+}
 .tb-section{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
 .tb-section-label{font:700 8px/1 "IBM Plex Mono",monospace;letter-spacing:.34em;color:var(--dim);text-transform:uppercase;padding-right:5px}
 .tb-section+.tb-section{margin-top:4px;padding-top:10px;border-top:1px solid #ffffff14}
@@ -262,13 +283,11 @@ body.menu-open #deckR *{pointer-events:none!important}
 .ab.red{border-color:var(--red)!important;color:var(--red)!important}
 .ab.on{background:var(--red)!important;color:#fff!important}
 .ab.small{width:52px!important;height:52px!important;font-size:10px!important}
-/* dog / speak panel */
-body #chatWrap{bottom:14px!important}
-body #chatLog .line{background:#151b20!important;border:1px solid var(--edge)!important;color:var(--txt)!important}
-body #chatLog .line.dog{background:#241c10!important;color:var(--amber)!important;border-color:#4a3c1c!important}
-body #chatLog .line.world{background:#0f211d!important;color:var(--teal)!important;border-color:#1f4a41!important}
-body #chatSay{background:#0a0d10!important;color:var(--txt)!important;border:1.5px solid var(--edge)!important}
-body #chatSay:focus{border-color:var(--teal)!important}
+/* the log lines */
+body #chatLog{max-height:30vh;margin-bottom:0}
+body #chatLog .line{background:#151b20e8!important;border:1px solid var(--edge)!important;color:var(--txt)!important}
+body #chatLog .line.dog{background:#241c10e8!important;color:var(--amber)!important;border-color:#4a3c1c!important}
+body #chatLog .line.world{background:#0f211de8!important;color:var(--teal)!important;border-color:#1f4a41!important}
 /* the instruments go dark but stay themselves */
 body .joy{background:rgba(10,14,17,.42)!important;border-color:#46525a!important}
 body .joy .ring1,body .joy .ring2{border-color:#39434a!important}
@@ -294,19 +313,32 @@ body #headDock .joy{background:rgba(10,14,17,.6)!important}
 <canvas id="gl"></canvas>
 <div id="top">
   <div id="brand">HLIÐARENDI · TERRARIUM</div>
-  <button class="tb hb" id="warnBtn" aria-label="diagnostics">⚠</button>
+  <button class="tb hb" id="viewBtn">CAM</button>
+  <button class="tb hb" id="landBtn" aria-label="land">▲</button>
   <button class="tb hb" id="recBtn" aria-label="record the screen"><span class="dot"></span>REC</button>
   <button class="tb hb" id="playFab">▶ PLAY</button>
   <button class="tb hb" id="menuFab" aria-label="menu"><span class="bars">≡</span><span class="x">✕</span></button>
 </div>
 <button id="tiltBtn" style="display:none">TILT</button>
+<div id="landMenu">
+  <button class="land-item" data-lat="63.7422" data-lon="-20.1080">▲ HLÍÐARENDI — Gunnar's farm</button>
+  <button class="land-item" data-lat="63.6603" data-lon="-20.3213">▲ BERGÞÓRSHVOLL — Njáll's farm</button>
+  <button class="land-item" data-lat="63.6833" data-lon="-19.4833">▲ ÞÓRSMÖRK — the ridge valley</button>
+  <button class="land-item" data-lat="63.6314" data-lon="-19.6083">▲ EYJAFJALLAJÖKULL — the ice cap</button>
+  <button class="land-item" data-land="place">⌖ TERRA HERE — pick a place</button>
+  <button class="land-item" data-land="dress">✦ DRESS THE LAND — imagery</button>
+  <button class="land-item" data-land="save">↓ SAVE LAND</button>
+</div>
 <div id="agentBar">
   <div id="agentRow">
-    <span id="agentTag">AGENT</span>
-    <form id="agentForm"><input id="agentSay" placeholder="summon a structure — a dragon gate, a watchtower, a bridge…" autocomplete="off"><button id="agentGo" type="submit">➤</button></form>
+    <span id="agentTag">SPEAK</span>
+    <form id="agentForm"><input id="agentSay" placeholder="speak — words reach the dog and the terrarium · /help" autocomplete="off" autocapitalize="off"><button id="agentGo" type="submit">➤</button></form>
+    <button id="modeBtn" type="button" aria-label="agent mode">🗲</button>
+    <button id="logBtn" type="button" aria-label="log">▾</button>
   </div>
-  <div id="agentStatus">● AI OFF · stand-ins · say /ai &lt;key&gt;</div>
+  <div id="agentStatus">● AI OFF · stand-ins · tap to configure</div>
 </div>
+<div id="chatWrap"><div id="chatLog"></div></div>
 <div id="readout">PUPPET · LOCK</div>
 <div id="tiltViz"><span id="tiltDot"></span><b id="tiltState">OFF</b></div>
 <div id="viewerAim"></div>
@@ -327,40 +359,65 @@ body #headDock .joy{background:rgba(10,14,17,.6)!important}
 <div id="help">MOVE + LOOK TRAVEL · TOUCH A LIMB: IT GROWS, OTHERS STORE · BALL = TAKE/THROW · FEED AT THE BOWL<br>ARGOS DECIDES FOR HIMSELF · CAM = FREE CAMERA · RST = RESET</div>
 <div class="fieldline" id="fieldLineLA"></div><div class="fieldline" id="fieldLineLL"></div><div class="fieldline" id="fieldLineRA"></div><div class="fieldline" id="fieldLineRL"></div><div class="fieldline" id="fieldLineH"></div>
 <div class="fieldhome" id="fieldHomeLA"></div><div class="fieldhome" id="fieldHomeLL"></div><div class="fieldhome" id="fieldHomeRA"></div><div class="fieldhome" id="fieldHomeRL"></div><div class="fieldhome" id="fieldHomeH"></div>
-<div id="chatWrap">
-  <div id="chatLog"></div>
-  <form id="chatForm"><input id="chatSay" placeholder="SPEAK — words reach the dog and the terrarium" autocomplete="off" autocapitalize="off"></form>
-</div>
+<div id="driveHint">DRAG HERE TO DRIVE · TOUCH A LIMB TO PUPPET</div>
 <div id="toolbars">
   <div class="tb-section">
     <div class="tb-section-label">play</div>
     <div class="tb-group"><button class="tb-toggle" data-target="tb-play">PLAY</button>
       <div id="tb-play" class="tb-items collapsed">
         <button class="bbtn plain" id="strikerBtn">PLAY</button>
-        <button class="bbtn" id="sayBtn"><span class="lab">SAY</span><span class="sub">CHAT</span></button>
+      </div></div>
+    <div class="tb-group"><button class="tb-toggle" data-target="tb-say">SAY</button>
+      <div id="tb-say" class="tb-items collapsed">
+        <button class="bbtn" id="sayBtn"><span class="lab">LOG</span><span class="sub">DOG·WORLD</span></button>
+        <button class="bbtn" id="speakBtn"><span class="lab">SPEAK</span><span class="sub">TO ARGOS</span></button>
       </div></div>
   </div>
   <div class="tb-section">
     <div class="tb-section-label">build</div>
+    <div class="tb-group"><button class="tb-toggle amber" data-target="tb-ai">AI</button>
+      <div id="tb-ai" class="tb-items collapsed">
+        <button class="bbtn" id="aiBtn"><span class="lab amber">AI</span><span class="sub">KEY</span></button>
+      </div></div>
     <div class="tb-group"><button class="tb-toggle amber" data-target="tb-build">BUILD</button>
       <div id="tb-build" class="tb-items collapsed">
         <button class="bbtn" id="buildBtn"><span class="lab amber">AGENT</span><span class="sub">SUMMON</span></button>
-        <button class="bbtn" id="aiBtn"><span class="lab amber">AI</span><span class="sub">KEY</span></button>
-        <button class="bbtn" id="worldBtn"><span class="lab amber">WORLD</span><span class="sub">GOTO</span></button>
+        <button class="bbtn" data-build="cairn"><span class="lab amber">CAIRN</span><span class="sub">STONE</span></button>
+        <button class="bbtn" data-build="gate"><span class="lab amber">GATE</span><span class="sub">TIMBER</span></button>
+        <button class="bbtn" data-build="tower"><span class="lab amber">TOWER</span><span class="sub">WATCH</span></button>
+        <button class="bbtn" data-build="sheepfold"><span class="lab amber">FOLD</span><span class="sub">SHEEP</span></button>
+      </div></div>
+    <div class="tb-group"><button class="tb-toggle amber" data-target="tb-world">WORLD</button>
+      <div id="tb-world" class="tb-items collapsed">
+        <button class="bbtn" id="dressBtn"><span class="lab amber">DRESS</span><span class="sub">IMAGERY</span></button>
+        <button class="bbtn" id="gotoBtn"><span class="lab amber">GOTO</span><span class="sub">LAT LON</span></button>
+        <button class="bbtn" id="placeBtn"><span class="lab amber">PLACE</span><span class="sub">BY NAME</span></button>
       </div></div>
   </div>
   <div class="tb-section">
     <div class="tb-section-label">system</div>
+    <div class="tb-group"><button class="tb-toggle" data-target="tb-sky">SKY</button>
+      <div id="tb-sky" class="tb-items collapsed">
+        <button class="bbtn plain" data-sky="dawn">DAWN</button>
+        <button class="bbtn plain" data-sky="day">DAY</button>
+        <button class="bbtn plain" data-sky="dusk">DUSK</button>
+        <button class="bbtn plain" data-sky="night">NIGHT</button>
+        <button class="bbtn plain" data-sky="fog">FOG</button>
+        <button class="bbtn plain" data-sky="rain">RAIN</button>
+      </div></div>
+    <div class="tb-group"><button class="tb-toggle" data-target="tb-file">FILE</button>
+      <div id="tb-file" class="tb-items collapsed">
+        <button class="bbtn" id="saveBtn"><span class="lab">SAVE</span><span class="sub">KEEP</span></button>
+        <button class="bbtn" id="forgetBtn"><span class="lab red">FORGET</span><span class="sub">CLEAR</span></button>
+      </div></div>
     <div class="tb-group"><button class="tb-toggle" data-target="tb-sys">SYS</button>
       <div id="tb-sys" class="tb-items collapsed">
-        <button class="bbtn" id="skyBtn"><span class="lab">SKY</span><span class="sub">TURN</span></button>
-        <button class="bbtn" id="saveBtn"><span class="lab">FILE</span><span class="sub">SAVE</span></button>
-        <button class="bbtn" id="resetBtn"><span class="lab red">SYS</span><span class="sub">RESET</span></button>
+        <button class="bbtn" id="resetBtn"><span class="lab red">RESET</span><span class="sub">WORLD</span></button>
+        <button class="bbtn" id="diagBtn"><span class="lab">DIAG</span><span class="sub">READOUT</span></button>
       </div></div>
     <div class="tb-group"><button class="tb-toggle" data-target="tb-body">BODY</button>
       <div id="tb-body" class="tb-items collapsed">
         <button class="bbtn plain on" id="headBtn">AUTO GAZE</button>
-        <button class="bbtn plain" id="viewBtn">CAM</button>
         <button class="bbtn plain" id="styleBtn">INK</button>
         <button class="bbtn plain" id="quickReset">RST</button>
       </div></div>
