@@ -45,6 +45,14 @@ button{font-family:inherit}
 @media(max-width:700px){#brand{font-size:11px;padding:0 8px}.tb{padding:0 8px;font-size:8px}.joy{width:96px;height:96px}.joy.head{width:76px;height:76px}.nub{width:34px;height:34px}.joy.head .nub{width:28px;height:28px}#joyLA,#joyLL{right:2vw}#joyRA,#joyRL{left:2vw}#joyLA,#joyRA{top:46%}#joyLL,#joyRL{top:69%}#atlasLegend{position:fixed;z-index:18;right:8px;top:52px;display:none;background:rgba(255,255,255,.88);border:1px solid #000;padding:4px 6px;font-size:7px;line-height:1.35;pointer-events:none}#atlasLegend.on{display:block}#atlasLegend b{font-weight:700}#motionFile{display:none}#help{display:none}}
 /* BASELINE: keep the proven puppet instrument, remove non-control chrome. */
 #atlasLegend,#motionFile,#tiltBtn{display:none!important}
+#chatWrap{position:fixed;left:8px;bottom:58px;width:min(64vw,340px);z-index:24;display:none}
+#chatWrap.on{display:block}
+#chatLog{max-height:22vh;overflow:auto;display:flex;flex-direction:column;gap:2px;margin-bottom:5px;scrollbar-width:none}
+#chatLog .line{font-size:11px;line-height:1.4;padding:2px 6px;width:fit-content;max-width:100%;background:rgba(255,255,255,.92);border:1px solid #000}
+#chatLog .line.dog{font-style:italic;background:#f3e2c4}
+#chatLog .line.world{background:#e4efe9}
+#chatSay{width:100%;font:16px/1.4 "IBM Plex Mono",ui-monospace,monospace;padding:7px 9px;border:1.5px solid #000;background:rgba(255,255,255,.95);color:#000}
+#chatSay:focus{outline:none;border-color:#b95d18}
 #readout{max-width:42vw;background:rgba(255,255,255,.72)}
 #joyLA,#joyRA,#joyLL,#joyRL{border-color:var(--red)}
 #joyLA .nub,#joyRA .nub,#joyLL .nub,#joyRL .nub{background:var(--red)}
@@ -204,7 +212,12 @@ body.free-camera #viewBtn{background:var(--teal);color:#000}
 <div id="help">MOVE + LOOK TRAVEL · TOUCH A LIMB: IT GROWS, OTHERS STORE · BALL = TAKE/THROW · FEED AT THE BOWL<br>ARGOS DECIDES FOR HIMSELF · CAM = FREE CAMERA · RST = RESET</div>
 <div class="fieldline" id="fieldLineLA"></div><div class="fieldline" id="fieldLineLL"></div><div class="fieldline" id="fieldLineRA"></div><div class="fieldline" id="fieldLineRL"></div><div class="fieldline" id="fieldLineH"></div>
 <div class="fieldhome" id="fieldHomeLA"></div><div class="fieldhome" id="fieldHomeLL"></div><div class="fieldhome" id="fieldHomeRA"></div><div class="fieldhome" id="fieldHomeRL"></div><div class="fieldhome" id="fieldHomeH"></div>
+<div id="chatWrap">
+  <div id="chatLog"></div>
+  <form id="chatForm"><input id="chatSay" placeholder="SPEAK — words reach the dog and the world" autocomplete="off" autocapitalize="off"></form>
+</div>
 <div id="bottom">
+  <button class="mode" id="sayBtn">SAY</button>
   <button class="mode" id="ballBtn">BALL</button>
   <button class="mode" id="feedBtn">FEED</button>
   <button class="mode on" data-mode="PUPPET">PUPPET</button>

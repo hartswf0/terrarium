@@ -68,7 +68,7 @@ const WT=4.5, DH=DECK+80*IN;                       // wall thickness, door head
 function wallW(id,y0,y1,z0,z1){return{id,kind:'wall',x0:0,x1:WT,y0,y1,z0,z1}}
 function wallE(id,y0,y1,z0,z1){return{id,kind:'wall',x0:96.5,x1:101,y0,y1,z0,z1}}
 const zFull=[15.75,106], EL=[
-  {id:'frame',kind:'frame',x0:6,x1:95,y0:2,y1:238,z0:5,z1:15.75},
+  {id:'frame',kind:'frame',x0:6,x1:95,y0:2,y1:238,z0:5,z1:14.2},
   {id:'deck',kind:'floor',x0:0,x1:101,y0:0,y1:240,z0:14.25,z1:15.75},
   wallW('wall.W.s',4.5,72,...zFull), wallW('door.header',72,108,80+15.75,106), wallW('wall.W.m',108,128,...zFull),
   wallW('win.dinette.sill',128,168,15.75,45.75), wallW('win.dinette.head',128,168,75.75,106),
@@ -99,19 +99,24 @@ const DOOR={id:'door.entry',wall:'W',from:72,to:108,x:px2w(0),z0:py2w(72),z1:py2
 const SOLIDS=EL.map(e=>({id:e.id,kind:e.kind,
   min:[Math.min(px2w(e.x0),px2w(e.x1)),e.z0*IN,Math.min(py2w(e.y0),py2w(e.y1))],
   max:[Math.max(px2w(e.x0),px2w(e.x1)),e.z1*IN,Math.max(py2w(e.y0),py2w(e.y1))]}));
+for(const b of SOLIDS)b.climb=b.kind==='fixture'&&(b.max[1]-DECK)<=0.6;
 const BLOCKERS=SOLIDS.filter(s=>s.kind==='wall'||s.kind==='glass'||s.kind==='fixture'||s.kind==='frame');
 const TOPS=SOLIDS.filter(s=>s.kind==='step');
-function structSurface(x,z){
+function structSurface(x,z,forDog){
   const px=(x-TR.x)/IN+50.5,py=(z-TR.z)/IN+120;
-  if(px>WT&&px<96.5&&py>4.5&&py<235.5)return DECK;
-  if(px>-0.5&&px<=WT&&py>72&&py<108)return DECK; // door.entry threshold: the sill is part of the floor
-  for(const t of TOPS)if(x>=t.min[0]&&x<=t.max[0]&&z>=t.min[2]&&z<=t.max[2])return t.max[1];
-  return null;
+  let base=null;
+  if(px>WT&&px<96.5&&py>4.5&&py<235.5)base=DECK;
+  else if(px>-0.5&&px<=WT&&py>72&&py<108)base=DECK; // door.entry threshold: the sill is part of the floor
+  else for(const t of TOPS)if(x>=t.min[0]&&x<=t.max[0]&&z>=t.min[2]&&z<=t.max[2]){base=t.max[1];break}
+  if(base!=null&&!forDog)for(const b of SOLIDS)
+    if(b.climb&&x>=b.min[0]&&x<=b.max[0]&&z>=b.min[2]&&z<=b.max[2]&&b.max[1]>base)base=b.max[1];
+  return base;
 }
 const PLACE={
   id:'place.hlidarendi',
   ground:{
     heightAt(x,z){const s=structSurface(x,z);return s!=null?s:terrainH(x,z)},
+    heightAtDog(x,z){const s=structSurface(x,z,true);return s!=null?s:terrainH(x,z)},
     normalAt(x,z){const d=.14,h=this.heightAt,dx=(h(x+d,z)-h(x-d,z))/(2*d),dz=(h(x,z+d)-h(x,z-d))/(2*d),l=Math.hypot(dx,1,dz);return[-dx/l,1/l,-dz/l]}
   },
   heightAt(x,z){return this.ground.heightAt(x,z)},
@@ -119,8 +124,9 @@ const PLACE={
   door:DOOR, solids:SOLIDS, structure:{id:'structure.ingold',datum:DECK,elements:EL,door:DOOR},
   // circle-vs-box occupancy in a height band; used by the hero root, foot
   // anchors and the ball — same boxes the renderer draws.
-  pushOutCircle(v,r,y0,y1,out){
+  pushOutCircle(v,r,y0,y1,out,skipClimb){
     for(const b of BLOCKERS){
+      if(skipClimb&&b.climb)continue;
       if(b.max[1]<y0||b.min[1]>y1)continue;
       const cx=clamp(v.x,b.min[0],b.max[0]),cz=clamp(v.z,b.min[2],b.max[2]);
       let dx=v.x-cx,dz=v.z-cz,d=Math.hypot(dx,dz);
@@ -266,8 +272,14 @@ let _fadeAcc=0,_uiAcc=0;
 function worldStep(dt){
   locomotion.root.y=groundYAt(locomotion.root.x,locomotion.root.z);
   const gy=locomotion.root.y;
-  PLACE.pushOutCircle(locomotion.root,.17,gy+.14,gy+1.55);
-  for(const side of ['L','R']){const a=locomotion.footAnchor[side];PLACE.pushOutCircle(a,.07,a.y+.02,a.y+.42)}
+  for(let i=0;i<3;i++)PLACE.pushOutCircle(locomotion.root,.17,gy+.14,gy+1.55,null,true);
+  // wedged in a seam (window/bench corner): give the step back rather than jitter
+  worldStep._pr??=locomotion.root.clone();
+  _pushInfo.hit=false;PLACE.pushOutCircle(locomotion.root,.155,gy+.14,gy+1.55,_pushInfo,true);
+  if(_pushInfo.hit){locomotion.root.x=worldStep._pr.x;locomotion.root.z=worldStep._pr.z;
+    locomotion.root.y=groundYAt(locomotion.root.x,locomotion.root.z)}
+  worldStep._pr.copy(locomotion.root);
+  for(const side of ['L','R']){const a=locomotion.footAnchor[side];PLACE.pushOutCircle(a,.07,a.y+.02,a.y+.42,null,true)}
   stepBall(dt);
   _fadeAcc+=dt;if(_fadeAcc>.05){_fadeAcc=0;updateStructFade()}
   _uiAcc+=dt;if(_uiAcc>.22){_uiAcc=0;updateWorldUI()}
@@ -305,12 +317,13 @@ const DOG_SPAWN=[TR.x-2.1,0,TR.z-2.4];
 const argos=AR.createArgos({});
 argos.world.dog=DOG_SPAWN.slice();
 argos.world.human=[0,0,0];
-argos.setTerrain((x,z)=>PLACE.heightAt(x,z));
+argos.setTerrain((x,z)=>PLACE.ground.heightAtDog(x,z));
 argos.setWalkable((x,z)=>PLACE.dogWalkable(x,z));
 // --- skin: AR deforms its marching-tets surface on the CPU in world space;
 //     three.js just displays it. Colors ride per-vertex from the dog's own palette.
 const dogGroup=new THREE.Group();dogGroup.name='DOG.ARGOS';scene.add(dogGroup);
-let dogSkinMesh=null,dogFeatureMeshes=[];
+const dogExtraSkins=[AR.buildSkin(argos.rig,{region:'head'}),AR.buildSkin(argos.rig,{region:'jaw'})];
+let dogSkinMeshes=[],dogFeatureMeshes=[];
 function arGeoToThree(g){
   const geo=new THREE.BufferGeometry();
   geo.setAttribute('position',new THREE.Float32BufferAttribute(Array.from(g.pos),3));
@@ -319,26 +332,28 @@ function arGeoToThree(g){
   else geo.computeVertexNormals();
   return geo;
 }
+const DOG_PALETTE=[[216,118,39],[244,224,189],[247,211,200],[27,24,22],[252,250,246],[90,50,25],[74,52,50],[249,247,240],[202,109,113],[217,152,141]];
+function addSkinMesh(skin){
+  if(!skin)return;
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(skin.pos.length),3));
+  geo.setAttribute('normal',new THREE.BufferAttribute(new Float32Array(skin.nrm.length),3));
+  const col=new Float32Array(skin.verts*3);
+  for(let i=0;i<skin.verts;i++){const rgb=DOG_PALETTE[skin.mat[i]]||DOG_PALETTE[0];col[i*3]=rgb[0]/255;col[i*3+1]=rgb[1]/255;col[i*3+2]=rgb[2]/255}
+  geo.setAttribute('color',new THREE.BufferAttribute(col,3));
+  geo.setIndex(Array.from(skin.idx));
+  const mesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.95,metalness:0}));
+  mesh.frustumCulled=false;dogGroup.add(mesh);
+  dogSkinMeshes.push({skin,mesh});
+}
 function buildDogVisual(){
-  const skin=argos.skin;
-  if(skin){
-    const geo=new THREE.BufferGeometry();
-    geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(skin.pos.length),3));
-    geo.setAttribute('normal',new THREE.BufferAttribute(new Float32Array(skin.nrm.length),3));
-    const col=new Float32Array(skin.verts*3);
-    const palette=[[216,118,39],[244,224,189],[247,211,200],[27,24,22],[252,250,246],[90,50,25],[74,52,50],[249,247,240],[202,109,113],[217,152,141]];
-    for(let i=0;i<skin.verts;i++){const rgb=palette[skin.mat[i]]||palette[0];col[i*3]=rgb[0]/255;col[i*3+1]=rgb[1]/255;col[i*3+2]=rgb[2]/255}
-    geo.setAttribute('color',new THREE.BufferAttribute(col,3));
-    geo.setIndex(Array.from(skin.idx));
-    dogSkinMesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.95,metalness:0}));
-    dogSkinMesh.frustumCulled=false;dogGroup.add(dogSkinMesh);
-  }
+  addSkinMesh(argos.skin);
+  for(const sk of dogExtraSkins)addSkinMesh(sk);
   // features (eyes, teeth, tongue) are solids outside the fused skin: follow bone worlds
   const FEATURES=['leftEye','rightEye','leftIris','rightIris','leftPupil','rightPupil','upperTeeth','lowerTeeth','tongue','nose'];
-  const palette=[[216,118,39],[244,224,189],[247,211,200],[27,24,22],[252,250,246],[90,50,25],[74,52,50],[249,247,240],[202,109,113],[217,152,141]];
   for(const name of FEATURES){
     const n=argos.rig.nodes[name];if(!n||!n.solid)continue;
-    const rgb=palette[n.mat]||palette[3];
+    const rgb=DOG_PALETTE[n.mat]||DOG_PALETTE[3];
     const m=new THREE.Mesh(arGeoToThree(AR.geoForSolid(n.solid)),new THREE.MeshStandardMaterial({color:new THREE.Color(rgb[0]/255,rgb[1]/255,rgb[2]/255),roughness:.5}));
     m.matrixAutoUpdate=false;m.frustumCulled=false;dogGroup.add(m);
     dogFeatureMeshes.push({node:n,mesh:m});
@@ -346,12 +361,12 @@ function buildDogVisual(){
 }
 buildDogVisual();
 function syncDogVisual(){
-  const skin=argos.skin;
-  if(dogSkinMesh&&skin){
-    dogSkinMesh.geometry.attributes.position.array.set(skin.pos);
-    dogSkinMesh.geometry.attributes.normal.array.set(skin.nrm);
-    dogSkinMesh.geometry.attributes.position.needsUpdate=true;
-    dogSkinMesh.geometry.attributes.normal.needsUpdate=true;
+  for(const sk of dogExtraSkins)AR.skinDeform(argos.rig,sk);   // body skin deforms inside argos.tick
+  for(const e of dogSkinMeshes){
+    e.mesh.geometry.attributes.position.array.set(e.skin.pos);
+    e.mesh.geometry.attributes.normal.array.set(e.skin.nrm);
+    e.mesh.geometry.attributes.position.needsUpdate=true;
+    e.mesh.geometry.attributes.normal.needsUpdate=true;
   }
   for(const f of dogFeatureMeshes){f.mesh.matrix.fromArray(f.node.world);f.mesh.matrixWorldNeedsUpdate=true}
 }
@@ -410,7 +425,7 @@ function updateDog(t,dt){
     _dogEatT+=dt;argos.mind.iv.hunger=Math.max(0,argos.mind.iv.hunger-dt*.10);
     if(_dogEatT>bowl.meal){bowl.food=false;_dogEatT=0}
   }
-  for(const ev of argos.events)if(ev.type==='bark')buzz('dogbark',[16,36,12],900);
+  for(const ev of argos.events)if(ev.type==='bark'){buzz('dogbark',[16,36,12],900);chat.line('dog','WOOF')}
   dogMind.interest=clamp(1-argos.mind.iv.fatigue,0,1);
   dogMind.obey=argos.world.handPose==='lure'?.8:0;
   dogMind.look.set(d[0],d[1],d[2]);
@@ -1784,6 +1799,53 @@ function restoreWorld(){
     return true;
   }catch(e){console.warn('restore failed',e);return false}
 }
+// ============================================================================
+// SAY — language enters the world. This is the HELLO/WORLDTEXT seam from the
+// Terrarium line: words are read, they land on the dog's mind as evidence
+// (never as commands), and slash-verbs address the world. External builders
+// (the III chat-to-build pipeline, an LLM, a peer) register handlers here
+// instead of being wholesale ingested.
+const chat={
+  handlers:[],
+  register(fn){if(typeof fn==='function')this.handlers.push(fn);return()=>{const i=this.handlers.indexOf(fn);if(i>=0)this.handlers.splice(i,1)}},
+  line(who,text){
+    const log=$('#chatLog');if(!log)return;
+    const el=document.createElement('div');el.className='line '+who;el.textContent=text;
+    log.appendChild(el);while(log.children.length>28)log.removeChild(log.firstChild);
+    log.scrollTop=log.scrollHeight;
+  },
+  say(text){
+    text=String(text||'').trim();if(!text)return null;
+    chat.line('you',text);
+    for(const h of chat.handlers){try{if(h(text)===true)return null}catch(e){console.warn('chat handler',e)}}
+    if(text[0]==='/'){
+      const cmd=text.slice(1).toLowerCase().split(/\s+/)[0];
+      let r='nothing here answers to /'+cmd;
+      if(cmd==='save')r=saveWorld()?'saved — the situation keeps':'save failed';
+      else if(cmd==='reset'){resetAll();r='reset — home again'}
+      else if(cmd==='feed')r=feedBowl()?'the bowl is full':'stand by the bowl first (or it is already full)';
+      else if(cmd==='ball')r=ball.state==='hero'?(throwBall()?'thrown':'…'):(takeBall()?'you have the ball':'the ball is not at hand');
+      else if(cmd==='door')r='door.entry — wall W, plan 72..108, the only way in';
+      else if(cmd==='help')r='/save /reset /feed /ball /door — anything else is spoken aloud';
+      chat.line('world',r);updateWorldUI();return null;
+    }
+    let prog=null;
+    try{prog=argos.say(text)}catch(e){console.warn(e)}
+    if(prog){
+      const biased=Object.keys(prog.prefer||{});
+      chat.line('dog',prog.reading+(prog.cue?' · cue "'+prog.cue+'"':'')+(biased.length?' · leans '+biased.join(', '):''));
+    }
+    return prog;
+  }
+};
+{
+  const form=$('#chatForm'),input=$('#chatSay'),wrap=$('#chatWrap'),btn=$('#sayBtn');
+  if(form&&input){form.addEventListener('submit',e=>{e.preventDefault();chat.say(input.value);input.value='';if(IS_TOUCH)input.blur()})}
+  const setChat=on2=>{wrap?.classList.toggle('on',on2);btn?.classList.toggle('on',on2);if(on2&&!IS_TOUCH)input?.focus()};
+  if(btn)btn.onclick=()=>setChat(!wrap.classList.contains('on'));
+  setChat(!IS_TOUCH);
+  chat.line('world','HLIÐARENDI — a body, a dog, a dwelling, a place. Speak, or /help.');
+}
 const on=(sel,fn)=>{const el=$(sel);if(el)el.onclick=fn};
 on('#saveBtn',saveWorld);
 on('#ballBtn',()=>{if(ball.state==='hero')throwBall();else takeBall();updateWorldUI()});
@@ -1797,6 +1859,6 @@ window.HLIDARENDI={
   actors:{hero:HERO_ACTOR,dog:ARGOS_ACTOR},argos,
   props:{ball,bowl},
   integration:INTEGRATION,
-  save:saveWorld,restore:restoreWorld,takeBall,throwBall,feedBowl,placeHero,
+  save:saveWorld,restore:restoreWorld,takeBall,throwBall,feedBowl,placeHero,chat,
   snapshot:()=>INTEGRATION.snapshot()
 };

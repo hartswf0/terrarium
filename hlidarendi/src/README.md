@@ -25,6 +25,16 @@ no CDN). It is assembled from three parts by `../build.sh`:
   markers. It is not duplicated here; the vendored source stays the source of
   record.
 
+**SAY — the language seam.** The chat dock (SAY button on phones, open by
+default on desktop) is the HELLO/WORLDTEXT line from the Terrarium base,
+scoped rather than wholesale-ingested: spoken words are read offline by the
+dog's own word rules and land on his mind as evidence (`argos.say`), slash
+verbs address the world (`/save /reset /feed /ball /door`), and external
+builders — the III chat-to-build pipeline, an LLM, a peer — plug in through
+`HLIDARENDI.chat.register(handler)`: a handler that returns `true` claims the
+utterance before the dog hears it. That registration point is where the III
+structure compiler should eventually attach, keeping play offline-first.
+
 Console API in the built page: `window.HLIDARENDI`
 (`place`, `actors`, `argos`, `props`, `takeBall/throwBall/feedBowl`,
 `save/restore`, `snapshot()` → `thunder-rigs.cartridge/v1`).
