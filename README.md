@@ -97,6 +97,24 @@ node tests/audit-geometry.mjs
 - `TERRARIUM.md` — the integration theory and failure audit
 - `STANDING-WORLD.md` — the standing-world model
 - `THEORY.md` — CREO's design doctrine
+- `hlidarendi/` — the HLIÐARENDI mission, specification, integration map, and vendored sources
+
+## HLIÐARENDI
+
+The first complete inhabited situation in Terrarium: a body, a dog, a
+dwelling, and a place held together by one world. The mission and
+specification live in [`hlidarendi/`](hlidarendi/); the mission sits before
+the engineering.
+
+The lineage gives the project four questions, and the project adds a fifth:
+
+> ARGOS — *Who are you?*
+> SÁMR — *What do you intend?*
+> GOODYEAR — *Should I trust you?*
+> SILAS — *Can I act with you without becoming your puppet?*
+>
+> HLIÐARENDI — *Can we inhabit the same world long enough for those
+> distinctions to matter?*
 
 ## Data and provenance
 
