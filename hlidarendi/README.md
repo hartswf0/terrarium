@@ -24,6 +24,22 @@ Then HLIÐARENDI asks the fifth question:
 
 *Can we inhabit the same world long enough for those distinctions to matter?*
 
+## Play
+
+**[HLIDARENDI.html](HLIDARENDI.html)** — one self-contained file (three.js
+bundled in, no network needed), phone-first. Everybody wakes beside the Ingold
+trailer with Argos nearby. MOVE/LOOK to travel; touch a limb control and it
+grows while the others store; BALL takes and throws, FEED fills the bowl at
+the galley, SAVE keeps the situation across reloads. Argos decides for
+himself — a throw enters his world as evidence, not as a command.
+
+BOOT 0 holds in this build: one clock, one camera system, one authoritative
+world. Both actors' feet query the same PLACE (terrain, deck, steps,
+`door.entry` threshold); the trailer's rendered walls, collision boxes and
+wall capsules derive from one element list; the dog earns every meter through
+paw traction and enters the home through the same door the hero uses.
+Rebuild with `./build.sh` (see [src/README.md](src/README.md)).
+
 ## Reading order
 
 The mission sits before the engineering specification. It is not decoration:

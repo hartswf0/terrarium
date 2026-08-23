@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>HLIÐARENDI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#000;--paper:#fff;--teal:#19e6c8;--amber:#ffb000;--red:#ff2e2e;--muted:#777}
+*{box-sizing:border-box;margin:0;padding:0;border-radius:0!important}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--paper);color:var(--ink);font-family:'IBM Plex Mono',monospace;-webkit-user-select:none;user-select:none;touch-action:none}
+button{font-family:inherit}
+#gl{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#top{position:fixed;z-index:20;left:0;right:0;top:0;height:44px;display:flex;background:#fff;border-bottom:2px solid #000}
+#brand{flex:1;min-width:0;display:flex;align-items:center;padding:0 12px;font-size:12px;font-weight:700;letter-spacing:1.5px;white-space:nowrap;overflow:hidden}
+#brand:before{content:'';width:13px;height:13px;background:#000;margin-right:10px;box-shadow:4px 4px 0 #fff inset;flex:0 0 auto}
+.tb{border:0;border-left:2px solid #000;background:#fff;color:#000;padding:0 10px;font-size:9px;font-weight:700;letter-spacing:.7px;height:100%}
+.tb.on{background:#000;color:#fff}.tb:active{background:var(--teal);color:#000}
+#readout{position:fixed;z-index:19;top:45px;left:0;background:rgba(255,255,255,.84);border-right:1px solid #000;border-bottom:1px solid #000;padding:3px 6px;font-size:8px;line-height:1.2;pointer-events:none;max-width:58vw}
+#readout .ok{color:#08785d;font-weight:700}#readout .bad{color:var(--red);font-weight:700}
+#tiltViz{position:fixed;z-index:20;top:68px;left:8px;width:64px;height:44px;border:1px solid #000;background:rgba(255,255,255,.82);display:none;pointer-events:none}
+#tiltViz:before,#tiltViz:after{content:'';position:absolute;background:#000;opacity:.18}#tiltViz:before{left:50%;top:4px;bottom:15px;width:1px}#tiltViz:after{top:17px;left:5px;right:5px;height:1px}
+#tiltDot{position:absolute;left:50%;top:17px;width:9px;height:9px;margin:-4.5px;border-radius:999px!important;background:var(--teal);transform:translate(0,0);will-change:transform}
+#tiltState{position:absolute;left:0;right:0;bottom:1px;text-align:center;font-size:7px;letter-spacing:.5px;white-space:nowrap}#tiltViz.bad #tiltDot{background:var(--red)}#tiltViz.wait #tiltDot{background:var(--amber)}
+#headDock{position:fixed;z-index:23;left:50%;top:142px;transform:translate(-50%,-100%);pointer-events:none;will-change:left,top}
+#joys{position:fixed;z-index:21;inset:44px 0 58px 0;pointer-events:none}
+.fieldline{position:fixed;z-index:20;height:2px;background:#000;opacity:.10;transform-origin:0 50%;pointer-events:none;will-change:width,transform,left,top}.fieldhome{position:fixed;z-index:20;width:8px;height:8px;margin:-4px;border:1px solid #000;border-radius:999px!important;opacity:.16;pointer-events:none}.joy.field1{box-shadow:0 0 0 3px rgba(25,230,200,.28)}.joy.field2{box-shadow:0 0 0 4px rgba(255,176,0,.30)}.joy.field3{box-shadow:0 0 0 5px rgba(255,46,46,.22)}
+.joy{width:112px;height:112px;border:2px solid #000;border-radius:999px!important;background:rgba(255,255,255,.88);position:absolute;pointer-events:auto;touch-action:none;will-change:transform}.joy.head{position:relative;width:88px;height:88px;background:rgba(255,255,255,.92)}
+#joyLA{right:2.8vw;top:45%;transform:translateY(-50%)}#joyLL{right:2.8vw;top:68%;transform:translateY(-50%)}#joyRA{left:2.8vw;top:45%;transform:translateY(-50%)}#joyRL{left:2.8vw;top:68%;transform:translateY(-50%)}
+.joy:before,.joy:after{content:'';position:absolute;background:#000;opacity:.16;pointer-events:none}.joy:before{width:1px;top:10px;bottom:10px;left:50%}.joy:after{height:1px;left:10px;right:10px;top:50%}
+.joylabel{position:absolute;top:-21px;left:50%;transform:translateX(-50%);background:#fff;border:1px solid #000;padding:2px 6px;font-size:9px;font-weight:700;letter-spacing:.7px;white-space:nowrap;pointer-events:none}
+.nub{position:absolute;left:50%;top:50%;width:38px;height:38px;background:#000;border-radius:999px!important;pointer-events:none;will-change:transform;transform:translate(-50%,-50%)}
+.joy.wind{box-shadow:inset 0 0 0 4px var(--amber)}.joy.nudge{box-shadow:inset 0 0 0 5px var(--teal)}.joy.over{box-shadow:inset 0 0 0 4px var(--teal),0 0 0 2px #000}.joy.pointing{box-shadow:inset 0 0 0 5px var(--amber),0 0 0 2px #000}
+.aperture{position:absolute;left:13%;right:13%;top:19%;bottom:12%;border:1px solid rgba(0,0,0,.34);border-radius:48% 52% 44% 56%/56% 45% 55% 44%!important;pointer-events:none}.ring1,.ring2,.facehint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none}.ring1{width:74%;height:74%;border:1px solid rgba(0,0,0,.13);border-radius:999px!important}.ring2{width:98%;height:98%;border:1px dashed rgba(0,0,0,.22);border-radius:999px!important}.facehint{width:108%;height:108%;border-radius:20px!important;border:1px solid rgba(0,0,0,.08);opacity:.4}
+.overline{position:absolute;left:50%;top:50%;height:2px;width:0;background:#000;transform-origin:0 50%;pointer-events:none;opacity:.7}
+.pinnotch{position:absolute;z-index:4;left:50%;top:-5px;width:18px;height:7px;transform:translateX(-50%);border:1px solid #000;background:#fff;pointer-events:none}.pinrail{position:absolute;z-index:3;left:50%;top:3px;width:1px;height:calc(100% + 42px);background:#000;opacity:0;pointer-events:none;transform-origin:50% 0}.secnub{position:absolute;z-index:5;left:50%;top:4px;width:18px;height:18px;transform:translate(-50%,-50%);border:2px solid #000;background:#fff;border-radius:999px!important;opacity:0;pointer-events:none;will-change:transform}.joy.pinned .pinnotch{background:var(--teal)}.joy.pinned .pinrail{opacity:.28}.joy.pinned .secnub{opacity:1}.joy.pinarming .pinnotch{background:var(--amber)}
+#viewerAim{position:fixed;z-index:18;left:50%;top:43%;width:26px;height:26px;margin:-13px;border:1px solid rgba(0,0,0,.25);border-radius:999px!important;pointer-events:none;opacity:0;transition:opacity .08s}
+#viewerAim:before,#viewerAim:after{content:'';position:absolute;background:#000;opacity:.30}#viewerAim:before{left:50%;top:-8px;bottom:-8px;width:1px}#viewerAim:after{top:50%;left:-8px;right:-8px;height:1px}#viewerAim.on{opacity:.62}
+.joyz{position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);font-size:8px;font-weight:700;letter-spacing:.6px;background:#fff;padding:1px 4px;border:1px solid #000;white-space:nowrap;pointer-events:none}.joy.head .joyz{bottom:-16px;font-size:7px}.joy.head .joylabel{top:-18px;font-size:8px}.joy.head:before,.joy.head:after{opacity:.12}
+#bottom{position:fixed;z-index:22;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 8px);height:46px;display:flex;background:#fff;border-top:2px solid #000;border-bottom:2px solid #000}
+.mode{flex:1;border:0;border-right:1px solid #000;background:#fff;font-size:9px;font-weight:700;letter-spacing:.8px}.mode.on{box-shadow:inset 0 -5px 0 var(--teal)}.mode:active{background:#000;color:#fff}
+#atlasLegend{position:fixed;z-index:18;right:8px;top:52px;display:none;background:rgba(255,255,255,.88);border:1px solid #000;padding:4px 6px;font-size:7px;line-height:1.35;pointer-events:none}#atlasLegend.on{display:block}#atlasLegend b{font-weight:700}#motionFile{display:none}#help{display:none}
+@media(max-width:700px){#brand{font-size:11px;padding:0 8px}.tb{padding:0 8px;font-size:8px}.joy{width:96px;height:96px}.joy.head{width:76px;height:76px}.nub{width:34px;height:34px}.joy.head .nub{width:28px;height:28px}#joyLA,#joyLL{right:2vw}#joyRA,#joyRL{left:2vw}#joyLA,#joyRA{top:46%}#joyLL,#joyRL{top:69%}#atlasLegend{position:fixed;z-index:18;right:8px;top:52px;display:none;background:rgba(255,255,255,.88);border:1px solid #000;padding:4px 6px;font-size:7px;line-height:1.35;pointer-events:none}#atlasLegend.on{display:block}#atlasLegend b{font-weight:700}#motionFile{display:none}#help{display:none}}
+/* BASELINE: keep the proven puppet instrument, remove non-control chrome. */
+#atlasLegend,#motionFile,#tiltBtn{display:none!important}
+#readout{max-width:42vw;background:rgba(255,255,255,.72)}
+#joyLA,#joyRA,#joyLL,#joyRL{border-color:var(--red)}
+#joyLA .nub,#joyRA .nub,#joyLL .nub,#joyRL .nub{background:var(--red)}
+@media(orientation:landscape) and (max-height:760px){#readout{max-width:40vw}#headDock{top:166px}.joy{width:92px;height:92px}.joy.head{width:82px;height:82px}#joyLA,#joyLL{right:2vw}#joyRA,#joyRL{left:2vw}#joyLA,#joyRA{top:46%}#joyLL,#joyRL{top:73%}#bottom{height:42px;bottom:calc(env(safe-area-inset-bottom,0px) + 10px)}.mode{font-size:8px}}
+
+/* =====================================================================
+   V7 · MOBILE EXPLORER INSTRUMENT
+   Navigation is a temporary mode, not permanent UI.  Two thumb handles
+   bloom only while touched.  Walking stores the fine puppet controls;
+   stopping restores them for manipulation.
+   ===================================================================== */
+:root{--nav-size:118px;--nav-handle:46px}
+#navLayer{position:fixed;z-index:45;inset:0;pointer-events:none;display:none}
+.navSlot{position:absolute;width:138px;height:150px;bottom:calc(env(safe-area-inset-bottom,0px) + 54px);pointer-events:none}
+#navMoveSlot{left:0}#navLookSlot{right:0}
+.navHandle{position:absolute;width:var(--nav-handle);height:var(--nav-handle);bottom:10px;border:2px solid var(--ink);background:rgba(255,255,255,.92);border-radius:999px!important;pointer-events:auto;touch-action:none;transition:width .12s ease,height .12s ease,opacity .12s ease,background .12s ease;overflow:visible}
+#navMove{left:45px}#navLook{right:45px}
+.navHandle:before,.navHandle:after{content:'';position:absolute;background:var(--ink);opacity:.38;pointer-events:none}
+.navHandle:before{left:50%;top:8px;bottom:8px;width:1px}.navHandle:after{top:50%;left:8px;right:8px;height:1px}
+.navHandle.live{width:var(--nav-size);height:var(--nav-size);background:rgba(255,255,255,.84)}
+#navMove.live{left:9px}#navLook.live{right:9px}
+.navRing{position:absolute;inset:8px;border:1px dashed rgba(0,0,0,.36);border-radius:999px!important;opacity:0;transition:opacity .10s;pointer-events:none}
+.navHandle.live .navRing{opacity:1}
+.navNub{position:absolute;left:50%;top:50%;width:26px;height:26px;transform:translate(-50%,-50%);background:var(--ink);border-radius:999px!important;pointer-events:none;will-change:transform}
+#navMove .navNub{box-shadow:0 0 0 5px rgba(25,230,200,.45)}
+#navLook .navNub{box-shadow:0 0 0 5px rgba(255,46,46,.28)}
+.navGlyph{position:absolute;left:50%;top:-17px;transform:translateX(-50%);font-size:7px;font-weight:700;letter-spacing:.7px;white-space:nowrap;opacity:0;pointer-events:none}
+.navHandle.live .navGlyph{opacity:.72}
+#navHint{position:fixed;z-index:44;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 66px);transform:translateX(-50%);font-size:7px;font-weight:700;letter-spacing:.6px;background:rgba(255,255,255,.82);border:1px solid rgba(0,0,0,.38);padding:3px 5px;pointer-events:none;opacity:0;transition:opacity .18s;white-space:nowrap}
+body.nav-awake #navHint{opacity:.62}
+
+/* V9: navigation never steals the puppet. Each screen side is a three-chamber
+   control revolver. The selected control grows; the other two remain live and
+   visible as small diagnostic/control instruments. */
+#headDock,.fieldline,.fieldhome,#bottom{transition:opacity .10s ease,transform .10s ease}
+body.navigating #readout{opacity:.58}
+.controlDeck{position:fixed;z-index:43;top:48px;bottom:52px;width:126px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;pointer-events:none}
+#deckL{left:0}#deckR{right:0}
+.deckItem{width:112px;height:58px;display:flex;align-items:center;justify-content:center;pointer-events:none;transition:flex-basis .12s ease,height .12s ease,opacity .12s ease}
+.deckItem>*{pointer-events:auto}
+.deckItem.active{height:116px;opacity:1}
+.deckItem.secondary{height:52px;opacity:.62}
+.controlDeck .joy,.controlDeck .navHandle{position:relative!important;left:auto!important;right:auto!important;top:auto!important;bottom:auto!important;transform:none!important;translate:none!important;margin:0!important;transition:width .12s ease,height .12s ease,opacity .12s ease,transform .12s ease}
+.controlDeck .deckItem.active .joy,.controlDeck .deckItem.active .navHandle{width:104px!important;height:104px!important}
+.controlDeck .deckItem.secondary .joy,.controlDeck .deckItem.secondary .navHandle{width:48px!important;height:48px!important;border-width:1.5px!important}
+.controlDeck .deckItem.secondary .joy .ring1,.controlDeck .deckItem.secondary .joy .ring2,.controlDeck .deckItem.secondary .joy .pinnotch,.controlDeck .deckItem.secondary .joy .pinrail,.controlDeck .deckItem.secondary .joy .overline,.controlDeck .deckItem.secondary .joy .secnub{display:none!important}
+.controlDeck .deckItem.secondary .joylabel,.controlDeck .deckItem.secondary .navGlyph{top:-12px;font-size:6px;padding:1px 3px;opacity:.72}
+.controlDeck .deckItem.secondary .joyz{display:none}
+.controlDeck .deckItem.secondary .nub,.controlDeck .deckItem.secondary .navNub{width:18px!important;height:18px!important;margin:0!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%)}
+.controlDeck .navSlot{position:relative!important;inset:auto!important;width:auto!important;height:auto!important;pointer-events:none}
+.controlDeck .navHandle{position:relative!important}
+.autoNub{position:absolute;z-index:8;left:50%;top:50%;width:12px;height:12px;border:2px solid var(--teal);background:#fff;border-radius:999px!important;transform:translate(-50%,-50%);pointer-events:none;opacity:.82;will-change:transform}
+#deckR .autoNub{border-color:var(--red)}
+.deckItem.active .autoNub{width:14px;height:14px}
+.deckItem.secondary .autoNub{width:9px;height:9px;border-width:1.5px}
+.controlDeck .navHandle .autoNub{display:none}
+body.deck-using #headDock{transform:translate(-50%,-100%) scale(.72);opacity:.72}
+#navHint{display:none!important}
+
+@media (pointer:coarse), (max-width:820px){
+  #navLayer{display:block}
+  #viewBtn,#styleBtn{display:none!important}
+  #readout{font-size:7px;max-width:64vw}
+  #top{height:40px}
+  #brand{font-size:9px;letter-spacing:1px}
+  #headDock{top:128px}
+  .joy.head{width:66px;height:66px}
+  .controlDeck{top:44px;bottom:48px;width:118px}
+  #bottom{height:42px}
+}
+@media (pointer:coarse) and (orientation:landscape){
+  :root{--nav-size:106px;--nav-handle:42px}
+  .controlDeck{top:42px;bottom:46px;width:118px;gap:4px}
+  .deckItem.active{height:106px}.deckItem.secondary{height:44px}
+}
+
+/* V10.2 RECOVERY: keep the proven V9 runtime, reclaim the bottom edge without
+   deleting legacy DOM targets that the stable script still binds to. */
+#bottom{position:fixed!important;left:-10000px!important;right:auto!important;top:auto!important;bottom:auto!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important;border:0!important;overflow:hidden!important}
+#joys{inset:44px 0 0 0}
+.controlDeck{bottom:max(4px,env(safe-area-inset-bottom,0px));top:46px}
+@media(max-width:700px){.controlDeck{bottom:max(2px,env(safe-area-inset-bottom,0px));top:44px}}
+@media(orientation:landscape) and (max-height:760px){.controlDeck{bottom:max(2px,env(safe-area-inset-bottom,0px));top:42px}}
+
+
+/* V11: the revolvers are a global mode switch, not six competing controls.
+   Travel makes MOVE/LOOK primary. Touching any body effector makes both
+   navigation controls secondary and returns the instrument to PUPPET. */
+body.travel-mode .deckItem[data-role="arm"],body.travel-mode .deckItem[data-role="leg"]{opacity:.52}
+body.puppet-mode .deckItem[data-role="move"],body.puppet-mode .deckItem[data-role="look"]{opacity:.38}
+body.puppet-mode .deckItem.active{opacity:1}
+body.travel-mode .deckItem.active{opacity:1}
+body.puppet-mode #headDock{opacity:1;transform:translate(-50%,-100%) scale(1)}
+body.travel-mode #headDock{opacity:.68;transform:translate(-50%,-100%) scale(.78)}
+
+
+/* V16 CONTROL PRIORITY: the currently touched instrument becomes the screen's
+   dominant control. Everything else remains available but stores into a small
+   live index instead of competing for thumb space. */
+body.puppet-mode .controlDeck .deckItem.active{height:148px;opacity:1}
+body.puppet-mode .controlDeck .deckItem.active .joy{width:132px!important;height:132px!important;border-width:2px!important}
+body.puppet-mode .controlDeck .deckItem.secondary{height:32px;opacity:.30}
+body.puppet-mode .controlDeck .deckItem.secondary .joy,
+body.puppet-mode .controlDeck .deckItem.secondary .navHandle{width:30px!important;height:30px!important;border-width:1px!important}
+body.puppet-mode .controlDeck .deckItem.secondary .nub,
+body.puppet-mode .controlDeck .deckItem.secondary .navNub{width:11px!important;height:11px!important}
+body.puppet-mode .controlDeck .deckItem.secondary .autoNub{width:7px;height:7px;border-width:1px}
+body.puppet-mode .controlDeck .deckItem.secondary .joylabel,
+body.puppet-mode .controlDeck .deckItem.secondary .navGlyph{top:-9px;font-size:5px;opacity:.48}
+body.travel-mode .controlDeck .deckItem.active{height:126px}
+body.travel-mode .controlDeck .deckItem.active .navHandle{width:114px!important;height:114px!important}
+body.travel-mode .controlDeck .deckItem.secondary{height:34px;opacity:.34}
+body.travel-mode .controlDeck .deckItem.secondary .joy{width:32px!important;height:32px!important}
+body.puppet-mode #headDock{transform:translate(-50%,-100%) scale(1.12)}
+body.travel-mode #headDock{transform:translate(-50%,-100%) scale(.68);opacity:.52}
+#quickReset{display:none}
+.tb.utility{min-width:42px;padding:0 9px;font-size:7px;letter-spacing:.7px}
+body.free-camera #viewBtn{background:var(--teal);color:#000}
+@media (pointer:coarse), (max-width:820px){
+  #viewBtn,#quickReset{display:flex!important}
+  #tiltBtn,#styleBtn{display:none!important}
+  #viewBtn,#quickReset{height:40px;min-width:44px;padding:0 8px;border-left:1px solid #000}
+  #headBtn{min-width:74px;padding:0 8px}
+  body.puppet-mode .controlDeck .deckItem.active{height:138px}
+  body.puppet-mode .controlDeck .deckItem.active .joy{width:124px!important;height:124px!important}
+}
+
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="top">
+  <div id="brand">HLIÐARENDI · TERRARIUM</div>
+  <button class="tb on" id="headBtn">AUTO GAZE</button>
+  <button class="tb" id="tiltBtn">TILT</button>
+  <button class="tb utility" id="viewBtn">CAM</button>
+  <button class="tb" id="styleBtn">INK</button>
+  <button class="tb utility" id="quickReset">RST</button>
+</div>
+<div id="readout">PUPPET · LOCK</div>
+<div id="tiltViz"><span id="tiltDot"></span><b id="tiltState">OFF</b></div>
+<div id="viewerAim"></div>
+<div id="navLayer" aria-label="mobile explorer control revolvers">
+  <div class="controlDeck" id="deckL" data-active="move">
+    <div class="deckItem secondary" data-role="arm"><div class="joy" id="joyRA"><div class="joylabel">L ARM</div><div class="ring2"></div><div class="ring1"></div><div class="pinnotch"></div><div class="pinrail"></div><div class="secnub"></div><div class="overline" id="overRA"></div><div class="nub" id="nubRA"></div><div class="autoNub"></div><div class="joyz" id="joyZRA">ARM</div></div></div>
+    <div class="deckItem active" data-role="move"><div class="navSlot" id="navMoveSlot"><div class="navHandle" id="navMove"><div class="navGlyph">MOVE</div><div class="navRing"></div><div class="navNub"></div></div></div></div>
+    <div class="deckItem secondary" data-role="leg"><div class="joy" id="joyRL"><div class="joylabel">L LEG</div><div class="ring2"></div><div class="ring1"></div><div class="pinnotch"></div><div class="pinrail"></div><div class="secnub"></div><div class="overline" id="overRL"></div><div class="nub" id="nubRL"></div><div class="autoNub"></div><div class="joyz" id="joyZRL">LEG</div></div></div>
+  </div>
+  <div class="controlDeck" id="deckR" data-active="look">
+    <div class="deckItem secondary" data-role="arm"><div class="joy" id="joyLA"><div class="joylabel">R ARM</div><div class="ring2"></div><div class="ring1"></div><div class="pinnotch"></div><div class="pinrail"></div><div class="secnub"></div><div class="overline" id="overLA"></div><div class="nub" id="nubLA"></div><div class="autoNub"></div><div class="joyz" id="joyZLA">ARM</div></div></div>
+    <div class="deckItem active" data-role="look"><div class="navSlot" id="navLookSlot"><div class="navHandle" id="navLook"><div class="navGlyph">LOOK</div><div class="navRing"></div><div class="navNub"></div></div></div></div>
+    <div class="deckItem secondary" data-role="leg"><div class="joy" id="joyLL"><div class="joylabel">R LEG</div><div class="ring2"></div><div class="ring1"></div><div class="pinnotch"></div><div class="pinrail"></div><div class="secnub"></div><div class="overline" id="overLL"></div><div class="nub" id="nubLL"></div><div class="autoNub"></div><div class="joyz" id="joyZLL">LEG</div></div></div>
+  </div>
+  <div id="navHint"></div>
+</div>
+<div id="headDock"><div class="joy head" id="joyH"><div class="joylabel">HEAD</div><div class="ring2"></div><div class="ring1"></div><div class="nub" id="nubH"></div><div class="autoNub"></div><div class="joyz" id="joyZH">LOOK</div></div></div>
+<div id="help">MOVE + LOOK TRAVEL · TOUCH A LIMB: IT GROWS, OTHERS STORE · BALL = TAKE/THROW · FEED AT THE BOWL<br>ARGOS DECIDES FOR HIMSELF · CAM = FREE CAMERA · RST = RESET</div>
+<div class="fieldline" id="fieldLineLA"></div><div class="fieldline" id="fieldLineLL"></div><div class="fieldline" id="fieldLineRA"></div><div class="fieldline" id="fieldLineRL"></div><div class="fieldline" id="fieldLineH"></div>
+<div class="fieldhome" id="fieldHomeLA"></div><div class="fieldhome" id="fieldHomeLL"></div><div class="fieldhome" id="fieldHomeRA"></div><div class="fieldhome" id="fieldHomeRL"></div><div class="fieldhome" id="fieldHomeH"></div>
+<div id="bottom">
+  <button class="mode" id="ballBtn">BALL</button>
+  <button class="mode" id="feedBtn">FEED</button>
+  <button class="mode on" data-mode="PUPPET">PUPPET</button>
+  <button class="mode" id="saveBtn">SAVE</button>
+  <button class="mode" id="resetBtn">RESET</button>
+</div>
+<div id="atlasLegend"><b>REACH</b> blue arm · green chest · amber pelvis · red no</div>
