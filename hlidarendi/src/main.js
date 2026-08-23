@@ -2219,12 +2219,20 @@ const on=(sel,fn)=>{const el=$(sel);if(el)el.onclick=fn};
       const mime=['video/mp4;codecs=avc1','video/webm;codecs=vp9','video/webm'].find(m=>MediaRecorder.isTypeSupported(m))||'';
       mr=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);chunks=[];
       mr.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
-      mr.onstop=()=>{
+      mr.onstop=async()=>{
         const type=mr.mimeType||'video/webm';mr=null;rb.classList.remove('on');
-        const blob=new Blob(chunks,{type}),a=document.createElement('a');
-        a.href=URL.createObjectURL(blob);a.download='hlidarendi-take'+(/mp4/.test(type)?'.mp4':'.webm');
-        a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
-        chat.line('world','the take is saved to your files');
+        const blob=new Blob(chunks,{type}),name='hlidarendi-take'+(/mp4/.test(type)?'.mp4':'.webm');
+        // hosted as an artifact, saves go through the viewer's confirmed
+        // download surface; standing on its own page, a plain anchor serves.
+        const dl=(window.claude&&typeof window.claude.use==='function')?await window.claude.use('downloads').catch(()=>null):null;
+        if(dl){
+          try{await dl.save({filename:name,data:blob});chat.line('world','the take is saved to your files')}
+          catch(e){chat.line('world',e&&e.code==='declined'?'the take was let go':'the take could not be saved — '+String((e&&e.message)||e).slice(0,40))}
+        }else{
+          const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;
+          a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+          chat.line('world','the take is saved to your files');
+        }
       };
       mr.start(250);rb.classList.add('on');chat.line('world','● recording — REC again to keep the take');
     }catch(e){mr=null;rb.classList.remove('on');chat.line('world','recording failed — '+String(e.message||e).slice(0,50))}
