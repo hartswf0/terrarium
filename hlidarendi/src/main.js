@@ -2034,11 +2034,11 @@ requestAnimationFrame(resize);
 requestAnimationFrame(()=>{try{resize();rig.mesh.updateMatrixWorld(true);renderer.render(scene,camera)}catch(e){console.error('INITIAL RENDER',e)}});
 
 let last=performance.now();lockHeadNow();
-function tick(t){requestAnimationFrame(tick);let dt=Math.min(.025,Math.max(0,(t-last)/1000));last=t;updateExplorer(dt);worldStep(dt);updateMotorPrior(dt);support.position.x=locomotion.root.x;support.position.z=locomotion.root.z;support.position.y=groundYAt(locomotion.root.x,locomotion.root.z)+.003;updateDog(t,dt);updateExplorerCamera(dt); updateGame(dt);updateDataPlayback(dt);if(motionPlayer.active&&motionPlayer.mixer){motionPlayer.mixer.update(dt);enforceAnimationAnatomy();muscleFilterPose(dt);updateViz();const auxNow=performance.now();tick._auxAt??=0;if(!IS_TOUCH||auxNow-tick._auxAt>48){tick._auxAt=auxNow;updateDataBus();updateReadout()}renderer.render(scene,camera);return}
+function tick(t){requestAnimationFrame(tick);let dt=Math.min(.025,Math.max(0,(t-last)/1000));last=t;updateExplorer(dt);worldStep(dt);updateMotorPrior(dt);support.position.x=locomotion.root.x;support.position.z=locomotion.root.z;support.position.y=groundYAt(locomotion.root.x,locomotion.root.z)+.003;updateDog(t,dt);updateExplorerCamera(dt); updateGame(dt);updateDataPlayback(dt);if(motionPlayer.active&&motionPlayer.mixer){motionPlayer.mixer.update(dt);enforceAnimationAnatomy();muscleFilterPose(dt);updateViz();const auxNow=performance.now();tick._auxAt??=0;if(!IS_TOUCH||auxNow-tick._auxAt>48){tick._auxAt=auxNow;updateDataBus();updateReadout()}window.__hudTick&&window.__hudTick();renderer.render(scene,camera);return}
 // Mobile renders every frame but solves the expensive collision-aware body at 40 Hz.
 // This preserves responsive sticks/camera while cutting repeated IK/capsule work.
 tick._solveAcc=(tick._solveAcc||0)+dt;if(IS_TOUCH&&tick._solveAcc<1/40){renderer.render(scene,camera);return}if(IS_TOUCH){dt=Math.min(.04,tick._solveAcc);tick._solveAcc=0}else tick._solveAcc=0;
-relaxJoyBases(dt);const sm=1-Math.exp(-dt*5.5);motion.pitch=lerp(motion.pitch,motion.enabled?motion.targetPitch:0,sm);motion.roll=lerp(motion.roll,motion.enabled?motion.targetRoll:0,sm);const nd=Math.exp(-dt*8.5);motion.nudge.L.multiplyScalar(nd);motion.nudge.R.multiplyScalar(nd);motion.nudge.body.multiplyScalar(nd);const hs=1-Math.exp(-dt*(headCtl.pointer!=null?11.5:6.2));headDyn.x=lerp(headDyn.x,resistedAxis(headCtl.x,.05,2.0),hs);headDyn.y=lerp(headDyn.y,resistedAxis(headCtl.y,.05,2.0),hs);if(headCtl.pointer==null)headCtl.wind=lerp(headCtl.wind,0,1-Math.exp(-dt*4.1));headDyn.roll=lerp(headDyn.roll,resistedAxis(headCtl.wind,.02,1.7),1-Math.exp(-dt*5.4));headDyn.lead=lerp(headDyn.lead,headCtl.lead,1-Math.exp(-dt*(headCtl.pointer!=null?8.5:4.2)));headDyn.faceX=lerp(headDyn.faceX,headCtl.faceX,1-Math.exp(-dt*8.0));headDyn.faceY=lerp(headDyn.faceY,headCtl.faceY,1-Math.exp(-dt*8.0));limits.leftHand=limits.rightHand=limits.pelvis=limits.head=false;contacts.leftHand=contacts.rightHand=contacts.leftFoot=contacts.rightFoot=contacts.pelvis=false;let des=desiredTargets();updateWholeBodyLocomotion(des,dt);des=desiredTargets();const m=MODE[mode];const prevLH=dyn.leftHand.p.clone(),prevRH=dyn.rightHand.p.clone(),prevPel=dyn.pelvis.p.clone(),prevLF=dynFeet.left.p.clone(),prevRF=dynFeet.right.p.clone();spring(dyn.leftHand,des.leftHand,dt,m.freq*.82,Math.max(1.18,m.damp+.22),m.gravity);spring(dyn.rightHand,des.rightHand,dt,m.freq*.82,Math.max(1.18,m.damp+.22),m.gravity);spring(dyn.pelvis,des.pelvis,dt,m.freq+1.2,1.16,0);spring(dynFeet.left,des.leftFoot,dt,5.6,1.18,0);spring(dynFeet.right,des.rightFoot,dt,5.6,1.18,0);clampVecStep(dyn.leftHand.p,prevLH,0.88*dt);clampVecStep(dyn.rightHand.p,prevRH,0.88*dt);const travelSpeed=locomotion.walking>.08?Math.max(.9,explorer.speed):0;const pelvisStep=travelSpeed?Math.max(1.35,travelSpeed*1.18):.66,footStep=travelSpeed?Math.max(1.8,travelSpeed*1.65):.74;clampVecStep(dyn.pelvis.p,prevPel,pelvisStep*dt);clampVecStep(dynFeet.left.p,prevLF,footStep*dt);clampVecStep(dynFeet.right.p,prevRF,footStep*dt);clampVel(dyn.leftHand.v,1.45);clampVel(dyn.rightHand.v,1.45);clampVel(dyn.pelvis.v,travelSpeed?Math.max(1.6,travelSpeed*1.35):1.0);clampVel(dynFeet.left.v,travelSpeed?Math.max(2.0,travelSpeed*1.8):1.05);clampVel(dynFeet.right.v,travelSpeed?Math.max(2.0,travelSpeed*1.8):1.05);solveRig(des,dt);updateViz();tick._teleAt??=0;const teleNow=performance.now();if(!IS_TOUCH||teleNow-tick._teleAt>32){tick._teleAt=teleNow;updateControllerTelemetry()}tick._hapAt??=0;const hapNow=performance.now();if(!IS_TOUCH||!explorer.mobileNav||hapNow-tick._hapAt>66){tick._hapAt=hapNow;updateHaptics()}const auxNow=performance.now();tick._auxAt??=0;if(!IS_TOUCH||!explorer.mobileNav||auxNow-tick._auxAt>48){tick._auxAt=auxNow;updateDataBus();updateReadout()}renderer.render(scene,camera)}requestAnimationFrame(tick);
+relaxJoyBases(dt);const sm=1-Math.exp(-dt*5.5);motion.pitch=lerp(motion.pitch,motion.enabled?motion.targetPitch:0,sm);motion.roll=lerp(motion.roll,motion.enabled?motion.targetRoll:0,sm);const nd=Math.exp(-dt*8.5);motion.nudge.L.multiplyScalar(nd);motion.nudge.R.multiplyScalar(nd);motion.nudge.body.multiplyScalar(nd);const hs=1-Math.exp(-dt*(headCtl.pointer!=null?11.5:6.2));headDyn.x=lerp(headDyn.x,resistedAxis(headCtl.x,.05,2.0),hs);headDyn.y=lerp(headDyn.y,resistedAxis(headCtl.y,.05,2.0),hs);if(headCtl.pointer==null)headCtl.wind=lerp(headCtl.wind,0,1-Math.exp(-dt*4.1));headDyn.roll=lerp(headDyn.roll,resistedAxis(headCtl.wind,.02,1.7),1-Math.exp(-dt*5.4));headDyn.lead=lerp(headDyn.lead,headCtl.lead,1-Math.exp(-dt*(headCtl.pointer!=null?8.5:4.2)));headDyn.faceX=lerp(headDyn.faceX,headCtl.faceX,1-Math.exp(-dt*8.0));headDyn.faceY=lerp(headDyn.faceY,headCtl.faceY,1-Math.exp(-dt*8.0));limits.leftHand=limits.rightHand=limits.pelvis=limits.head=false;contacts.leftHand=contacts.rightHand=contacts.leftFoot=contacts.rightFoot=contacts.pelvis=false;let des=desiredTargets();updateWholeBodyLocomotion(des,dt);des=desiredTargets();const m=MODE[mode];const prevLH=dyn.leftHand.p.clone(),prevRH=dyn.rightHand.p.clone(),prevPel=dyn.pelvis.p.clone(),prevLF=dynFeet.left.p.clone(),prevRF=dynFeet.right.p.clone();spring(dyn.leftHand,des.leftHand,dt,m.freq*.82,Math.max(1.18,m.damp+.22),m.gravity);spring(dyn.rightHand,des.rightHand,dt,m.freq*.82,Math.max(1.18,m.damp+.22),m.gravity);spring(dyn.pelvis,des.pelvis,dt,m.freq+1.2,1.16,0);spring(dynFeet.left,des.leftFoot,dt,5.6,1.18,0);spring(dynFeet.right,des.rightFoot,dt,5.6,1.18,0);clampVecStep(dyn.leftHand.p,prevLH,0.88*dt);clampVecStep(dyn.rightHand.p,prevRH,0.88*dt);const travelSpeed=locomotion.walking>.08?Math.max(.9,explorer.speed):0;const pelvisStep=travelSpeed?Math.max(1.35,travelSpeed*1.18):.66,footStep=travelSpeed?Math.max(1.8,travelSpeed*1.65):.74;clampVecStep(dyn.pelvis.p,prevPel,pelvisStep*dt);clampVecStep(dynFeet.left.p,prevLF,footStep*dt);clampVecStep(dynFeet.right.p,prevRF,footStep*dt);clampVel(dyn.leftHand.v,1.45);clampVel(dyn.rightHand.v,1.45);clampVel(dyn.pelvis.v,travelSpeed?Math.max(1.6,travelSpeed*1.35):1.0);clampVel(dynFeet.left.v,travelSpeed?Math.max(2.0,travelSpeed*1.8):1.05);clampVel(dynFeet.right.v,travelSpeed?Math.max(2.0,travelSpeed*1.8):1.05);solveRig(des,dt);updateViz();tick._teleAt??=0;const teleNow=performance.now();if(!IS_TOUCH||teleNow-tick._teleAt>32){tick._teleAt=teleNow;updateControllerTelemetry()}tick._hapAt??=0;const hapNow=performance.now();if(!IS_TOUCH||!explorer.mobileNav||hapNow-tick._hapAt>66){tick._hapAt=hapNow;updateHaptics()}const auxNow=performance.now();tick._auxAt??=0;if(!IS_TOUCH||!explorer.mobileNav||auxNow-tick._auxAt>48){tick._auxAt=auxNow;updateDataBus();updateReadout()}window.__hudTick&&window.__hudTick();renderer.render(scene,camera)}requestAnimationFrame(tick);
 
 
 // ---------------------------------------------------------------------------
@@ -2133,6 +2133,8 @@ const chat={
   handlers:[],
   register(fn){if(typeof fn==='function')this.handlers.push(fn);return()=>{const i=this.handlers.indexOf(fn);if(i>=0)this.handlers.splice(i,1)}},
   line(who,text){
+    if(who==='world'&&/closed|refus|failed|cannot|error/i.test(text)&&!document.body.classList.contains('diag-open'))
+      $('#warnBtn')?.classList.add('live');
     const log=$('#chatLog');if(!log)return;
     const el=document.createElement('div');el.className='line '+who;el.textContent=text;
     log.appendChild(el);while(log.children.length>28)log.removeChild(log.firstChild);
@@ -2187,8 +2189,47 @@ const chat={
   chat.line('world','HLIÐARENDI — a body, a dog, a dwelling, a place. Speak, or /help.');
 }
 const on=(sel,fn)=>{const el=$(sel);if(el)el.onclick=fn};
-on('#railToggle',()=>$('#rail')?.classList.toggle('open'));
-if(IS_TOUCH)$('#rail')?.addEventListener('click',e=>{if(e.target.classList?.contains('rb'))setTimeout(()=>$('#rail')?.classList.remove('open'),150)});
+// ---- THE SHELL — Thunder Rigs' header law: play mode vs menu mode ----------
+// Default is PLAY MODE: a clean screen, just the world and the citizens.
+// ≡ opens the sectioned toolbars (and the agent bar); ✕, ▶ PLAY, or tapping
+// the world returns to play. ⚠ toggles the diagnostics readout and lights
+// amber when the world reports a closed line. ● REC records the canvas.
+{
+  const body=document.body;
+  const enterPlay=()=>{body.classList.add('play-mode');body.classList.remove('menu-open')};
+  const openMenu=()=>{body.classList.remove('play-mode');body.classList.add('menu-open')};
+  enterPlay();
+  on('#menuFab',()=>{body.classList.contains('menu-open')?enterPlay():openMenu()});
+  on('#playFab',enterPlay);
+  document.querySelectorAll('.tb-toggle').forEach(b=>b.addEventListener('click',()=>{
+    const t=document.getElementById(b.dataset.target);t?.classList.toggle('collapsed');
+  }));
+  $('#gl')?.addEventListener('pointerdown',()=>{if(body.classList.contains('menu-open'))enterPlay()},true);
+  on('#warnBtn',()=>{body.classList.toggle('diag-open');$('#warnBtn')?.classList.remove('live')});
+  // ● REC — the take is real: canvas capture through MediaRecorder, saved to
+  // the player's files on stop. Honest about where the browser can't record.
+  const rb=$('#recBtn');let mr=null,chunks=[];
+  const canRec=!!(window.MediaRecorder&&renderer?.domElement?.captureStream);
+  if(rb&&!canRec)rb.classList.add('dead');
+  if(rb)rb.onclick=()=>{
+    if(!canRec){chat.line('world','this browser cannot record the canvas');return}
+    if(mr){mr.stop();return}
+    try{
+      const stream=renderer.domElement.captureStream(30);
+      const mime=['video/mp4;codecs=avc1','video/webm;codecs=vp9','video/webm'].find(m=>MediaRecorder.isTypeSupported(m))||'';
+      mr=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);chunks=[];
+      mr.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
+      mr.onstop=()=>{
+        const type=mr.mimeType||'video/webm';mr=null;rb.classList.remove('on');
+        const blob=new Blob(chunks,{type}),a=document.createElement('a');
+        a.href=URL.createObjectURL(blob);a.download='hlidarendi-take'+(/mp4/.test(type)?'.mp4':'.webm');
+        a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+        chat.line('world','the take is saved to your files');
+      };
+      mr.start(250);rb.classList.add('on');chat.line('world','● recording — REC again to keep the take');
+    }catch(e){mr=null;rb.classList.remove('on');chat.line('world','recording failed — '+String(e.message||e).slice(0,50))}
+  };
+}
 // ---- the AGENT bar: words become structures through the forge
 {
   const ag=$('#agentSay'),st2=$('#agentStatus');
@@ -2214,6 +2255,31 @@ if(IS_TOUCH)$('#rail')?.addEventListener('click',e=>{if(e.target.classList?.cont
 on('#saveBtn',saveWorld);
 on('#ballBtn',()=>{if(ball.state==='hero')throwBall();else takeBall();updateWorldUI()});
 on('#feedBtn',()=>{feedBowl();updateWorldUI()});
+// ---- THE CITIZENS ANNOUNCE THEMSELVES — floating names over the actors and
+// the dwelling (Everybody · Argos · Ingold ▼), projected through the one
+// camera on the one clock. They dim with distance and hide behind you.
+{
+  const layer=document.createElement('div');layer.id='labels';document.body.appendChild(layer);
+  const mk=(name,mark)=>{const d=document.createElement('div');d.className='elabel';
+    d.innerHTML='<span>'+name+'</span>'+(mark?'<span class="mark">▼</span>':'');layer.appendChild(d);return d};
+  const LBL={hero:mk('Everybody'),dog:mk('Argos'),home:mk('Ingold',true)};
+  const pv=new THREE.Vector3();
+  const put=(el,x,y,z,far)=>{
+    pv.set(x,y,z).project(camera);
+    const off=pv.z>1||pv.x<-1.1||pv.x>1.1||pv.y<-1.15||pv.y>1.15;
+    el.style.display=off?'none':'flex';if(off)return;
+    el.style.transform='translate('+(((pv.x*.5+.5)*innerWidth)|0)+'px,'+((((-pv.y*.5+.5)*innerHeight)|0))+'px) translate(-50%,-100%)';
+    el.classList.toggle('dim',!!far);
+  };
+  window.__hudTick=()=>{
+    const r=locomotion.root;
+    put(LBL.hero,r.x,groundYAt(r.x,r.z)+2.15,r.z,false);
+    const d=argos.world.dog,dd=Math.hypot(d[0]-r.x,d[2]-r.z);
+    put(LBL.dog,d[0],PLACE.ground.heightAtDog(d[0],d[2])+1.05,d[2],dd>26);
+    const hd=Math.hypot(TR.x-r.x,TR.z-r.z);
+    put(LBL.home,TR.x,rawTerrain(TR.x,TR.z)+3.6,TR.z,hd>40);
+  };
+}
 // boot: hero wakes beside the trailer, on real ground, and the dog is nearby.
 locomotion.root.y=groundYAt(locomotion.root.x,locomotion.root.z);
 restoreWorld();

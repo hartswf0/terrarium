@@ -48,10 +48,15 @@ GROUND dresses it: satellite imagery (© Esri) painted onto the real heights,
 roads and rivers inked from OpenStreetMap, buildings standing as real
 occupancy the body, dog and ball all answer to. The page dresses itself at
 boot too, where the network allows; the procedural moss is the honest
-fallback where it is closed. `/forget` clears the save. The chrome is Thunder Rigs': the AGENT bar
-up top summons structures, the right rail carries PLAY/SAY · AI/BUILD/WORLD ·
-SKY/FILE/SYS (collapsed behind ☰ on phones), and FEED/JUMP/FIRE/BOOST sit
-bottom-right. MOVE/LOOK to travel; touch a limb control and it grows while
+fallback where it is closed. `/forget` clears the save. The chrome is Thunder Rigs' own shell law: the
+header carries ⚠ (diagnostics — it lights amber when a line closes) · ● REC
+(records the canvas, the take saves to your files) · ▶ PLAY · ≡. Default is
+PLAY MODE — a clean screen; ≡ opens the sectioned toolbars (PLAY / BUILD /
+SYSTEM, each group expanding from its toggle, III-style) together with the
+AGENT bar, and ✕ or tapping the world returns to play. The citizens announce
+themselves — **Everybody**, **Argos**, and **Ingold ▼** float as names
+projected over the actors and the dwelling through the one camera.
+FEED/JUMP/FIRE/BOOST sit bottom-right. MOVE/LOOK to travel; touch a limb control and it grows while
 the others store; FIRE takes/throws the ball, FEED fills the bowl at the
 galley, FILE keeps the situation across reloads. Argos decides for
 himself — a throw enters his world as evidence, not as a command.
