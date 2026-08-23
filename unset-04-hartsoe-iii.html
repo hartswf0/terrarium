@@ -10134,6 +10134,7 @@ window.III_HOST = {
     groundY: (x, z) => window.__groundY(x, z),
     get P() { return P; },            // the player rig: pos/vel/yaw
     get B() { return B; },            // the ball: pos/vel/active
+    get playerCar() { return (typeof playerCar !== 'undefined') ? playerCar : null; },
     notify: m => { try { notify(m); } catch (_) {} },
 };
 window.III_SPECIES = {

@@ -2431,6 +2431,237 @@ if(typeof window !== "undefined"){ window.AR = AR; }
             restore: function (rec) { if (rec && rec.state) dog.restore(rec.state); },
             api: dog,
         });
+
+        /* ═════════════════════════════════════════════════════════════════════
+           EVERYBODY — the walking body as a possessable species (Phase 1).
+           The travel core of the V16 explorer, freed from its instrument deck:
+           CONTACT DRIVES MOTION — feet are world anchors, steps are earned,
+           the root follows stance support, per-foot ground from __groundY.
+           EMBODIMENT: the car controller keeps running on the real stick but
+           becomes the INTENT GENERATOR — each frame the body reads the delta
+           the car tried to move, walks as far as its feet earn, and pins P
+           back onto itself. Camera, MULTI, the ball and the dog all follow P,
+           so the whole host converges on the body. B (or the chip) toggles.
+           ═══════════════════════════════════════════════════════════════════ */
+        var KB = 2;                                   // 1 body-metre = 2 III units
+        var bodyGround = function (x, z) { var g = H.groundY(x * KB, z * KB); return isFinite(g) ? g / KB : 0; };
+        function V(x, y, z) { return new THREE.Vector3(x, y, z); }
+        var DOWN = V(0, -1, 0), UP = V(0, 1, 0);
+        function yawDir(h) { return V(Math.sin(h), 0, Math.cos(h)); }
+        function yawLat(h) { return V(Math.cos(h), 0, -Math.sin(h)); }
+        function normAng(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
+        function lerpAng(a, b, t) { return a + normAng(b - a) * t; }
+
+        // ---- rig: joints as Object3Ds, capsule segments as their children
+        var bodyRoot = new THREE.Group(); bodyRoot.scale.setScalar(KB); bodyRoot.visible = false; H.scene.add(bodyRoot);
+        var BJ = {};
+        function joint(name, parent, x, y, z) {
+            var o = new THREE.Object3D(); o.position.set(x, y, z);
+            (parent ? BJ[parent] : bodyRoot).add(o); BJ[name] = o; return o;
+        }
+        var skinM = new THREE.MeshStandardMaterial({ color: 0xdadde0, roughness: 0.95 });
+        var darkM = new THREE.MeshStandardMaterial({ color: 0x24272b, roughness: 0.9 });
+        function seg(parent, from, to, r, mat) {
+            var d = V(to[0] - from[0], to[1] - from[1], to[2] - from[2]), len = d.length();
+            var g = new THREE.CapsuleGeometry(r, Math.max(0.02, len), 4, 10);
+            var m = new THREE.Mesh(g, mat || skinM);
+            m.position.set((from[0] + to[0]) / 2, (from[1] + to[1]) / 2, (from[2] + to[2]) / 2);
+            m.quaternion.setFromUnitVectors(UP, d.normalize());
+            BJ[parent].add(m); return m;
+        }
+        // joints at V16's rest positions (metres, local offsets)
+        joint('hips', null, 0, 0.95, 0);
+        joint('spine', 'hips', 0, 0.11, 0); joint('chest', 'spine', 0, 0.14, 0);
+        joint('neck', 'chest', 0, 0.24, 0); joint('head', 'neck', 0, 0.08, 0);
+        joint('uarmL', 'chest', 0.16, 0.20, 0); joint('larmL', 'uarmL', 0, -0.26, 0); joint('handL', 'larmL', 0, -0.24, 0);
+        joint('uarmR', 'chest', -0.16, 0.20, 0); joint('larmR', 'uarmR', 0, -0.26, 0); joint('handR', 'larmR', 0, -0.24, 0);
+        joint('ulegL', 'hips', 0.092, -0.03, 0); joint('llegL', 'ulegL', 0, -0.40, 0); joint('footL', 'llegL', 0, -0.42, 0);
+        joint('ulegR', 'hips', -0.092, -0.03, 0); joint('llegR', 'ulegR', 0, -0.40, 0); joint('footR', 'llegR', 0, -0.42, 0);
+        seg('hips', [-0.09, 0, 0], [0.09, 0, 0], 0.115);
+        seg('hips', [0, 0.02, 0], [0, 0.26, 0], 0.13); seg('chest', [0, -0.02, 0], [0, 0.18, 0], 0.145);
+        seg('neck', [0, -0.02, 0], [0, 0.06, 0], 0.05);
+        seg('head', [0, 0.02, 0], [0, 0.16, 0], 0.105, darkM);
+        seg('uarmL', [0, 0, 0], [0, -0.26, 0], 0.048, darkM); seg('larmL', [0, 0, 0], [0, -0.24, 0], 0.042);
+        seg('uarmR', [0, 0, 0], [0, -0.26, 0], 0.048, darkM); seg('larmR', [0, 0, 0], [0, -0.24, 0], 0.042);
+        seg('ulegL', [0, 0, 0], [0, -0.40, 0], 0.064); seg('llegL', [0, 0, 0], [0, -0.42, 0], 0.052, darkM);
+        seg('ulegR', [0, 0, 0], [0, -0.40, 0], 0.064); seg('llegR', [0, 0, 0], [0, -0.42, 0], 0.052, darkM);
+        var footGL = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.07, 0.24), darkM); footGL.position.set(0, -0.02, 0.05); BJ.footL.add(footGL);
+        var footGR = footGL.clone(); BJ.footR.add(footGR);
+        // the face — recognition matters (Argos taught us that)
+        (function () {
+            var cv = document.createElement('canvas'); cv.width = cv.height = 128; var c2 = cv.getContext('2d');
+            c2.fillStyle = '#fff'; c2.beginPath(); c2.ellipse(64, 66, 46, 52, 0, 0, 7); c2.fill();
+            c2.fillStyle = '#000'; c2.fillRect(28, 42, 26, 6); c2.fillRect(74, 42, 26, 6);
+            c2.beginPath(); c2.arc(42, 60, 7, 0, 7); c2.fill(); c2.beginPath(); c2.arc(86, 60, 7, 0, 7); c2.fill();
+            c2.fillRect(58, 60, 6, 24); c2.beginPath(); c2.ellipse(64, 98, 16, 5, 0, 0, 7); c2.fill();
+            var face = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.16),
+                new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true }));
+            face.position.set(0, 0.09, 0.095); BJ.head.add(face);
+        })();
+
+        // ---- the travel gait (V16 laws, compact)
+        var GB = { root: V(0, 0, 0), heading: 0, headingGoal: 0, walking: 0, speed: 0, phase: 0,
+                   fA: { L: V(0.09, 0, 0), R: V(-0.09, 0, 0) }, step: null, next: 'L', clock: 0 };
+        function lane(side, p, hd) {   // anatomical lanes: a foot has no legal path through the other leg
+            var lat = yawLat(hd), rel = p.clone().sub(GB.root), l = rel.dot(lat), sgn = side === 'L' ? 1 : -1;
+            var safe = sgn * Math.max(0.075, Math.min(0.34, sgn * l));
+            var fwd = yawDir(hd), f = rel.dot(fwd);
+            return GB.root.clone().addScaledVector(lat, safe).addScaledVector(fwd, f).setY(p.y);
+        }
+        function beginStep(side, to, turnDelta, pivot) {
+            GB.step = { side: side, from: GB.fA[side].clone(), to: lane(side, to, GB.heading + turnDelta * 0.55),
+                        t: 0, dur: pivot ? 0.32 : 0.36 - Math.min(0.09, GB.speed * 0.02),
+                        h0: GB.heading, h1: GB.heading + turnDelta };
+            GB.next = side === 'L' ? 'R' : 'L';
+        }
+        function gaitUpdate(dt, dir, run) {
+            var moving = dir.lengthSq() > 0.01;
+            var tSpeed = moving ? (run ? 4.1 : 2.15) : 0;
+            GB.speed += (tSpeed - GB.speed) * (1 - Math.exp(-dt * 9));
+            GB.walking += ((moving ? 1 : 0) - GB.walking) * (1 - Math.exp(-dt * 9));
+            if (moving) GB.headingGoal = Math.atan2(dir.x, dir.z);
+            var err = normAng(GB.headingGoal - GB.heading);
+            if (GB.step) {
+                var st = GB.step; st.t += dt; var u = Math.min(1, st.t / st.dur), e = u * u * (3 - 2 * u);
+                var p = st.from.clone().lerp(st.to, e);
+                p = lane(st.side, p, lerpAng(st.h0, st.h1, e));
+                p.y = bodyGround(p.x, p.z) + Math.pow(Math.sin(Math.PI * u), 1.1) * Math.min(0.17, 0.07 + st.from.distanceTo(st.to) * 0.16);
+                GB.fA[st.side].copy(p);
+                GB.heading = lerpAng(st.h0, st.h1, Math.min(1, Math.max(0, (u - 0.1) / 0.84)));
+                if (u >= 1) { GB.fA[st.side].y = bodyGround(p.x, p.z); GB.heading = st.h1; GB.step = null; GB.clock = 0; }
+            } else if (GB.walking > 0.1) {
+                GB.clock += dt;
+                if (GB.clock > 0.42 - Math.min(0.14, GB.speed * 0.035)) {
+                    GB.clock = 0;
+                    var td = Math.max(-0.4, Math.min(0.4, err)), hd = GB.heading + td * 0.45;
+                    var to = GB.root.clone().addScaledVector(yawDir(hd), 0.34 + GB.speed * 0.06)
+                                           .addScaledVector(yawLat(hd), (GB.next === 'L' ? 1 : -1) * 0.105);
+                    to.y = bodyGround(to.x, to.z); beginStep(GB.next, to, td, false);
+                }
+            } else if (Math.abs(err) > 0.24) {
+                var side = err > 0 ? 'R' : 'L', ang = Math.max(-0.55, Math.min(0.55, err));
+                var to2 = GB.root.clone().addScaledVector(yawDir(GB.heading + ang), 0.1)
+                                         .addScaledVector(yawLat(GB.heading + ang), (side === 'L' ? 1 : -1) * 0.105);
+                to2.y = bodyGround(to2.x, to2.z); beginStep(side, to2, ang, true);
+            } else {
+                var mid = GB.fA.L.clone().add(GB.fA.R).multiplyScalar(0.5);
+                if (Math.hypot(GB.root.x - mid.x, GB.root.z - mid.z) > 0.18) {
+                    var side2 = GB.next, to3 = GB.root.clone().addScaledVector(yawLat(GB.heading), (side2 === 'L' ? 1 : -1) * 0.105);
+                    to3.y = bodyGround(to3.x, to3.z); beginStep(side2, to3, 0, false);
+                }
+            }
+            // CONTACT DRIVES MOTION: the root only goes where support carries it
+            var goal;
+            if (GB.step) {
+                var u2 = Math.min(1, GB.step.t / GB.step.dur);
+                var stance = GB.fA[GB.step.side === 'L' ? 'R' : 'L'];
+                var tr = Math.min(1, Math.max(0, (u2 - 0.48) / 0.5));
+                goal = stance.clone().lerp(GB.step.to, 0.10 + 0.58 * (tr * tr * (3 - 2 * tr)));
+            } else goal = GB.fA.L.clone().add(GB.fA.R).multiplyScalar(0.5);
+            var d = V(goal.x - GB.root.x, 0, goal.z - GB.root.z), m = d.length();
+            var cap = Math.max(0.7, GB.speed * 0.95) * dt;
+            if (m > cap) d.multiplyScalar(cap / m);
+            GB.root.add(d);
+            GB.root.y = bodyGround(GB.root.x, GB.root.z);
+            if (moving) GB.phase = (GB.phase + dt * (4.35 + GB.speed * 1.6)) % (2 * Math.PI);
+        }
+        function setWorldQuat(o, q) { var pq = o.parent.getWorldQuaternion(new THREE.Quaternion()); o.quaternion.copy(pq.invert().multiply(q)); }
+        function qFromTo(dir) { return new THREE.Quaternion().setFromUnitVectors(DOWN, dir.clone().normalize()); }
+        function solveLegW(hip, knee, footJ, targetW, hd) {
+            hip.updateWorldMatrix(true, false);
+            var Hp = hip.getWorldPosition(new THREE.Vector3());
+            var Fw = targetW.clone(), l1 = 0.40 * KB, l2 = 0.42 * KB;
+            var D = Fw.sub(Hp), dl = Math.max(Math.abs(l1 - l2) + 0.01, Math.min(l1 + l2 - 0.01, D.length()));
+            var n = D.clone().normalize();
+            var a = (l1 * l1 - l2 * l2 + dl * dl) / (2 * dl), h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
+            var pole = yawDir(hd), bend = pole.clone().sub(n.clone().multiplyScalar(pole.dot(n)));
+            if (bend.lengthSq() < 1e-6) bend.set(0, 0, 1); bend.normalize();
+            var K2 = Hp.clone().add(n.clone().multiplyScalar(a)).add(bend.multiplyScalar(h));
+            setWorldQuat(hip, qFromTo(K2.clone().sub(Hp))); hip.updateWorldMatrix(true, false);
+            var Kp = knee.getWorldPosition(new THREE.Vector3());
+            setWorldQuat(knee, qFromTo(targetW.clone().sub(Kp))); knee.updateWorldMatrix(true, false);
+            setWorldQuat(footJ, new THREE.Quaternion().setFromEuler(new THREE.Euler(0, hd, 0)));
+        }
+        function poseBody() {
+            var w = GB.walking, sw = Math.sin(GB.phase), cw = Math.cos(GB.phase), drive = w * Math.min(1, GB.speed / 2.2);
+            bodyRoot.position.set(GB.root.x * KB, GB.root.y * KB, GB.root.z * KB);
+            BJ.hips.position.set(cw * 0.03 * drive, 0.95 - Math.abs(Math.sin(GB.phase * 2)) * 0.02 * drive, 0);
+            BJ.hips.rotation.set(0.03 * drive, GB.heading + sw * 0.05 * drive, -cw * 0.06 * drive);
+            BJ.spine.rotation.set(0.02 * drive, sw * -0.04 * drive, cw * 0.03 * drive);
+            BJ.chest.rotation.set(0.02 * drive, sw * -0.09 * drive, 0);
+            BJ.neck.rotation.set(0, -sw * 0.03 * drive, 0); BJ.head.rotation.set(0, 0, 0);
+            var swing = 0.5 * drive;
+            BJ.uarmL.rotation.set(sw * swing, 0, -0.12); BJ.larmL.rotation.set(-0.18 - Math.max(0, -sw) * 0.35 * drive, 0, 0);
+            BJ.uarmR.rotation.set(-sw * swing, 0, 0.12); BJ.larmR.rotation.set(-0.18 - Math.max(0, sw) * 0.35 * drive, 0, 0);
+            bodyRoot.updateMatrixWorld(true);
+            solveLegW(BJ.ulegL, BJ.llegL, BJ.footL, GB.fA.L.clone().multiplyScalar(KB).add(V(0, 0.06 * KB, 0)), GB.heading);
+            solveLegW(BJ.ulegR, BJ.llegR, BJ.footR, GB.fA.R.clone().multiplyScalar(KB).add(V(0, 0.06 * KB, 0)), GB.heading);
+        }
+        function placeBody(x, z, hd) {   // body-space metres
+            GB.root.set(x, 0, z); GB.root.y = bodyGround(x, z);
+            GB.heading = GB.headingGoal = hd || 0; GB.step = null; GB.walking = 0; GB.speed = 0;
+            var lat = yawLat(GB.heading);
+            GB.fA.L.copy(GB.root).addScaledVector(lat, 0.105); GB.fA.L.y = bodyGround(GB.fA.L.x, GB.fA.L.z);
+            GB.fA.R.copy(GB.root).addScaledVector(lat, -0.105); GB.fA.R.y = bodyGround(GB.fA.R.x, GB.fA.R.z);
+        }
+
+        // ---- EMBODIMENT: pin-and-diff on P
+        var embodied = false, pin = { x: 0, z: 0 }, carWasVisible = true;
+        function embody() {
+            if (embodied) return release();
+            var P2 = H.P, pc = H.playerCar;
+            if (pc) { carWasVisible = pc.visible; pc.visible = false; }
+            placeBody(P2.pos.x / KB, P2.pos.z / KB, P2.yaw || 0);
+            bodyRoot.visible = true; embodied = true;
+            pin.x = P2.pos.x; pin.z = P2.pos.z;
+            try { P2.vel.set(0, 0, 0); } catch (_) {}
+            H.notify('👁 YOU ARE EVERYBODY — the stick walks the body · B releases');
+            var c = document.getElementById('hl-embody'); if (c) { c.textContent = 'RIG'; c.classList.add('on'); }
+            return true;
+        }
+        function release() {
+            if (!embodied) return false;
+            embodied = false; bodyRoot.visible = false;
+            var pc = H.playerCar; if (pc) pc.visible = carWasVisible;
+            H.notify('RELEASED — back in your rig');
+            var c = document.getElementById('hl-embody'); if (c) { c.textContent = 'BODY'; c.classList.remove('on'); }
+            return true;
+        }
+        function bodyTick(dt) {
+            if (!embodied) return;
+            var P2 = H.P;
+            // the car ran on the real stick from our pin: the delta IS the intent
+            var ix = (P2.pos.x - pin.x) / KB, iz = (P2.pos.z - pin.z) / KB;
+            var mag = Math.hypot(ix, iz), dir = V(0, 0, 0), run = false;
+            if (mag > 0.0025) { dir.set(ix / mag, 0, iz / mag); run = mag / Math.max(dt, 1e-3) > 3.4; }
+            try { if (P2.vel.length() > 12) P2.vel.setLength(12); } catch (_) {}
+            gaitUpdate(dt, dir, run);
+            poseBody();
+            // pin the host onto the body: camera, MULTI, ball and dog all follow P
+            P2.pos.x = GB.root.x * KB; P2.pos.z = GB.root.z * KB;
+            P2.pos.y = GB.root.y * KB + 0.7;
+            P2.yaw = GB.heading;
+            pin.x = P2.pos.x; pin.z = P2.pos.z;
+        }
+        // chip + key
+        (function () {
+            var b = document.createElement('button'); b.id = 'hl-embody'; b.textContent = 'BODY';
+            b.style.cssText = 'position:fixed;left:10px;bottom:206px;z-index:60;font:700 10px/1 ui-monospace,monospace;letter-spacing:.1em;padding:10px 12px;border-radius:8px;background:rgba(12,16,19,.92);color:#e6e9ea;border:1px solid #2dd4bf;cursor:pointer;';
+            b.addEventListener('click', embody);
+            document.body.appendChild(b);
+            document.addEventListener('keydown', function (e) {
+                if (e.code === 'KeyB' && !e.repeat) { var ae = document.activeElement; if (!ae || (ae.tagName !== 'INPUT' && ae.tagName !== 'TEXTAREA')) embody(); }
+            });
+        })();
+        III_SPECIES.register({
+            id: 'everybody',
+            tick: function (dt) { dt = Math.max(0.001, Math.min(dt || 0.016, 0.05)); bodyTick(dt); },
+            spawn: function (e) { if (e.at) { placeBody((e.at.x || 0) / KB, (e.at.z || 0) / KB, e.ry || 0); bodyRoot.visible = true; poseBody(); } return true; },
+            serialize: function () { return { species: 'everybody', at: { x: GB.root.x * KB, z: GB.root.z * KB }, heading: GB.heading, embodied: embodied }; },
+            restore: function (rec) { if (rec && rec.at) { placeBody(rec.at.x / KB, rec.at.z / KB, rec.heading || 0); } },
+            embody: embody, release: release,
+        });
+
         H.notify('ARGOS IS HERE — he plays the ball back; feed him words through SAY');
     }
     wait();

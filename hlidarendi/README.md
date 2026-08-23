@@ -77,7 +77,9 @@ Rebuild with `./build.sh` (see [src/README.md](src/README.md)).
 the reverse of the standalone page: `unset-04-hartsoe-iii.html` now carries a
 SPECIES seam (`window.III_HOST` / `window.III_SPECIES`, four small guarded
 touches), and `terrarium-iii-hlidarendi.js` — a sidecar like
-`terrarium-iii-net.js` — registers **Argos as III's first legged species**:
+`terrarium-iii-net.js` — registers **Argos and Everybody as III's first legged species**: the body is
+possessable (B key — the DRIVE stick walks it, the car becomes the intent
+generator, and camera/MULTI/ball/dog all converge on it), and Argos is
 seated on the real ground, tracking by scent at car-scale distances, playing
 the real III ball back to the player through his own FETCH. The cartridge
 places him via `{kind:'actor', species:'argos'}`. The architecture and the

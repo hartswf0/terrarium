@@ -72,20 +72,25 @@ integration. Verified headless against the patched page:
 
 Regenerate the sidecar with `node hlidarendi/tools/make-iii-sidecar.mjs`.
 
-## Phase 1 — EVERYBODY as a possessable species (the body port)
+## Phase 1 — EVERYBODY as a possessable species — SHIPPED
 
-III's possession is the exact seam: it already swaps *which body the DRIVE
-controls drive*. Generalized: possessing a `species:'everybody'` actor swaps
-the **controller**, not just the body — the DRIVE stick feeds the walking
-locomotion (heading/speed intent into the contact gait) instead of the car
-controller; ESC releases back to the rig, as today. Work items:
+The travel core of V16 lives in the sidecar, freed from its instrument deck:
+feet as world anchors, steps earned on per-foot `__groundY`, the root
+following stance support (CONTACT DRIVES MOTION), anatomical lanes, analytic
+two-bone leg IK, counter-rotating trunk and arm swing — a capsule body with
+the V16 face, at its own scale seam (1 body-metre = 2 III units).
 
-- extract V16's locomotion + IK core from the DOM (the solver is clean; the
-  revolvers are presentation) into the sidecar, driven by `{move, look}`
-  intent vectors;
-- a `possessable: true` species contract: `possess()` hands the species the
-  DRIVE input stream and the camera follow target; `release()` returns them;
-- ground = `III_HOST.groundY` per foot; scale seam like the dog's.
+**Embodiment is a pin-and-diff on `P`, and it is what "towards each other"
+means mechanically.** The car controller keeps running on the real stick but
+becomes the intent generator: each frame the body reads the delta the car
+tried to move from the pin, walks as far as its feet earn, and pins `P` back
+onto itself. Because camera follow, MULTI, the ball, and the dog's
+perception all read `P`, the entire host converges on the walking body with
+zero further hooks — verified headless: embody (B key or the BODY chip),
+walk under W, and Argos closes from 27 units to heel at 5.7 on his own.
+ESC-equivalent: B again (or the chip, now reading RIG) releases back to the
+rig, which reappears where the body stands — III's own possession semantics,
+generalized across the species boundary.
 
 ## Phase 2 — the puppet instruments as a HUD deck
 
