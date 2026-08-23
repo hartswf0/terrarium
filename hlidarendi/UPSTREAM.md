@@ -105,6 +105,20 @@ Species state (`serialize()`/`restore()` already in the contract) rides it:
 the host runs the dog's mind, peers interpolate the posed skeleton — same
 split III already uses for rigs. The trailer already travels as a fort.
 
+## The living ground — one place stack, not two (the parasitism answer)
+
+The standalone page walking on naked elevation while III wore the real place
+was the tell: two ground stacks, one starved. `src/living-ground.js` is the
+correction — ONE module owning the mercator math, the imagery dressing
+(the same Esri World Imagery source III reads), Overpass ways inked onto the
+terrain texture, and OSM buildings as occupancy, registered onto the baked
+heights through `TERRAIN.geo`. The page consumes it at boot and on
+`/goto`/`/place`; the registration was proven with labeled stub tiles
+(north up, west left, seams continuous). The remaining unification — III's
+importer and this module converging on one shared place library — is the
+standing direction: the sidecar pattern is the vehicle, but the goal is
+shared organs, not a rider on a host.
+
 ## Division of labour from here
 
 - **`unset-04-hartsoe-iii.html`** — the game: shell, chrome, AI, games,

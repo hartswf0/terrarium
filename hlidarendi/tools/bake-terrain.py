@@ -51,6 +51,9 @@ export const TERRAIN = {{
   n: {N}, res: {round(res, 4)},
   min: {round(mn, 2)}, max: {round(mx, 2)},
   cx: {round(CX - x0, 2)}, cy: {round(CY - y0, 2)},
+  // geographic registration: the window's place on earth, so the LIVING GROUND
+  // can dress these heights with imagery and ways at any tile zoom.
+  geo: {{ lat: {LAT}, lon: {LON}, z: {Z}, tx: {x0t}, ty: {y0t}, wx: {x0}, wy: {y0} }},
   b64: "{b64}"
 }};
 ''')

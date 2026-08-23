@@ -2,6 +2,7 @@ import * as THREE from 'three';
 const AR=window.AR; // ARGOS half-dog game contract (PURE module, loaded before this bundle)
 import {IN as EL_IN, WT, EL, DOOR_PLAN} from './elements.js';
 import {TERRAIN} from './terrain-data.js';
+import {LIVING_GROUND} from './living-ground.js';
 import {MEMBERS} from './trailer-members.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -183,9 +184,59 @@ function buildTerrainMesh(){
   }
   g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.computeVertexNormals();
   terrainMesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,metalness:0}));
+  terrainMesh.userData.SZ=SZ;terrainMesh.userData.cxOff=cxOff;terrainMesh.userData.czOff=czOff;
   worldGroup.add(terrainMesh);
 }
 buildTerrainMesh();
+// ---- THE LIVING GROUND — dress the baked heights with the real place:
+// imagery + ways painted onto the terrain, buildings standing as occupancy.
+// Runs when the network allows (Pages, local); the procedural moss is the
+// honest fallback where it is closed (the artifact sandbox).
+const OSM_BUILDINGS=[];
+function clearOsmBuildings(){
+  for(const b of OSM_BUILDINGS){worldGroup.remove(b.mesh);const i=BLOCKERS.indexOf(b.solid);if(i>=0)BLOCKERS.splice(i,1)}
+  OSM_BUILDINGS.length=0;
+}
+async function dressWorld(){
+  if(!TERRAIN.geo)throw new Error('no geographic registration');
+  const img=await LIVING_GROUND.imagery(TERRAIN);
+  try{const w=await LIVING_GROUND.ways(TERRAIN);LIVING_GROUND.drawWays(img,w);placeOsmBuildings(w.buildings)}
+  catch(e){console.warn('[living ground] ways unavailable',e)}
+  const tex=new THREE.CanvasTexture(img.canvas);
+  tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=4;
+  // register: window px 0..n over the window's metre extent; the mesh covers
+  // the central 96%, so offset/repeat map mesh UVs into the window texture.
+  const n=TERRAIN.n,res=TERRAIN.res,SZ=terrainMesh.userData.SZ;
+  const meshX0=terrainMesh.userData.cxOff-SZ/2,meshZ0=terrainMesh.userData.czOff-SZ/2;
+  const winX0=(0-TERRAIN.cx)*res,winZ0=(0-TERRAIN.cy)*res,winW=n*res;
+  tex.repeat.set(SZ/winW,SZ/winW);
+  tex.offset.set((meshX0-winX0)/winW,1-(meshZ0-winZ0)/winW-SZ/winW);
+  const m=terrainMesh.material;
+  m.map=tex;m.vertexColors=false;m.color.set(0xffffff);m.needsUpdate=true;
+  return img.tiles;
+}
+function placeOsmBuildings(list){
+  clearOsmBuildings();
+  const res=TERRAIN.res;
+  for(const b of list){
+    let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;
+    for(const p of b.pts){
+      const wx=(p[0]-TERRAIN.cx)*res,wz=(p[1]-TERRAIN.cy)*res;
+      x0=Math.min(x0,wx);x1=Math.max(x1,wx);z0=Math.min(z0,wz);z1=Math.max(z1,wz);
+    }
+    const cx2=(x0+x1)/2,cz2=(z0+z1)/2,sx=x1-x0,szl=z1-z0;
+    if(sx<1.5||szl<1.5||sx>60||szl>60)continue;
+    if(Math.abs(cx2-TR.x)<9&&Math.abs(cz2-TR.z)<9)continue;   // the trailer keeps its yard
+    const h=3.1,gy2=PLACE.heightAt(cx2,cz2);
+    const mesh=new THREE.Mesh(new THREE.BoxGeometry(sx,h,szl),
+      new THREE.MeshStandardMaterial({color:0xd8d4cb,roughness:.9}));
+    mesh.position.set(cx2,gy2+h/2,cz2);worldGroup.add(mesh);
+    const solid={id:'osm.'+OSM_BUILDINGS.length,kind:'osm',climb:false,
+      min:[cx2-sx/2,gy2,cz2-szl/2],max:[cx2+sx/2,gy2+h,cz2+szl/2]};
+    BLOCKERS.push(solid);
+    OSM_BUILDINGS.push({mesh,solid});
+  }
+}
 // Members from the ACTUAL operative construction (src/trailer-members.js):
 // chassis, joists, studs, headers, rafters, sheathing, door leaf, glazing,
 // fixtures, water runs. Merged per fade-group + material; EL stays the coarse
@@ -429,7 +480,9 @@ async function gotoPlace(lat,lon){
   const a=new Float32Array(N*N);
   for(let j=0;j<N;j++)for(let i=0;i<N;i++)a[j*N+i]=H(wx0+i,wy0+j)-base;
   TG=a;TERRAIN.res=156543.03*Math.cos(lr)/n2;TERRAIN.cx=CX-wx0;TERRAIN.cy=CY-wy0;
+  TERRAIN.geo={lat,lon,z,tx:x0,ty:y0,wx:wx0,wy:wy0};
   buildTerrainMesh();
+  dressWorld().then(t=>chat.line('world','dressed — '+t+' tiles · © Esri · © OpenStreetMap')).catch(()=>{});
   placeHero(0,0,locomotion.heading);argos.world.dog=[TR.x-2.1,0,TR.z-2.4];
   return true;
 }
@@ -2102,12 +2155,18 @@ const chat={
       else if(cmd==='goto'){const m2=text.match(/goto\s+(-?[\d.]+)[ ,]+(-?[\d.]+)/);
         if(m2){r='calling on the landscape at '+m2[1]+', '+m2[2]+'…';gotoPlace(+m2[1],+m2[2]).then(()=>chat.line('world','the land answered — a new place stands under home')).catch(e=>chat.line('world','the network here is closed — Hlíðarendi stands ('+String(e.message||e).slice(0,50)+')'))}
         else r='say: /goto <lat> <lon>'}
+      else if(cmd==='place'){const nm=text.slice(7).trim();
+        if(nm){r='asking the atlas for "'+nm+'"…';
+          LIVING_GROUND.geocode(nm).then(g=>{chat.line('world','found '+g.name.split(',')[0]+' — calling on the landscape…');return gotoPlace(g.lat,g.lon)})
+            .then(()=>chat.line('world','a new place stands under home'))
+            .catch(e=>chat.line('world','the atlas line is closed — '+String(e.message||e).slice(0,50)))}
+        else r='say: /place <somewhere on earth>'}
       else if(cmd==='ai'){const k2=text.slice(4).trim();
         if(k2==='off'||!k2){try{localStorage.removeItem('hlidarendi.ai.key')}catch(e){}r='AI OFF — the agent uses stand-ins'}
         else{try{localStorage.setItem('hlidarendi.ai.key',k2)}catch(e){}r='agent line configured — /build speaks to Claude now'}window.__refreshAI?.()}
       else if(WEATHER.presets[cmd])r=WEATHER.set(cmd)?('the sky turns — '+cmd):'…';
       else if(cmd==='forget'){try{localStorage.removeItem('hlidarendi.v1')}catch(e){}r='forgotten — next visit starts fresh'}
-      else if(cmd==='help')r='/build <words> /striker /goto <lat> <lon> /ai <key|off> · /save /reset /feed /ball /door /forget · sky: /dawn /day /dusk /night /fog /rain';
+      else if(cmd==='help')r='/build <words> /striker /place <name> /goto <lat> <lon> /ai <key|off> · /save /reset /feed /ball /door /forget · sky: /dawn /day /dusk /night /fog /rain';
       chat.line('world',r);updateWorldUI();return null;
     }
     let prog=null;
@@ -2159,6 +2218,8 @@ on('#feedBtn',()=>{feedBowl();updateWorldUI()});
 locomotion.root.y=groundYAt(locomotion.root.x,locomotion.root.z);
 restoreWorld();
 updateWorldUI();
+dressWorld().then(t=>{chat.line('world','the living ground answered — '+t+' imagery tiles, ways and buildings · imagery © Esri · ways © OpenStreetMap');})
+  .catch(e=>{chat.line('world','the imagery line is closed here — procedural moss stands ('+String(e.message||e).slice(0,40)+')')});
 window.HLIDARENDI={
   place:PLACE,structure:PLACE.structure,door:DOOR,weather:WEATHER,
   view:{camera,controls},
@@ -2166,6 +2227,6 @@ window.HLIDARENDI={
   props:{ball,bowl},
   integration:INTEGRATION,
   save:saveWorld,restore:restoreWorld,takeBall,throwBall,feedBowl,placeHero,chat,
-  forge:FORGE,build:buildFromWords,striker:STRIKER,goto:gotoPlace,
+  forge:FORGE,build:buildFromWords,striker:STRIKER,goto:gotoPlace,ground:LIVING_GROUND,dress:dressWorld,
   snapshot:()=>INTEGRATION.snapshot()
 };

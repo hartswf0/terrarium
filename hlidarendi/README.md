@@ -42,9 +42,13 @@ the agent line to Claude so words design the structure. What you build is
 REAL: its solids enter the world's occupancy (bodies, dog and ball all answer
 to it), and it rides the save and the cartridge snapshot. **`/striker`**
 turns the yard into a pitch — run into the ball to kick, and Argos plays for
-himself, carrying to his own goal. **`/goto <lat> <lon>`** calls on the world
-landscape — live terrarium elevation tiles for anywhere on earth (where the
-network allows). `/forget` clears the save. The chrome is Thunder Rigs': the AGENT bar
+himself, carrying to his own goal. **`/goto <lat> <lon>`** and **`/place <name>`** call on
+the world landscape — live elevation for anywhere on earth, and THE LIVING
+GROUND dresses it: satellite imagery (© Esri) painted onto the real heights,
+roads and rivers inked from OpenStreetMap, buildings standing as real
+occupancy the body, dog and ball all answer to. The page dresses itself at
+boot too, where the network allows; the procedural moss is the honest
+fallback where it is closed. `/forget` clears the save. The chrome is Thunder Rigs': the AGENT bar
 up top summons structures, the right rail carries PLAY/SAY · AI/BUILD/WORLD ·
 SKY/FILE/SYS (collapsed behind ☰ on phones), and FEED/JUMP/FIRE/BOOST sit
 bottom-right. MOVE/LOOK to travel; touch a limb control and it grows while
