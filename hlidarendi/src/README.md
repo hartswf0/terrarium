@@ -24,6 +24,10 @@ no CDN). It is assembled from three parts by `../build.sh`:
   - TRAILER SHIFT loop: take/throw ball (`argos.say('fetch the ball')` biases,
     never commands), feed bowl, dog fetch/carry/return, eat; save/restore of
     the inhabited situation via localStorage.
+- **`terrain-data.js`** — the real ground, baked by `../tools/bake-terrain.py`
+  (change LAT/LON there to stand the situation anywhere on earth).
+- **`trailer-members.js`** — the finished operative World, baked by
+  `../tools/bake-trailer.mjs` running the actual ingold.js construction.
 - **the AR module** — extracted verbatim at build time from
   `../sources/argos-half-dog.html` between the `==PURE-BEGIN==`/`==PURE-END==`
   markers. It is not duplicated here; the vendored source stays the source of
@@ -38,6 +42,10 @@ builders — the III chat-to-build pipeline, an LLM, a peer — plug in through
 `HLIDARENDI.chat.register(handler)`: a handler that returns `true` claims the
 utterance before the dog hears it. That registration point is where the III
 structure compiler should eventually attach, keeping play offline-first.
+
+One build-time patch is applied to the AR module (see build.sh): pad contact
+is measured against the dog's own ground instead of absolute y=0, so traction
+is earned on real slopes. The vendored source stays verbatim.
 
 Console API in the built page: `window.HLIDARENDI`
 (`place`, `actors`, `argos`, `props`, `takeBall/throwBall/feedBowl`,

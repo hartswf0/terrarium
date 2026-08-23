@@ -28,7 +28,13 @@ Then HLIÐARENDI asks the fifth question:
 
 **[HLIDARENDI.html](HLIDARENDI.html)** — one self-contained file (three.js
 bundled in, no network needed), phone-first. Everybody wakes beside the Ingold
-trailer with Argos nearby. MOVE/LOOK to travel; touch a limb control and it
+trailer with Argos nearby — at the real Hlíðarendi: the ground is a baked
+kilometre of Fljótshlíð, Iceland (public AWS terrarium elevation tiles, farm
+datum 189 m, the drop to the Markarfljót plain included), and the dwelling is
+the FULL operative construction — 314 members from ingold.js's committed
+operations: chassis, joists, studs, headers, rafters, sheathing, the door leaf
+standing open, glazing, fixtures, water runs. The sky answers to words:
+`/dawn /day /dusk /night /fog /rain`; `/forget` clears the save. MOVE/LOOK to travel; touch a limb control and it
 grows while the others store; BALL takes and throws, FEED fills the bowl at
 the galley, SAVE keeps the situation across reloads. Argos decides for
 himself — a throw enters his world as evidence, not as a command.

@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 const AR=window.AR; // ARGOS half-dog game contract (PURE module, loaded before this bundle)
 import {IN as EL_IN, WT, EL, DOOR_PLAN} from './elements.js';
+import {TERRAIN} from './terrain-data.js';
+import {MEMBERS} from './trailer-members.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
@@ -15,13 +17,13 @@ function clampVecStep(v,from,maxStep){const d=v.clone().sub(from),m=d.length();i
 function clampVel(vec,max){const m=vec.length();if(m>max&&m>1e-9)vec.multiplyScalar(max/m);return vec}
 const HAND_FRONT_Z=.20; // camera is +Z: protected front working plane in front of the torso
 const ANATOMY={skinPad:.018,upperArmR:.052,forearmR:.047,thighR:.066,shinR:.052,elbowMax:142,kneeMax:145};
-const scene=new THREE.Scene();scene.background=new THREE.Color(0xffffff);
-const camera=new THREE.PerspectiveCamera(38,1,.05,30);camera.position.set(0,1.20,6.2);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xb8cbd8);
+const camera=new THREE.PerspectiveCamera(38,1,.05,1400);camera.position.set(0,1.20,6.2);
 const IS_TOUCH=(navigator.maxTouchPoints||0)>0||matchMedia('(pointer:coarse)').matches;
 const renderer=new THREE.WebGLRenderer({canvas,antialias:!IS_TOUCH,preserveDrawingBuffer:false,powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(devicePixelRatio,IS_TOUCH?1:1.75));renderer.outputColorSpace=THREE.SRGBColorSpace;
-const controls=new OrbitControls(camera,canvas);controls.target.set(0,1.12,0);controls.enableDamping=true;controls.dampingFactor=.08;controls.enabled=false;controls.minDistance=1.5;controls.maxDistance=5;
-scene.add(new THREE.HemisphereLight(0xffffff,0xd8d8d8,1.35));
+const controls=new OrbitControls(camera,canvas);controls.target.set(0,1.12,0);controls.enableDamping=true;controls.dampingFactor=.08;controls.enabled=false;controls.minDistance=1.5;controls.maxDistance=700;
+const hemi=new THREE.HemisphereLight(0xffffff,0xd8d8d8,1.35);scene.add(hemi);
 const dl=new THREE.DirectionalLight(0xffffff,1.25);dl.position.set(2,3,2);scene.add(dl);
 const GROUND_Y=0;
 
@@ -54,12 +56,25 @@ const IN=EL_IN;                                    // the trailer is authored in
 const TR={x:2.4,z:0};                              // trailer datum in world (plan 50.5,120 maps here)
 const DECK=15.75*IN, WALLTOP=106*IN;               // ingold SHELL: deckTop 15.75, wallTop 106
 const px2w=px=>TR.x+(px-50.5)*IN, py2w=py=>TR.z+(py-120)*IN;
+// REAL GROUND — Hlíðarendi, Fljótshlíð (see src/terrain-data.js). The farm
+// datum is world origin; +x east, +z south; heights are metres above the farm.
+const TG=(()=>{
+  const bin=atob(TERRAIN.b64),n=TERRAIN.n,a=new Float32Array(n*n),scale=(TERRAIN.max-TERRAIN.min)/65535;
+  for(let i=0;i<n*n;i++)a[i]=TERRAIN.min+((bin.charCodeAt(i*2))|(bin.charCodeAt(i*2+1)<<8))*scale;
+  return a;
+})();
+function rawTerrain(x,z){
+  const n=TERRAIN.n,gi=clamp(TERRAIN.cx+x/TERRAIN.res,0,n-1.001),gj=clamp(TERRAIN.cy+z/TERRAIN.res,0,n-1.001);
+  const i0=Math.floor(gi),j0=Math.floor(gj),fx=gi-i0,fz=gj-j0;
+  const h00=TG[j0*n+i0],h10=TG[j0*n+i0+1],h01=TG[(j0+1)*n+i0],h11=TG[(j0+1)*n+i0+1];
+  return (h00*(1-fx)+h10*fx)*(1-fz)+(h01*(1-fx)+h11*fx)*fz;
+}
 function terrainH(x,z){
-  // gentle standing ground with a flat pad under the trailer yard
-  const rx=Math.max(0,Math.abs(x-TR.x)-2.6),rz=Math.max(0,Math.abs(z-TR.z)-4.2);
-  const r=Math.hypot(rx,rz),t=clamp(r/3.2,0,1),mask=t*t*(3-2*t);
-  const h=.34*Math.sin(x*.31+1.7)*Math.sin(z*.27-.4)+.16*Math.sin(x*.71+z*.53+.8)+.06*Math.sin(x*1.6-z*1.2);
-  return h*mask;
+  // the farmyard is levelled: blend the real hillside to a flat pad under home
+  const rx=Math.max(0,Math.abs(x-TR.x)-4.0),rz=Math.max(0,Math.abs(z-TR.z)-5.5);
+  const r=Math.hypot(rx,rz),t=clamp(r/7.0,0,1),mask=t*t*(3-2*t);
+  const pad=rawTerrain(TR.x,TR.z);
+  return pad*(1-mask)+rawTerrain(x,z)*mask - pad; // datum: the pad is 0
 }
 // STRUCTURE — the element table lives in src/elements.js: ONE authority for the
 // standalone page and the thunder-rigs cartridge alike.
@@ -148,35 +163,90 @@ WORLD_BRIDGE.setPlace(PLACE);
 // ---- terrain + structure views (meshes are views of world state, not authorities)
 const worldGroup=new THREE.Group();scene.add(worldGroup);
 {
-  const N=88,SZ=46,g=new THREE.PlaneGeometry(SZ,SZ,N,N);g.rotateX(-Math.PI/2);
+  const SZ=TERRAIN.n*TERRAIN.res*0.96,N=150,g=new THREE.PlaneGeometry(SZ,SZ,N,N);g.rotateX(-Math.PI/2);
+  const cxOff=(TERRAIN.n/2-TERRAIN.cx)*TERRAIN.res,czOff=(TERRAIN.n/2-TERRAIN.cy)*TERRAIN.res;
+  g.translate(cxOff,0,czOff);
   const pos=g.attributes.position,col=[];
+  const jit=(x,z)=>{const v=Math.sin(x*12.9898+z*78.233)*43758.5453;return v-Math.floor(v)};
   for(let i=0;i<pos.count;i++){
     const x=pos.getX(i),z=pos.getZ(i),h=terrainH(x,z);pos.setY(i,h);
-    const t=clamp(.5+h*.9,0,1),r=lerp(.845,.905,t),gr=lerp(.855,.885,t),b=lerp(.80,.845,t);
-    col.push(r,gr,b);
+    const d=2.4,sl=Math.hypot(terrainH(x+d,z)-terrainH(x-d,z),terrainH(x,z+d)-terrainH(x,z-d))/(2*d);
+    const n=jit(x,z)*.05-.025;
+    let r,gr,b;
+    if(h<-46){r=.46;gr=.44;b=.39}                                   // Markarfljót outwash plain
+    else if(sl>.52){r=.47;gr=.45;b=.42}                             // rock
+    else{const t=clamp((h+46)/60,0,1);r=lerp(.40,.56,t);gr=lerp(.47,.56,t);b=lerp(.30,.40,t)} // moss→grass
+    const shade=1-clamp(sl*.55,0,.28);
+    col.push(clamp(r*shade+n,0,1),clamp(gr*shade+n,0,1),clamp(b*shade+n,0,1));
   }
   g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.computeVertexNormals();
-  const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,metalness:0,flatShading:true}));
+  const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,metalness:0}));
   worldGroup.add(m);
 }
-const STRUCT_MATS={wall:0xf2efe8,glass:0xbcd6dd,floor:0xc9b48a,fixture:0xded2b8,frame:0x6b6257,step:0xb8ab91};
+// Members from the ACTUAL operative construction (src/trailer-members.js):
+// chassis, joists, studs, headers, rafters, sheathing, door leaf, glazing,
+// fixtures, water runs. Merged per fade-group + material; EL stays the coarse
+// collision/surface authority for the same structure.
+const MEMBER_MATS={concrete:0x97928a,steel:0x4a4f55,treated_wood:0x8b7355,plywood:0xc9b48a,
+  engineered_lumber:0xa08a5f,siding:0xd8d5cc,corrugated_metal:0x9aa0a4,paint:0xe8e5da,
+  wood:0xa0784a,glass:0xbcd6dd,tile:0xd8d8d0,stone:0x8a8880,fabric:0xc05a4a,polycarbonate:0xcfe0e4};
+function memberGroup(lox,loy,loz,hix,hiy,hiz,kind){
+  if(kind==='rafter'||kind==='flashing'||kind==='panel'||loz>=100)return 'roof';
+  if(hix<=8)return 'W'; if(lox>=93)return 'E'; if(hiy<=8)return 'S'; if(loy>=232)return 'N';
+  return 'in';
+}
 const structMeshes=[];
-for(const b of SOLIDS){
-  const sx=b.max[0]-b.min[0],sy=b.max[1]-b.min[1],sz=b.max[2]-b.min[2];
-  const mat=new THREE.MeshStandardMaterial({color:STRUCT_MATS[b.kind]||0xcccccc,roughness:1,metalness:0,transparent:true,opacity:b.kind==='glass'?.45:1});
-  const m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),mat);
-  m.position.set((b.min[0]+b.max[0])/2,(b.min[1]+b.max[1])/2,(b.min[2]+b.max[2])/2);
-  worldGroup.add(m);
-  const edge=new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry),new THREE.LineBasicMaterial({color:0x000000,transparent:true,opacity:.30}));
-  edge.position.copy(m.position);worldGroup.add(edge);
-  structMeshes.push({box:b,mesh:m,edge,baseOpacity:mat.opacity});
+{
+  const buckets={}; // group|material -> geometries
+  const gAABB={};   // group -> world aabb
+  for(const m of MEMBERS){
+    let [id,kind,mat,layer,lox,loy,loz,hix,hiy,hiz]=m;
+    // the door leaf STANDS OPEN — the way in must look like the way in.
+    // Hinged at the south jamb, swung against the inside of wall W.
+    if(kind==='leaf'){
+      const wdt=hiy-loy,thk=hix-lox;
+      lox=hix; hix=lox+wdt*0.98; hiy=loy+thk;
+    }
+    const grp=memberGroup(lox,loy,loz,hix,hiy,hiz,kind);
+    const sx=Math.abs(px2w(hix)-px2w(lox)),sy=(hiz-loz)*IN,sz=Math.abs(py2w(hiy)-py2w(loy));
+    if(sx<1e-4||sy<1e-4||sz<1e-4)continue;
+    const g=new THREE.BoxGeometry(sx,sy,sz);
+    g.translate((px2w(lox)+px2w(hix))/2,(loz+hiz)/2*IN,(py2w(loy)+py2w(hiy))/2);
+    const key=grp+'|'+(kind==='glazing'?'glass':(mat||'wood'));
+    (buckets[key]=buckets[key]||[]).push(g);
+    const a=gAABB[grp]=gAABB[grp]||{min:[1e9,1e9,1e9],max:[-1e9,-1e9,-1e9]};
+    a.min[0]=Math.min(a.min[0],px2w(lox),px2w(hix));a.max[0]=Math.max(a.max[0],px2w(lox),px2w(hix));
+    a.min[1]=Math.min(a.min[1],loz*IN);a.max[1]=Math.max(a.max[1],hiz*IN);
+    a.min[2]=Math.min(a.min[2],py2w(loy),py2w(hiy));a.max[2]=Math.max(a.max[2],py2w(loy),py2w(hiy));
+  }
+  for(const key of Object.keys(buckets)){
+    const [grp,mat]=key.split('|');
+    const merged=mergeGeometries(buckets[key],false);
+    const glass=mat==='glass'||mat==='polycarbonate';
+    const material=new THREE.MeshStandardMaterial({color:MEMBER_MATS[mat]||0xb0a898,
+      roughness:mat==='steel'||mat==='corrugated_metal'?.55:.9,metalness:mat==='steel'?.35:0,
+      transparent:true,opacity:glass?.45:1});
+    const mesh=new THREE.Mesh(merged,material);
+    worldGroup.add(mesh);
+    structMeshes.push({box:Object.assign({kind:grp==='in'?'interior':'wall'},gAABB[grp]),grp,mesh,baseOpacity:material.opacity});
+  }
+  // the steps are HLIDARENDI's own addition (EL) — the way in, rendered too
+  for(const b of SOLIDS){
+    if(b.kind!=='step')continue;
+    const g=new THREE.BoxGeometry(b.max[0]-b.min[0],b.max[1]-b.min[1],b.max[2]-b.min[2]);
+    const mesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0xb8ab91,roughness:.95}));
+    mesh.position.set((b.min[0]+b.max[0])/2,(b.min[1]+b.max[1])/2,(b.min[2]+b.max[2])/2);
+    worldGroup.add(mesh);
+  }
 }
 // walls between the camera and the hero become see-through; same elements, one truth
 function updateStructFade(){
   const hero=locomotion.root,cx=camera.position.x,cz=camera.position.z;
+  const home=insideShell(hero.x,hero.z);
   for(const s of structMeshes){
     let block=false;
-    if(s.box.max[1]>hero.y+.9&&(s.box.kind!=='floor')){
+    if(s.grp==='roof'){block=home}
+    else if(s.grp!=='in'&&s.box.max[1]>hero.y+.9){
       for(let t=.12;t<.97;t+=.12){
         const x=lerp(cx,hero.x,t),z=lerp(cz,hero.z,t);
         if(x>s.box.min[0]-.08&&x<s.box.max[0]+.08&&z>s.box.min[2]-.08&&z<s.box.max[2]+.08){
@@ -185,11 +255,53 @@ function updateStructFade(){
         }
       }
     }
-    const want=block?Math.min(.18,s.baseOpacity):s.baseOpacity;
-    s.mesh.material.opacity+= (want-s.mesh.material.opacity)*.25;
-    s.edge.material.opacity=s.mesh.material.opacity*.3+.05;
+    const want=block?Math.min(.15,s.baseOpacity):s.baseOpacity;
+    s.mesh.material.opacity+=(want-s.mesh.material.opacity)*.25;
+    s.mesh.material.depthWrite=s.mesh.material.opacity>.5;
   }
 }
+// ---- WEATHER — the sky over Fljótshlíð. An environmental system of its own:
+// it changes light, fog and rain, never the bodies.
+const WEATHER={
+  presets:{
+    dawn:{sky:0xd8b9a0,fog:0xd8c4b0,fogFar:520,hemi:[0xffe0c4,0x9a8a80,1.0],dl:[0xffc890,.9,[-3,1.2,2]],rain:false},
+    day:{sky:0xb8cbd8,fog:0xc9d4d2,fogFar:900,hemi:[0xffffff,0xd8d8d8,1.35],dl:[0xffffff,1.25,[2,3,2]],rain:false},
+    dusk:{sky:0xc9a888,fog:0xb9a89a,fogFar:600,hemi:[0xffd0a8,0x807a78,.9],dl:[0xff9c60,.8,[3,.9,-1]],rain:false},
+    night:{sky:0x1a2230,fog:0x161d28,fogFar:380,hemi:[0x8098b8,0x303840,.42],dl:[0xaac4e8,.3,[2,3,2]],rain:false},
+    fog:{sky:0xc4c9c6,fog:0xc4c9c6,fogFar:150,hemi:[0xe8e8e4,0xb8b8b0,.9],dl:[0xffffff,.5,[2,3,2]],rain:false},
+    rain:{sky:0x707a80,fog:0x78827f,fogFar:320,hemi:[0xb8c0c0,0x788078,.8],dl:[0xc8d0d0,.55,[2,3,2]],rain:true}
+  },
+  current:'day',drops:null,
+  set(name){
+    const p=this.presets[name];if(!p)return false;
+    this.current=name;
+    scene.background=new THREE.Color(p.sky);
+    scene.fog=new THREE.Fog(p.fog,30,p.fogFar);
+    hemi.color.set(p.hemi[0]);hemi.groundColor.set(p.hemi[1]);hemi.intensity=p.hemi[2];
+    dl.color.set(p.dl[0]);dl.intensity=p.dl[1];dl.position.set(...p.dl[2]);
+    if(p.rain&&!this.drops)this.makeRain();
+    if(this.drops)this.drops.visible=!!p.rain;
+    return true;
+  },
+  makeRain(){
+    const N=700,pos=new Float32Array(N*3);
+    for(let i=0;i<N;i++){pos[i*3]=(Math.random()-.5)*44;pos[i*3+1]=Math.random()*16;pos[i*3+2]=(Math.random()-.5)*44}
+    const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,1*3));
+    this.drops=new THREE.Points(g,new THREE.PointsMaterial({color:0x9fb2bd,size:.055,transparent:true,opacity:.7,depthWrite:false}));
+    this.drops.frustumCulled=false;scene.add(this.drops);
+  },
+  step(dt){
+    if(!this.drops||!this.drops.visible)return;
+    const a=this.drops.geometry.attributes.position.array,hx=locomotion.root.x,hz=locomotion.root.z;
+    for(let i=0;i<a.length;i+=3){
+      a[i+1]-=dt*11;
+      if(a[i+1]<groundYAt(a[i]+hx,a[i+2]+hz)-locomotion.root.y){a[i]=(Math.random()-.5)*44;a[i+1]=14+Math.random()*3;a[i+2]=(Math.random()-.5)*44}
+    }
+    this.drops.position.set(hx,locomotion.root.y,hz);
+    this.drops.geometry.attributes.position.needsUpdate=true;
+  }
+};
+WEATHER.set('day');
 // ---- props: the ball and the bowl are entities of the one world
 const ball={state:'free',p:new THREE.Vector3(px2w(34),DECK+.055,py2w(146)),v:new THREE.Vector3(),r:.055};
 const bowl={p:new THREE.Vector3(px2w(66),DECK,py2w(102)),food:false,meal:0};
@@ -251,6 +363,7 @@ function worldStep(dt){
   worldStep._pr.copy(locomotion.root);
   for(const side of ['L','R']){const a=locomotion.footAnchor[side];PLACE.pushOutCircle(a,.07,a.y+.02,a.y+.42,null,true)}
   stepBall(dt);
+  WEATHER.step(dt);
   _fadeAcc+=dt;if(_fadeAcc>.05){_fadeAcc=0;updateStructFade()}
   _uiAcc+=dt;if(_uiAcc>.22){_uiAcc=0;updateWorldUI()}
 }
@@ -287,7 +400,11 @@ const DOG_SPAWN=[TR.x-2.1,0,TR.z-2.4];
 const argos=AR.createArgos({});
 argos.world.dog=DOG_SPAWN.slice();
 argos.world.human=[0,0,0];
-argos.setTerrain((x,z)=>PLACE.ground.heightAtDog(x,z));
+// The half-dog solves his stance against locally-flat ground. On the real
+// hillside we answer terrain queries with the ground under his BODY, so his
+// pads plant coherently and traction is truly earned; his root still rides
+// the actual terrain height every step.
+argos.setTerrain(()=>{const d=argos.world.dog;return PLACE.ground.heightAtDog(d[0],d[2])});
 argos.setWalkable((x,z)=>PLACE.dogWalkable(x,z));
 // --- skin: AR deforms its marching-tets surface on the CPU in world space;
 //     three.js just displays it. Colors ride per-vertex from the dog's own palette.
@@ -391,9 +508,9 @@ function updateDog(t,dt){
       buzz('dogdrop',[8,22,8],600);
     }
   }
-  if(st.winner==='EAT'&&bowl.food&&Math.hypot(d[0]-bowl.p.x,d[2]-bowl.p.z)<.65){
+  if(st.winner==='EAT'&&bowl.food&&Math.hypot(d[0]-bowl.p.x,d[2]-bowl.p.z)<.85){
     _dogEatT+=dt;argos.mind.iv.hunger=Math.max(0,argos.mind.iv.hunger-dt*.10);
-    if(_dogEatT>bowl.meal){bowl.food=false;_dogEatT=0}
+    if(_dogEatT>bowl.meal||argos.mind.iv.hunger<0.3){bowl.food=false;_dogEatT=0}
   }
   for(const ev of argos.events)if(ev.type==='bark'){buzz('dogbark',[16,36,12],900);chat.line('dog','WOOF')}
   dogMind.interest=clamp(1-argos.mind.iv.fatigue,0,1);
@@ -1671,7 +1788,7 @@ function fitPerformanceCamera(){
   camera.position.set(root.x,root.y+(portrait?1.54:1.40),root.z+radius);
   camera.lookAt(target);controls.target.copy(target);
   camera.userData.performance={y:camera.position.y,z:radius};
-  explorer.cameraRadius=radius;controls.minDistance=1.8;controls.maxDistance=7.5;controls.update();
+  explorer.cameraRadius=radius;controls.minDistance=1.8;controls.maxDistance=700;controls.update();
 }
 function resize(){
   renderer.setSize(innerWidth,innerHeight,false);
@@ -1750,7 +1867,7 @@ function saveWorld(){
     hero:{x:locomotion.root.x,z:locomotion.root.z,heading:locomotion.heading},
     argos:argos.serialize(),
     ball:{state:ball.state==='hero'?'free':ball.state,p:[ball.p.x,ball.p.y,ball.p.z],v:[ball.v.x,ball.v.y,ball.v.z]},
-    bowl:{food:bowl.food,meal:bowl.meal},
+    bowl:{food:bowl.food,meal:bowl.meal},weather:WEATHER.current,
     cartridge:INTEGRATION.snapshot()};
   try{localStorage.setItem('hlidarendi.v1',JSON.stringify(rec));readout.textContent='SAVED · THE SITUATION KEEPS';buzz('save',[10,30,10],400);return true}
   catch(e){console.warn('save failed',e);readout.textContent='SAVE FAILED';return false}
@@ -1765,6 +1882,7 @@ function restoreWorld(){
     if(rec.ball){ball.state=rec.ball.state;ball.p.set(...rec.ball.p);ball.v.set(...rec.ball.v);
       argos.world.carrying=ball.state==='dog'}
     if(rec.bowl){bowl.food=rec.bowl.food;bowl.meal=rec.bowl.meal}
+    if(rec.weather)WEATHER.set(rec.weather);
     readout.textContent='RESTORED · WELCOME HOME';
     return true;
   }catch(e){console.warn('restore failed',e);return false}
@@ -1796,7 +1914,9 @@ const chat={
       else if(cmd==='feed')r=feedBowl()?'the bowl is full':'stand by the bowl first (or it is already full)';
       else if(cmd==='ball')r=ball.state==='hero'?(throwBall()?'thrown':'…'):(takeBall()?'you have the ball':'the ball is not at hand');
       else if(cmd==='door')r='door.entry — wall W, plan 72..108, the only way in';
-      else if(cmd==='help')r='/save /reset /feed /ball /door — anything else is spoken aloud';
+      else if(WEATHER.presets[cmd])r=WEATHER.set(cmd)?('the sky turns — '+cmd):'…';
+      else if(cmd==='forget'){try{localStorage.removeItem('hlidarendi.v1')}catch(e){}r='forgotten — next visit starts fresh'}
+      else if(cmd==='help')r='/save /reset /feed /ball /door /forget · sky: /dawn /day /dusk /night /fog /rain';
       chat.line('world',r);updateWorldUI();return null;
     }
     let prog=null;
@@ -1825,7 +1945,8 @@ locomotion.root.y=groundYAt(locomotion.root.x,locomotion.root.z);
 restoreWorld();
 updateWorldUI();
 window.HLIDARENDI={
-  place:PLACE,structure:PLACE.structure,door:DOOR,
+  place:PLACE,structure:PLACE.structure,door:DOOR,weather:WEATHER,
+  view:{camera,controls},
   actors:{hero:HERO_ACTOR,dog:ARGOS_ACTOR},argos,
   props:{ball,bowl},
   integration:INTEGRATION,
