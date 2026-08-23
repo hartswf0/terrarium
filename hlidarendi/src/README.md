@@ -5,6 +5,10 @@ no CDN). It is assembled from three parts by `../build.sh`:
 
 - **`shell.html`** — the V16 Everybody HTML/CSS shell, retitled, with the
   BALL / FEED / SAVE buttons replacing the motion-import UI.
+- **`elements.js`** — THE trailer element table (plan inches, walls split
+  around real openings), transcribed from operative/ingold.js. One authority,
+  two consumers: `main.js` renders and collides it in the standalone page;
+  `../tools/make-cartridge.mjs` emits it as fort code for Terrarium III.
 - **`main.js`** — the V16 Everybody module script, surgically fused:
   - `WORLD_BRIDGE.setPlace(PLACE)` — PLACE wraps a terrain heightfield plus
     the Ingold trailer (deck, walls split around real openings, `door.entry`
