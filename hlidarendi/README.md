@@ -33,8 +33,18 @@ kilometre of Fljótshlíð, Iceland (public AWS terrarium elevation tiles, farm
 datum 189 m, the drop to the Markarfljót plain included), and the dwelling is
 the FULL operative construction — 314 members from ingold.js's committed
 operations: chassis, joists, studs, headers, rafters, sheathing, the door leaf
-standing open, glazing, fixtures, water runs. The sky answers to words:
-`/dawn /day /dusk /night /fog /rain`; `/forget` clears the save. MOVE/LOOK to travel; touch a limb control and it
+standing open, glazing, fixtures, water runs. The sky answers to words
+(`/dawn /day /dusk /night /fog /rain`), and so does the world: **`/build
+<words>`** forges a structure on the land ahead through the same
+`build(w, WG, THREE)` admission Terrarium III's AI builder speaks — offline it
+uses stand-ins (cairn, gate, tower, sheepfold, beacon); `/ai <key>` connects
+the agent line to Claude so words design the structure. What you build is
+REAL: its solids enter the world's occupancy (bodies, dog and ball all answer
+to it), and it rides the save and the cartridge snapshot. **`/striker`**
+turns the yard into a pitch — run into the ball to kick, and Argos plays for
+himself, carrying to his own goal. **`/goto <lat> <lon>`** calls on the world
+landscape — live terrarium elevation tiles for anywhere on earth (where the
+network allows). `/forget` clears the save. MOVE/LOOK to travel; touch a limb control and it
 grows while the others store; BALL takes and throws, FEED fills the bowl at
 the galley, SAVE keeps the situation across reloads. Argos decides for
 himself — a throw enters his world as evidence, not as a command.

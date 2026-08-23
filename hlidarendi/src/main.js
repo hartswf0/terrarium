@@ -58,7 +58,7 @@ const DECK=15.75*IN, WALLTOP=106*IN;               // ingold SHELL: deckTop 15.7
 const px2w=px=>TR.x+(px-50.5)*IN, py2w=py=>TR.z+(py-120)*IN;
 // REAL GROUND — Hlíðarendi, Fljótshlíð (see src/terrain-data.js). The farm
 // datum is world origin; +x east, +z south; heights are metres above the farm.
-const TG=(()=>{
+let TG=(()=>{
   const bin=atob(TERRAIN.b64),n=TERRAIN.n,a=new Float32Array(n*n),scale=(TERRAIN.max-TERRAIN.min)/65535;
   for(let i=0;i<n*n;i++)a[i]=TERRAIN.min+((bin.charCodeAt(i*2))|(bin.charCodeAt(i*2+1)<<8))*scale;
   return a;
@@ -84,7 +84,7 @@ const DOOR={id:DOOR_PLAN.id,wall:DOOR_PLAN.wall,from:DOOR_PLAN.from,to:DOOR_PLAN
 const SOLIDS=EL.map(e=>({id:e.id,kind:e.kind,
   min:[Math.min(px2w(e.x0),px2w(e.x1)),e.z0*IN,Math.min(py2w(e.y0),py2w(e.y1))],
   max:[Math.max(px2w(e.x0),px2w(e.x1)),e.z1*IN,Math.max(py2w(e.y0),py2w(e.y1))]}));
-for(const b of SOLIDS)b.climb=b.kind==='fixture'&&(b.max[1]-DECK)<=0.6;
+for(const b of SOLIDS)b.climb=false; // furniture blocks; the floor is the floor
 const BLOCKERS=SOLIDS.filter(s=>s.kind==='wall'||s.kind==='glass'||s.kind==='fixture'||s.kind==='frame');
 const TOPS=SOLIDS.filter(s=>s.kind==='step');
 function structSurface(x,z,forDog){
@@ -93,8 +93,6 @@ function structSurface(x,z,forDog){
   if(px>WT&&px<96.5&&py>4.5&&py<235.5)base=DECK;
   else if(px>-0.5&&px<=WT&&py>72&&py<108)base=DECK; // door.entry threshold: the sill is part of the floor
   else for(const t of TOPS)if(x>=t.min[0]&&x<=t.max[0]&&z>=t.min[2]&&z<=t.max[2]){base=t.max[1];break}
-  if(base!=null&&!forDog)for(const b of SOLIDS)
-    if(b.climb&&x>=b.min[0]&&x<=b.max[0]&&z>=b.min[2]&&z<=b.max[2]&&b.max[1]>base)base=b.max[1];
   return base;
 }
 const PLACE={
@@ -139,10 +137,12 @@ const PLACE={
   wallCapsulesNear(p,range){
     const caps=[];
     for(const b of BLOCKERS){
+      const ex=b.max[0]-b.min[0],ez=b.max[2]-b.min[2];
+      if(Math.min(ex,ez)>0.35)continue;   // thin solids only: walls and glass, never furniture slabs
       const cx=clamp(p.x,b.min[0],b.max[0]),cz=clamp(p.z,b.min[2],b.max[2]);
       if(Math.hypot(p.x-cx,p.z-cz)>range)continue;
-      const ex=b.max[0]-b.min[0],ez=b.max[2]-b.min[2],longX=ex>=ez;
-      const r=(longX?ez:ex)/2+.012, y0=b.min[1]+r,y1=Math.max(y0,b.max[1]-r);
+      const longX=ex>=ez;
+      const r=Math.min((longX?ez:ex)/2+.012,.14), y0=Math.min(b.min[1]+r,b.max[1]),y1=Math.max(y0,b.max[1]-r);
       const n=Math.min(3,Math.max(1,Math.round((y1-y0)/.5)+1));
       for(let i=0;i<n;i++){
         const y=n===1?(y0+y1)/2:y0+(y1-y0)*i/(n-1);
@@ -162,7 +162,9 @@ const PLACE={
 WORLD_BRIDGE.setPlace(PLACE);
 // ---- terrain + structure views (meshes are views of world state, not authorities)
 const worldGroup=new THREE.Group();scene.add(worldGroup);
-{
+let terrainMesh=null;
+function buildTerrainMesh(){
+  if(terrainMesh){worldGroup.remove(terrainMesh);terrainMesh.geometry.dispose();terrainMesh.material.dispose()}
   const SZ=TERRAIN.n*TERRAIN.res*0.96,N=150,g=new THREE.PlaneGeometry(SZ,SZ,N,N);g.rotateX(-Math.PI/2);
   const cxOff=(TERRAIN.n/2-TERRAIN.cx)*TERRAIN.res,czOff=(TERRAIN.n/2-TERRAIN.cy)*TERRAIN.res;
   g.translate(cxOff,0,czOff);
@@ -180,9 +182,10 @@ const worldGroup=new THREE.Group();scene.add(worldGroup);
     col.push(clamp(r*shade+n,0,1),clamp(gr*shade+n,0,1),clamp(b*shade+n,0,1));
   }
   g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.computeVertexNormals();
-  const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,metalness:0}));
-  worldGroup.add(m);
+  terrainMesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,metalness:0}));
+  worldGroup.add(terrainMesh);
 }
+buildTerrainMesh();
 // Members from the ACTUAL operative construction (src/trailer-members.js):
 // chassis, joists, studs, headers, rafters, sheathing, door leaf, glazing,
 // fixtures, water runs. Merged per fade-group + material; EL stays the coarse
@@ -246,6 +249,7 @@ function updateStructFade(){
   for(const s of structMeshes){
     let block=false;
     if(s.grp==='roof'){block=home}
+    else if(home&&s.grp!=='in'){block=true}
     else if(s.grp!=='in'&&s.box.max[1]>hero.y+.9){
       for(let t=.12;t<.97;t+=.12){
         const x=lerp(cx,hero.x,t),z=lerp(cz,hero.z,t);
@@ -259,6 +263,175 @@ function updateStructFade(){
     s.mesh.material.opacity+=(want-s.mesh.material.opacity)*.25;
     s.mesh.material.depthWrite=s.mesh.material.opacity>.5;
   }
+}
+// ---- FORGE — build things in the world. The same contract Terrarium III's
+// AI builder speaks: function build(w, WG, THREE), certified (mesh budget,
+// bounds), seated on the real land at its anchor, and REAL afterwards — the
+// solids enter the world's occupancy, so bodies, the dog and the ball all
+// answer to what you built. Structures ride the save and the cartridge.
+const FORGE={
+  structures:[],budgetMeshes:60,bounds:12,
+  _sandbox(anchorPt){
+    const group=new THREE.Group();
+    group.position.set(anchorPt.x,PLACE.heightAt(anchorPt.x,anchorPt.z),anchorPt.z);
+    const reg={meshes:0,solids:[],err:null};
+    const mat=(hex,o)=>new THREE.MeshStandardMaterial({color:hex,roughness:o&&o.rough!=null?o.rough:.9,metalness:o&&o.metal?o.metal:0});
+    const WG={
+      P:{ash:0x9aa0a4,moss:0x5f7748,stone:0x8a8880,wood:0x8b7355,snow:0xf0f2f4,volt:0xffd75e},
+      box:(w,h,d,m)=>new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m||mat(0xb0a89a)),
+      cyl:(r,h,m,seg)=>new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,seg||10),m||mat(0xb0a89a)),
+      cone:(r,h,m,seg)=>new THREE.Mesh(new THREE.ConeGeometry(r,h,seg||10),m||mat(0xb0a89a)),
+      sphere:(r,m)=>new THREE.Mesh(new THREE.SphereGeometry(r,12,9),m||mat(0xb0a89a)),
+      torus:(r,t,m,seg)=>new THREE.Mesh(new THREE.TorusGeometry(r,t,8,seg||18),m||mat(0xb0a89a)),
+      flat:mat, matte:(hex,r2)=>mat(hex,{rough:r2==null?.9:r2}),
+      lit:(hex,i)=>{const m=mat(hex,{rough:.6});m.emissive=new THREE.Color(hex);m.emissiveIntensity=i==null?.6:i;return m},
+      put:(mesh,x,y,z,ry)=>{
+        if(reg.meshes>=FORGE.budgetMeshes){reg.err='over the '+FORGE.budgetMeshes+'-mesh budget';return mesh}
+        if(Math.abs(x)>FORGE.bounds||Math.abs(z)>FORGE.bounds){reg.err='parts must stay within '+FORGE.bounds+' units of the anchor';return mesh}
+        mesh.position.set(x,y,z);if(ry)mesh.rotation.y=ry;group.add(mesh);reg.meshes++;return mesh;
+      },
+      solid:(mesh,w,h,d)=>{reg.solids.push({mesh,w:w||2,h:h||2,d:d||2});return mesh},
+      rand:seed=>{let t=(seed==null?9:seed)>>>0;return()=>{t+=0x6D2B79F5;let r2=Math.imul(t^t>>>15,1|t);r2^=r2+Math.imul(r2^r2>>>7,61|r2);return((r2^r2>>>14)>>>0)/4294967296}},
+      tick:()=>{},atmosphere:()=>{}
+    };
+    return {group,WG,reg};
+  },
+  run(code,anchorPt,id){
+    try{
+      if(typeof code!=='string'||code.length>20000)return{ok:false,err:'code missing or over 20k'};
+      const {group,WG,reg}=this._sandbox(anchorPt);
+      const fn=new Function('w','WG','THREE','"use strict";return ('+code+')(w,WG,THREE)');
+      fn({},WG,THREE);
+      if(reg.err){group.traverse(o=>{o.geometry&&o.geometry.dispose()});return{ok:false,err:reg.err}}
+      if(!reg.meshes)return{ok:false,err:'built nothing'};
+      scene.add(group);group.updateMatrixWorld(true);
+      const solids=[];
+      for(const s2 of reg.solids){
+        const p=s2.mesh.getWorldPosition(new THREE.Vector3());
+        const b={id:(id||'forge')+'.'+solids.length,kind:'forged',
+          min:[p.x-s2.w/2,p.y-s2.h/2,p.z-s2.d/2],max:[p.x+s2.w/2,p.y+s2.h/2,p.z+s2.d/2],climb:false};
+        BLOCKERS.push(b);solids.push(b);
+      }
+      this.structures.push({id:id||('forge-'+(this.structures.length+1)),code,anchor:{x:anchorPt.x,z:anchorPt.z},group,solids});
+      return {ok:true,meshes:reg.meshes,solids:solids.length};
+    }catch(e){return{ok:false,err:String(e&&e.message||e).slice(0,120)}}
+  },
+  clearAll(){
+    for(const st of this.structures){scene.remove(st.group);
+      for(const b of st.solids){const i=BLOCKERS.indexOf(b);if(i>=0)BLOCKERS.splice(i,1)}}
+    this.structures.length=0;
+  }
+};
+// stand-in structures — the AGENT works offline the way III's does: "AI OFF,
+// using stand-ins". Each is real forge code through the same admission.
+const STANDINS={
+  cairn:"function build(w,WG,THREE){var R=WG.rand(7),m=WG.matte(0x8a8880,.95);for(var i=0;i<9;i++){var s=.5-.045*i,b=WG.box(s+R()*.1,.22,s+R()*.1,m);WG.put(b,(R()-.5)*.14,.12+i*.2,(R()-.5)*.14,R()*.6);WG.solid(b,s,.22,s)}return w}",
+  gate:"function build(w,WG,THREE){var wd=WG.matte(0x8b7355,.9);var p1=WG.box(.3,2.6,.3,wd);WG.put(p1,-1.1,1.3,0);WG.solid(p1,.3,2.6,.3);var p2=WG.box(.3,2.6,.3,wd);WG.put(p2,1.1,1.3,0);WG.solid(p2,.3,2.6,.3);var l=WG.box(2.9,.28,.34,wd);WG.put(l,0,2.72,0);WG.solid(l,2.9,.28,.34);var l2=WG.box(3.3,.2,.3,wd);WG.put(l2,0,3.05,0);return w}",
+  tower:"function build(w,WG,THREE){var st=WG.matte(0x8a8880,.95),wd=WG.matte(0x8b7355,.9);for(var i=0;i<4;i++){var s=1.6-.22*i,b=WG.box(s,.9,s,st);WG.put(b,0,.45+i*.9,0);WG.solid(b,s,.9,s)}var d=WG.box(1.3,.14,1.3,wd);WG.put(d,0,3.75,0);WG.solid(d,1.3,.14,1.3);for(var k=0;k<4;k++){var px=(k%2?1:-1)*.55,pz=(k<2?1:-1)*.55,po=WG.box(.12,.7,.12,wd);WG.put(po,px,4.15,pz);WG.solid(po,.12,.7,.12)}var r=WG.cone(1.05,.8,WG.matte(0x6b6257,.8),4);WG.put(r,0,4.9,0,.785);return w}",
+  sheepfold:"function build(w,WG,THREE){var st=WG.matte(0x8a8880,.95),R=WG.rand(3);for(var i=0;i<14;i++){var a=.4+i/14*5.2,x=Math.cos(a)*2.6,z=Math.sin(a)*2.6,b=WG.box(.6,.75+R()*.2,.35,st);WG.put(b,x,.4,z,-a);WG.solid(b,.6,.9,.35)}return w}",
+  beacon:"function build(w,WG,THREE){var st=WG.matte(0x8a8880,.95);var b=WG.box(1,.5,1,st);WG.put(b,0,.25,0);WG.solid(b,1,.5,1);var p=WG.cyl(.09,2.6,WG.matte(0x8b7355,.9));WG.put(p,0,1.8,0);WG.solid(p,.2,2.6,.2);var l=WG.sphere(.22,WG.lit(0xffd75e,1.4));WG.put(l,0,3.2,0);return w}"
+};
+function standinFor(prompt){
+  const p=String(prompt||'').toLowerCase();
+  for(const k of Object.keys(STANDINS))if(p.includes(k))return k;
+  if(/wall|fence|fold|pen/.test(p))return 'sheepfold';
+  if(/gate|arch|door/.test(p))return 'gate';
+  if(/tower|watch|fort|keep/.test(p))return 'tower';
+  if(/light|lamp|fire|beacon|star/.test(p))return 'beacon';
+  return 'cairn';
+}
+const FORGE_SYS='You are a structure builder for HLIDARENDI, a small standing world. Reply with ONLY one JavaScript function, no fences, no prose:\nfunction build(w, WG, THREE){ ... return w; }\nOne focal structure at the origin. Vocabulary: WG.box(w,h,d,mat) WG.cyl(r,h,mat) WG.cone(r,h,mat) WG.sphere(r,mat) WG.torus(r,t,mat); materials WG.flat(hex,{rough,metal}) WG.matte(hex,rough) WG.lit(hex,intensity); WG.put(mesh,x,y,z,ry) places (y=0 is the ground); WG.solid(mesh,w,h,d) makes it collide; WG.rand(seed) for randomness. Under 60 meshes; every part within 12 units of the origin; scale in metres (a person is 1.7 tall).';
+async function askForgeAI(prompt){
+  let key=null;try{key=localStorage.getItem('hlidarendi.ai.key')}catch(e){}
+  if(!key)return null;
+  const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
+    headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:'claude-opus-5',max_tokens:3000,system:FORGE_SYS,
+      messages:[{role:'user',content:'Design for: "'+String(prompt).slice(0,200)+'"'}]})});
+  if(!r.ok)throw new Error('AI '+r.status);
+  const j=await r.json();
+  const text=(j.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
+  const m=text.match(/function\s+build\s*\([\s\S]*\}/);
+  return m?m[0]:null;
+}
+async function buildFromWords(prompt){
+  const fwd=rotateLocalY(new THREE.Vector3(0,0,1),locomotion.heading);
+  const at={x:locomotion.root.x+fwd.x*5,z:locomotion.root.z+fwd.z*5};
+  let code=null,via='stand-in';
+  try{code=await askForgeAI(prompt);if(code)via='claude'}catch(e){chat.line('world','the agent line failed ('+String(e.message||e).slice(0,60)+') — using a stand-in')}
+  if(!code)code=STANDINS[standinFor(prompt)];
+  const r=FORGE.run(code,at,'build-'+(FORGE.structures.length+1));
+  if(r.ok)chat.line('world','built via '+via+' — '+r.meshes+' meshes, '+r.solids+' solid, standing on the land ahead of you');
+  else chat.line('world','the forge refused: '+r.err);
+  return r.ok;
+}
+// ---- STRIKER — the dog as the opposing agent, the yard as the pitch.
+const STRIKER={on:false,heroGoal:null,dogGoal:null,score:[0,0],rings:[],
+  goalR:1.4,
+  toggle(){
+    this.on=!this.on;
+    if(this.on&&!this.rings.length){
+      const mk=(z,c)=>{const g=new THREE.Mesh(new THREE.TorusGeometry(this.goalR,.06,8,24),new THREE.MeshStandardMaterial({color:c,roughness:.5}));
+        g.rotation.x=Math.PI/2;scene.add(g);return g};
+      this.rings=[mk(0,0x2878ff),mk(0,0xc05a4a)];
+    }
+    const cx=TR.x-5;
+    this.heroGoal={x:cx,z:TR.z-8};this.dogGoal={x:cx,z:TR.z+8};
+    if(this.rings.length){
+      this.rings[0].position.set(this.heroGoal.x,PLACE.heightAt(this.heroGoal.x,this.heroGoal.z)+.08,this.heroGoal.z);
+      this.rings[1].position.set(this.dogGoal.x,PLACE.heightAt(this.dogGoal.x,this.dogGoal.z)+.08,this.dogGoal.z);
+      this.rings.forEach(r2=>r2.visible=this.on);
+    }
+    if(this.on){this.score=[0,0];ball.state='free';ball.p.set(cx,PLACE.heightAt(cx,TR.z)+ball.r,TR.z);ball.v.set(0,0,0);
+      try{argos.say('fetch the ball, game on')}catch(e){}}
+    return this.on;
+  },
+  step(){
+    if(!this.on||ball.state!=='free')return;
+    const inGoal=g=>Math.hypot(ball.p.x-g.x,ball.p.z-g.z)<this.goalR&&ball.v.lengthSq()<4;
+    let scored=null;
+    if(inGoal(this.heroGoal)){this.score[0]++;scored='YOU score — '+this.score[0]+' : '+this.score[1]}
+    else if(inGoal(this.dogGoal)){this.score[1]++;scored='ARGOS scores — '+this.score[0]+' : '+this.score[1]}
+    if(scored){chat.line('world',scored);buzz('goal',[20,40,20],600);
+      const cx=TR.x-5;ball.p.set(cx,PLACE.heightAt(cx,TR.z)+ball.r,TR.z);ball.v.set(0,0,0)}
+  }
+};
+// kicking is always on: run into the ball and it goes
+function stepKick(){
+  if(ball.state!=='free')return;
+  const d=Math.hypot(ball.p.x-locomotion.root.x,ball.p.z-locomotion.root.z);
+  if(d<.48&&explorer.speed>.6){
+    const dir=rotateLocalY(new THREE.Vector3(0,0,1),locomotion.heading);
+    ball.v.set(dir.x*(1.6+explorer.speed*.9),1.1+explorer.speed*.25,dir.z*(1.6+explorer.speed*.9));
+    buzz('kick',[10,20,8],350);
+  }
+}
+// ---- LOCATIONS — call on the world landscape. Fetches the same public
+// terrarium elevation tiles the bake used; where the network is closed
+// (the artifact sandbox), the baked Hlíðarendi stands.
+async function gotoPlace(lat,lon){
+  const z=14,n2=Math.pow(2,z),lr=lat*Math.PI/180;
+  const xf=(lon+180)/360*n2,yf=(1-Math.log(Math.tan(lr)+1/Math.cos(lr))/Math.PI)/2*n2;
+  const x0=Math.floor(xf),y0=Math.floor(yf);
+  const cv=document.createElement('canvas');cv.width=512;cv.height=512;
+  const cx2=cv.getContext('2d',{willReadFrequently:true});
+  for(const dx of [0,1])for(const dy of [0,1]){
+    const img=await new Promise((ok,bad)=>{const im=new Image();im.crossOrigin='anonymous';
+      im.onload=()=>ok(im);im.onerror=()=>bad(new Error('tile fetch blocked'));
+      im.src='https://s3.amazonaws.com/elevation-tiles-prod/terrarium/'+z+'/'+(x0+dx)+'/'+(y0+dy)+'.png'});
+    cx2.drawImage(img,dx*256,dy*256);
+  }
+  const px=cv.getContext('2d').getImageData(0,0,512,512).data;
+  const H=(gx,gy)=>{const i=(gy*512+gx)*4;return px[i]*256+px[i+1]+px[i+2]/256-32768};
+  const CX=(xf-x0)*256,CY=(yf-y0)*256,N=TERRAIN.n;
+  const wx0=Math.floor(Math.max(0,Math.min(512-N,CX-N/2))),wy0=Math.floor(Math.max(0,Math.min(512-N,CY-N/2)));
+  const base=H(Math.floor(CX),Math.floor(CY));
+  const a=new Float32Array(N*N);
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++)a[j*N+i]=H(wx0+i,wy0+j)-base;
+  TG=a;TERRAIN.res=156543.03*Math.cos(lr)/n2;TERRAIN.cx=CX-wx0;TERRAIN.cy=CY-wy0;
+  buildTerrainMesh();
+  placeHero(0,0,locomotion.heading);argos.world.dog=[TR.x-2.1,0,TR.z-2.4];
+  return true;
 }
 // ---- WEATHER — the sky over Fljótshlíð. An environmental system of its own:
 // it changes light, fog and rain, never the bodies.
@@ -354,15 +527,17 @@ let _fadeAcc=0,_uiAcc=0;
 function worldStep(dt){
   locomotion.root.y=groundYAt(locomotion.root.x,locomotion.root.z);
   const gy=locomotion.root.y;
-  for(let i=0;i<3;i++)PLACE.pushOutCircle(locomotion.root,.17,gy+.14,gy+1.55,null,true);
+  for(let i=0;i<3;i++)PLACE.pushOutCircle(locomotion.root,.17,gy+.14,gy+1.55,null,false);
   // wedged in a seam (window/bench corner): give the step back rather than jitter
   worldStep._pr??=locomotion.root.clone();
-  _pushInfo.hit=false;PLACE.pushOutCircle(locomotion.root,.155,gy+.14,gy+1.55,_pushInfo,true);
+  _pushInfo.hit=false;PLACE.pushOutCircle(locomotion.root,.155,gy+.14,gy+1.55,_pushInfo,false);
   if(_pushInfo.hit){locomotion.root.x=worldStep._pr.x;locomotion.root.z=worldStep._pr.z;
     locomotion.root.y=groundYAt(locomotion.root.x,locomotion.root.z)}
   worldStep._pr.copy(locomotion.root);
-  for(const side of ['L','R']){const a=locomotion.footAnchor[side];PLACE.pushOutCircle(a,.07,a.y+.02,a.y+.42,null,true)}
+  for(const side of ['L','R']){const a=locomotion.footAnchor[side];PLACE.pushOutCircle(a,.07,a.y+.02,a.y+.42,null,false)}
   stepBall(dt);
+  stepKick();
+  STRIKER.step();
   WEATHER.step(dt);
   _fadeAcc+=dt;if(_fadeAcc>.05){_fadeAcc=0;updateStructFade()}
   _uiAcc+=dt;if(_uiAcc>.22){_uiAcc=0;updateWorldUI()}
@@ -488,7 +663,8 @@ function routeForDog(target){
 let _dogEatT=0;
 function updateDog(t,dt){
   const hero=locomotion.root;
-  argos.world.human=routeForDog([hero.x,0,hero.z]);
+  const heroP=STRIKER.on&&argos.world.carrying?[STRIKER.dogGoal.x,0,STRIKER.dogGoal.z]:[hero.x,0,hero.z];
+  argos.world.human=routeForDog(heroP);
   const pt=pointingFloorTarget();
   if(pt){dogMind.pointTarget.copy(pt.q);argos.world.handPose='lure'}
   else argos.world.handPose=(ball.state==='hero'?'extended':'none');
@@ -502,7 +678,8 @@ function updateDog(t,dt){
   }
   if(ball.state==='dog'){
     const m=argos.rig.nodes.muzzle;if(m)ball.p.set(m.world[12],m.world[13]-.04,m.world[14]);
-    if(Math.hypot(d[0]-hero.x,d[2]-hero.z)<1.25){
+    const home=STRIKER.on?STRIKER.dogGoal:{x:hero.x,z:hero.z};
+    if(Math.hypot(d[0]-home.x,d[2]-home.z)<1.25){
       argos.world.carrying=false;ball.state='free';
       const gy=PLACE.heightAt(ball.p.x,ball.p.z);ball.p.y=gy+ball.r;ball.v.set(0,0,0);
       buzz('dogdrop',[8,22,8],600);
@@ -1770,10 +1947,11 @@ rig.mesh.userData.whiteMat=rig.mesh.material;
 $('#resetBtn').onclick=()=>resetAll();$('#quickReset').onclick=()=>{if(view3d){view3d=false;controls.enabled=false;document.body.classList.remove('free-camera');$('#viewBtn').classList.remove('on');$('#viewBtn').textContent='CAM'}resetAll()};
 document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{stopMotion();mode=b.dataset.mode;document.querySelectorAll('[data-mode]').forEach(x=>x.classList.toggle('on',x.dataset.mode===mode));updateReadout()});
 addEventListener('keydown',e=>{
+  if(document.activeElement&&document.activeElement.id==='chatSay'){if(e.code==='Escape')document.activeElement.blur();return}
   if(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','ShiftLeft','ShiftRight'].includes(e.code)){explorer.keys.add(e.code);if(e.code.startsWith('Arrow'))e.preventDefault()}
   if(e.repeat)return;if(e.code==='Space'){e.preventDefault();gameCommand('jump')}else if(e.key==='c'||e.key==='C')gameCommand('crouch',1);else if(e.key==='h'||e.key==='H')gameCommand('hide',1);else if(e.key==='g'||e.key==='G')gameCommand('guard',1);else if(e.key==='f'||e.key==='F')gameCommand('strike');else if(e.key==='v'||e.key==='V')$('#viewBtn').click()
 });
-addEventListener('keyup',e=>{explorer.keys.delete(e.code);if(e.key==='c'||e.key==='C')gameCommand('crouch',0);else if(e.key==='h'||e.key==='H')gameCommand('hide',0);else if(e.key==='g'||e.key==='G')gameCommand('guard',0)});
+addEventListener('keyup',e=>{if(document.activeElement&&document.activeElement.id==='chatSay')return;explorer.keys.delete(e.code);if(e.key==='c'||e.key==='C')gameCommand('crouch',0);else if(e.key==='h'||e.key==='H')gameCommand('hide',0);else if(e.key==='g'||e.key==='G')gameCommand('guard',0)});
 addEventListener('blur',()=>explorer.keys.clear());
 let lastReadoutAt=0;function updateReadout(){const now=performance.now();if(IS_TOUCH&&now-lastReadoutAt<110)return;lastReadoutAt=now;const contact=contacts.leftHand||contacts.rightHand||contacts.leftFoot||contacts.rightFoot;const state=contact?'CONTACT':locomotion.state;const ext=['externalPose','hands','mocap','xr','network'].find(k=>dataBus.get(k));readout.textContent=IS_TOUCH?`${state} · ${instrumentMode.mode==='travel'?'TRAVEL':'PUPPET'} · BODY DRIVE`:`${mode} · ${state}${ext?' · '+ext.toUpperCase():''} · WASD MOVE · SHIFT RUN · 4 EFFECTORS`;updateTiltViz()}
 function resetAll(){resetSkeleton();for(const st of [pole.L,pole.R,legCtl.L,legCtl.R]){st.x=st.y=st.wind=st.radius=st.edge=st.over=st.point=st.faceX=st.faceY=st.shoulder=st.cube=st.overX=st.overY=st.basePX=st.basePY=st.fieldX=st.fieldY=st.fieldMag=0;st.fieldBand=0;st.pinned=false;st.pinGateAt=0;if(st.pinTimer){clearTimeout(st.pinTimer);st.pinTimer=null}st.pinAnchor=null;st.pinOriginX=st.pinOriginY=st.secX=st.secY=st.secMag=st.secOver=0;st.pointer=null;st.lastAngle=null;st.down=null;st.wasPoint=false}for(const kind of ['arm','leg'])for(const key of ['L','R']){const ids=padIds(kind,key),nub=$(ids.nub),el=$(ids.joy),sec=el?.querySelector('.secnub');if(nub)nub.style.transform='translate(-50%,-50%)';if(sec)sec.style.transform='translate(-50%,-50%)';el?.classList.remove('pinned','pinarming');updateFieldState2(kind,key,el);updatePadUI(kind,key)}headCtl.x=headCtl.y=headCtl.wind=headCtl.radius=headCtl.edge=headCtl.over=headCtl.faceX=headCtl.faceY=headCtl.lead=0;headCtl.basePX=headCtl.basePY=headCtl.fieldX=headCtl.fieldY=headCtl.fieldMag=0;headCtl.fieldBand=0;headCtl.pointer=null;headCtl.lastAngle=null;headCtl.down=null;headDyn.x=headDyn.y=headDyn.roll=headDyn.lead=headDyn.faceX=headDyn.faceY=0;updateHeadFieldState();const hN=$('#nubH');if(hN)hN.style.transform='translate(-50%,-50%)';motion.targetPitch=motion.targetRoll=motion.pitch=motion.roll=0;motion.nudge.L.set(0,0,0);motion.nudge.R.set(0,0,0);motion.nudge.body.set(0,0,0);for(const st of Object.values(dyn))st.v.set(0,0,0);for(const st of Object.values(dynFeet))st.v.set(0,0,0);dyn.leftHand.p.copy(base.leftHand);dyn.rightHand.p.copy(base.rightHand);dyn.pelvis.p.copy(base.pelvis);dynFeet.left.p.copy(feet.left);dynFeet.right.p.copy(feet.right);manual.leftHand=manual.rightHand=manual.leftFoot=manual.rightFoot=manual.pelvis=null;draggers.clear();depthClutches.clear();locomotion.root.set(0,0,0);locomotion.rootGoal.set(0,0,0);locomotion.heading=locomotion.headingGoal=0;locomotion.walking=0;locomotion.drive=locomotion.turn=locomotion.turnError=locomotion.contactDrive=0;locomotion.motorState='IDLE';locomotion.motorBlend=0;locomotion.turning=false;locomotion.lastContactSide='L';locomotion.moveDir.set(0,0,1);explorer.keys.clear();explorer.move.set(0,0,0);explorer.speed=0;explorer.run=false;explorer.touchMove.set(0,0);explorer.touchLook.set(0,0);explorer.touchMoveMag=explorer.touchLookMag=0;explorer.inputMag=0;explorer.movePointer=explorer.lookPointer=null;explorer.mobileNav=false;explorer.cameraYaw=0;explorer.cameraPitch=.06;explorer.cameraEngaged=false;explorer.lookBodyYaw=explorer.lookBodyPitch=explorer.lookStrength=0;document.body.classList.remove('navigating');locomotion.phase=0;locomotion.gaitHalf=-1;locomotion.stepClock=0;locomotion.inputMoving=false;instrumentMode.puppet.L=instrumentMode.puppet.R='arm';enterTravelMode();locomotion.footAnchor.L.copy(feet.left);locomotion.footAnchor.R.copy(feet.right);locomotion.step=null;locomotion.nextSide='L';locomotion.state='STAND';locomotion.bend=locomotion.sit=locomotion.jump=locomotion.reach=0;argosReset();ball.state='free';ball.p.set(px2w(34),DECK+ball.r,py2w(146));ball.v.set(0,0,0);bowl.food=false;_dogEatT=0;fitPerformanceCamera();limits.leftHand=limits.rightHand=limits.leftFoot=limits.rightFoot=limits.pelvis=limits.head=false;contacts.leftHand=contacts.rightHand=contacts.leftFoot=contacts.rightFoot=contacts.pelvis=false;effective.leftHand.copy(base.leftHand);effective.rightHand.copy(base.rightHand);effective.leftFoot.copy(feet.left);effective.rightFoot.copy(feet.right);effective.pelvis.copy(base.pelvis);lastSafe.leftHand.copy(base.leftHand);lastSafe.rightHand.copy(base.rightHand);lastSafe.leftFoot.copy(feet.left);lastSafe.rightFoot.copy(feet.right);lastSafe.pelvis.copy(base.pelvis);lockHeadNow();updateReadout()}
@@ -1847,7 +2025,8 @@ const INTEGRATION={
     entities:[HERO_ACTOR.serialize(),ARGOS_ACTOR.serialize(),
       {id:'structure.ingold',kind:'structure',datum:DECK,door:DOOR,elements:EL.length},
       {id:'prop.ball',kind:'prop',state:ball.state,at:[ball.p.x,ball.p.y,ball.p.z],v:[ball.v.x,ball.v.y,ball.v.z]},
-      {id:'prop.bowl',kind:'prop',food:bowl.food,meal:bowl.meal,at:[bowl.p.x,bowl.p.y,bowl.p.z]}],
+      {id:'prop.bowl',kind:'prop',food:bowl.food,meal:bowl.meal,at:[bowl.p.x,bowl.p.y,bowl.p.z]},
+      ...FORGE.structures.map(st=>({kind:'fort',id:st.id,anchor:st.anchor,code:st.code}))],
     relations:[
       {from:'dog.argos',rel:'bonded-to',to:'hero.everybody'},
       {from:'hero.everybody',rel:'inhabits',to:'structure.ingold'},
@@ -1868,6 +2047,7 @@ function saveWorld(){
     argos:argos.serialize(),
     ball:{state:ball.state==='hero'?'free':ball.state,p:[ball.p.x,ball.p.y,ball.p.z],v:[ball.v.x,ball.v.y,ball.v.z]},
     bowl:{food:bowl.food,meal:bowl.meal},weather:WEATHER.current,
+    forged:FORGE.structures.map(st=>({id:st.id,code:st.code,anchor:st.anchor})),
     cartridge:INTEGRATION.snapshot()};
   try{localStorage.setItem('hlidarendi.v1',JSON.stringify(rec));readout.textContent='SAVED · THE SITUATION KEEPS';buzz('save',[10,30,10],400);return true}
   catch(e){console.warn('save failed',e);readout.textContent='SAVE FAILED';return false}
@@ -1883,6 +2063,7 @@ function restoreWorld(){
       argos.world.carrying=ball.state==='dog'}
     if(rec.bowl){bowl.food=rec.bowl.food;bowl.meal=rec.bowl.meal}
     if(rec.weather)WEATHER.set(rec.weather);
+    if(Array.isArray(rec.forged)){FORGE.clearAll();for(const st of rec.forged)FORGE.run(st.code,st.anchor,st.id)}
     readout.textContent='RESTORED · WELCOME HOME';
     return true;
   }catch(e){console.warn('restore failed',e);return false}
@@ -1914,9 +2095,17 @@ const chat={
       else if(cmd==='feed')r=feedBowl()?'the bowl is full':'stand by the bowl first (or it is already full)';
       else if(cmd==='ball')r=ball.state==='hero'?(throwBall()?'thrown':'…'):(takeBall()?'you have the ball':'the ball is not at hand');
       else if(cmd==='door')r='door.entry — wall W, plan 72..108, the only way in';
+      else if(cmd==='build'){const p2=text.slice(6).trim()||'cairn';buildFromWords(p2);r='forging "'+p2+'" on the land ahead…'}
+      else if(cmd==='striker')r=STRIKER.toggle()?'STRIKER — first to score; run into the ball to kick; Argos plays for himself':'match over — '+STRIKER.score[0]+' : '+STRIKER.score[1];
+      else if(cmd==='goto'){const m2=text.match(/goto\s+(-?[\d.]+)[ ,]+(-?[\d.]+)/);
+        if(m2){r='calling on the landscape at '+m2[1]+', '+m2[2]+'…';gotoPlace(+m2[1],+m2[2]).then(()=>chat.line('world','the land answered — a new place stands under home')).catch(e=>chat.line('world','the network here is closed — Hlíðarendi stands ('+String(e.message||e).slice(0,50)+')'))}
+        else r='say: /goto <lat> <lon>'}
+      else if(cmd==='ai'){const k2=text.slice(4).trim();
+        if(k2==='off'||!k2){try{localStorage.removeItem('hlidarendi.ai.key')}catch(e){}r='AI OFF — the agent uses stand-ins'}
+        else{try{localStorage.setItem('hlidarendi.ai.key',k2)}catch(e){}r='agent line configured — /build speaks to Claude now'}}
       else if(WEATHER.presets[cmd])r=WEATHER.set(cmd)?('the sky turns — '+cmd):'…';
       else if(cmd==='forget'){try{localStorage.removeItem('hlidarendi.v1')}catch(e){}r='forgotten — next visit starts fresh'}
-      else if(cmd==='help')r='/save /reset /feed /ball /door /forget · sky: /dawn /day /dusk /night /fog /rain';
+      else if(cmd==='help')r='/build <words> /striker /goto <lat> <lon> /ai <key|off> · /save /reset /feed /ball /door /forget · sky: /dawn /day /dusk /night /fog /rain';
       chat.line('world',r);updateWorldUI();return null;
     }
     let prog=null;
@@ -1931,7 +2120,7 @@ const chat={
 {
   const form=$('#chatForm'),input=$('#chatSay'),wrap=$('#chatWrap'),btn=$('#sayBtn');
   if(form&&input){form.addEventListener('submit',e=>{e.preventDefault();chat.say(input.value);input.value='';if(IS_TOUCH)input.blur()})}
-  const setChat=on2=>{wrap?.classList.toggle('on',on2);btn?.classList.toggle('on',on2);if(on2&&!IS_TOUCH)input?.focus()};
+  const setChat=on2=>{wrap?.classList.toggle('on',on2);btn?.classList.toggle('on',on2)};
   if(btn)btn.onclick=()=>setChat(!wrap.classList.contains('on'));
   setChat(!IS_TOUCH);
   chat.line('world','HLIÐARENDI — a body, a dog, a dwelling, a place. Speak, or /help.');
@@ -1951,5 +2140,6 @@ window.HLIDARENDI={
   props:{ball,bowl},
   integration:INTEGRATION,
   save:saveWorld,restore:restoreWorld,takeBall,throwBall,feedBowl,placeHero,chat,
+  forge:FORGE,build:buildFromWords,striker:STRIKER,goto:gotoPlace,
   snapshot:()=>INTEGRATION.snapshot()
 };
