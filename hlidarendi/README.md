@@ -73,6 +73,17 @@ wall capsules derive from one element list; the dog earns every meter through
 paw traction and enters the home through the same door the hero uses.
 Rebuild with `./build.sh` (see [src/README.md](src/README.md)).
 
+**Upstream — the real Terrarium hosts HLIÐARENDI.** The deeper direction is
+the reverse of the standalone page: `unset-04-hartsoe-iii.html` now carries a
+SPECIES seam (`window.III_HOST` / `window.III_SPECIES`, four small guarded
+touches), and `terrarium-iii-hlidarendi.js` — a sidecar like
+`terrarium-iii-net.js` — registers **Argos as III's first legged species**:
+seated on the real ground, tracking by scent at car-scale distances, playing
+the real III ball back to the player through his own FETCH. The cartridge
+places him via `{kind:'actor', species:'argos'}`. The architecture and the
+phased plan for the walking body (possession-based) are in
+[UPSTREAM.md](UPSTREAM.md).
+
 ## Reading order
 
 The mission sits before the engineering specification. It is not decoration:

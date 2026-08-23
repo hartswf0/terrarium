@@ -19,6 +19,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Ctext%20y='.9em'%20font-size='88'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E">
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script defer src="terrarium-iii-net.js"></script>
+<script defer src="terrarium-iii-hlidarendi.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&display=swap');
 
@@ -10122,6 +10123,28 @@ const sun = new THREE.DirectionalLight(0xffffff, 0.5);
 sun.position.set(12, 40, 8);
 scene.add(sun);
 
+// ── III HOST SURFACE + SPECIES REGISTRY (HLIÐARENDI upstream) ───────────────
+// Everything that moves in III is a car-physics chassis wearing a coded body.
+// Legged actors — a walking human, a quadruped with traction — are a new KIND,
+// registered by sidecar files (like terrarium-iii-net.js) as SPECIES. The host
+// exposes exactly what a species needs and no more; with no sidecar loaded,
+// nothing here changes stock behaviour.
+window.III_HOST = {
+    THREE, scene, camera, renderer,
+    groundY: (x, z) => window.__groundY(x, z),
+    get P() { return P; },            // the player rig: pos/vel/yaw
+    get B() { return B; },            // the ball: pos/vel/active
+    notify: m => { try { notify(m); } catch (_) {} },
+};
+window.III_SPECIES = {
+    list: [],
+    register(sp) { if (sp && sp.id) { this.list.push(sp); try { notify('SPECIES · ' + sp.id.toUpperCase() + ' JOINED THE WORLD'); } catch (_) {} } return sp; },
+    spawn(e) {   // cartridge entities of kind 'actor' route here by species id
+        for (const sp of this.list) if (sp.id === e.species && sp.spawn) { try { return !!sp.spawn(e); } catch (err) { console.warn('[species]', sp.id, err); } }
+        return false;
+    },
+};
+
 // ── QUALITY VEHICLE TOOLKIT (VG) + CODE EXECUTOR ────────────────────────────
 // The reference-quality material/parts library an LLM writes build CODE against,
 // so it can generate garage-grade vehicles instead of snapping fixed primitives.
@@ -12642,6 +12665,8 @@ const CART = (() => {
                     const b = deployBot({ team: e.team === 'ally' ? 'ally' : 'hostile' });
                     if (b) { try { if (b.phys && b.phys.pos) b.phys.pos.set(e.at.x || 0, 1, e.at.z || 0); if (b.car) b.car.position.set(e.at.x || 0, 1, e.at.z || 0); } catch(_){} did.push('bot:' + e.id); }
                     else skipped++;
+                } else if (e.kind === 'actor' && window.III_SPECIES) {
+                    if (III_SPECIES.spawn(e)) did.push('actor:' + (e.species || e.id)); else skipped++;
                 } else skipped++;   // flags install with their game mode (flag-run)
             } catch (err) { console.warn('[cart] entity', e && e.id, err); skipped++; }
         });
@@ -21169,6 +21194,7 @@ function frame(now) {
         orbit.update();
     }
 
+    try { if (window.III_SPECIES) for (const sp of III_SPECIES.list) sp.tick && sp.tick(dt, now); } catch (e) { if (!window.__spErr) { window.__spErr = 1; console.warn('[species tick]', e); } }
     renderer.render(scene, camera);
     } catch (err) {
         if (!_frameErr) {

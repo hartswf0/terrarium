@@ -70,6 +70,7 @@ const doc = {
     { kind: 'fort', id: 'structure-ingold', anchor: { x: 14, z: 6 }, code },
     { kind: 'ball', id: 'ball', at: { x: 9, z: 4 } },
     { kind: 'target', id: 'home-cup', at: { x: 11.5, z: 5.2 }, radius: 2, cup: true },
+    { kind: 'actor', species: 'argos', id: 'dog-argos', at: { x: 10, z: 3 } },
   ],
   rules: { mode: 'free-build' },
   net: { world: 'latest-wins', forts: 'accumulate' },

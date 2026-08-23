@@ -4,7 +4,7 @@
   "id": "hlidarendi",
   "name": "HLIÐARENDI — GUNNAR’S TRAILER",
   "author": "hlidarendi",
-  "created": "2026-08-23T19:07:19.426Z",
+  "created": "2026-08-23T20:26:21.876Z",
   "engine": {
    "min": "1.0.0"
   }
@@ -45,6 +45,15 @@
    },
    "radius": 2,
    "cup": true
+  },
+  {
+   "kind": "actor",
+   "species": "argos",
+   "id": "dog-argos",
+   "at": {
+    "x": 10,
+    "z": 3
+   }
   }
  ],
  "rules": {
