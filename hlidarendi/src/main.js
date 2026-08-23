@@ -545,7 +545,8 @@ function worldStep(dt){
 function updateWorldUI(){
   const bb=$('#ballBtn'),fb=$('#feedBtn');if(!bb)return;
   const d=Math.hypot(ball.p.x-locomotion.root.x,ball.p.z-locomotion.root.z);
-  bb.textContent=ball.state==='hero'?'THROW':ball.state==='dog'?'ARGOS…':(d<=1.05?'TAKE':'BALL');
+  bb.textContent=ball.state==='hero'?'THROW':ball.state==='dog'?'ARGOS':(d<=1.05?'TAKE':'FIRE');
+  const sb2=$('#strikerBtn');if(sb2){sb2.textContent=STRIKER.on?'END':'PLAY';sb2.classList.toggle('on',STRIKER.on)}
   bb.classList.toggle('on',ball.state==='hero'||(ball.state==='free'&&d<=1.05));
   if(fb){const bd=Math.hypot(bowl.p.x-locomotion.root.x,bowl.p.z-locomotion.root.z);
     fb.textContent=bowl.food?'FED':'FEED';fb.classList.toggle('on',!bowl.food&&bd<=1.5)}
@@ -1107,6 +1108,7 @@ function updateExplorer(dt){
       targetSpeed=m<.28?lerp(CREEP_SPEED,WALK_SPEED*.72,smoothstep(.07,.28,m)):m<.78?lerp(WALK_SPEED*.72,WALK_SPEED,smoothstep(.28,.78,m)):lerp(WALK_SPEED,RUN_SPEED,smoothstep(.78,1,m));
       explorer.run=m>.82;targetDrive=m;
     }else{targetSpeed=keyRun?RUN_SPEED:WALK_SPEED;explorer.run=keyRun;targetDrive=1}
+    if(explorer.boostHold){targetSpeed=RUN_SPEED;explorer.run=true;targetDrive=1}
     explorer.speed=lerp(explorer.speed,targetSpeed,1-Math.exp(-dt*10));explorer.lastMoveAt=performance.now();
     locomotion.moveDir.lerp(dir,1-Math.exp(-dt*12));if(locomotion.moveDir.lengthSq()>.0001)locomotion.moveDir.normalize();
     locomotion.headingGoal=Math.atan2(locomotion.moveDir.x,locomotion.moveDir.z);
@@ -1665,7 +1667,7 @@ const markers={leftHand:new THREE.Mesh(markerGeo,markerMat.clone()),rightHand:ne
 for(const [name,m] of Object.entries(markers)){scene.add(m);m.renderOrder=20;m.quaternion.copy(camera.quaternion);m.userData.semantic=name}
 function updateViz(){
   const L=poleWorld('L'),R=poleWorld('R');leftPoleObj.position.copy(L);rightPoleObj.position.copy(R);beamLR.userData.update();stem.userData.update();
-  const now=performance.now();updateViz._uiAt??=0;if(!IS_TOUCH||now-updateViz._uiAt>70){updateViz._uiAt=now;const stemTip=L.clone().add(R).multiplyScalar(.5).add(new THREE.Vector3(0,.46,0)),sp=stemTip.clone().project(camera),hsx=(sp.x*.5+.5)*innerWidth,hsy=(-sp.y*.5+.5)*innerHeight,hd=$('#headDock');const landscape=innerWidth>innerHeight;headCtl.homeX=clamp(hsx,52,innerWidth-52);headCtl.homeY=clamp(hsy+(landscape?52:32),landscape?124:98,innerHeight-(landscape?252:236));hd.style.left=`${headCtl.homeX+headCtl.basePX}px`;hd.style.top=`${headCtl.homeY+headCtl.basePY}px`;if(headCtl.pointer!=null||pole.L.pointer!=null||pole.R.pointer!=null||legCtl.L.pointer!=null||legCtl.R.pointer!=null||Math.abs(headCtl.basePX)+Math.abs(headCtl.basePY)+Math.abs(pole.L.basePX)+Math.abs(pole.R.basePX)+Math.abs(legCtl.L.basePX)+Math.abs(legCtl.R.basePX)>.5)updateAllFieldVisuals();}
+  const now=performance.now();updateViz._uiAt??=0;if(!IS_TOUCH||now-updateViz._uiAt>70){updateViz._uiAt=now;const stemTip=L.clone().add(R).multiplyScalar(.5).add(new THREE.Vector3(0,.46,0)),sp=stemTip.clone().project(camera),hsx=(sp.x*.5+.5)*innerWidth,hsy=(-sp.y*.5+.5)*innerHeight,hd=$('#headDock');const landscape=innerWidth>innerHeight;headCtl.homeX=clamp(hsx,52,innerWidth-52);headCtl.homeY=clamp(hsy+(landscape?52:32),landscape?150:180,innerHeight-(landscape?252:236));hd.style.left=`${headCtl.homeX+headCtl.basePX}px`;hd.style.top=`${headCtl.homeY+headCtl.basePY}px`;if(headCtl.pointer!=null||pole.L.pointer!=null||pole.R.pointer!=null||legCtl.L.pointer!=null||legCtl.R.pointer!=null||Math.abs(headCtl.basePX)+Math.abs(headCtl.basePY)+Math.abs(pole.L.basePX)+Math.abs(pole.R.basePX)+Math.abs(legCtl.L.basePX)+Math.abs(legCtl.R.basePX)>.5)updateAllFieldVisuals();}
   markers.leftHand.position.copy(effective.leftHand);markers.rightHand.position.copy(effective.rightHand);markers.leftFoot.position.copy(effective.leftFoot);markers.rightFoot.position.copy(effective.rightFoot);markers.pelvis.position.copy(dyn.pelvis.p);for(const m of Object.values(markers))m.quaternion.copy(camera.quaternion);
   for(const name of ['leftHand','rightHand','leftFoot','rightFoot'])markers[name].material.color.set(limits[name]?0x000000:contacts[name]?0xffb000:0xff2e2e);markers.pelvis.material.color.set(limits.pelvis?0xff2e2e:0x19e6c8);
   const ls=rig.by.leftShoulder.getWorldPosition(new THREE.Vector3()),rs=rig.by.rightShoulder.getWorldPosition(new THREE.Vector3()),head=rig.by.head.getWorldPosition(new THREE.Vector3()),lh=rig.by.leftHand.getWorldPosition(new THREE.Vector3()),rh=rig.by.rightHand.getWorldPosition(new THREE.Vector3());
@@ -1947,11 +1949,11 @@ rig.mesh.userData.whiteMat=rig.mesh.material;
 $('#resetBtn').onclick=()=>resetAll();$('#quickReset').onclick=()=>{if(view3d){view3d=false;controls.enabled=false;document.body.classList.remove('free-camera');$('#viewBtn').classList.remove('on');$('#viewBtn').textContent='CAM'}resetAll()};
 document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{stopMotion();mode=b.dataset.mode;document.querySelectorAll('[data-mode]').forEach(x=>x.classList.toggle('on',x.dataset.mode===mode));updateReadout()});
 addEventListener('keydown',e=>{
-  if(document.activeElement&&document.activeElement.id==='chatSay'){if(e.code==='Escape')document.activeElement.blur();return}
+  const ae=document.activeElement;if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')){if(e.code==='Escape')ae.blur();return}
   if(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','ShiftLeft','ShiftRight'].includes(e.code)){explorer.keys.add(e.code);if(e.code.startsWith('Arrow'))e.preventDefault()}
   if(e.repeat)return;if(e.code==='Space'){e.preventDefault();gameCommand('jump')}else if(e.key==='c'||e.key==='C')gameCommand('crouch',1);else if(e.key==='h'||e.key==='H')gameCommand('hide',1);else if(e.key==='g'||e.key==='G')gameCommand('guard',1);else if(e.key==='f'||e.key==='F')gameCommand('strike');else if(e.key==='v'||e.key==='V')$('#viewBtn').click()
 });
-addEventListener('keyup',e=>{if(document.activeElement&&document.activeElement.id==='chatSay')return;explorer.keys.delete(e.code);if(e.key==='c'||e.key==='C')gameCommand('crouch',0);else if(e.key==='h'||e.key==='H')gameCommand('hide',0);else if(e.key==='g'||e.key==='G')gameCommand('guard',0)});
+addEventListener('keyup',e=>{const ae=document.activeElement;if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return;explorer.keys.delete(e.code);if(e.key==='c'||e.key==='C')gameCommand('crouch',0);else if(e.key==='h'||e.key==='H')gameCommand('hide',0);else if(e.key==='g'||e.key==='G')gameCommand('guard',0)});
 addEventListener('blur',()=>explorer.keys.clear());
 let lastReadoutAt=0;function updateReadout(){const now=performance.now();if(IS_TOUCH&&now-lastReadoutAt<110)return;lastReadoutAt=now;const contact=contacts.leftHand||contacts.rightHand||contacts.leftFoot||contacts.rightFoot;const state=contact?'CONTACT':locomotion.state;const ext=['externalPose','hands','mocap','xr','network'].find(k=>dataBus.get(k));readout.textContent=IS_TOUCH?`${state} · ${instrumentMode.mode==='travel'?'TRAVEL':'PUPPET'} · BODY DRIVE`:`${mode} · ${state}${ext?' · '+ext.toUpperCase():''} · WASD MOVE · SHIFT RUN · 4 EFFECTORS`;updateTiltViz()}
 function resetAll(){resetSkeleton();for(const st of [pole.L,pole.R,legCtl.L,legCtl.R]){st.x=st.y=st.wind=st.radius=st.edge=st.over=st.point=st.faceX=st.faceY=st.shoulder=st.cube=st.overX=st.overY=st.basePX=st.basePY=st.fieldX=st.fieldY=st.fieldMag=0;st.fieldBand=0;st.pinned=false;st.pinGateAt=0;if(st.pinTimer){clearTimeout(st.pinTimer);st.pinTimer=null}st.pinAnchor=null;st.pinOriginX=st.pinOriginY=st.secX=st.secY=st.secMag=st.secOver=0;st.pointer=null;st.lastAngle=null;st.down=null;st.wasPoint=false}for(const kind of ['arm','leg'])for(const key of ['L','R']){const ids=padIds(kind,key),nub=$(ids.nub),el=$(ids.joy),sec=el?.querySelector('.secnub');if(nub)nub.style.transform='translate(-50%,-50%)';if(sec)sec.style.transform='translate(-50%,-50%)';el?.classList.remove('pinned','pinarming');updateFieldState2(kind,key,el);updatePadUI(kind,key)}headCtl.x=headCtl.y=headCtl.wind=headCtl.radius=headCtl.edge=headCtl.over=headCtl.faceX=headCtl.faceY=headCtl.lead=0;headCtl.basePX=headCtl.basePY=headCtl.fieldX=headCtl.fieldY=headCtl.fieldMag=0;headCtl.fieldBand=0;headCtl.pointer=null;headCtl.lastAngle=null;headCtl.down=null;headDyn.x=headDyn.y=headDyn.roll=headDyn.lead=headDyn.faceX=headDyn.faceY=0;updateHeadFieldState();const hN=$('#nubH');if(hN)hN.style.transform='translate(-50%,-50%)';motion.targetPitch=motion.targetRoll=motion.pitch=motion.roll=0;motion.nudge.L.set(0,0,0);motion.nudge.R.set(0,0,0);motion.nudge.body.set(0,0,0);for(const st of Object.values(dyn))st.v.set(0,0,0);for(const st of Object.values(dynFeet))st.v.set(0,0,0);dyn.leftHand.p.copy(base.leftHand);dyn.rightHand.p.copy(base.rightHand);dyn.pelvis.p.copy(base.pelvis);dynFeet.left.p.copy(feet.left);dynFeet.right.p.copy(feet.right);manual.leftHand=manual.rightHand=manual.leftFoot=manual.rightFoot=manual.pelvis=null;draggers.clear();depthClutches.clear();locomotion.root.set(0,0,0);locomotion.rootGoal.set(0,0,0);locomotion.heading=locomotion.headingGoal=0;locomotion.walking=0;locomotion.drive=locomotion.turn=locomotion.turnError=locomotion.contactDrive=0;locomotion.motorState='IDLE';locomotion.motorBlend=0;locomotion.turning=false;locomotion.lastContactSide='L';locomotion.moveDir.set(0,0,1);explorer.keys.clear();explorer.move.set(0,0,0);explorer.speed=0;explorer.run=false;explorer.touchMove.set(0,0);explorer.touchLook.set(0,0);explorer.touchMoveMag=explorer.touchLookMag=0;explorer.inputMag=0;explorer.movePointer=explorer.lookPointer=null;explorer.mobileNav=false;explorer.cameraYaw=0;explorer.cameraPitch=.06;explorer.cameraEngaged=false;explorer.lookBodyYaw=explorer.lookBodyPitch=explorer.lookStrength=0;document.body.classList.remove('navigating');locomotion.phase=0;locomotion.gaitHalf=-1;locomotion.stepClock=0;locomotion.inputMoving=false;instrumentMode.puppet.L=instrumentMode.puppet.R='arm';enterTravelMode();locomotion.footAnchor.L.copy(feet.left);locomotion.footAnchor.R.copy(feet.right);locomotion.step=null;locomotion.nextSide='L';locomotion.state='STAND';locomotion.bend=locomotion.sit=locomotion.jump=locomotion.reach=0;argosReset();ball.state='free';ball.p.set(px2w(34),DECK+ball.r,py2w(146));ball.v.set(0,0,0);bowl.food=false;_dogEatT=0;fitPerformanceCamera();limits.leftHand=limits.rightHand=limits.leftFoot=limits.rightFoot=limits.pelvis=limits.head=false;contacts.leftHand=contacts.rightHand=contacts.leftFoot=contacts.rightFoot=contacts.pelvis=false;effective.leftHand.copy(base.leftHand);effective.rightHand.copy(base.rightHand);effective.leftFoot.copy(feet.left);effective.rightFoot.copy(feet.right);effective.pelvis.copy(base.pelvis);lastSafe.leftHand.copy(base.leftHand);lastSafe.rightHand.copy(base.rightHand);lastSafe.leftFoot.copy(feet.left);lastSafe.rightFoot.copy(feet.right);lastSafe.pelvis.copy(base.pelvis);lockHeadNow();updateReadout()}
@@ -2102,7 +2104,7 @@ const chat={
         else r='say: /goto <lat> <lon>'}
       else if(cmd==='ai'){const k2=text.slice(4).trim();
         if(k2==='off'||!k2){try{localStorage.removeItem('hlidarendi.ai.key')}catch(e){}r='AI OFF — the agent uses stand-ins'}
-        else{try{localStorage.setItem('hlidarendi.ai.key',k2)}catch(e){}r='agent line configured — /build speaks to Claude now'}}
+        else{try{localStorage.setItem('hlidarendi.ai.key',k2)}catch(e){}r='agent line configured — /build speaks to Claude now'}window.__refreshAI?.()}
       else if(WEATHER.presets[cmd])r=WEATHER.set(cmd)?('the sky turns — '+cmd):'…';
       else if(cmd==='forget'){try{localStorage.removeItem('hlidarendi.v1')}catch(e){}r='forgotten — next visit starts fresh'}
       else if(cmd==='help')r='/build <words> /striker /goto <lat> <lon> /ai <key|off> · /save /reset /feed /ball /door /forget · sky: /dawn /day /dusk /night /fog /rain';
@@ -2126,6 +2128,30 @@ const chat={
   chat.line('world','HLIÐARENDI — a body, a dog, a dwelling, a place. Speak, or /help.');
 }
 const on=(sel,fn)=>{const el=$(sel);if(el)el.onclick=fn};
+on('#railToggle',()=>$('#rail')?.classList.toggle('open'));
+if(IS_TOUCH)$('#rail')?.addEventListener('click',e=>{if(e.target.classList?.contains('rb'))setTimeout(()=>$('#rail')?.classList.remove('open'),150)});
+// ---- the AGENT bar: words become structures through the forge
+{
+  const ag=$('#agentSay'),st2=$('#agentStatus');
+  const refreshAI=()=>{let k=null;try{k=localStorage.getItem('hlidarendi.ai.key')}catch(e){}
+    if(st2)st2.textContent=k?'● AI ON · claude-opus-5 · say /ai off to disconnect':'● AI OFF · stand-ins · say /ai <key> to connect'};
+  refreshAI();window.__refreshAI=refreshAI;
+  $('#agentForm')?.addEventListener('submit',e=>{
+    e.preventDefault();const t=(ag?.value||'').trim();if(!t)return;ag.value='';
+    chat.line('you','⚒ '+t);buildFromWords(t);if(IS_TOUCH)ag?.blur();
+  });
+  on('#buildBtn',()=>ag?.focus());
+  on('#jumpBtn',()=>gameCommand('jump'));
+  const bb2=$('#boostBtn');
+  if(bb2){const dn=e=>{e.preventDefault();explorer.boostHold=true;bb2.classList.add('on')};
+    const up=()=>{explorer.boostHold=false;bb2.classList.remove('on')};
+    bb2.addEventListener('pointerdown',dn);bb2.addEventListener('pointerup',up);bb2.addEventListener('pointercancel',up);bb2.addEventListener('pointerleave',up)}
+  on('#strikerBtn',()=>chat.say('/striker'));
+  on('#aiBtn',()=>{const i=$('#chatSay');$('#chatWrap')?.classList.add('on');$('#sayBtn')?.classList.add('on');if(i){i.value='/ai ';i.focus()}});
+  on('#worldBtn',()=>{const i=$('#chatSay');$('#chatWrap')?.classList.add('on');$('#sayBtn')?.classList.add('on');if(i){i.value='/goto 63.7422 -20.1080';if(!IS_TOUCH)i.focus()}});
+  const SKYS=['day','dusk','night','fog','rain','dawn'];let skyI=0;
+  on('#skyBtn',()=>{skyI=(skyI+1)%SKYS.length;WEATHER.set(SKYS[skyI]);chat.line('world','the sky turns — '+SKYS[skyI])});
+}
 on('#saveBtn',saveWorld);
 on('#ballBtn',()=>{if(ball.state==='hero')throwBall();else takeBall();updateWorldUI()});
 on('#feedBtn',()=>{feedBowl();updateWorldUI()});

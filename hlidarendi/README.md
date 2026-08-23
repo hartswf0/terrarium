@@ -44,9 +44,12 @@ to it), and it rides the save and the cartridge snapshot. **`/striker`**
 turns the yard into a pitch — run into the ball to kick, and Argos plays for
 himself, carrying to his own goal. **`/goto <lat> <lon>`** calls on the world
 landscape — live terrarium elevation tiles for anywhere on earth (where the
-network allows). `/forget` clears the save. MOVE/LOOK to travel; touch a limb control and it
-grows while the others store; BALL takes and throws, FEED fills the bowl at
-the galley, SAVE keeps the situation across reloads. Argos decides for
+network allows). `/forget` clears the save. The chrome is Thunder Rigs': the AGENT bar
+up top summons structures, the right rail carries PLAY/SAY · AI/BUILD/WORLD ·
+SKY/FILE/SYS (collapsed behind ☰ on phones), and FEED/JUMP/FIRE/BOOST sit
+bottom-right. MOVE/LOOK to travel; touch a limb control and it grows while
+the others store; FIRE takes/throws the ball, FEED fills the bowl at the
+galley, FILE keeps the situation across reloads. Argos decides for
 himself — a throw enters his world as evidence, not as a command.
 
 **[hlidarendi.trig.json](hlidarendi.trig.json)** — the same trailer as a
