@@ -2605,26 +2605,36 @@ if(typeof window !== "undefined"){ window.AR = AR; }
             GB.fA.R.copy(GB.root).addScaledVector(lat, -0.105); GB.fA.R.y = bodyGround(GB.fA.R.x, GB.fA.R.z);
         }
 
-        // ---- EMBODIMENT: pin-and-diff on P
-        var embodied = false, pin = { x: 0, z: 0 }, carWasVisible = true;
+        // ---- EMBODIMENT, GTA LAW: the rig is a PLACE, not a skin. Stepping
+        // out PARKS the fully capable rig where it stands; the world holds it
+        // there while the body walks; driving again means walking back to it.
+        var embodied = false, pin = { x: 0, z: 0 };
+        var PARK = { x: 0, y: 0, z: 0, yaw: 0, q: null, has: false };
+        var BOARD_REACH = 3.6; // III units — an arm's swing from the door
+        function parkDist() { return Math.hypot(GB.root.x * KB - PARK.x, GB.root.z * KB - PARK.z); }
         function embody() {
             if (embodied) return release();
             var P2 = H.P, pc = H.playerCar;
-            if (pc) { carWasVisible = pc.visible; pc.visible = false; }
+            PARK.x = P2.pos.x; PARK.z = P2.pos.z; PARK.yaw = P2.yaw || 0; PARK.has = true;
+            if (pc) { PARK.y = pc.position.y; PARK.q = pc.quaternion.clone(); }
             placeBody(P2.pos.x / KB, P2.pos.z / KB, P2.yaw || 0);
             bodyRoot.visible = true; embodied = true;
             pin.x = P2.pos.x; pin.z = P2.pos.z;
             try { P2.vel.set(0, 0, 0); } catch (_) {}
-            H.notify('👁 YOU ARE EVERYBODY — the stick walks the body · B releases');
+            H.notify('👁 YOU ARE EVERYBODY — the rig stays parked here · walk back + B to drive');
             var c = document.getElementById('hl-embody'); if (c) { c.textContent = 'RIG'; c.classList.add('on'); }
             return true;
         }
         function release() {
             if (!embodied) return false;
+            var d = parkDist();
+            if (d > BOARD_REACH) { H.notify('🚗 the rig is parked ' + d.toFixed(0) + ' back — walk to it'); return false; }
             embodied = false; bodyRoot.visible = false;
-            var pc = H.playerCar; if (pc) pc.visible = carWasVisible;
-            H.notify('RELEASED — back in your rig');
-            var c = document.getElementById('hl-embody'); if (c) { c.textContent = 'BODY'; c.classList.remove('on'); }
+            var P2 = H.P;
+            P2.pos.x = PARK.x; P2.pos.z = PARK.z; P2.yaw = PARK.yaw;
+            try { P2.vel.set(0, 0, 0); } catch (_) {}
+            H.notify('AT THE WHEEL — the rig takes you');
+            var c = document.getElementById('hl-embody'); if (c) { c.textContent = 'BODY'; c.classList.remove('on'); c.style.borderColor = '#2dd4bf'; }
             return true;
         }
         function bodyTick(dt) {
@@ -2642,6 +2652,21 @@ if(typeof window !== "undefined"){ window.AR = AR; }
             P2.pos.y = GB.root.y * KB + 0.7;
             P2.yaw = GB.heading;
             pin.x = P2.pos.x; pin.z = P2.pos.z;
+            // the parked rig stays parked: III wrote the car from P this frame,
+            // so put it back on its spot before the render sees it
+            var pc = H.playerCar;
+            if (pc && PARK.has) {
+                pc.visible = true;
+                pc.position.x = PARK.x; pc.position.z = PARK.z; pc.position.y = PARK.y;
+                if (PARK.q) pc.quaternion.copy(PARK.q);
+            }
+            // the chip reads the walk back
+            bodyTick._c = (bodyTick._c || 0) + dt;
+            if (bodyTick._c > 0.5) {
+                bodyTick._c = 0;
+                var c = document.getElementById('hl-embody');
+                if (c) { var d = parkDist(); c.textContent = d > BOARD_REACH ? ('RIG · ' + d.toFixed(0)) : 'RIG'; c.style.borderColor = d > BOARD_REACH ? '#8a6a22' : '#2dd4bf'; }
+            }
         }
         // chip + key
         (function () {

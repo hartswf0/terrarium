@@ -88,9 +88,17 @@ onto itself. Because camera follow, MULTI, the ball, and the dog's
 perception all read `P`, the entire host converges on the walking body with
 zero further hooks — verified headless: embody (B key or the BODY chip),
 walk under W, and Argos closes from 27 units to heel at 5.7 on his own.
-ESC-equivalent: B again (or the chip, now reading RIG) releases back to the
-rig, which reappears where the body stands — III's own possession semantics,
-generalized across the species boundary.
+
+**The GTA law.** The rig is a PLACE, not a skin. Stepping out parks the
+fully capable rig where it stands — the species tick pins the car mesh onto
+its parking spot after III's own frame writes it, so the world visibly
+keeps it there while the body walks away. Boarding again means walking
+back: release is refused beyond arm's reach of the parked rig (the chip
+reads `RIG · 31` with the distance), and within reach B puts you at the
+wheel exactly where you left it, heading and all. Leaving the rig somewhere
+therefore creates geography — the walk back is real, and the dog walks it
+with you. Verified headless: park → body 31 units out with the car still on
+its spot → B refused → walk back → boarded, P restored to the parking spot.
 
 ## Phase 2 — the puppet instruments as a HUD deck
 

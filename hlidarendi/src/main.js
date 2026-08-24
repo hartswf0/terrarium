@@ -509,18 +509,37 @@ const TRUCK={x:TR0.x-8.5,z:TR0.z+7.5,yaw:Math.PI*.55,speed:0,on:false,hitched:fa
     const w=new THREE.Mesh(new THREE.CylinderGeometry(.44,.44,.36,14),dark);
     w.geometry.rotateZ(Math.PI/2);w.position.set(wx,.44,wz);g.add(w);TRUCK.wheels.push(w);
   }
+  // the driver is seen at the wheel — a silhouette, present only when boarded
+  const drv=new THREE.Group();
+  const torso=new THREE.Mesh(new THREE.CapsuleGeometry(.17,.34,4,10),new THREE.MeshStandardMaterial({color:0x2a2d31,roughness:1}));
+  torso.position.y=.28;drv.add(torso);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.13,12,10),new THREE.MeshStandardMaterial({color:0x111214,roughness:1}));
+  head.position.y=.66;drv.add(head);
+  drv.position.set(0,1.28,.72);drv.visible=false;g.add(drv);TRUCK.driver=drv;
   scene.add(g);TRUCK.group=g;
 }
 function truckPlace(){
-  const gy=terrainH(TRUCK.x,TRUCK.z);
-  TRUCK.group.position.set(TRUCK.x,gy,TRUCK.z);
-  TRUCK.group.rotation.y=TRUCK.yaw;
+  // the rig sits ON the hill, not level above it: four wheel samples give
+  // the pose, so climbing reads as climbing and the drop reads as the drop
+  const dirx=Math.sin(TRUCK.yaw),dirz=Math.cos(TRUCK.yaw);
+  const sx=Math.cos(TRUCK.yaw),sz=-Math.sin(TRUCK.yaw);
+  const hF=terrainH(TRUCK.x+dirx*1.5,TRUCK.z+dirz*1.5),hB=terrainH(TRUCK.x-dirx*1.5,TRUCK.z-dirz*1.5);
+  const hL=terrainH(TRUCK.x+sx*.95,TRUCK.z+sz*.95),hR=terrainH(TRUCK.x-sx*.95,TRUCK.z-sz*.95);
+  TRUCK.group.position.set(TRUCK.x,(hF+hB+hL+hR)/4+(TRUCK.airY||0),TRUCK.z);
+  TRUCK.group.rotation.set(0,TRUCK.yaw,0);
+  TRUCK.group.rotateX(Math.atan2(hB-hF,3.0)*.85);
+  TRUCK.group.rotateZ(Math.atan2(hR-hL,1.9)*.85);
 }
 function truckRear(){const dx=Math.sin(TRUCK.yaw),dz=Math.cos(TRUCK.yaw);return{x:TRUCK.x-dx*2.9,z:TRUCK.z-dz*2.9}}
 function trailerHitchWorld(){return{x:TR.x,z:TR.z-3.05}} // the home's south tongue
+function truckJump(){
+  if(!TRUCK.on||(TRUCK.airY||0)>0.02||TRUCK.hitched)return;
+  TRUCK.vy=5.4;TRUCK.airY=0.03;buzz('rigjump',[12,26,10],400);
+}
 function boardTruck(){
   if(TRUCK.on)return;
   TRUCK.on=true;TRUCK.speed=0;document.body.classList.add('driving');
+  if(TRUCK.driver)TRUCK.driver.visible=true;
   rig.mesh.visible=false;rig.outline.visible=false;support.visible=false;
   window.__exitFreeCam?.();
   placeHero(TRUCK.x,TRUCK.z,TRUCK.yaw);
@@ -528,7 +547,8 @@ function boardTruck(){
 }
 function exitTruck(){
   if(!TRUCK.on)return;
-  TRUCK.on=false;TRUCK.speed=0;document.body.classList.remove('driving');
+  TRUCK.on=false;TRUCK.speed=0;TRUCK.airY=0;TRUCK.vy=0;document.body.classList.remove('driving');
+  if(TRUCK.driver)TRUCK.driver.visible=false;
   rig.mesh.visible=true;rig.outline.visible=true;support.visible=true;
   const px2=Math.cos(TRUCK.yaw),pz2=-Math.sin(TRUCK.yaw);
   placeHero(TRUCK.x+px2*1.9,TRUCK.z+pz2*1.9,TRUCK.yaw);
@@ -559,19 +579,31 @@ function truckStep(dt){
   if(explorer.touchMoveMag>.03){st=explorer.touchMove.x;th=explorer.touchMove.y}
   else{th=((K.has('KeyW')||K.has('ArrowUp'))?1:0)-((K.has('KeyS')||K.has('ArrowDown'))?1:0);
        st=((K.has('KeyD')||K.has('ArrowRight'))?1:0)-((K.has('KeyA')||K.has('ArrowLeft'))?1:0)}
-  const top=(explorer.boostHold?13.5:8.5)*(TRUCK.hitched?.6:1);
+  const top=(explorer.boostHold?15.5:9.5)*(TRUCK.hitched?.6:1);
   const target=th*(th<0?top*.4:top);
-  TRUCK.speed=lerp(TRUCK.speed,target,1-Math.exp(-dt*(Math.abs(target)>Math.abs(TRUCK.speed)?1.7:2.8)));
-  if(Math.abs(TRUCK.speed)>.15)TRUCK.yaw-=st*dt*1.5*clamp(Math.abs(TRUCK.speed)/3.2,.3,1)*Math.sign(TRUCK.speed);
+  // vertical life: the rig leaves the ground under JUMP and gravity brings it home
+  if((TRUCK.vy||0)!==0||(TRUCK.airY||0)>0){
+    TRUCK.vy=(TRUCK.vy||0)-15.5*dt;
+    TRUCK.airY=Math.max(0,(TRUCK.airY||0)+TRUCK.vy*dt);
+    if(TRUCK.airY===0){if(TRUCK.vy<-2)buzz('rigland',[8,18,8],400);TRUCK.vy=0}
+  }
+  const air=(TRUCK.airY||0)>0.02;
+  TRUCK.speed=lerp(TRUCK.speed,target,1-Math.exp(-dt*(air?.4:(Math.abs(target)>Math.abs(TRUCK.speed)?1.9:2.8))));
+  if(Math.abs(TRUCK.speed)>.15&&!air)TRUCK.yaw-=st*dt*1.55*clamp(Math.abs(TRUCK.speed)/3.2,.3,1)*Math.sign(TRUCK.speed);
+  TRUCK.steerVis=lerp(TRUCK.steerVis||0,-st*.45,1-Math.exp(-dt*8));
+  TRUCK.wheels[0].rotation.y=TRUCK.wheels[1].rotation.y=TRUCK.steerVis;
   const dx=Math.sin(TRUCK.yaw),dz=Math.cos(TRUCK.yaw);
-  // the hill has a say: climbing costs, descending feeds
-  const grade=(terrainH(TRUCK.x+dx*2.2,TRUCK.z+dz*2.2)-terrainH(TRUCK.x,TRUCK.z))/2.2;
-  TRUCK.speed-=grade*dt*6*Math.sign(TRUCK.speed||0);
+  // the hill has a say: climbing costs, descending feeds — unless airborne
+  if(!air){
+    const grade=(terrainH(TRUCK.x+dx*2.2,TRUCK.z+dz*2.2)-terrainH(TRUCK.x,TRUCK.z))/2.2;
+    TRUCK.speed-=grade*dt*6*Math.sign(TRUCK.speed||0);
+  }
   const v=new THREE.Vector3(TRUCK.x+dx*TRUCK.speed*dt,0,TRUCK.z+dz*TRUCK.speed*dt);
   const gy=terrainH(v.x,v.z);
   PLACE.pushOutCircle(v,1.15,gy+.25,gy+1.7);
   TRUCK.x=v.x;TRUCK.z=v.z;
   for(const w of TRUCK.wheels)w.rotation.x+=TRUCK.speed*dt/.44;
+  if(explorer.boostHold&&Math.abs(TRUCK.speed)>6)buzz('rigboost',6,500);
   truckPlace();
   // the driver IS the root: camera, dog, labels, striker all read this
   placeHero(TRUCK.x,TRUCK.z,TRUCK.yaw);
@@ -1372,6 +1404,21 @@ function updateExplorer(dt){
 }
 function updateExplorerCamera(dt){
   if(view3d){controls.update();return}
+  if(TRUCK.on){
+    // the chase cam breathes with speed: behind the heading, pulling back as
+    // the rig opens up — take the look stick and it orbits the cab instead
+    const sp=Math.abs(TRUCK.speed),dirx=Math.sin(TRUCK.yaw),dirz=Math.cos(TRUCK.yaw);
+    const radius=7.4+sp*.34,height=2.7+sp*.11;
+    const target=new THREE.Vector3(TRUCK.x+dirx*(1.8+sp*.14),locomotion.root.y+1.25+(TRUCK.airY||0)*.6,TRUCK.z+dirz*(1.8+sp*.14));
+    let desired;
+    if(explorer.cameraEngaged&&explorer.touchLookMag>.02){
+      const cp=Math.cos(explorer.cameraPitch),sp2=Math.sin(explorer.cameraPitch),sy=Math.sin(explorer.cameraYaw),cy=Math.cos(explorer.cameraYaw);
+      desired=new THREE.Vector3(target.x+sy*cp*radius,target.y+sp2*radius+.4,target.z+cy*cp*radius);
+    }else desired=new THREE.Vector3(TRUCK.x-dirx*radius,locomotion.root.y+height,TRUCK.z-dirz*radius);
+    const k=1-Math.exp(-dt*4.5);
+    camera.position.lerp(desired,k);controls.target.lerp(target,k);camera.lookAt(controls.target);
+    return;
+  }
   const radius=explorer.cameraRadius||(innerHeight>innerWidth?4.65:4.15);
   const target=new THREE.Vector3(locomotion.root.x,locomotion.root.y+1.03,locomotion.root.z+.02);
   if(!IS_TOUCH&&!explorer.cameraEngaged){
@@ -2200,7 +2247,7 @@ document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{stopMotion();
 addEventListener('keydown',e=>{
   const ae=document.activeElement;if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')){if(e.code==='Escape')ae.blur();return}
   if(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','ShiftLeft','ShiftRight'].includes(e.code)){explorer.keys.add(e.code);if(e.code.startsWith('Arrow'))e.preventDefault()}
-  if(e.repeat)return;if(e.code==='Space'){e.preventDefault();gameCommand('jump')}else if(e.key==='c'||e.key==='C')gameCommand('crouch',1);else if(e.key==='h'||e.key==='H')gameCommand('hide',1);else if(e.key==='g'||e.key==='G')gameCommand('guard',1);else if(e.key==='f'||e.key==='F')gameCommand('strike');else if(e.key==='v'||e.key==='V')$('#viewBtn').click();else if(e.key==='e'||e.key==='E'){if(TRUCK.on)exitTruck();else if(Math.hypot(TRUCK.x-locomotion.root.x,TRUCK.z-locomotion.root.z)<3.4)boardTruck()}
+  if(e.repeat)return;if(e.code==='Space'){e.preventDefault();TRUCK.on?truckJump():gameCommand('jump')}else if(e.key==='c'||e.key==='C')gameCommand('crouch',1);else if(e.key==='h'||e.key==='H')gameCommand('hide',1);else if(e.key==='g'||e.key==='G')gameCommand('guard',1);else if(e.key==='f'||e.key==='F')gameCommand('strike');else if(e.key==='v'||e.key==='V')$('#viewBtn').click();else if(e.key==='e'||e.key==='E'){if(TRUCK.on)exitTruck();else if(Math.hypot(TRUCK.x-locomotion.root.x,TRUCK.z-locomotion.root.z)<3.4)boardTruck()}
 });
 addEventListener('keyup',e=>{const ae=document.activeElement;if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return;explorer.keys.delete(e.code);if(e.key==='c'||e.key==='C')gameCommand('crouch',0);else if(e.key==='h'||e.key==='H')gameCommand('hide',0);else if(e.key==='g'||e.key==='G')gameCommand('guard',0)});
 addEventListener('blur',()=>explorer.keys.clear());
@@ -2500,7 +2547,7 @@ const on=(sel,fn)=>{const el=$(sel);if(el)el.onclick=fn};
   on('#forgetBtn',()=>chat.say('/forget'));
   on('#rigBtn',()=>{TRUCK.on?exitTruck():boardTruck()});
   on('#hitchBtn',()=>{TRUCK.hitched?unhitchTrailer():hitchTrailer()});
-  on('#jumpBtn',()=>gameCommand('jump'));
+  on('#jumpBtn',()=>{TRUCK.on?truckJump():gameCommand('jump')});
   const bb2=$('#boostBtn');
   if(bb2){const dn=e=>{e.preventDefault();explorer.boostHold=true;bb2.classList.add('on')};
     const up=()=>{explorer.boostHold=false;bb2.classList.remove('on')};

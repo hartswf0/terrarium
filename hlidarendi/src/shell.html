@@ -237,6 +237,10 @@ body.menu-open #menuFab .x{display:inline}
 body.menu-open #playFab{display:none!important}
 body.play-mode #readout,body.play-mode #tiltViz{display:none!important}
 body.diag-open #readout{display:block!important}
+/* at the wheel, the puppet instruments stand down: the stick and the road */
+body.driving #headDock,body.driving .fieldline,body.driving .fieldhome{display:none!important}
+body.driving .deckItem[data-role="arm"],body.driving .deckItem[data-role="leg"]{opacity:.12;pointer-events:none}
+body.driving .deckItem[data-role="arm"] *,body.driving .deckItem[data-role="leg"] *{pointer-events:none!important}
 /* the travel stick lives in the drive corner, as it does in the standing world —
    and it is the corner-most control: grabbing the corner always drives */
 #deckL{justify-content:flex-end;padding-bottom:10px}
