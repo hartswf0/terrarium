@@ -92,7 +92,11 @@ the load never becomes the view. **The household starts coupled**: the rig
 stands at the home's north tongue, nose to the open land, already hitched —
 take the wheel and the whole dwelling comes with you. (The trailer keeps
 its bearing on the skids rather than swinging in behind the rig; its
-collision boxes, door and plan stay exactly true that way.) Walk to the rig
+collision boxes, door and plan stay exactly true that way.) **A rig does
+not collide with its own load** — while hitched, the home's boxes stay
+solid for everyone else but cannot shove the thing towing them, and the
+loaded nose swings toward the stick instead of snapping to it: six tonnes
+of house has an opinion about your corner.) Walk to the rig
 and DRIVE (or E); the driver IS the hero root, so the camera, the labels,
 the striker and the dog's whole perception follow the wheel with no further
 hooks. Bring it within reach of the home's south

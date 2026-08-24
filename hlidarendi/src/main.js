@@ -89,7 +89,12 @@ const DOOR={id:DOOR_PLAN.id,wall:DOOR_PLAN.wall,from:DOOR_PLAN.from,to:DOOR_PLAN
 const SOLIDS=EL.map(e=>({id:e.id,kind:e.kind,
   min:[Math.min(px2w(e.x0),px2w(e.x1)),e.z0*IN,Math.min(py2w(e.y0),py2w(e.y1))],
   max:[Math.max(px2w(e.x0),px2w(e.x1)),e.z1*IN,Math.max(py2w(e.y0),py2w(e.y1))]}));
-for(const b of SOLIDS)b.climb=false; // furniture blocks; the floor is the floor
+for(const b of SOLIDS){b.climb=false;b.trailer=true} // furniture blocks; the floor is the floor
+// A RIG DOES NOT COLLIDE WITH ITS OWN LOAD. While the home is hitched it
+// travels WITH the rig, so its boxes must not shove the thing towing them —
+// that feedback (drag the load into the cab, get pushed, get kicked) is what
+// spins a tow rig out. The load stays solid for everyone else, always.
+const TOW={skip:false};
 const BLOCKERS=SOLIDS.filter(s=>s.kind==='wall'||s.kind==='glass'||s.kind==='fixture'||s.kind==='frame');
 const TOPS=SOLIDS.filter(s=>s.kind==='step');
 // ---- THE HOME CAN BE HAULED. One offset moves the WHOLE dwelling — the
@@ -134,6 +139,7 @@ const PLACE={
   pushOutCircle(v,r,y0,y1,out,skipClimb){
     for(const b of BLOCKERS){
       if(skipClimb&&b.climb)continue;
+      if(TOW.skip&&b.trailer)continue;      // you are towing this; it cannot hit you
       if(b.max[1]<y0||b.min[1]>y1)continue;
       const cx=clamp(v.x,b.min[0],b.max[0]),cz=clamp(v.z,b.min[2],b.max[2]);
       let dx=v.x-cx,dz=v.z-cz,d=Math.hypot(dx,dz);
@@ -787,12 +793,18 @@ function truckStep(dt){
   TRUCK.vel.y=0;
   const spd0=TRUCK.vel.length();if(spd0>MAX)TRUCK.vel.multiplyScalar(MAX/spd0);
   // the stick owns the nose; momentum owns the road
-  if(mag>0.1)TRUCK.yaw=Math.atan2(dir.x,dir.z);
+  if(mag>0.1){
+    const want=Math.atan2(dir.x,dir.z);
+    // light, the nose is the stick; loaded, six tonnes of house has an opinion
+    TRUCK.yaw=TRUCK.hitched?lerpAngle(TRUCK.yaw,want,1-Math.exp(-dt*1.9)):want;
+  }
   else if(Math.hypot(TRUCK.vel.x,TRUCK.vel.z)>0.5)TRUCK.yaw+=normAngle(Math.atan2(TRUCK.vel.x,TRUCK.vel.z)-TRUCK.yaw)*Math.min(1,10*dt);
   // integrate; walls answer with a bounce
   const v=new THREE.Vector3(TRUCK.x+TRUCK.vel.x*dt,0,TRUCK.z+TRUCK.vel.z*dt);
   const gy=terrainH(v.x,v.z);const hitI={hit:false};
+  TOW.skip=TRUCK.hitched;
   PLACE.pushOutCircle(v,1.15,gy+.25,gy+1.7,hitI);
+  TOW.skip=false;
   if(hitI.hit){const nl=Math.hypot(hitI.x,hitI.z)||1,nx=hitI.x/nl,nz=hitI.z/nl;
     const vn=TRUCK.vel.x*nx+TRUCK.vel.z*nz;
     if(vn<0){TRUCK.vel.x-=1.4*vn*nx;TRUCK.vel.z-=1.4*vn*nz;if(-vn>6)buzz('rigwall',[10,22,10],400)}}
@@ -971,14 +983,20 @@ function worldStep(dt){
   truckStep(dt);
   locomotion.root.y=groundYAt(locomotion.root.x,locomotion.root.z);
   const gy=locomotion.root.y;
-  for(let i=0;i<3;i++)PLACE.pushOutCircle(locomotion.root,.17,gy+.14,gy+1.55,null,false);
-  // wedged in a seam (window/bench corner): give the step back rather than jitter
   worldStep._pr??=locomotion.root.clone();
-  _pushInfo.hit=false;PLACE.pushOutCircle(locomotion.root,.155,gy+.14,gy+1.55,_pushInfo,false);
-  if(_pushInfo.hit){locomotion.root.x=worldStep._pr.x;locomotion.root.z=worldStep._pr.z;
-    locomotion.root.y=groundYAt(locomotion.root.x,locomotion.root.z)}
+  // At the wheel the body is cargo: the RIG's collision is the only authority.
+  // Otherwise the walls the rig legitimately passes would shove the pinned body
+  // every frame and the rollback would fight the pin — the world keeps turning,
+  // only the walking body's own occupancy stands down.
+  if(!TRUCK.on){
+    for(let i=0;i<3;i++)PLACE.pushOutCircle(locomotion.root,.17,gy+.14,gy+1.55,null,false);
+    // wedged in a seam (window/bench corner): give the step back rather than jitter
+    _pushInfo.hit=false;PLACE.pushOutCircle(locomotion.root,.155,gy+.14,gy+1.55,_pushInfo,false);
+    if(_pushInfo.hit){locomotion.root.x=worldStep._pr.x;locomotion.root.z=worldStep._pr.z;
+      locomotion.root.y=groundYAt(locomotion.root.x,locomotion.root.z)}
+    for(const side of ['L','R']){const a=locomotion.footAnchor[side];PLACE.pushOutCircle(a,.07,a.y+.02,a.y+.42,null,false)}
+  }
   worldStep._pr.copy(locomotion.root);
-  for(const side of ['L','R']){const a=locomotion.footAnchor[side];PLACE.pushOutCircle(a,.07,a.y+.02,a.y+.42,null,false)}
   stepBall(dt);
   stepKick();
   STRIKER.step();
