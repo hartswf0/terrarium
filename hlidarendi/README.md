@@ -84,9 +84,7 @@ Thunder Rigs' OWN car law, ported from unset-04: the stick points the way
 (camera-relative), yaw snaps to input, momentum drifts you through the
 turn, climbing gets torque, walls answer with a bounce, JUMP leaps, and the
 ball answers the bumper with III's collision law — slow contact stows it in
-the bed instead. The camera is III's too: it PANS — you keep whatever angle
-and distance you choose, the world slides under it, the LOOK stick re-aims.
-The driving eye falls in BEHIND the nose whenever the rig is rolling — the
+the bed instead. The driving eye falls in BEHIND the nose whenever the rig is rolling — the
 road ahead is always the road on screen — while keeping the distance and
 height you choose; the LOOK stick re-aims and re-frames it, and letting go
 lets the eye swing back. Towing, it climbs and rides off the shoulder so
