@@ -81,7 +81,7 @@ one exchanges bodies); ask for *a trailer* and a caravan shell stands.
 
 **THE RIG** — Thunder Rigs' gift stands in the yard, and it drives by
 Thunder Rigs' OWN car law, ported from unset-04: the stick points the way
-(camera-relative), yaw snaps to input, momentum drifts you through the
+(camera-relative), the nose follows it, momentum drifts you through the
 turn, climbing gets torque, walls answer with a bounce, JUMP leaps, and the
 ball answers the bumper with III's collision law — slow contact stows it in
 the bed instead. The driving eye falls in BEHIND the nose whenever the rig is rolling — the
@@ -96,7 +96,7 @@ collision boxes, door and plan stay exactly true that way.) **A rig does
 not collide with its own load** — while hitched, the home's boxes stay
 solid for everyone else but cannot shove the thing towing them, and the
 loaded nose swings toward the stick instead of snapping to it: six tonnes
-of house has an opinion about your corner.) Walk to the rig
+of house has an opinion about your corner. Walk to the rig
 and DRIVE (or E); the driver IS the hero root, so the camera, the labels,
 the striker and the dog's whole perception follow the wheel with no further
 hooks. Bring it within reach of the home's south
