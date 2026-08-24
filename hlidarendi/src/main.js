@@ -595,6 +595,8 @@ function launchBall(){
 // hooks. Back it to the home's south end and the dwelling itself can travel.
 // ============================================================================
 const TRUCK={x:TR0.x-8.5,z:TR0.z+7.5,yaw:Math.PI*.55,speed:0,on:false,hitched:false,group:null,wheels:[],driver:null};
+// the driving eye's own state: where it stands relative to the rig
+const CAMR={az:null,dist:12,high:5.0,hold:0};
 function makeTruckBody(color,form){
   form=form||'classic';
   const g=new THREE.Group();g.name='RIG.TRUCK';
@@ -715,10 +717,10 @@ function boardTruck(){
   rig.mesh.visible=false;rig.outline.visible=false;support.visible=false;
   window.__exitFreeCam?.();
   placeHero(TRUCK.x,TRUCK.z,TRUCK.yaw);
-  // a driving eye: step the camera back and up once; from here it only pans
-  {const dx=Math.sin(TRUCK.yaw),dz=Math.cos(TRUCK.yaw);
+  // the eye takes its place behind the nose — the road ahead is the screen
+  {CAMR.az=TRUCK.yaw+Math.PI+(TRUCK.hitched?0.62:0);CAMR.dist=TRUCK.hitched?20:12;CAMR.high=TRUCK.hitched?10:5.0;CAMR.hold=0;
    controls.target.set(TRUCK.x,TRUCK.group.position.y+1,TRUCK.z);
-   camera.position.set(TRUCK.x-dx*11,TRUCK.group.position.y+6,TRUCK.z-dz*11)}
+   camera.position.set(TRUCK.x+Math.sin(CAMR.az)*CAMR.dist,TRUCK.group.position.y+1+CAMR.high,TRUCK.z+Math.cos(CAMR.az)*CAMR.dist)}
   buzz('board',10,300);chat.line('world','the rig takes you — the stick points the way, momentum does the rest');
 }
 function exitTruck(){
@@ -1618,18 +1620,36 @@ function updateExplorer(dt){
 function updateExplorerCamera(dt){
   if(view3d){controls.update();return}
   if(TRUCK.on){
-    // III's own car camera: it PANS — you keep whatever angle and distance
-    // you chose, and the world slides under it; the LOOK stick re-aims it
+    // THE DRIVING EYE — III's pan, with the one thing a driver needs: the
+    // eye falls in BEHIND the nose whenever the rig is rolling, so the road
+    // ahead is always the road on screen. Distance and height stay whatever
+    // you chose; the LOOK stick re-aims and re-frames, and letting go lets
+    // the eye swing back behind you.
     const target=new THREE.Vector3(TRUCK.x,TRUCK.group.position.y+1.0+(TRUCK.airY||0)*.6,TRUCK.z);
-    const k=Math.min(1,dt*6);
-    const delta=target.clone().sub(controls.target).multiplyScalar(k);
-    controls.target.add(delta);camera.position.add(delta);
-    if(explorer.touchLookMag>.02){
-      const radius=Math.max(6,camera.position.distanceTo(controls.target));
-      const cp=Math.cos(explorer.cameraPitch),sp2=Math.sin(explorer.cameraPitch),sy=Math.sin(explorer.cameraYaw),cy=Math.cos(explorer.cameraYaw);
-      const desired=new THREE.Vector3(controls.target.x+sy*cp*radius,controls.target.y+sp2*radius+.4,controls.target.z+cy*cp*radius);
-      camera.position.lerp(desired,1-Math.exp(-dt*8));
+    CAMR.dist=CAMR.dist||12;CAMR.high=CAMR.high||5.0;
+    // towing, the eye climbs and drops back so the load never becomes the view
+    if((CAMR.hold||0)<=0){
+      const wantD=TRUCK.hitched?20:12,wantH=TRUCK.hitched?10:5.0,ck=1-Math.exp(-dt*1.6);
+      CAMR.dist=lerp(CAMR.dist,wantD,ck);CAMR.high=lerp(CAMR.high,wantH,ck);
     }
+    if(explorer.touchLookMag>.02){
+      CAMR.az=explorer.cameraYaw;
+      CAMR.high=clamp(Math.sin(explorer.cameraPitch)*CAMR.dist+.4,1.2,CAMR.dist*.9);
+      CAMR.hold=1.1;                                   // your framing stands a moment
+    }else if((CAMR.hold=Math.max(0,(CAMR.hold||0)-dt))<=0&&TRUCK.speed>1.2){
+      // realign only while moving — parked, the eye holds still and lets you look
+      // towing, the eye rides off the shoulder: the road ahead, the rig, and
+      // the load all in frame instead of a wall of trailer
+      const behind=TRUCK.yaw+Math.PI+(TRUCK.hitched?0.62:0);
+      CAMR.az=lerpAngle(CAMR.az??behind,behind,1-Math.exp(-dt*(1.1+TRUCK.speed*.10)));
+    }
+    if(CAMR.az==null)CAMR.az=TRUCK.yaw+Math.PI+(TRUCK.hitched?0.62:0);
+    const desired=new THREE.Vector3(
+      target.x+Math.sin(CAMR.az)*CAMR.dist,
+      target.y+CAMR.high,
+      target.z+Math.cos(CAMR.az)*CAMR.dist);
+    camera.position.lerp(desired,1-Math.exp(-dt*5.5));
+    controls.target.lerp(target,1-Math.exp(-dt*9));
     camera.lookAt(controls.target);
     return;
   }
@@ -2866,6 +2886,15 @@ on('#feedBtn',()=>{feedBowl();updateWorldUI()});
 }
 // boot: hero wakes beside the trailer, on real ground, and the dog is nearby.
 locomotion.root.y=groundYAt(locomotion.root.x,locomotion.root.z);
+// the household starts COUPLED: the rig stands at the home's north tongue,
+// nose to the open land, already hitched — take the wheel and the whole
+// dwelling comes with you. (A save overrides this with where you left it.)
+{
+  TRUCK.yaw=Math.PI;                         // facing away from the home
+  TRUCK.x=TR.x;TRUCK.z=TR.z-5.95;            // rear exactly on the tongue
+  TRUCK.hitched=true;truckPlace();
+  chat.line('world','the rig stands hitched at the home’s tongue — DRIVE and it all travels');
+}
 restoreWorld();
 updateWorldUI();
 dressWorld().then(t=>{chat.line('world','the living ground answered — '+t+' imagery tiles, ways and buildings · imagery © Esri · ways © OpenStreetMap');})

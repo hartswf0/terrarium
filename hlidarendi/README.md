@@ -86,9 +86,18 @@ turn, climbing gets torque, walls answer with a bounce, JUMP leaps, and the
 ball answers the bumper with III's collision law — slow contact stows it in
 the bed instead. The camera is III's too: it PANS — you keep whatever angle
 and distance you choose, the world slides under it, the LOOK stick re-aims.
-Walk to the rig and DRIVE (or E); the driver IS the hero root, so the
-camera, the labels, the striker and the dog's whole perception follow the
-wheel with no further hooks. Bring it within reach of the home's south
+The driving eye falls in BEHIND the nose whenever the rig is rolling — the
+road ahead is always the road on screen — while keeping the distance and
+height you choose; the LOOK stick re-aims and re-frames it, and letting go
+lets the eye swing back. Towing, it climbs and rides off the shoulder so
+the load never becomes the view. **The household starts coupled**: the rig
+stands at the home's north tongue, nose to the open land, already hitched —
+take the wheel and the whole dwelling comes with you. (The trailer keeps
+its bearing on the skids rather than swinging in behind the rig; its
+collision boxes, door and plan stay exactly true that way.) Walk to the rig
+and DRIVE (or E); the driver IS the hero root, so the camera, the labels,
+the striker and the dog's whole perception follow the wheel with no further
+hooks. Bring it within reach of the home's south
 tongue — the amber mark lights when you're close — and HITCH: the WHOLE
 dwelling rides one offset behind the rig; DROP sets it down and the land
 levels under the new site. The hauled home rides the save. And the rig is
