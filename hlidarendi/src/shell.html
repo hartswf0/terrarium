@@ -202,9 +202,17 @@ body #readout{background:var(--panel)!important;color:var(--dim)!important;borde
   border:1px solid var(--edge);border-radius:7px;padding:7px 9px;min-width:0}
 #agentSay:focus{outline:none;border-color:#6d5aa8}
 #agentGo{flex:0 0 auto;width:34px;border-radius:50%;border:none;background:var(--red);color:#fff;font-size:13px;cursor:pointer}
-#modeBtn,#logBtn{flex:0 0 auto;width:30px;height:34px;border:none;background:transparent;color:var(--dim);font-size:14px;cursor:pointer}
+#modeBtn,#logBtn,#barMin{flex:0 0 auto;width:30px;height:34px;border:none;background:transparent;color:var(--dim);font-size:14px;cursor:pointer}
 #modeBtn.on{color:var(--red)}
 body.log-open #logBtn{color:var(--teal);transform:rotate(180deg)}
+/* the line folds to a lightning chip, top-left, out of the world's way */
+#barChip{display:none;position:fixed;top:52px;left:8px;z-index:30;width:42px;height:42px;
+  align-items:center;justify-content:center;font-size:17px;cursor:pointer;
+  background:var(--panel);color:var(--red);border:1px solid var(--edge);border-radius:10px!important}
+body.bar-min #agentBar,body.bar-min #chatWrap{display:none!important}
+body.bar-min #barChip{display:flex}
+/* the drive stick is FOR EVERYONE: the deck instrument stands on desktop too */
+#navLayer{display:block}
 #agentStatus{margin-top:5px;font:10px/1.3 "IBM Plex Mono",monospace;letter-spacing:.06em;color:var(--dim);text-align:center;cursor:pointer}
 /* the log — the dog's and the world's words, folded under the one line */
 body #chatWrap{position:fixed!important;z-index:29;top:122px!important;bottom:auto!important;left:50%!important;transform:translateX(-50%);width:min(92vw,560px)!important;display:none!important}
@@ -344,10 +352,12 @@ body #headDock .joy{background:rgba(10,14,17,.6)!important}
     <form id="agentForm"><input id="agentSay" placeholder="speak — words reach the dog and the terrarium · /help" autocomplete="off" autocapitalize="off"><button id="agentGo" type="submit">➤</button></form>
     <button id="modeBtn" type="button" aria-label="agent mode">🗲</button>
     <button id="logBtn" type="button" aria-label="log">▾</button>
+    <button id="barMin" type="button" aria-label="minimize the line">—</button>
   </div>
   <div id="agentStatus">● AI OFF · stand-ins · tap to configure</div>
 </div>
 <div id="chatWrap"><div id="chatLog"></div></div>
+<button id="barChip" aria-label="open the line">🗲</button>
 <div id="readout">PUPPET · LOCK</div>
 <div id="tiltViz"><span id="tiltDot"></span><b id="tiltState">OFF</b></div>
 <div id="viewerAim"></div>
@@ -375,6 +385,8 @@ body #headDock .joy{background:rgba(10,14,17,.6)!important}
     <div class="tb-group"><button class="tb-toggle" data-target="tb-play">PLAY</button>
       <div id="tb-play" class="tb-items collapsed">
         <button class="bbtn plain" id="strikerBtn">PLAY</button>
+        <button class="bbtn" id="golfBtn"><span class="lab">GOLF</span><span class="sub">THE PIN</span></button>
+        <button class="bbtn" id="ctfBtn"><span class="lab">CTF</span><span class="sub">THE FLAG</span></button>
       </div></div>
     <div class="tb-group"><button class="tb-toggle" data-target="tb-say">SAY</button>
       <div id="tb-say" class="tb-items collapsed">

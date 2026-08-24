@@ -409,11 +409,13 @@ const STANDINS={
   gate:"function build(w,WG,THREE){var wd=WG.matte(0x8b7355,.9);var p1=WG.box(.3,2.6,.3,wd);WG.put(p1,-1.1,1.3,0);WG.solid(p1,.3,2.6,.3);var p2=WG.box(.3,2.6,.3,wd);WG.put(p2,1.1,1.3,0);WG.solid(p2,.3,2.6,.3);var l=WG.box(2.9,.28,.34,wd);WG.put(l,0,2.72,0);WG.solid(l,2.9,.28,.34);var l2=WG.box(3.3,.2,.3,wd);WG.put(l2,0,3.05,0);return w}",
   tower:"function build(w,WG,THREE){var st=WG.matte(0x8a8880,.95),wd=WG.matte(0x8b7355,.9);for(var i=0;i<4;i++){var s=1.6-.22*i,b=WG.box(s,.9,s,st);WG.put(b,0,.45+i*.9,0);WG.solid(b,s,.9,s)}var d=WG.box(1.3,.14,1.3,wd);WG.put(d,0,3.75,0);WG.solid(d,1.3,.14,1.3);for(var k=0;k<4;k++){var px=(k%2?1:-1)*.55,pz=(k<2?1:-1)*.55,po=WG.box(.12,.7,.12,wd);WG.put(po,px,4.15,pz);WG.solid(po,.12,.7,.12)}var r=WG.cone(1.05,.8,WG.matte(0x6b6257,.8),4);WG.put(r,0,4.9,0,.785);return w}",
   sheepfold:"function build(w,WG,THREE){var st=WG.matte(0x8a8880,.95),R=WG.rand(3);for(var i=0;i<14;i++){var a=.4+i/14*5.2,x=Math.cos(a)*2.6,z=Math.sin(a)*2.6,b=WG.box(.6,.75+R()*.2,.35,st);WG.put(b,x,.4,z,-a);WG.solid(b,.6,.9,.35)}return w}",
-  beacon:"function build(w,WG,THREE){var st=WG.matte(0x8a8880,.95);var b=WG.box(1,.5,1,st);WG.put(b,0,.25,0);WG.solid(b,1,.5,1);var p=WG.cyl(.09,2.6,WG.matte(0x8b7355,.9));WG.put(p,0,1.8,0);WG.solid(p,.2,2.6,.2);var l=WG.sphere(.22,WG.lit(0xffd75e,1.4));WG.put(l,0,3.2,0);return w}"
+  beacon:"function build(w,WG,THREE){var st=WG.matte(0x8a8880,.95);var b=WG.box(1,.5,1,st);WG.put(b,0,.25,0);WG.solid(b,1,.5,1);var p=WG.cyl(.09,2.6,WG.matte(0x8b7355,.9));WG.put(p,0,1.8,0);WG.solid(p,.2,2.6,.2);var l=WG.sphere(.22,WG.lit(0xffd75e,1.4));WG.put(l,0,3.2,0);return w}",
+  trailer:"function build(w,WG,THREE){var sd=WG.matte(0xd8d5cc,.9),wd=WG.matte(0x8b7355,.9),mt=WG.matte(0x9aa0a4,.6),dk=WG.matte(0x1e2226,.9);var f=WG.box(2.6,.22,6.2,wd);WG.put(f,0,.5,0);WG.solid(f,2.6,.22,6.2);var wl=WG.box(.14,2.2,6.2,sd);WG.put(wl,-1.23,1.71,0);WG.solid(wl,.14,2.2,6.2);var wr1=WG.box(.14,2.2,2.4,sd);WG.put(wr1,1.23,1.71,-1.9);WG.solid(wr1,.14,2.2,2.4);var wr2=WG.box(.14,2.2,2.4,sd);WG.put(wr2,1.23,1.71,1.9);WG.solid(wr2,.14,2.2,2.4);var wf=WG.box(2.6,2.2,.14,sd);WG.put(wf,0,1.71,-3.03);WG.solid(wf,2.6,2.2,.14);var wb=WG.box(2.6,2.2,.14,sd);WG.put(wb,0,1.71,3.03);WG.solid(wb,2.6,2.2,.14);var li=WG.box(.14,.5,1.4,sd);WG.put(li,1.23,2.56,0);var r=WG.box(2.9,.12,6.6,mt);WG.put(r,0,2.92,0);WG.solid(r,2.9,.12,6.6);var w1=WG.box(.3,.8,.8,dk);WG.put(w1,-1.35,.4,1.6);var w2=WG.box(.3,.8,.8,dk);WG.put(w2,1.35,.4,1.6);var s1=WG.box(1.1,.18,.5,wd);WG.put(s1,1.75,.32,0);WG.solid(s1,1.1,.18,.5);return w}"
 };
 function standinFor(prompt){
   const p=String(prompt||'').toLowerCase();
   for(const k of Object.keys(STANDINS))if(p.includes(k))return k;
+  if(/caravan|home|cabin|hut|shed|house|dwell/.test(p))return 'trailer';
   if(/wall|fence|fold|pen/.test(p))return 'sheepfold';
   if(/gate|arch|door/.test(p))return 'gate';
   if(/tower|watch|fort|keep/.test(p))return 'tower';
@@ -435,6 +437,9 @@ async function askForgeAI(prompt){
   return m?m[0]:null;
 }
 async function buildFromWords(prompt){
+  // a vehicle is not a statue: ask for one and a DRIVABLE rig rolls off the line
+  if(/\b(car|truck|rig|vehicle|van|jeep|buggy|lorry|pickup)\b/i.test(String(prompt||'')))
+    return spawnVehicle();
   const fwd=rotateLocalY(new THREE.Vector3(0,0,1),locomotion.heading);
   const at={x:locomotion.root.x+fwd.x*5,z:locomotion.root.z+fwd.z*5};
   let code=null,via='stand-in';
@@ -476,18 +481,108 @@ const STRIKER={on:false,heroGoal:null,dogGoal:null,score:[0,0],rings:[],
       const cx=TR.x-5;ball.p.set(cx,PLACE.heightAt(cx,TR.z)+ball.r,TR.z);ball.v.set(0,0,0)}
   }
 };
+// ============================================================================
+// GAMES — the standing world's sports, played with the bodies that live here.
+// STRIKER is the dog's game; GOLF is the land's; CTF is played against the
+// bond itself: Argos chases whoever runs, and the flag carrier runs.
+// ============================================================================
+const GAMES={mode:null,strokes:0,captures:0,steals:0,_stealCool:0,carrying:false,
+  flag:null,hole:null,
+  _mkFlag(c){const g=new THREE.Group();
+    const pole=new THREE.Mesh(new THREE.CylinderGeometry(.05,.05,3.4,10),new THREE.MeshStandardMaterial({color:0x8b7355,roughness:.9}));
+    pole.position.y=1.7;g.add(pole);
+    const cloth=new THREE.Mesh(new THREE.PlaneGeometry(1.1,.62),new THREE.MeshStandardMaterial({color:c,roughness:.7,side:THREE.DoubleSide}));
+    cloth.position.set(.56,3.0,0);g.add(cloth);scene.add(g);return g},
+  _spot(minD,maxD){const a=Math.random()*Math.PI*2,d=minD+Math.random()*(maxD-minD);
+    const x=locomotion.root.x+Math.sin(a)*d,z=locomotion.root.z+Math.cos(a)*d;
+    return{x,z,y:terrainH(x,z)}},
+  start(mode){
+    if(this.mode)this.end(true);
+    this.mode=mode;
+    if(mode==='golf'){
+      this.strokes=0;
+      const s=this._spot(55,95);
+      this.hole=this.hole||this._mkFlag(0xd29a3a);
+      this.hole.position.set(s.x,s.y,s.z);this.hole.visible=true;
+      if(ball.state==='dog')return chat.line('world','Argos holds the ball — his choice. Win it back first.');
+      chat.line('world','GOLF — the pin stands '+Math.hypot(s.x-locomotion.root.x,s.z-locomotion.root.z).toFixed(0)+' m out. Kicks, throws and launches all count as strokes.');
+    }else if(mode==='ctf'){
+      this.captures=0;this.steals=0;this.carrying=false;this._stealCool=0;
+      const s=this._spot(60,100);
+      this.flag=this.flag||this._mkFlag(0xc0392b);
+      this.flag.position.set(s.x,s.y,s.z);this.flag.visible=true;
+      chat.line('world','CAPTURE THE FLAG — it stands far out. Bring it home to the door. Argos hunts the carrier.');
+    }
+  },
+  end(quiet){
+    if(this.hole)this.hole.visible=false;
+    if(this.flag)this.flag.visible=false;
+    if(!quiet&&this.mode)chat.line('world',this.mode.toUpperCase()+' over — '+(this.mode==='golf'?this.strokes+' strokes':this.captures+' capture'+(this.captures===1?'':'s')+', '+this.steals+' steal'+(this.steals===1?'':'s')+' by Argos'));
+    this.mode=null;this.carrying=false;
+  },
+  stroke(){if(this.mode==='golf')this.strokes++},
+  step(dt){
+    if(!this.mode)return;
+    const r=locomotion.root;
+    if(this.mode==='golf'&&this.hole){
+      const d=Math.hypot(ball.p.x-this.hole.position.x,ball.p.z-this.hole.position.z);
+      if(ball.state==='free'&&d<1.25&&ball.v.lengthSq()<.6){
+        chat.line('world','⛳ HOLED in '+this.strokes+' stroke'+(this.strokes===1?'':'s')+' — the land keeps the score');
+        buzz('holed',[20,40,20],800);this.end(true);this.mode=null;
+      }
+    }else if(this.mode==='ctf'&&this.flag){
+      this._stealCool=Math.max(0,this._stealCool-dt);
+      if(!this.carrying){
+        if(Math.hypot(r.x-this.flag.position.x,r.z-this.flag.position.z)<2.2){
+          this.carrying=true;buzz('flag',[10,26,10],500);
+          chat.line('world','you carry the flag — run it home. Argos is coming.');
+        }
+      }else{
+        // the flag rides the carrier — on foot or at the wheel
+        this.flag.position.set(r.x,r.y+(TRUCK.on?2.9:2.3),r.z);
+        const d=argos.world.dog,dd=Math.hypot(d[0]-r.x,d[2]-r.z);
+        const chasing=argos.mind.winner==='FOLLOW'||argos.mind.winner==='FETCH';
+        if(!TRUCK.on&&dd<1.15&&chasing&&this._stealCool<=0){
+          this.carrying=false;this.steals++;this._stealCool=6;
+          this.flag.position.set(r.x,terrainH(r.x,r.z),r.z);
+          chat.line('dog','ARGOS STRIPS THE FLAG — he stands over it');buzz('steal',[18,30,18],600);
+        }else if(Math.hypot(r.x-DOOR.x,r.z-(DOOR.z0+DOOR.z1)/2)<6){
+          this.captures++;this.carrying=false;
+          chat.line('world','🚩 CAPTURED — '+this.captures+' home. A new flag stands.');
+          buzz('capture',[20,40,20],800);
+          const s=this._spot(60,100);this.flag.position.set(s.x,s.y,s.z);
+        }
+      }
+    }
+  }
+};
 // kicking is always on: run into the ball and it goes — and the rig's bumper
 // is a bigger boot than any foot
 function stepKick(){
   if(ball.state!=='free')return;
   const d=Math.hypot(ball.p.x-locomotion.root.x,ball.p.z-locomotion.root.z);
   const reach=TRUCK.on?1.45:.48;
+  if(TRUCK.on&&explorer.speed<=5)return; // gentle rolling stows the ball instead
   if(d<reach&&explorer.speed>.6){
     const dir=rotateLocalY(new THREE.Vector3(0,0,1),locomotion.heading);
     const k=TRUCK.on?1.6:1;
     ball.v.set(dir.x*(1.6+explorer.speed*.9)*k,1.1+explorer.speed*.25,dir.z*(1.6+explorer.speed*.9)*k);
+    GAMES.stroke();
     buzz('kick',[10,20,8],350);
   }
+}
+// FIRE at the wheel: the bed launches its ball down the road — and Argos runs
+function launchBall(){
+  if(ball.state!=='rig')return false;
+  const dx=Math.sin(TRUCK.yaw),dz=Math.cos(TRUCK.yaw);
+  ball.state='free';
+  ball.p.set(TRUCK.x+dx*2.8,TRUCK.group.position.y+1.5,TRUCK.z+dz*2.8);
+  const sp=Math.abs(TRUCK.speed);
+  ball.v.set(dx*(7+sp*.9),3.2,dz*(7+sp*.9));
+  GAMES.stroke();
+  buzz('launch',[14,30,12],500);
+  try{argos.say('fetch the ball')}catch(e){}
+  return true;
 }
 // ============================================================================
 // THE RIG — Thunder Rigs' gift to the hillside: a truck. Board it and the
@@ -495,19 +590,20 @@ function stepKick(){
 // striker and the dog's whole perception follow the wheel with zero extra
 // hooks. Back it to the home's south end and the dwelling itself can travel.
 // ============================================================================
-const TRUCK={x:TR0.x-8.5,z:TR0.z+7.5,yaw:Math.PI*.55,speed:0,on:false,hitched:false,group:null,wheels:[]};
-{
+const TRUCK={x:TR0.x-8.5,z:TR0.z+7.5,yaw:Math.PI*.55,speed:0,on:false,hitched:false,group:null,wheels:[],driver:null};
+function makeTruckBody(color){
   const g=new THREE.Group();g.name='RIG.TRUCK';
-  const paint=new THREE.MeshStandardMaterial({color:0xb95d18,roughness:.55,metalness:.2});
+  const paint=new THREE.MeshStandardMaterial({color:color||0xb95d18,roughness:.55,metalness:.2});
   const dark=new THREE.MeshStandardMaterial({color:0x1e2226,roughness:.9});
   const glassM=new THREE.MeshStandardMaterial({color:0x9fc4cc,roughness:.25,metalness:.1,transparent:true,opacity:.5});
   const bed=new THREE.Mesh(new THREE.BoxGeometry(1.9,.5,4.5),paint);bed.position.y=.92;g.add(bed);
   const cab=new THREE.Mesh(new THREE.BoxGeometry(1.78,.72,1.7),paint);cab.position.set(0,1.5,.85);g.add(cab);
   const win=new THREE.Mesh(new THREE.BoxGeometry(1.6,.46,1.55),glassM);win.position.set(0,1.58,.85);g.add(win);
   const grill=new THREE.Mesh(new THREE.BoxGeometry(1.7,.34,.2),dark);grill.position.set(0,.78,2.3);g.add(grill);
+  const wheels=[];
   for(const [wx,wz] of [[-.98,1.5],[.98,1.5],[-.98,-1.5],[.98,-1.5]]){
     const w=new THREE.Mesh(new THREE.CylinderGeometry(.44,.44,.36,14),dark);
-    w.geometry.rotateZ(Math.PI/2);w.position.set(wx,.44,wz);g.add(w);TRUCK.wheels.push(w);
+    w.geometry.rotateZ(Math.PI/2);w.position.set(wx,.44,wz);g.add(w);wheels.push(w);
   }
   // the driver is seen at the wheel — a silhouette, present only when boarded
   const drv=new THREE.Group();
@@ -515,8 +611,43 @@ const TRUCK={x:TR0.x-8.5,z:TR0.z+7.5,yaw:Math.PI*.55,speed:0,on:false,hitched:fa
   torso.position.y=.28;drv.add(torso);
   const head=new THREE.Mesh(new THREE.SphereGeometry(.13,12,10),new THREE.MeshStandardMaterial({color:0x111214,roughness:1}));
   head.position.y=.66;drv.add(head);
-  drv.position.set(0,1.28,.72);drv.visible=false;g.add(drv);TRUCK.driver=drv;
-  scene.add(g);TRUCK.group=g;
+  drv.position.set(0,1.28,.72);drv.visible=false;g.add(drv);
+  scene.add(g);
+  return{group:g,wheels,driver:drv};
+}
+{const b=makeTruckBody(0xb95d18);TRUCK.group=b.group;TRUCK.wheels=b.wheels;TRUCK.driver=b.driver}
+// THE FLEET — rigs summoned by words stand parked until you take one. Only
+// one rig is ever driven; boarding a parked one exchanges bodies with it.
+const FLEET=[];
+const RIG_COLORS=[0x2d6f8e,0x596650,0x8e2d3c,0xd29a3a,0x4a4f55];
+function poseFleetRig(r){
+  const dirx=Math.sin(r.yaw),dirz=Math.cos(r.yaw),sx=Math.cos(r.yaw),sz=-Math.sin(r.yaw);
+  const hF=terrainH(r.x+dirx*1.5,r.z+dirz*1.5),hB=terrainH(r.x-dirx*1.5,r.z-dirz*1.5);
+  const hL=terrainH(r.x+sx*.95,r.z+sz*.95),hR=terrainH(r.x-sx*.95,r.z-sz*.95);
+  r.group.position.set(r.x,(hF+hB+hL+hR)/4,r.z);
+  r.group.rotation.set(0,r.yaw,0);
+  r.group.rotateX(Math.atan2(hB-hF,3.0)*.85);r.group.rotateZ(Math.atan2(hR-hL,1.9)*.85);
+}
+function spawnVehicle(){
+  if(FLEET.length>=5){chat.line('world','the yard holds five rigs already — drive one');return false}
+  const fwd=rotateLocalY(new THREE.Vector3(0,0,1),locomotion.heading);
+  const x=locomotion.root.x+fwd.x*6.5,z=locomotion.root.z+fwd.z*6.5;
+  const b=makeTruckBody(RIG_COLORS[FLEET.length%RIG_COLORS.length]);
+  const r={x,z,yaw:locomotion.heading+Math.PI*.5,group:b.group,wheels:b.wheels,driver:b.driver,steerVis:0};
+  FLEET.push(r);poseFleetRig(r);
+  chat.line('world','a rig rolls off the line and stands ahead — walk to it and DRIVE');
+  return true;
+}
+function nearestRig(){
+  let best=TRUCK,bd=Math.hypot(TRUCK.x-locomotion.root.x,TRUCK.z-locomotion.root.z);
+  for(const f of FLEET){const d=Math.hypot(f.x-locomotion.root.x,f.z-locomotion.root.z);if(d<bd){bd=d;best=f}}
+  return{best,bd};
+}
+function adoptRig(f){ // exchange bodies: the fleet rig becomes THE rig, the old one parks
+  const keep={x:TRUCK.x,z:TRUCK.z,yaw:TRUCK.yaw,group:TRUCK.group,wheels:TRUCK.wheels,driver:TRUCK.driver,steerVis:TRUCK.steerVis||0};
+  TRUCK.x=f.x;TRUCK.z=f.z;TRUCK.yaw=f.yaw;TRUCK.group=f.group;TRUCK.wheels=f.wheels;TRUCK.driver=f.driver;TRUCK.steerVis=f.steerVis||0;
+  f.x=keep.x;f.z=keep.z;f.yaw=keep.yaw;f.group=keep.group;f.wheels=keep.wheels;f.driver=keep.driver;f.steerVis=keep.steerVis;
+  poseFleetRig(f);
 }
 function truckPlace(){
   // the rig sits ON the hill, not level above it: four wheel samples give
@@ -538,6 +669,9 @@ function truckJump(){
 }
 function boardTruck(){
   if(TRUCK.on)return;
+  const {best,bd}=nearestRig();
+  if(bd>3.4)return;
+  if(best!==TRUCK)adoptRig(best);
   TRUCK.on=true;TRUCK.speed=0;document.body.classList.add('driving');
   if(TRUCK.driver)TRUCK.driver.visible=true;
   rig.mesh.visible=false;rig.outline.visible=false;support.visible=false;
@@ -574,6 +708,17 @@ function unhitchTrailer(){
   chat.line('world','the home stands here now — the land levels under it');
 }
 function truckStep(dt){
+  for(const f of FLEET)poseFleetRig(f);
+  GAMES.step(dt);
+  // the ball rides the rig: roll gently over it and the bed takes it
+  if(ball.state==='rig'){
+    const dx=Math.sin(TRUCK.yaw),dz=Math.cos(TRUCK.yaw);
+    ball.p.set(TRUCK.x-dx*1.1,TRUCK.group.position.y+1.35,TRUCK.z-dz*1.1);ball.v.set(0,0,0);
+  }else if(TRUCK.on&&ball.state==='free'&&Math.abs(TRUCK.speed)<5&&Math.abs(TRUCK.speed)>.3){
+    if(Math.hypot(ball.p.x-TRUCK.x,ball.p.z-TRUCK.z)<1.7){
+      ball.state='rig';buzz('stow',[8,18,8],500);chat.line('world','the bed takes the ball — FIRE launches it');
+    }
+  }
   if(!TRUCK.on){truckPlace();return}
   const K=explorer.keys;let st=0,th=0;
   if(explorer.touchMoveMag>.03){st=explorer.touchMove.x;th=explorer.touchMove.y}
@@ -737,7 +882,7 @@ function throwBall(){
   rig.mesh.updateMatrixWorld(true);
   ball.state='free';ball.p.copy(rig.by.rightHand.getWorldPosition(new THREE.Vector3()));
   const dir=rotateLocalY(new THREE.Vector3(0,0,1),locomotion.heading);
-  ball.v.set(dir.x*4.0,2.6,dir.z*4.0);buzz('throw',[12,26,10],400);
+  ball.v.set(dir.x*4.0,2.6,dir.z*4.0);GAMES.stroke();buzz('throw',[12,26,10],400);
   try{argos.say('fetch the ball')}catch(e){}
   return true;
 }
@@ -776,9 +921,11 @@ function worldStep(dt){
 function updateWorldUI(){
   const bb=$('#ballBtn'),fb=$('#feedBtn');if(!bb)return;
   const d=Math.hypot(ball.p.x-locomotion.root.x,ball.p.z-locomotion.root.z);
-  bb.textContent=ball.state==='hero'?'THROW':ball.state==='dog'?'ARGOS':(d<=1.35?'TAKE':'FIRE');
+  bb.textContent=ball.state==='hero'?'THROW':ball.state==='dog'?'ARGOS':ball.state==='rig'?'LAUNCH':(d<=1.35?'TAKE':'FIRE');
   const sb2=$('#strikerBtn');if(sb2){sb2.textContent=STRIKER.on?'END':'PLAY';sb2.classList.toggle('on',STRIKER.on)}
-  bb.classList.toggle('on',ball.state==='hero'||(ball.state==='free'&&d<=1.35));
+  $('#golfBtn')?.classList.toggle('on',GAMES.mode==='golf');
+  $('#ctfBtn')?.classList.toggle('on',GAMES.mode==='ctf');
+  bb.classList.toggle('on',ball.state==='hero'||ball.state==='rig'||(ball.state==='free'&&d<=1.35));
   if(fb){const bd=Math.hypot(bowl.p.x-locomotion.root.x,bowl.p.z-locomotion.root.z);
     fb.textContent=bowl.food?'FED':'FEED';fb.classList.toggle('on',!bowl.food&&bd<=1.5)}
 }
@@ -2343,7 +2490,7 @@ function saveWorld(){
   const rec={format:'hlidarendi.save/1',t:Date.now(),
     hero:{x:locomotion.root.x,z:locomotion.root.z,heading:locomotion.heading},
     argos:argos.serialize(),
-    ball:{state:ball.state==='hero'?'free':ball.state,p:[ball.p.x,ball.p.y,ball.p.z],v:[ball.v.x,ball.v.y,ball.v.z]},
+    ball:{state:(ball.state==='hero'||ball.state==='rig')?'free':ball.state,p:[ball.p.x,ball.p.y,ball.p.z],v:[ball.v.x,ball.v.y,ball.v.z]},
     bowl:{food:bowl.food,meal:bowl.meal},weather:WEATHER.current,
     bond:BOND.v,
     truck:{x:TRUCK.x,z:TRUCK.z,yaw:TRUCK.yaw,hitched:TRUCK.hitched},
@@ -2390,7 +2537,14 @@ const chat={
     if(who==='world'&&/closed|refus|failed|cannot|error/i.test(text)&&!document.body.classList.contains('diag-open'))
       $('#menuFab')?.classList.add('live');
     const log=$('#chatLog');if(!log)return;
+    // the same word again is one line growing, not a wall: WOOF ×8
+    const last=log.lastElementChild;
+    if(last&&last.dataset.who===who&&last.dataset.raw===text){
+      const n=(+last.dataset.n||1)+1;last.dataset.n=n;last.textContent=text+' ×'+n;
+      log.scrollTop=log.scrollHeight;return;
+    }
     const el=document.createElement('div');el.className='line '+who;el.textContent=text;
+    el.dataset.who=who;el.dataset.raw=text;
     log.appendChild(el);while(log.children.length>28)log.removeChild(log.firstChild);
     log.scrollTop=log.scrollHeight;
   },
@@ -2406,6 +2560,16 @@ const chat={
       else if(cmd==='feed')r=feedBowl()?'the bowl is full':'stand by the bowl first (or it is already full)';
       else if(cmd==='ball')r=ball.state==='hero'?(throwBall()?'thrown':'…'):(takeBall()?'you have the ball':'the ball is not at hand');
       else if(cmd==='door')r='door.entry — wall W, plan 72..108, the only way in';
+      else if(cmd==='golf'){GAMES.mode==='golf'?GAMES.end():GAMES.start('golf');r=null}
+      else if(cmd==='ctf'){GAMES.mode==='ctf'?GAMES.end():GAMES.start('ctf');r=null}
+      else if(cmd==='deed'){const nm=text.slice(6).trim();
+        if(!nm)r='say: /deed <a name for this land>';
+        else if(!TERRAIN.geo)r='this land has no registration to keep';
+        else{try{const ds=JSON.parse(localStorage.getItem('hlidarendi.deeds')||'[]');
+          ds.push({name:nm.slice(0,28),lat:TERRAIN.geo.lat,lon:TERRAIN.geo.lon});
+          localStorage.setItem('hlidarendi.deeds',JSON.stringify(ds.slice(-12)));
+          window.__renderDeeds?.();r='▲ the deed is kept — "'+nm.slice(0,28)+'" stands in the land list'}
+        catch(e){r='the deed could not be kept'}}}
       else if(cmd==='build'){const p2=text.slice(6).trim()||'cairn';buildFromWords(p2);r='forging "'+p2+'" on the land ahead…'}
       else if(cmd==='striker')r=STRIKER.toggle()?'STRIKER — first to score; run into the ball to kick; Argos plays for himself':'match over — '+STRIKER.score[0]+' : '+STRIKER.score[1];
       else if(cmd==='goto'){const m2=text.match(/goto\s+(-?[\d.]+)[ ,]+(-?[\d.]+)/);
@@ -2422,7 +2586,7 @@ const chat={
         else{try{localStorage.setItem('hlidarendi.ai.key',k2)}catch(e){}r='agent line configured — /build speaks to Claude now'}window.__refreshAI?.()}
       else if(WEATHER.presets[cmd])r=WEATHER.set(cmd)?('the sky turns — '+cmd):'…';
       else if(cmd==='forget'){try{localStorage.removeItem('hlidarendi.v1')}catch(e){}r='forgotten — next visit starts fresh'}
-      else if(cmd==='help')r='/build <words> /striker /place <name> /goto <lat> <lon> /ai <key|off> · /save /reset /feed /ball /door /forget · sky: /dawn /day /dusk /night /fog /rain · the RIG: walk to the truck, DRIVE (or E) — back it to the home’s tongue and HITCH to haul';
+      else if(cmd==='help')r='/build <words> (a tower, a trailer, a truck…) · games: /striker /golf /ctf · land: /place <name> /goto <lat> <lon> /deed <name> · /ai <key|off> /save /reset /feed /ball /forget · sky: /dawn /day /dusk /night /fog /rain · the RIG: DRIVE (or E), HITCH at the home’s tongue to haul, roll over the ball to stow it, FIRE launches';
       chat.line('world',r);updateWorldUI();return null;
     }
     let prog=null;
@@ -2462,16 +2626,30 @@ const on=(sel,fn)=>{const el=$(sel);if(el)el.onclick=fn};
     if(body.classList.contains('land-open'))enterPlay();
     else{body.classList.remove('play-mode','menu-open');body.classList.add('land-open')}
   });
-  document.querySelectorAll('#landMenu .land-item').forEach(b=>b.addEventListener('click',()=>{
+  $('#landMenu')?.addEventListener('click',e=>{
+    const b=e.target.closest('.land-item');if(!b)return;
     enterPlay();openLog();
     const k=b.dataset.land;
     if(b.dataset.lat)chat.say('/goto '+b.dataset.lat+' '+b.dataset.lon);
     else if(k==='place'){const i=$('#agentSay');if(i){i.value='/place ';i.focus()}}
     else if(k==='dress'){chat.line('world','calling on the living ground…');
       dressWorld().then(t=>chat.line('world','dressed — '+t+' tiles · imagery © Esri · ways © OpenStreetMap'))
-        .catch(e=>chat.line('world','the imagery line is closed here — '+String(e.message||e).slice(0,40)))}
+        .catch(e2=>chat.line('world','the imagery line is closed here — '+String(e2.message||e2).slice(0,40)))}
     else if(k==='save'){saveWorld();chat.line('world','the land is kept')}
-  }));
+  });
+  // deeds you keep yourself join the land list (/deed <name>)
+  window.__renderDeeds=()=>{
+    const menu=$('#landMenu');if(!menu)return;
+    menu.querySelectorAll('.land-item.deed').forEach(el=>el.remove());
+    let ds=[];try{ds=JSON.parse(localStorage.getItem('hlidarendi.deeds')||'[]')}catch(e){}
+    const anchor=menu.querySelector('[data-land="place"]');
+    for(const d2 of ds){
+      const el=document.createElement('button');el.className='land-item deed';
+      el.dataset.lat=d2.lat;el.dataset.lon=d2.lon;el.textContent='▲ '+d2.name+' — your deed';
+      menu.insertBefore(el,anchor);
+    }
+  };
+  window.__renderDeeds();
   // ● REC — the take is real: canvas capture through MediaRecorder, saved to
   // the player's files on stop. Honest about where the browser can't record.
   const rb=$('#recBtn');let mr=null,chunks=[];
@@ -2553,10 +2731,19 @@ const on=(sel,fn)=>{const el=$(sel);if(el)el.onclick=fn};
     const up=()=>{explorer.boostHold=false;bb2.classList.remove('on')};
     bb2.addEventListener('pointerdown',dn);bb2.addEventListener('pointerup',up);bb2.addEventListener('pointercancel',up);bb2.addEventListener('pointerleave',up)}
   on('#strikerBtn',()=>chat.say('/striker'));
+  on('#golfBtn',()=>chat.say('/golf'));
+  on('#ctfBtn',()=>chat.say('/ctf'));
+  on('#barMin',()=>document.body.classList.add('bar-min'));
+  on('#barChip',()=>document.body.classList.remove('bar-min'));
 }
 on('#saveBtn',saveWorld);
 on('#ballBtn',()=>{
   if(ball.state==='hero')throwBall();
+  else if(ball.state==='rig'){
+    if(TRUCK.on)launchBall();
+    else if(Math.hypot(TRUCK.x-locomotion.root.x,TRUCK.z-locomotion.root.z)<2.4){ball.state='hero';buzz('take',8,300)}
+    else{openLog();chat.line('world','the ball rides the rig — drive, or fetch it from the bed')}
+  }
   else if(!takeBall()){
     // the tap always answers: the ball is his, or it is somewhere to walk to
     const d=Math.hypot(ball.p.x-locomotion.root.x,ball.p.z-locomotion.root.z);
@@ -2616,6 +2803,7 @@ window.HLIDARENDI={
   integration:INTEGRATION,
   save:saveWorld,restore:restoreWorld,takeBall,throwBall,feedBowl,placeHero,chat,
   forge:FORGE,build:buildFromWords,striker:STRIKER,goto:gotoPlace,ground:LIVING_GROUND,dress:dressWorld,
-  truck:TRUCK,rig:{board:boardTruck,exit:exitTruck,hitch:hitchTrailer,drop:unhitchTrailer},bond:BOND,trailerOffset:TRAILER,
+  truck:TRUCK,rig:{board:boardTruck,exit:exitTruck,hitch:hitchTrailer,drop:unhitchTrailer,spawn:spawnVehicle},fleet:FLEET,
+  games:GAMES,bond:BOND,trailerOffset:TRAILER,
   snapshot:()=>INTEGRATION.snapshot()
 };

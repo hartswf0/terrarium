@@ -68,6 +68,17 @@ the others store; FIRE takes/throws the ball, FEED fills the bowl at the
 galley, FILE keeps the situation across reloads. Argos decides for
 himself — a throw enters his world as evidence, not as a command.
 
+**THE GAMES** — the standing world's sports live here: **/striker** (the
+dog plays for himself), **/golf** (a pin stands 60–95 m out on the real
+terrain — kicks, throws and rig-launches all count as strokes), and
+**/ctf** (a flag far out; carry it home to the door while Argos hunts the
+carrier — he strips the flag if he catches you on foot). The ball rides
+the rig: roll gently over it and the bed takes it, FIRE launches it down
+the road for the dog to chase. Ask the AGENT for *a truck* and a drivable
+rig rolls off the line (up to five stand in the world; boarding a parked
+one exchanges bodies); ask for *a trailer* and a caravan shell stands.
+**/deed <name>** keeps the land under you in the ▲ list forever.
+
 **THE RIG** — Thunder Rigs' gift stands in the yard: a truck. Walk to it and
 DRIVE (or E) — the stick becomes the wheel, and because the driver IS the
 hero root, the camera, the labels, the striker and the dog's whole
