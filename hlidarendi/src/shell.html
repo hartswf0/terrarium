@@ -285,6 +285,9 @@ body.menu-open #deckR *{pointer-events:none!important}
 .ab.red{border-color:var(--red)!important;color:var(--red)!important}
 .ab.on{background:var(--red)!important;color:#fff!important}
 .ab.small{width:52px!important;height:52px!important;font-size:10px!important}
+#rigBtn{border-color:var(--amber)!important;color:var(--amber)!important}
+#rigBtn.on{background:var(--amber)!important;color:#1a1503!important}
+#hitchBtn{border-color:#8a6a22!important;color:var(--amber)!important}
 /* the log lines */
 body #chatLog{max-height:30vh;margin-bottom:0}
 body #chatLog .line{background:#151b20e8!important;border:1px solid var(--edge)!important;color:var(--txt)!important}
@@ -426,6 +429,8 @@ body #headDock .joy{background:rgba(10,14,17,.6)!important}
   </div>
 </div>
 <div id="actions">
+  <button class="ab small" id="hitchBtn" style="display:none">HITCH</button>
+  <button class="ab small" id="rigBtn" style="display:none">DRIVE</button>
   <button class="ab small" id="feedBtn">FEED</button>
   <button class="ab" id="jumpBtn">JUMP</button>
   <button class="ab teal" id="ballBtn">FIRE</button>

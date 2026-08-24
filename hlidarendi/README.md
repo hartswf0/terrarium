@@ -68,6 +68,21 @@ the others store; FIRE takes/throws the ball, FEED fills the bowl at the
 galley, FILE keeps the situation across reloads. Argos decides for
 himself — a throw enters his world as evidence, not as a command.
 
+**THE RIG** — Thunder Rigs' gift stands in the yard: a truck. Walk to it and
+DRIVE (or E) — the stick becomes the wheel, and because the driver IS the
+hero root, the camera, the labels, the striker and the dog's whole
+perception follow the wheel with no further hooks. Back it to the home's
+south tongue and HITCH: the WHOLE dwelling — rendered members, collision
+boxes, the door, the plan datum, the galley bowl — rides one offset behind
+the rig, skid-style; DROP sets it down and the land levels under the new
+site. The hauled home rides the save. **THE BOND** — companionship is
+accumulated history, never a meter: feeding, delivered fetches and time
+spent near him deepen it; what it buys is not obedience but a standing pull
+— the deeper the bond, the sharper his nose reads your scent, and when you
+range far he chooses, more and more often, to come. A new land (`/goto`,
+`/place`) arrives with his mind fresh — fatigue shed, spirits up, leaning
+FOLLOW — so he explores it with you instead of going back inside.
+
 **[hlidarendi.trig.json](hlidarendi.trig.json)** — the same trailer as a
 `thunder-rigs.cartridge/v1` for the real standing world. Open
 [unset-04-hartsoe-iii.html](https://hartswf0.github.io/terrarium/unset-04-hartsoe-iii.html),

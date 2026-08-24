@@ -70,13 +70,17 @@ function rawTerrain(x,z){
   const h00=TG[j0*n+i0],h10=TG[j0*n+i0+1],h01=TG[(j0+1)*n+i0],h11=TG[(j0+1)*n+i0+1];
   return (h00*(1-fx)+h10*fx)*(1-fz)+(h01*(1-fx)+h11*fx)*fz;
 }
+// the world's vertical datum is FIXED per land (set at boot and at /goto) so
+// hauling the home never re-datums everything standing on the ground.
+const PAD={datum:0};
 function terrainH(x,z){
   // the farmyard is levelled: blend the real hillside to a flat pad under home
   const rx=Math.max(0,Math.abs(x-TR.x)-4.0),rz=Math.max(0,Math.abs(z-TR.z)-5.5);
   const r=Math.hypot(rx,rz),t=clamp(r/7.0,0,1),mask=t*t*(3-2*t);
   const pad=rawTerrain(TR.x,TR.z);
-  return pad*(1-mask)+rawTerrain(x,z)*mask - pad; // datum: the pad is 0
+  return pad*(1-mask)+rawTerrain(x,z)*mask - PAD.datum;
 }
+PAD.datum=rawTerrain(TR.x,TR.z);
 // STRUCTURE — the element table lives in src/elements.js: ONE authority for the
 // standalone page and the thunder-rigs cartridge alike.
 const DOOR={id:DOOR_PLAN.id,wall:DOOR_PLAN.wall,from:DOOR_PLAN.from,to:DOOR_PLAN.to,
@@ -88,11 +92,30 @@ const SOLIDS=EL.map(e=>({id:e.id,kind:e.kind,
 for(const b of SOLIDS)b.climb=false; // furniture blocks; the floor is the floor
 const BLOCKERS=SOLIDS.filter(s=>s.kind==='wall'||s.kind==='glass'||s.kind==='fixture'||s.kind==='frame');
 const TOPS=SOLIDS.filter(s=>s.kind==='step');
+// ---- THE HOME CAN BE HAULED. One offset moves the WHOLE dwelling — the
+// rendered members, the collision boxes, the door, the plan datum — because
+// they all derive from the one element table. The boxes stay axis-aligned:
+// a towed home slides on its skids, keeping its bearing.
+const SOLIDS0=SOLIDS.map(s=>({min:s.min.slice(),max:s.max.slice()}));
+const DOOR0={x:DOOR.x,z0:DOOR.z0,z1:DOOR.z1};
+const TR0={x:TR.x,z:TR.z};
+const TRAILER={ox:0,oz:0,oy:0,moveBowl:null,group:null};
+function applyTrailerOffset(ox,oz,oy){
+  TRAILER.ox=ox;TRAILER.oz=oz;TRAILER.oy=oy;
+  TR.x=TR0.x+ox;TR.z=TR0.z+oz;
+  for(let i=0;i<SOLIDS.length;i++){const s=SOLIDS[i],o=SOLIDS0[i];
+    s.min[0]=o.min[0]+ox;s.max[0]=o.max[0]+ox;
+    s.min[1]=o.min[1]+oy;s.max[1]=o.max[1]+oy;
+    s.min[2]=o.min[2]+oz;s.max[2]=o.max[2]+oz;}
+  DOOR.x=DOOR0.x+ox;DOOR.z0=DOOR0.z0+oz;DOOR.z1=DOOR0.z1+oz;
+  if(TRAILER.group)TRAILER.group.position.set(ox,oy,oz);
+  if(TRAILER.moveBowl)TRAILER.moveBowl(ox,oz,oy);
+}
 function structSurface(x,z,forDog){
   const px=(x-TR.x)/IN+50.5,py=(z-TR.z)/IN+120;
   let base=null;
-  if(px>WT&&px<96.5&&py>4.5&&py<235.5)base=DECK;
-  else if(px>-0.5&&px<=WT&&py>72&&py<108)base=DECK; // door.entry threshold: the sill is part of the floor
+  if(px>WT&&px<96.5&&py>4.5&&py<235.5)base=DECK+TRAILER.oy;
+  else if(px>-0.5&&px<=WT&&py>72&&py<108)base=DECK+TRAILER.oy; // door.entry threshold: the sill is part of the floor
   else for(const t of TOPS)if(x>=t.min[0]&&x<=t.max[0]&&z>=t.min[2]&&z<=t.max[2]){base=t.max[1];break}
   return base;
 }
@@ -165,7 +188,8 @@ WORLD_BRIDGE.setPlace(PLACE);
 const worldGroup=new THREE.Group();scene.add(worldGroup);
 let terrainMesh=null;
 function buildTerrainMesh(){
-  if(terrainMesh){worldGroup.remove(terrainMesh);terrainMesh.geometry.dispose();terrainMesh.material.dispose()}
+  let keepMap=null;
+  if(terrainMesh){keepMap=terrainMesh.material.map||null;worldGroup.remove(terrainMesh);terrainMesh.geometry.dispose();terrainMesh.material.dispose()}
   const SZ=TERRAIN.n*TERRAIN.res*0.96,N=150,g=new THREE.PlaneGeometry(SZ,SZ,N,N);g.rotateX(-Math.PI/2);
   const cxOff=(TERRAIN.n/2-TERRAIN.cx)*TERRAIN.res,czOff=(TERRAIN.n/2-TERRAIN.cy)*TERRAIN.res;
   g.translate(cxOff,0,czOff);
@@ -185,6 +209,9 @@ function buildTerrainMesh(){
   g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.computeVertexNormals();
   terrainMesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,metalness:0}));
   terrainMesh.userData.SZ=SZ;terrainMesh.userData.cxOff=cxOff;terrainMesh.userData.czOff=czOff;
+  // a reshaped ground keeps its dressing: same land, same window, same texture
+  if(keepMap&&buildTerrainMesh._keepDress){const m=terrainMesh.material;m.map=keepMap;m.vertexColors=false;m.color.set(0xffffff);m.needsUpdate=true}
+  buildTerrainMesh._keepDress=false;
   worldGroup.add(terrainMesh);
 }
 buildTerrainMesh();
@@ -250,6 +277,8 @@ function memberGroup(lox,loy,loz,hix,hiy,hiz,kind){
   return 'in';
 }
 const structMeshes=[];
+const trailerGroup=new THREE.Group();trailerGroup.name='STRUCTURE.INGOLD';worldGroup.add(trailerGroup);
+TRAILER.group=trailerGroup;
 {
   const buckets={}; // group|material -> geometries
   const gAABB={};   // group -> world aabb
@@ -281,7 +310,7 @@ const structMeshes=[];
       roughness:mat==='steel'||mat==='corrugated_metal'?.55:.9,metalness:mat==='steel'?.35:0,
       transparent:true,opacity:glass?.45:1});
     const mesh=new THREE.Mesh(merged,material);
-    worldGroup.add(mesh);
+    trailerGroup.add(mesh);
     structMeshes.push({box:Object.assign({kind:grp==='in'?'interior':'wall'},gAABB[grp]),grp,mesh,baseOpacity:material.opacity});
   }
   // the steps are HLIDARENDI's own addition (EL) — the way in, rendered too
@@ -290,7 +319,7 @@ const structMeshes=[];
     const g=new THREE.BoxGeometry(b.max[0]-b.min[0],b.max[1]-b.min[1],b.max[2]-b.min[2]);
     const mesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0xb8ab91,roughness:.95}));
     mesh.position.set((b.min[0]+b.max[0])/2,(b.min[1]+b.max[1])/2,(b.min[2]+b.max[2])/2);
-    worldGroup.add(mesh);
+    trailerGroup.add(mesh);
   }
 }
 // walls between the camera and the hero become see-through; same elements, one truth
@@ -301,12 +330,12 @@ function updateStructFade(){
     let block=false;
     if(s.grp==='roof'){block=home}
     else if(home&&s.grp!=='in'){block=true}
-    else if(s.grp!=='in'&&s.box.max[1]>hero.y+.9){
+    else if(s.grp!=='in'&&s.box.max[1]+TRAILER.oy>hero.y+.9){
       for(let t=.12;t<.97;t+=.12){
         const x=lerp(cx,hero.x,t),z=lerp(cz,hero.z,t);
-        if(x>s.box.min[0]-.08&&x<s.box.max[0]+.08&&z>s.box.min[2]-.08&&z<s.box.max[2]+.08){
+        if(x>s.box.min[0]+TRAILER.ox-.08&&x<s.box.max[0]+TRAILER.ox+.08&&z>s.box.min[2]+TRAILER.oz-.08&&z<s.box.max[2]+TRAILER.oz+.08){
           const y=lerp(camera.position.y,hero.y+1.1,t);
-          if(y>s.box.min[1]&&y<s.box.max[1]){block=true;break}
+          if(y>s.box.min[1]+TRAILER.oy&&y<s.box.max[1]+TRAILER.oy){block=true;break}
         }
       }
     }
@@ -447,14 +476,112 @@ const STRIKER={on:false,heroGoal:null,dogGoal:null,score:[0,0],rings:[],
       const cx=TR.x-5;ball.p.set(cx,PLACE.heightAt(cx,TR.z)+ball.r,TR.z);ball.v.set(0,0,0)}
   }
 };
-// kicking is always on: run into the ball and it goes
+// kicking is always on: run into the ball and it goes — and the rig's bumper
+// is a bigger boot than any foot
 function stepKick(){
   if(ball.state!=='free')return;
   const d=Math.hypot(ball.p.x-locomotion.root.x,ball.p.z-locomotion.root.z);
-  if(d<.48&&explorer.speed>.6){
+  const reach=TRUCK.on?1.45:.48;
+  if(d<reach&&explorer.speed>.6){
     const dir=rotateLocalY(new THREE.Vector3(0,0,1),locomotion.heading);
-    ball.v.set(dir.x*(1.6+explorer.speed*.9),1.1+explorer.speed*.25,dir.z*(1.6+explorer.speed*.9));
+    const k=TRUCK.on?1.6:1;
+    ball.v.set(dir.x*(1.6+explorer.speed*.9)*k,1.1+explorer.speed*.25,dir.z*(1.6+explorer.speed*.9)*k);
     buzz('kick',[10,20,8],350);
+  }
+}
+// ============================================================================
+// THE RIG — Thunder Rigs' gift to the hillside: a truck. Board it and the
+// stick drives; the driver IS the hero root, so the camera, the labels, the
+// striker and the dog's whole perception follow the wheel with zero extra
+// hooks. Back it to the home's south end and the dwelling itself can travel.
+// ============================================================================
+const TRUCK={x:TR0.x-8.5,z:TR0.z+7.5,yaw:Math.PI*.55,speed:0,on:false,hitched:false,group:null,wheels:[]};
+{
+  const g=new THREE.Group();g.name='RIG.TRUCK';
+  const paint=new THREE.MeshStandardMaterial({color:0xb95d18,roughness:.55,metalness:.2});
+  const dark=new THREE.MeshStandardMaterial({color:0x1e2226,roughness:.9});
+  const glassM=new THREE.MeshStandardMaterial({color:0x9fc4cc,roughness:.25,metalness:.1,transparent:true,opacity:.5});
+  const bed=new THREE.Mesh(new THREE.BoxGeometry(1.9,.5,4.5),paint);bed.position.y=.92;g.add(bed);
+  const cab=new THREE.Mesh(new THREE.BoxGeometry(1.78,.72,1.7),paint);cab.position.set(0,1.5,.85);g.add(cab);
+  const win=new THREE.Mesh(new THREE.BoxGeometry(1.6,.46,1.55),glassM);win.position.set(0,1.58,.85);g.add(win);
+  const grill=new THREE.Mesh(new THREE.BoxGeometry(1.7,.34,.2),dark);grill.position.set(0,.78,2.3);g.add(grill);
+  for(const [wx,wz] of [[-.98,1.5],[.98,1.5],[-.98,-1.5],[.98,-1.5]]){
+    const w=new THREE.Mesh(new THREE.CylinderGeometry(.44,.44,.36,14),dark);
+    w.geometry.rotateZ(Math.PI/2);w.position.set(wx,.44,wz);g.add(w);TRUCK.wheels.push(w);
+  }
+  scene.add(g);TRUCK.group=g;
+}
+function truckPlace(){
+  const gy=terrainH(TRUCK.x,TRUCK.z);
+  TRUCK.group.position.set(TRUCK.x,gy,TRUCK.z);
+  TRUCK.group.rotation.y=TRUCK.yaw;
+}
+function truckRear(){const dx=Math.sin(TRUCK.yaw),dz=Math.cos(TRUCK.yaw);return{x:TRUCK.x-dx*2.9,z:TRUCK.z-dz*2.9}}
+function trailerHitchWorld(){return{x:TR.x,z:TR.z-3.05}} // the home's south tongue
+function boardTruck(){
+  if(TRUCK.on)return;
+  TRUCK.on=true;TRUCK.speed=0;document.body.classList.add('driving');
+  rig.mesh.visible=false;rig.outline.visible=false;support.visible=false;
+  window.__exitFreeCam?.();
+  placeHero(TRUCK.x,TRUCK.z,TRUCK.yaw);
+  buzz('board',10,300);chat.line('world','the rig takes you — the stick is the wheel now');
+}
+function exitTruck(){
+  if(!TRUCK.on)return;
+  TRUCK.on=false;TRUCK.speed=0;document.body.classList.remove('driving');
+  rig.mesh.visible=true;rig.outline.visible=true;support.visible=true;
+  const px2=Math.cos(TRUCK.yaw),pz2=-Math.sin(TRUCK.yaw);
+  placeHero(TRUCK.x+px2*1.9,TRUCK.z+pz2*1.9,TRUCK.yaw);
+  chat.line('world','you step down — the rig waits');
+}
+function hitchTrailer(){
+  if(!TRUCK.on||TRUCK.hitched)return false;
+  const r=truckRear(),h=trailerHitchWorld();
+  if(Math.hypot(r.x-h.x,r.z-h.z)>3.4){chat.line('world','back the rig to the home’s south tongue to hitch');return false}
+  TRUCK.hitched=true;buzz('hitch',[14,30,14],500);
+  chat.line('world','HITCHED — the home rides the rig. DROP to set it down.');
+  return true;
+}
+function unhitchTrailer(){
+  if(!TRUCK.hitched)return;
+  TRUCK.hitched=false;
+  // the pad levels itself under the new site; the dressing stays
+  buildTerrainMesh._keepDress=!!(terrainMesh&&terrainMesh.material.map);
+  buildTerrainMesh();
+  const oy=rawTerrain(TR.x,TR.z)-PAD.datum;
+  applyTrailerOffset(TRAILER.ox,TRAILER.oz,oy);
+  buzz('unhitch',[10,24,10],500);
+  chat.line('world','the home stands here now — the land levels under it');
+}
+function truckStep(dt){
+  if(!TRUCK.on){truckPlace();return}
+  const K=explorer.keys;let st=0,th=0;
+  if(explorer.touchMoveMag>.03){st=explorer.touchMove.x;th=explorer.touchMove.y}
+  else{th=((K.has('KeyW')||K.has('ArrowUp'))?1:0)-((K.has('KeyS')||K.has('ArrowDown'))?1:0);
+       st=((K.has('KeyD')||K.has('ArrowRight'))?1:0)-((K.has('KeyA')||K.has('ArrowLeft'))?1:0)}
+  const top=(explorer.boostHold?13.5:8.5)*(TRUCK.hitched?.6:1);
+  const target=th*(th<0?top*.4:top);
+  TRUCK.speed=lerp(TRUCK.speed,target,1-Math.exp(-dt*(Math.abs(target)>Math.abs(TRUCK.speed)?1.7:2.8)));
+  if(Math.abs(TRUCK.speed)>.15)TRUCK.yaw-=st*dt*1.5*clamp(Math.abs(TRUCK.speed)/3.2,.3,1)*Math.sign(TRUCK.speed);
+  const dx=Math.sin(TRUCK.yaw),dz=Math.cos(TRUCK.yaw);
+  // the hill has a say: climbing costs, descending feeds
+  const grade=(terrainH(TRUCK.x+dx*2.2,TRUCK.z+dz*2.2)-terrainH(TRUCK.x,TRUCK.z))/2.2;
+  TRUCK.speed-=grade*dt*6*Math.sign(TRUCK.speed||0);
+  const v=new THREE.Vector3(TRUCK.x+dx*TRUCK.speed*dt,0,TRUCK.z+dz*TRUCK.speed*dt);
+  const gy=terrainH(v.x,v.z);
+  PLACE.pushOutCircle(v,1.15,gy+.25,gy+1.7);
+  TRUCK.x=v.x;TRUCK.z=v.z;
+  for(const w of TRUCK.wheels)w.rotation.x+=TRUCK.speed*dt/.44;
+  truckPlace();
+  // the driver IS the root: camera, dog, labels, striker all read this
+  placeHero(TRUCK.x,TRUCK.z,TRUCK.yaw);
+  locomotion.heading=TRUCK.yaw;locomotion.headingGoal=TRUCK.yaw;
+  explorer.speed=Math.abs(TRUCK.speed);
+  if(TRUCK.hitched){
+    const r=truckRear();
+    const ox=r.x-TR0.x,oz=r.z-(TR0.z-3.05);
+    const oy=rawTerrain(TR0.x+ox,TR0.z+oz)-PAD.datum;
+    applyTrailerOffset(ox,oz,oy);
   }
 }
 // ---- LOCATIONS — call on the world landscape. Fetches the same public
@@ -481,9 +608,22 @@ async function gotoPlace(lat,lon){
   for(let j=0;j<N;j++)for(let i=0;i<N;i++)a[j*N+i]=H(wx0+i,wy0+j)-base;
   TG=a;TERRAIN.res=156543.03*Math.cos(lr)/n2;TERRAIN.cx=CX-wx0;TERRAIN.cy=CY-wy0;
   TERRAIN.geo={lat,lon,z,tx:x0,ty:y0,wx:wx0,wy:wy0};
+  // the household arrives together: home to origin, new datum, rig and dog
+  // in the yard, the ball at your feet — and a mind fresh for the new land
+  if(TRUCK.hitched)TRUCK.hitched=false;
+  applyTrailerOffset(0,0,0);
+  PAD.datum=rawTerrain(TR.x,TR.z);
   buildTerrainMesh();
   dressWorld().then(t=>chat.line('world','dressed — '+t+' tiles · © Esri · © OpenStreetMap')).catch(()=>{});
-  placeHero(0,0,locomotion.heading);argos.world.dog=[TR.x-2.1,0,TR.z-2.4];
+  placeHero(0,0,locomotion.heading);
+  argos.world.dog=[TR.x-2.1,0,TR.z-2.4];
+  TRUCK.x=TR.x-8.5;TRUCK.z=TR.z+7.5;TRUCK.speed=0;truckPlace();
+  if(ball.state!=='hero'){ball.state='free';ball.p.set(TR.x-4.2,terrainH(TR.x-4.2,TR.z-1)+ball.r,TR.z-1);ball.v.set(0,0,0)}
+  argos.world.carrying=false;
+  argos.mind.iv.fatigue=Math.min(argos.mind.iv.fatigue,.15);
+  argos.mind.iv.happiness=Math.max(argos.mind.iv.happiness||0,.7);
+  argos.mind.prefs.FOLLOW=Math.max(argos.mind.prefs.FOLLOW||0,.8);
+  argos.mind.prefs.SLEEP=-.4;
   return true;
 }
 // ---- WEATHER — the sky over Fljótshlíð. An environmental system of its own:
@@ -531,6 +671,11 @@ WEATHER.set('day');
 // ---- props: the ball and the bowl are entities of the one world
 const ball={state:'free',p:new THREE.Vector3(px2w(34),DECK+.055,py2w(146)),v:new THREE.Vector3(),r:.055};
 const bowl={p:new THREE.Vector3(px2w(66),DECK,py2w(102)),food:false,meal:0};
+{ // the galley travels with the home
+  const BOWL0={x:bowl.p.x,z:bowl.p.z};
+  TRAILER.moveBowl=(ox,oz,oy)=>{bowl.p.set(BOWL0.x+ox,DECK+oy,BOWL0.z+oz);
+    bowlMesh.position.copy(bowl.p);bowlMesh.position.y+=.028};
+}
 const ballMesh=new THREE.Mesh(new THREE.SphereGeometry(.055,14,10),new THREE.MeshStandardMaterial({color:0xa8392b,roughness:.7}));
 scene.add(ballMesh);
 const bowlMesh=new THREE.Mesh(new THREE.CylinderGeometry(.11,.085,.055,18,1,true),new THREE.MeshStandardMaterial({color:0x56606e,roughness:.6,side:THREE.DoubleSide}));
@@ -578,6 +723,7 @@ function feedBowl(){
 // ---- one clock: the world advances inside the same tick as the body solver
 let _fadeAcc=0,_uiAcc=0;
 function worldStep(dt){
+  truckStep(dt);
   locomotion.root.y=groundYAt(locomotion.root.x,locomotion.root.z);
   const gy=locomotion.root.y;
   for(let i=0;i<3;i++)PLACE.pushOutCircle(locomotion.root,.17,gy+.14,gy+1.55,null,false);
@@ -715,14 +861,52 @@ function routeForDog(target){
   return [di?DOOR.x+0.55:DOOR.x-0.55,0,DOOR_MID];
 }
 let _dogEatT=0;
+// ---- THE BOND — companionship as accumulated history, never a meter shown.
+// Feeding, delivered fetches and time spent near him all deepen it; what it
+// buys is not obedience but a standing pull toward you when you move off.
+const BOND={v:.3,_t:0};
+// scent: beyond eyesight a target is presented at a squashed distance in its
+// TRUE direction — the signal strengthens as the real gap closes, so you are
+// always in his world, however far you range. (Same law as the III seam.)
+function scentSquash(target,near,cap){
+  if(!target)return target;
+  const d=argos.world.dog,dx=target[0]-d[0],dz=target[2]-d[2],ds=Math.hypot(dx,dz);
+  near=near??3.6;cap=cap??4.6;
+  if(ds<=near)return target;
+  const p=near+(cap-near)*(1-Math.exp(-(ds-near)/30));
+  return [d[0]+dx/ds*p,target[1],d[2]+dz/ds*p];
+}
 function updateDog(t,dt){
   const hero=locomotion.root;
   const heroP=STRIKER.on&&argos.world.carrying?[STRIKER.dogGoal.x,0,STRIKER.dogGoal.z]:[hero.x,0,hero.z];
-  argos.world.human=routeForDog(heroP);
+  const routedHuman=routeForDog(heroP);
+  // squash only when no door stands between them — routed waypoints stay exact.
+  // The deeper the bond, the sharper his nose: your scent reads CLOSER, so
+  // social behaviors keep real strength however far you range.
+  const hCap=4.6-2.4*BOND.v,hNear=Math.max(1.6,hCap-1);
+  argos.world.human=(routedHuman===heroP)?scentSquash(heroP,hNear,hCap):routedHuman;
+  // companionship: near him the bond grows; far and moving, it pulls him after you
+  BOND._t+=dt;
+  const dd0=argos.world.dog,heroDist=Math.hypot(hero.x-dd0[0],hero.z-dd0[2]);
+  if(heroDist<3)BOND.v=Math.min(1,BOND.v+dt*.004);
+  BOND.v=Math.max(0,BOND.v-dt*.0004);
+  if(BOND._t>1){BOND._t=0;
+    if(heroDist>6&&!STRIKER.on){
+      // the standing pull of the bond — a bias he re-smells every second,
+      // stronger for every meal and every returned ball. Never a command:
+      // hunger, fear and fatigue still get their vote.
+      argos.mind.prefs.FOLLOW=Math.max(argos.mind.prefs.FOLLOW||0,.9+BOND.v*.6);
+      argos.mind.prefs.WANDER=Math.min(argos.mind.prefs.WANDER||0,-.25);
+      argos.mind.prefs.SLEEP=Math.min(argos.mind.prefs.SLEEP||0,-.3);
+      argos.mind.prefs.SIT=Math.min(argos.mind.prefs.SIT||0,-.35);
+      argos.mind.iv.happiness=Math.max(argos.mind.iv.happiness||0,.35+.3*BOND.v);
+    }
+  }
   const pt=pointingFloorTarget();
   if(pt){dogMind.pointTarget.copy(pt.q);argos.world.handPose='lure'}
   else argos.world.handPose=(ball.state==='hero'?'extended':'none');
-  argos.world.ball=ball.state==='free'?routeForDog([ball.p.x,ball.p.y,ball.p.z]):null;
+  {const bp=[ball.p.x,ball.p.y,ball.p.z];const rb3=routeForDog(bp);
+   argos.world.ball=ball.state==='free'?(rb3===bp?scentSquash(bp):rb3):null;}
   argos.world.bowl=bowl.food?routeForDog([bowl.p.x,0,bowl.p.z]):null;
   const st=argos.tick(Math.min(dt,.05));
   const d=argos.world.dog;
@@ -736,12 +920,14 @@ function updateDog(t,dt){
     if(Math.hypot(d[0]-home.x,d[2]-home.z)<1.25){
       argos.world.carrying=false;ball.state='free';
       const gy=PLACE.heightAt(ball.p.x,ball.p.z);ball.p.y=gy+ball.r;ball.v.set(0,0,0);
+      BOND.v=Math.min(1,BOND.v+.06); // he chose to bring it back — that counts
       buzz('dogdrop',[8,22,8],600);
     }
   }
   if(st.winner==='EAT'&&bowl.food&&Math.hypot(d[0]-bowl.p.x,d[2]-bowl.p.z)<.85){
     _dogEatT+=dt;argos.mind.iv.hunger=Math.max(0,argos.mind.iv.hunger-dt*.10);
-    if(_dogEatT>bowl.meal||argos.mind.iv.hunger<0.3){bowl.food=false;_dogEatT=0}
+    if(_dogEatT>bowl.meal||argos.mind.iv.hunger<0.3){bowl.food=false;_dogEatT=0;
+      BOND.v=Math.min(1,BOND.v+.1)} // fed by your hand — remembered
   }
   for(const ev of argos.events)if(ev.type==='bark'){buzz('dogbark',[16,36,12],900);chat.line('dog','WOOF')}
   dogMind.interest=clamp(1-argos.mind.iv.fatigue,0,1);
@@ -750,7 +936,7 @@ function updateDog(t,dt){
   syncDogVisual();
 }
 function argosReset(){
-  argos.world.dog=DOG_SPAWN.slice();
+  argos.world.dog=[TR.x-2.1,0,TR.z-2.4];
   argos.world.carrying=false;argos.world.cue='';
   argos.loco.heading=0;argos.loco.speed=0;argos.loco.desiredSpeed=0;
   if(ball.state==='dog')ball.state='free';
@@ -1149,6 +1335,14 @@ function updateControllerTelemetry(){
 }
 enterTravelMode();
 function updateExplorer(dt){
+  if(TRUCK.on){ // the stick belongs to the wheel; the body rides
+    updateMobileLook(dt);syncMobileInstrumentVisibility();
+    locomotion.inputMoving=false;
+    locomotion.walking=lerp(locomotion.walking,0,1-Math.exp(-dt*9));
+    locomotion.drive=lerp(locomotion.drive,0,1-Math.exp(-dt*7));
+    game.run=lerp(game.run,0,1-Math.exp(-dt*12));
+    return;
+  }
   updateMobileLook(dt);syncMobileInstrumentVisibility();
   const dir=explorerMoveVector(),moving=dir.lengthSq()>.01;explorer.move.lerp(dir,1-Math.exp(-dt*16));
   if(moving&&!locomotion.inputMoving)locomotion.stepClock=99;locomotion.inputMoving=moving;
@@ -2006,7 +2200,7 @@ document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{stopMotion();
 addEventListener('keydown',e=>{
   const ae=document.activeElement;if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')){if(e.code==='Escape')ae.blur();return}
   if(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','ShiftLeft','ShiftRight'].includes(e.code)){explorer.keys.add(e.code);if(e.code.startsWith('Arrow'))e.preventDefault()}
-  if(e.repeat)return;if(e.code==='Space'){e.preventDefault();gameCommand('jump')}else if(e.key==='c'||e.key==='C')gameCommand('crouch',1);else if(e.key==='h'||e.key==='H')gameCommand('hide',1);else if(e.key==='g'||e.key==='G')gameCommand('guard',1);else if(e.key==='f'||e.key==='F')gameCommand('strike');else if(e.key==='v'||e.key==='V')$('#viewBtn').click()
+  if(e.repeat)return;if(e.code==='Space'){e.preventDefault();gameCommand('jump')}else if(e.key==='c'||e.key==='C')gameCommand('crouch',1);else if(e.key==='h'||e.key==='H')gameCommand('hide',1);else if(e.key==='g'||e.key==='G')gameCommand('guard',1);else if(e.key==='f'||e.key==='F')gameCommand('strike');else if(e.key==='v'||e.key==='V')$('#viewBtn').click();else if(e.key==='e'||e.key==='E'){if(TRUCK.on)exitTruck();else if(Math.hypot(TRUCK.x-locomotion.root.x,TRUCK.z-locomotion.root.z)<3.4)boardTruck()}
 });
 addEventListener('keyup',e=>{const ae=document.activeElement;if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return;explorer.keys.delete(e.code);if(e.key==='c'||e.key==='C')gameCommand('crouch',0);else if(e.key==='h'||e.key==='H')gameCommand('hide',0);else if(e.key==='g'||e.key==='G')gameCommand('guard',0)});
 addEventListener('blur',()=>explorer.keys.clear());
@@ -2104,6 +2298,9 @@ function saveWorld(){
     argos:argos.serialize(),
     ball:{state:ball.state==='hero'?'free':ball.state,p:[ball.p.x,ball.p.y,ball.p.z],v:[ball.v.x,ball.v.y,ball.v.z]},
     bowl:{food:bowl.food,meal:bowl.meal},weather:WEATHER.current,
+    bond:BOND.v,
+    truck:{x:TRUCK.x,z:TRUCK.z,yaw:TRUCK.yaw,hitched:TRUCK.hitched},
+    trailer:{ox:TRAILER.ox,oz:TRAILER.oz},
     forged:FORGE.structures.map(st=>({id:st.id,code:st.code,anchor:st.anchor})),
     cartridge:INTEGRATION.snapshot()};
   try{localStorage.setItem('hlidarendi.v1',JSON.stringify(rec));readout.textContent='SAVED · THE SITUATION KEEPS';buzz('save',[10,30,10],400);return true}
@@ -2120,6 +2317,14 @@ function restoreWorld(){
       argos.world.carrying=ball.state==='dog'}
     if(rec.bowl){bowl.food=rec.bowl.food;bowl.meal=rec.bowl.meal}
     if(rec.weather)WEATHER.set(rec.weather);
+    if(typeof rec.bond==='number')BOND.v=clamp(rec.bond,0,1);
+    if(rec.trailer&&(rec.trailer.ox||rec.trailer.oz)){
+      const oy=rawTerrain(TR0.x+rec.trailer.ox,TR0.z+rec.trailer.oz)-PAD.datum;
+      applyTrailerOffset(rec.trailer.ox,rec.trailer.oz,oy);
+      buildTerrainMesh._keepDress=!!(terrainMesh&&terrainMesh.material.map);
+      buildTerrainMesh();
+    }
+    if(rec.truck){TRUCK.x=rec.truck.x;TRUCK.z=rec.truck.z;TRUCK.yaw=rec.truck.yaw||0;TRUCK.hitched=false;truckPlace()}
     if(Array.isArray(rec.forged)){FORGE.clearAll();for(const st of rec.forged)FORGE.run(st.code,st.anchor,st.id)}
     readout.textContent='RESTORED · WELCOME HOME';
     return true;
@@ -2170,7 +2375,7 @@ const chat={
         else{try{localStorage.setItem('hlidarendi.ai.key',k2)}catch(e){}r='agent line configured — /build speaks to Claude now'}window.__refreshAI?.()}
       else if(WEATHER.presets[cmd])r=WEATHER.set(cmd)?('the sky turns — '+cmd):'…';
       else if(cmd==='forget'){try{localStorage.removeItem('hlidarendi.v1')}catch(e){}r='forgotten — next visit starts fresh'}
-      else if(cmd==='help')r='/build <words> /striker /place <name> /goto <lat> <lon> /ai <key|off> · /save /reset /feed /ball /door /forget · sky: /dawn /day /dusk /night /fog /rain';
+      else if(cmd==='help')r='/build <words> /striker /place <name> /goto <lat> <lon> /ai <key|off> · /save /reset /feed /ball /door /forget · sky: /dawn /day /dusk /night /fog /rain · the RIG: walk to the truck, DRIVE (or E) — back it to the home’s tongue and HITCH to haul';
       chat.line('world',r);updateWorldUI();return null;
     }
     let prog=null;
@@ -2293,6 +2498,8 @@ const on=(sel,fn)=>{const el=$(sel);if(el)el.onclick=fn};
     WEATHER.set(b.dataset.sky);chat.line('world','the sky turns — '+b.dataset.sky);
   }));
   on('#forgetBtn',()=>chat.say('/forget'));
+  on('#rigBtn',()=>{TRUCK.on?exitTruck():boardTruck()});
+  on('#hitchBtn',()=>{TRUCK.hitched?unhitchTrailer():hitchTrailer()});
   on('#jumpBtn',()=>gameCommand('jump'));
   const bb2=$('#boostBtn');
   if(bb2){const dn=e=>{e.preventDefault();explorer.boostHold=true;bb2.classList.add('on')};
@@ -2319,7 +2526,7 @@ on('#feedBtn',()=>{feedBowl();updateWorldUI()});
   const layer=document.createElement('div');layer.id='labels';document.body.appendChild(layer);
   const mk=(name,mark)=>{const d=document.createElement('div');d.className='elabel';
     d.innerHTML='<span>'+name+'</span>'+(mark?'<span class="mark">▼</span>':'');layer.appendChild(d);return d};
-  const LBL={hero:mk('Everybody'),dog:mk('Argos'),home:mk('Ingold',true)};
+  const LBL={hero:mk('Everybody'),dog:mk('Argos'),home:mk('Ingold',true),rig:mk('Rig')};
   const pv=new THREE.Vector3();
   const put=(el,x,y,z,far)=>{
     pv.set(x,y,z).project(camera);
@@ -2334,7 +2541,18 @@ on('#feedBtn',()=>{feedBowl();updateWorldUI()});
     const d=argos.world.dog,dd=Math.hypot(d[0]-r.x,d[2]-r.z);
     put(LBL.dog,d[0],PLACE.ground.heightAtDog(d[0],d[2])+1.05,d[2],dd>26);
     const hd=Math.hypot(TR.x-r.x,TR.z-r.z);
-    put(LBL.home,TR.x,rawTerrain(TR.x,TR.z)+3.6,TR.z,hd>40);
+    put(LBL.home,TR.x,terrainH(TR.x,TR.z)+3.6,TR.z,hd>40);
+    if(TRUCK.on)LBL.rig.style.display='none';
+    else{const td=Math.hypot(TRUCK.x-r.x,TRUCK.z-r.z);put(LBL.rig,TRUCK.x,terrainH(TRUCK.x,TRUCK.z)+2.3,TRUCK.z,td>24)}
+    // contextual chips: the rig offers itself, the tongue offers the hitch
+    const rb3=$('#rigBtn'),hb3=$('#hitchBtn');
+    if(rb3){const dT=Math.hypot(TRUCK.x-r.x,TRUCK.z-r.z);
+      rb3.style.display=(TRUCK.on||dT<3.4)?'':'none';
+      rb3.textContent=TRUCK.on?'EXIT':'DRIVE';rb3.classList.toggle('on',TRUCK.on)}
+    if(hb3){let show=false;
+      if(TRUCK.on){if(TRUCK.hitched)show=true;
+        else{const rr=truckRear(),hh=trailerHitchWorld();show=Math.hypot(rr.x-hh.x,rr.z-hh.z)<3.4}}
+      hb3.style.display=show?'':'none';hb3.textContent=TRUCK.hitched?'DROP':'HITCH'}
   };
 }
 // boot: hero wakes beside the trailer, on real ground, and the dog is nearby.
@@ -2351,5 +2569,6 @@ window.HLIDARENDI={
   integration:INTEGRATION,
   save:saveWorld,restore:restoreWorld,takeBall,throwBall,feedBowl,placeHero,chat,
   forge:FORGE,build:buildFromWords,striker:STRIKER,goto:gotoPlace,ground:LIVING_GROUND,dress:dressWorld,
+  truck:TRUCK,rig:{board:boardTruck,exit:exitTruck,hitch:hitchTrailer,drop:unhitchTrailer},bond:BOND,trailerOffset:TRAILER,
   snapshot:()=>INTEGRATION.snapshot()
 };
