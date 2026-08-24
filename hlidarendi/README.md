@@ -79,14 +79,22 @@ rig rolls off the line (up to five stand in the world; boarding a parked
 one exchanges bodies); ask for *a trailer* and a caravan shell stands.
 **/deed <name>** keeps the land under you in the ▲ list forever.
 
-**THE RIG** — Thunder Rigs' gift stands in the yard: a truck. Walk to it and
-DRIVE (or E) — the stick becomes the wheel, and because the driver IS the
-hero root, the camera, the labels, the striker and the dog's whole
-perception follow the wheel with no further hooks. Back it to the home's
-south tongue and HITCH: the WHOLE dwelling — rendered members, collision
-boxes, the door, the plan datum, the galley bowl — rides one offset behind
-the rig, skid-style; DROP sets it down and the land levels under the new
-site. The hauled home rides the save. **THE BOND** — companionship is
+**THE RIG** — Thunder Rigs' gift stands in the yard, and it drives by
+Thunder Rigs' OWN car law, ported from unset-04: the stick points the way
+(camera-relative), yaw snaps to input, momentum drifts you through the
+turn, climbing gets torque, walls answer with a bounce, JUMP leaps, and the
+ball answers the bumper with III's collision law — slow contact stows it in
+the bed instead. The camera is III's too: it PANS — you keep whatever angle
+and distance you choose, the world slides under it, the LOOK stick re-aims.
+Walk to the rig and DRIVE (or E); the driver IS the hero root, so the
+camera, the labels, the striker and the dog's whole perception follow the
+wheel with no further hooks. Bring it within reach of the home's south
+tongue — the amber mark lights when you're close — and HITCH: the WHOLE
+dwelling rides one offset behind the rig; DROP sets it down and the land
+levels under the new site. The hauled home rides the save. And the rig is
+promptable like the HELLO line: at the wheel, say *a red racer rig* — or a
+monster, a van, any color — and it takes its new shape under you; say *a
+new truck* and another rolls off the line. **THE BOND** — companionship is
 accumulated history, never a meter: feeding, delivered fetches and time
 spent near him deepen it; what it buys is not obedience but a standing pull
 — the deeper the bond, the sharper his nose reads your scent, and when you

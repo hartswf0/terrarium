@@ -437,9 +437,15 @@ async function askForgeAI(prompt){
   return m?m[0]:null;
 }
 async function buildFromWords(prompt){
-  // a vehicle is not a statue: ask for one and a DRIVABLE rig rolls off the line
-  if(/\b(car|truck|rig|vehicle|van|jeep|buggy|lorry|pickup)\b/i.test(String(prompt||'')))
-    return spawnVehicle();
+  // a vehicle is not a statue: ask for one and a DRIVABLE rig rolls off the
+  // line — or, at the wheel (or beside it), the words RESHAPE the rig itself,
+  // the way the standing world's HELLO line does
+  if(/\b(car|truck|rig|vehicle|van|jeep|buggy|lorry|pickup|racer)\b/i.test(String(prompt||''))){
+    const wantNew=/\b(new|another|second|spawn|more)\b/i.test(String(prompt||''));
+    const nearRig=Math.hypot(TRUCK.x-locomotion.root.x,TRUCK.z-locomotion.root.z)<4;
+    if(!wantNew&&(TRUCK.on||nearRig))return restyleRig(prompt);
+    return spawnVehicle(prompt);
+  }
   const fwd=rotateLocalY(new THREE.Vector3(0,0,1),locomotion.heading);
   const at={x:locomotion.root.x+fwd.x*5,z:locomotion.root.z+fwd.z*5};
   let code=null,via='stand-in';
@@ -561,12 +567,10 @@ const GAMES={mode:null,strokes:0,captures:0,steals:0,_stealCool:0,carrying:false
 function stepKick(){
   if(ball.state!=='free')return;
   const d=Math.hypot(ball.p.x-locomotion.root.x,ball.p.z-locomotion.root.z);
-  const reach=TRUCK.on?1.45:.48;
-  if(TRUCK.on&&explorer.speed<=5)return; // gentle rolling stows the ball instead
-  if(d<reach&&explorer.speed>.6){
+  if(TRUCK.on)return; // at the wheel, the car law owns the ball
+  if(d<.48&&explorer.speed>.6){
     const dir=rotateLocalY(new THREE.Vector3(0,0,1),locomotion.heading);
-    const k=TRUCK.on?1.6:1;
-    ball.v.set(dir.x*(1.6+explorer.speed*.9)*k,1.1+explorer.speed*.25,dir.z*(1.6+explorer.speed*.9)*k);
+    ball.v.set(dir.x*(1.6+explorer.speed*.9),1.1+explorer.speed*.25,dir.z*(1.6+explorer.speed*.9));
     GAMES.stroke();
     buzz('kick',[10,20,8],350);
   }
@@ -591,19 +595,28 @@ function launchBall(){
 // hooks. Back it to the home's south end and the dwelling itself can travel.
 // ============================================================================
 const TRUCK={x:TR0.x-8.5,z:TR0.z+7.5,yaw:Math.PI*.55,speed:0,on:false,hitched:false,group:null,wheels:[],driver:null};
-function makeTruckBody(color){
+function makeTruckBody(color,form){
+  form=form||'classic';
   const g=new THREE.Group();g.name='RIG.TRUCK';
-  const paint=new THREE.MeshStandardMaterial({color:color||0xb95d18,roughness:.55,metalness:.2});
+  const paint=new THREE.MeshStandardMaterial({color:color||0xb95d18,roughness:form==='racer'?.3:.55,metalness:form==='racer'?.4:.2});
   const dark=new THREE.MeshStandardMaterial({color:0x1e2226,roughness:.9});
   const glassM=new THREE.MeshStandardMaterial({color:0x9fc4cc,roughness:.25,metalness:.1,transparent:true,opacity:.5});
-  const bed=new THREE.Mesh(new THREE.BoxGeometry(1.9,.5,4.5),paint);bed.position.y=.92;g.add(bed);
-  const cab=new THREE.Mesh(new THREE.BoxGeometry(1.78,.72,1.7),paint);cab.position.set(0,1.5,.85);g.add(cab);
-  const win=new THREE.Mesh(new THREE.BoxGeometry(1.6,.46,1.55),glassM);win.position.set(0,1.58,.85);g.add(win);
-  const grill=new THREE.Mesh(new THREE.BoxGeometry(1.7,.34,.2),dark);grill.position.set(0,.78,2.3);g.add(grill);
+  const wr=form==='monster'?.66:form==='racer'?.36:.44;         // wheel radius
+  const lift=form==='monster'?.5:form==='racer'?-.18:0;         // body lift
+  if(form==='van'){
+    const box2=new THREE.Mesh(new THREE.BoxGeometry(2.0,1.7,4.6),paint);box2.position.y=1.5+lift;g.add(box2);
+    const win=new THREE.Mesh(new THREE.BoxGeometry(1.85,.5,1.2),glassM);win.position.set(0,1.85+lift,1.75);g.add(win);
+  }else{
+    const bed=new THREE.Mesh(new THREE.BoxGeometry(1.9,.5,form==='racer'?5.0:4.5),paint);bed.position.y=.92+lift;g.add(bed);
+    const cab=new THREE.Mesh(new THREE.BoxGeometry(1.78,form==='racer'?.5:.72,1.7),paint);cab.position.set(0,(form==='racer'?1.32:1.5)+lift,.85);g.add(cab);
+    const win=new THREE.Mesh(new THREE.BoxGeometry(1.6,.42,1.55),glassM);win.position.set(0,(form==='racer'?1.42:1.58)+lift,.85);g.add(win);
+    if(form==='racer'){const spoiler=new THREE.Mesh(new THREE.BoxGeometry(1.9,.1,.5),dark);spoiler.position.set(0,1.5+lift,-2.35);g.add(spoiler)}
+  }
+  const grill=new THREE.Mesh(new THREE.BoxGeometry(1.7,.34,.2),dark);grill.position.set(0,.78+lift,form==='racer'?2.55:2.3);g.add(grill);
   const wheels=[];
   for(const [wx,wz] of [[-.98,1.5],[.98,1.5],[-.98,-1.5],[.98,-1.5]]){
-    const w=new THREE.Mesh(new THREE.CylinderGeometry(.44,.44,.36,14),dark);
-    w.geometry.rotateZ(Math.PI/2);w.position.set(wx,.44,wz);g.add(w);wheels.push(w);
+    const w=new THREE.Mesh(new THREE.CylinderGeometry(wr,wr,.38,14),dark);
+    w.geometry.rotateZ(Math.PI/2);w.position.set(wx,wr,wz);g.add(w);wheels.push(w);
   }
   // the driver is seen at the wheel — a silhouette, present only when boarded
   const drv=new THREE.Group();
@@ -628,14 +641,39 @@ function poseFleetRig(r){
   r.group.rotation.set(0,r.yaw,0);
   r.group.rotateX(Math.atan2(hB-hF,3.0)*.85);r.group.rotateZ(Math.atan2(hR-hL,1.9)*.85);
 }
-function spawnVehicle(){
+// words shape the machine, like the HELLO line shapes the rig in the
+// standing world: color words paint it, form words rebuild it
+function parseRigWords(p){
+  p=String(p||'').toLowerCase();
+  const C={red:0xc0392b,blue:0x2d6f8e,green:0x596650,black:0x22262a,white:0xd8d5cc,
+    yellow:0xd2b53a,orange:0xb95d18,purple:0x6d5aa8,gold:0xd29a3a,grey:0x70726b,gray:0x70726b,pink:0xc26a8a};
+  let color=null;for(const k of Object.keys(C))if(p.includes(k)){color=C[k];break}
+  let form='classic';
+  if(/race|racer|racing|sport|fast|low/.test(p))form='racer';
+  else if(/monster|crawler|big wheel|offroad|off-road/.test(p))form='monster';
+  else if(/van|bus|box/.test(p))form='van';
+  return{color:color??0xb95d18,form};
+}
+function spawnVehicle(prompt){
   if(FLEET.length>=5){chat.line('world','the yard holds five rigs already — drive one');return false}
+  const P2=parseRigWords(prompt);
   const fwd=rotateLocalY(new THREE.Vector3(0,0,1),locomotion.heading);
   const x=locomotion.root.x+fwd.x*6.5,z=locomotion.root.z+fwd.z*6.5;
-  const b=makeTruckBody(RIG_COLORS[FLEET.length%RIG_COLORS.length]);
+  const b=makeTruckBody(P2.color??RIG_COLORS[FLEET.length%RIG_COLORS.length],P2.form);
   const r={x,z,yaw:locomotion.heading+Math.PI*.5,group:b.group,wheels:b.wheels,driver:b.driver,steerVis:0};
   FLEET.push(r);poseFleetRig(r);
   chat.line('world','a rig rolls off the line and stands ahead — walk to it and DRIVE');
+  return true;
+}
+function restyleRig(prompt){
+  const P2=parseRigWords(prompt);
+  const b=makeTruckBody(P2.color,P2.form);
+  scene.remove(TRUCK.group);
+  TRUCK.group.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose&&o.material.dispose()});
+  TRUCK.group=b.group;TRUCK.wheels=b.wheels;TRUCK.driver=b.driver;
+  if(TRUCK.on&&TRUCK.driver)TRUCK.driver.visible=true;
+  truckPlace();
+  chat.line('world','the rig takes its new shape — '+P2.form+', same wheel in your hands');
   return true;
 }
 function nearestRig(){
@@ -665,7 +703,7 @@ function truckRear(){const dx=Math.sin(TRUCK.yaw),dz=Math.cos(TRUCK.yaw);return{
 function trailerHitchWorld(){return{x:TR.x,z:TR.z-3.05}} // the home's south tongue
 function truckJump(){
   if(!TRUCK.on||(TRUCK.airY||0)>0.02||TRUCK.hitched)return;
-  TRUCK.vy=5.4;TRUCK.airY=0.03;buzz('rigjump',[12,26,10],400);
+  TRUCK.vy=11;TRUCK.airY=0.03;buzz('rigjump',[12,26,10],400); // III's leap, scaled to the hillside
 }
 function boardTruck(){
   if(TRUCK.on)return;
@@ -677,21 +715,28 @@ function boardTruck(){
   rig.mesh.visible=false;rig.outline.visible=false;support.visible=false;
   window.__exitFreeCam?.();
   placeHero(TRUCK.x,TRUCK.z,TRUCK.yaw);
-  buzz('board',10,300);chat.line('world','the rig takes you — the stick is the wheel now');
+  // a driving eye: step the camera back and up once; from here it only pans
+  {const dx=Math.sin(TRUCK.yaw),dz=Math.cos(TRUCK.yaw);
+   controls.target.set(TRUCK.x,TRUCK.group.position.y+1,TRUCK.z);
+   camera.position.set(TRUCK.x-dx*11,TRUCK.group.position.y+6,TRUCK.z-dz*11)}
+  buzz('board',10,300);chat.line('world','the rig takes you — the stick points the way, momentum does the rest');
 }
 function exitTruck(){
   if(!TRUCK.on)return;
-  TRUCK.on=false;TRUCK.speed=0;TRUCK.airY=0;TRUCK.vy=0;document.body.classList.remove('driving');
+  TRUCK.on=false;TRUCK.speed=0;TRUCK.airY=0;TRUCK.vy=0;if(TRUCK.vel)TRUCK.vel.set(0,0,0);document.body.classList.remove('driving');
   if(TRUCK.driver)TRUCK.driver.visible=false;
   rig.mesh.visible=true;rig.outline.visible=true;support.visible=true;
   const px2=Math.cos(TRUCK.yaw),pz2=-Math.sin(TRUCK.yaw);
   placeHero(TRUCK.x+px2*1.9,TRUCK.z+pz2*1.9,TRUCK.yaw);
   chat.line('world','you step down — the rig waits');
 }
+// the tongue shows itself: an amber marker over the hitch point when a rig is near
+const tongueMark=new THREE.Mesh(new THREE.SphereGeometry(.22,12,10),new THREE.MeshStandardMaterial({color:0xd29a3a,emissive:0xd29a3a,emissiveIntensity:.7,roughness:.4}));
+tongueMark.visible=false;scene.add(tongueMark);
 function hitchTrailer(){
   if(!TRUCK.on||TRUCK.hitched)return false;
-  const r=truckRear(),h=trailerHitchWorld();
-  if(Math.hypot(r.x-h.x,r.z-h.z)>3.4){chat.line('world','back the rig to the home’s south tongue to hitch');return false}
+  const h=trailerHitchWorld();
+  if(Math.hypot(TRUCK.x-h.x,TRUCK.z-h.z)>7){chat.line('world','bring the rig to the home’s south tongue — the amber mark — to hitch');return false}
   TRUCK.hitched=true;buzz('hitch',[14,30,14],500);
   chat.line('world','HITCHED — the home rides the rig. DROP to set it down.');
   return true;
@@ -714,41 +759,62 @@ function truckStep(dt){
   if(ball.state==='rig'){
     const dx=Math.sin(TRUCK.yaw),dz=Math.cos(TRUCK.yaw);
     ball.p.set(TRUCK.x-dx*1.1,TRUCK.group.position.y+1.35,TRUCK.z-dz*1.1);ball.v.set(0,0,0);
-  }else if(TRUCK.on&&ball.state==='free'&&Math.abs(TRUCK.speed)<5&&Math.abs(TRUCK.speed)>.3){
-    if(Math.hypot(ball.p.x-TRUCK.x,ball.p.z-TRUCK.z)<1.7){
-      ball.state='rig';buzz('stow',[8,18,8],500);chat.line('world','the bed takes the ball — FIRE launches it');
-    }
   }
   if(!TRUCK.on){truckPlace();return}
-  const K=explorer.keys;let st=0,th=0;
-  if(explorer.touchMoveMag>.03){st=explorer.touchMove.x;th=explorer.touchMove.y}
-  else{th=((K.has('KeyW')||K.has('ArrowUp'))?1:0)-((K.has('KeyS')||K.has('ArrowDown'))?1:0);
-       st=((K.has('KeyD')||K.has('ArrowRight'))?1:0)-((K.has('KeyA')||K.has('ArrowLeft'))?1:0)}
-  const top=(explorer.boostHold?15.5:9.5)*(TRUCK.hitched?.6:1);
-  const target=th*(th<0?top*.4:top);
-  // vertical life: the rig leaves the ground under JUMP and gravity brings it home
+  // ══ THUNDER RIGS' OWN CAR LAW, ported (unset-04: ACCEL/COAST/DRIVE_DRAG,
+  // stick-owns-yaw, momentum drifts, climbing gets torque) ══
+  TRUCK.vel=TRUCK.vel||new THREE.Vector3();
+  const dir=explorerMoveVector(),mag=explorer.inputMag||0;
+  // vertical life: JUMP lifts along the ground, gravity brings it home
   if((TRUCK.vy||0)!==0||(TRUCK.airY||0)>0){
-    TRUCK.vy=(TRUCK.vy||0)-15.5*dt;
+    TRUCK.vy=(TRUCK.vy||0)-30*dt;
     TRUCK.airY=Math.max(0,(TRUCK.airY||0)+TRUCK.vy*dt);
-    if(TRUCK.airY===0){if(TRUCK.vy<-2)buzz('rigland',[8,18,8],400);TRUCK.vy=0}
+    if(TRUCK.airY===0){if(TRUCK.vy<-3)buzz('rigland',[8,18,8],400);TRUCK.vy=0}
   }
-  const air=(TRUCK.airY||0)>0.02;
-  TRUCK.speed=lerp(TRUCK.speed,target,1-Math.exp(-dt*(air?.4:(Math.abs(target)>Math.abs(TRUCK.speed)?1.9:2.8))));
-  if(Math.abs(TRUCK.speed)>.15&&!air)TRUCK.yaw-=st*dt*1.55*clamp(Math.abs(TRUCK.speed)/3.2,.3,1)*Math.sign(TRUCK.speed);
-  TRUCK.steerVis=lerp(TRUCK.steerVis||0,-st*.45,1-Math.exp(-dt*8));
-  TRUCK.wheels[0].rotation.y=TRUCK.wheels[1].rotation.y=TRUCK.steerVis;
-  const dx=Math.sin(TRUCK.yaw),dz=Math.cos(TRUCK.yaw);
-  // the hill has a say: climbing costs, descending feeds — unless airborne
-  if(!air){
-    const grade=(terrainH(TRUCK.x+dx*2.2,TRUCK.z+dz*2.2)-terrainH(TRUCK.x,TRUCK.z))/2.2;
-    TRUCK.speed-=grade*dt*6*Math.sign(TRUCK.speed||0);
+  const grounded=(TRUCK.airY||0)<=0.02;
+  const ACC=(explorer.boostHold?78:52)*(TRUCK.hitched?.55:1);
+  const MAX=(explorer.boostHold?40:26)*(TRUCK.hitched?.55:1);
+  if(grounded&&mag>0.1){
+    const nn=PLACE.ground.normalAt(TRUCK.x,TRUCK.z);
+    const proj=dir.clone().projectOnPlane(new THREE.Vector3(nn[0],nn[1],nn[2])).normalize();
+    let slopeBoost=1;if(proj.y>0.05)slopeBoost=1+proj.y*3.5; // torque climbs the quarterpipe
+    TRUCK.vel.addScaledVector(proj,ACC*mag*slopeBoost*dt);
   }
-  const v=new THREE.Vector3(TRUCK.x+dx*TRUCK.speed*dt,0,TRUCK.z+dz*TRUCK.speed*dt);
-  const gy=terrainH(v.x,v.z);
-  PLACE.pushOutCircle(v,1.15,gy+.25,gy+1.7);
+  if(grounded){const drag=mag<0.1?1.5:1.03;TRUCK.vel.multiplyScalar(Math.exp(-drag*dt))}
+  else{TRUCK.vel.x*=Math.exp(-.2*dt);TRUCK.vel.z*=Math.exp(-.2*dt)}
+  TRUCK.vel.y=0;
+  const spd0=TRUCK.vel.length();if(spd0>MAX)TRUCK.vel.multiplyScalar(MAX/spd0);
+  // the stick owns the nose; momentum owns the road
+  if(mag>0.1)TRUCK.yaw=Math.atan2(dir.x,dir.z);
+  else if(Math.hypot(TRUCK.vel.x,TRUCK.vel.z)>0.5)TRUCK.yaw+=normAngle(Math.atan2(TRUCK.vel.x,TRUCK.vel.z)-TRUCK.yaw)*Math.min(1,10*dt);
+  // integrate; walls answer with a bounce
+  const v=new THREE.Vector3(TRUCK.x+TRUCK.vel.x*dt,0,TRUCK.z+TRUCK.vel.z*dt);
+  const gy=terrainH(v.x,v.z);const hitI={hit:false};
+  PLACE.pushOutCircle(v,1.15,gy+.25,gy+1.7,hitI);
+  if(hitI.hit){const nl=Math.hypot(hitI.x,hitI.z)||1,nx=hitI.x/nl,nz=hitI.z/nl;
+    const vn=TRUCK.vel.x*nx+TRUCK.vel.z*nz;
+    if(vn<0){TRUCK.vel.x-=1.4*vn*nx;TRUCK.vel.z-=1.4*vn*nz;if(-vn>6)buzz('rigwall',[10,22,10],400)}}
   TRUCK.x=v.x;TRUCK.z=v.z;
+  TRUCK.speed=Math.hypot(TRUCK.vel.x,TRUCK.vel.z);
+  // the ball answers the bumper with III's own law — or the bed takes it, gently
+  if(ball.state==='free'){
+    const N=new THREE.Vector3(ball.p.x-TRUCK.x,0,ball.p.z-TRUCK.z),bd2=N.length(),sum=1.5+ball.r;
+    if(bd2<sum){
+      const Nn=N.clone().divideScalar(bd2||1);
+      const approach=Math.max(0,TRUCK.vel.dot(Nn));
+      if(approach<3){ball.state='rig';buzz('stow',[8,18,8],500);chat.line('world','the bed takes the ball — FIRE launches it')}
+      else{ball.p.set(TRUCK.x+Nn.x*(sum+.05),ball.p.y,TRUCK.z+Nn.z*(sum+.05));
+        const power=3+approach*1.2;
+        ball.v.set(Nn.x*power+TRUCK.vel.x*.4,2.2+approach*.12,Nn.z*power+TRUCK.vel.z*.4);
+        GAMES.stroke();buzz('kick',[10,20,8],350)}
+    }
+  }
+  // wheels tell the story: roll with speed, toe with the drift
+  const driftA=TRUCK.speed>1?normAngle(Math.atan2(TRUCK.vel.x,TRUCK.vel.z)-TRUCK.yaw):0;
+  TRUCK.steerVis=lerp(TRUCK.steerVis||0,clamp(driftA,-.5,.5),1-Math.exp(-dt*8));
+  TRUCK.wheels[0].rotation.y=TRUCK.wheels[1].rotation.y=TRUCK.steerVis;
   for(const w of TRUCK.wheels)w.rotation.x+=TRUCK.speed*dt/.44;
-  if(explorer.boostHold&&Math.abs(TRUCK.speed)>6)buzz('rigboost',6,500);
+  if(explorer.boostHold&&TRUCK.speed>8)buzz('rigboost',6,500);
   truckPlace();
   // the driver IS the root: camera, dog, labels, striker all read this
   placeHero(TRUCK.x,TRUCK.z,TRUCK.yaw);
@@ -1552,18 +1618,19 @@ function updateExplorer(dt){
 function updateExplorerCamera(dt){
   if(view3d){controls.update();return}
   if(TRUCK.on){
-    // the chase cam breathes with speed: behind the heading, pulling back as
-    // the rig opens up — take the look stick and it orbits the cab instead
-    const sp=Math.abs(TRUCK.speed),dirx=Math.sin(TRUCK.yaw),dirz=Math.cos(TRUCK.yaw);
-    const radius=7.4+sp*.34,height=2.7+sp*.11;
-    const target=new THREE.Vector3(TRUCK.x+dirx*(1.8+sp*.14),locomotion.root.y+1.25+(TRUCK.airY||0)*.6,TRUCK.z+dirz*(1.8+sp*.14));
-    let desired;
-    if(explorer.cameraEngaged&&explorer.touchLookMag>.02){
+    // III's own car camera: it PANS — you keep whatever angle and distance
+    // you chose, and the world slides under it; the LOOK stick re-aims it
+    const target=new THREE.Vector3(TRUCK.x,TRUCK.group.position.y+1.0+(TRUCK.airY||0)*.6,TRUCK.z);
+    const k=Math.min(1,dt*6);
+    const delta=target.clone().sub(controls.target).multiplyScalar(k);
+    controls.target.add(delta);camera.position.add(delta);
+    if(explorer.touchLookMag>.02){
+      const radius=Math.max(6,camera.position.distanceTo(controls.target));
       const cp=Math.cos(explorer.cameraPitch),sp2=Math.sin(explorer.cameraPitch),sy=Math.sin(explorer.cameraYaw),cy=Math.cos(explorer.cameraYaw);
-      desired=new THREE.Vector3(target.x+sy*cp*radius,target.y+sp2*radius+.4,target.z+cy*cp*radius);
-    }else desired=new THREE.Vector3(TRUCK.x-dirx*radius,locomotion.root.y+height,TRUCK.z-dirz*radius);
-    const k=1-Math.exp(-dt*4.5);
-    camera.position.lerp(desired,k);controls.target.lerp(target,k);camera.lookAt(controls.target);
+      const desired=new THREE.Vector3(controls.target.x+sy*cp*radius,controls.target.y+sp2*radius+.4,controls.target.z+cy*cp*radius);
+      camera.position.lerp(desired,1-Math.exp(-dt*8));
+    }
+    camera.lookAt(controls.target);
     return;
   }
   const radius=explorer.cameraRadius||(innerHeight>innerWidth?4.65:4.15);
@@ -2570,7 +2637,8 @@ const chat={
           localStorage.setItem('hlidarendi.deeds',JSON.stringify(ds.slice(-12)));
           window.__renderDeeds?.();r='▲ the deed is kept — "'+nm.slice(0,28)+'" stands in the land list'}
         catch(e){r='the deed could not be kept'}}}
-      else if(cmd==='build'){const p2=text.slice(6).trim()||'cairn';buildFromWords(p2);r='forging "'+p2+'" on the land ahead…'}
+      else if(cmd==='build'){const p2=text.slice(6).trim()||'cairn';buildFromWords(p2);
+        r=/\b(car|truck|rig|vehicle|van|jeep|buggy|lorry|pickup|racer)\b/i.test(p2)?null:'forging "'+p2+'" on the land ahead…'}
       else if(cmd==='striker')r=STRIKER.toggle()?'STRIKER — first to score; run into the ball to kick; Argos plays for himself':'match over — '+STRIKER.score[0]+' : '+STRIKER.score[1];
       else if(cmd==='goto'){const m2=text.match(/goto\s+(-?[\d.]+)[ ,]+(-?[\d.]+)/);
         if(m2){r='calling on the landscape at '+m2[1]+', '+m2[2]+'…';gotoPlace(+m2[1],+m2[2]).then(()=>chat.line('world','the land answered — a new place stands under home')).catch(e=>chat.line('world','the network here is closed — Hlíðarendi stands ('+String(e.message||e).slice(0,50)+')'))}
@@ -2744,6 +2812,9 @@ on('#ballBtn',()=>{
     else if(Math.hypot(TRUCK.x-locomotion.root.x,TRUCK.z-locomotion.root.z)<2.4){ball.state='hero';buzz('take',8,300)}
     else{openLog();chat.line('world','the ball rides the rig — drive, or fetch it from the bed')}
   }
+  else if(TRUCK.on&&ball.state==='free'&&Math.hypot(ball.p.x-TRUCK.x,ball.p.z-TRUCK.z)<3.5){
+    ball.state='rig';buzz('stow',[8,18,8],500); // reach from the cab: the bed takes it
+  }
   else if(!takeBall()){
     // the tap always answers: the ball is his, or it is somewhere to walk to
     const d=Math.hypot(ball.p.x-locomotion.root.x,ball.p.z-locomotion.root.z);
@@ -2784,9 +2855,13 @@ on('#feedBtn',()=>{feedBowl();updateWorldUI()});
       rb3.style.display=(TRUCK.on||dT<3.4)?'':'none';
       rb3.textContent=TRUCK.on?'EXIT':'DRIVE';rb3.classList.toggle('on',TRUCK.on)}
     if(hb3){let show=false;
+      const hh=trailerHitchWorld();
       if(TRUCK.on){if(TRUCK.hitched)show=true;
-        else{const rr=truckRear(),hh=trailerHitchWorld();show=Math.hypot(rr.x-hh.x,rr.z-hh.z)<3.4}}
-      hb3.style.display=show?'':'none';hb3.textContent=TRUCK.hitched?'DROP':'HITCH'}
+        else show=Math.hypot(TRUCK.x-hh.x,TRUCK.z-hh.z)<7}
+      hb3.style.display=show?'':'none';hb3.textContent=TRUCK.hitched?'DROP':'HITCH';
+      // the tongue lights when a rig is near enough to matter
+      tongueMark.visible=TRUCK.on&&!TRUCK.hitched&&Math.hypot(TRUCK.x-hh.x,TRUCK.z-hh.z)<20;
+      if(tongueMark.visible)tongueMark.position.set(hh.x,PLACE.heightAt(hh.x,hh.z)+.85,hh.z)}
   };
 }
 // boot: hero wakes beside the trailer, on real ground, and the dog is nearby.
