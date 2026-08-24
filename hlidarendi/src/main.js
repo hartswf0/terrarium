@@ -567,7 +567,7 @@ function throwBall(){
 function takeBall(){
   if(ball.state!=='free')return false;
   const d=Math.hypot(ball.p.x-locomotion.root.x,ball.p.z-locomotion.root.z);
-  if(d>1.05)return false;
+  if(d>1.35)return false;
   ball.state='hero';buzz('take',8,300);return true;
 }
 function feedBowl(){
@@ -598,9 +598,9 @@ function worldStep(dt){
 function updateWorldUI(){
   const bb=$('#ballBtn'),fb=$('#feedBtn');if(!bb)return;
   const d=Math.hypot(ball.p.x-locomotion.root.x,ball.p.z-locomotion.root.z);
-  bb.textContent=ball.state==='hero'?'THROW':ball.state==='dog'?'ARGOS':(d<=1.05?'TAKE':'FIRE');
+  bb.textContent=ball.state==='hero'?'THROW':ball.state==='dog'?'ARGOS':(d<=1.35?'TAKE':'FIRE');
   const sb2=$('#strikerBtn');if(sb2){sb2.textContent=STRIKER.on?'END':'PLAY';sb2.classList.toggle('on',STRIKER.on)}
-  bb.classList.toggle('on',ball.state==='hero'||(ball.state==='free'&&d<=1.05));
+  bb.classList.toggle('on',ball.state==='hero'||(ball.state==='free'&&d<=1.35));
   if(fb){const bd=Math.hypot(bowl.p.x-locomotion.root.x,bowl.p.z-locomotion.root.z);
     fb.textContent=bowl.food?'FED':'FEED';fb.classList.toggle('on',!bowl.food&&bd<=1.5)}
 }
@@ -1985,7 +1985,7 @@ function setupExplorerStick(sel,kind){
     if(kind==='move'){explorer.touchMove.set(nx,ny);explorer.touchMoveMag=mag;explorer.movePointer=pointer;syncMobileInstrumentVisibility()}
     else{explorer.touchLook.set(nx,ny);explorer.touchLookMag=mag;explorer.lookPointer=pointer;explorer.cameraEngaged=true}
   };
-  el.addEventListener('pointerdown',e=>{if(pointer!=null)return;enterTravelMode();pointer=e.pointerId;el.setPointerCapture(pointer);el.classList.add('live');const r=el.getBoundingClientRect();cx=r.left+r.width/2;cy=r.top+r.height/2;set(e);e.preventDefault()},{passive:false});
+  el.addEventListener('pointerdown',e=>{if(pointer!=null)return;if(kind==='move')window.__exitFreeCam?.();enterTravelMode();pointer=e.pointerId;el.setPointerCapture(pointer);el.classList.add('live');const r=el.getBoundingClientRect();cx=r.left+r.width/2;cy=r.top+r.height/2;set(e);e.preventDefault()},{passive:false});
   el.addEventListener('pointermove',e=>{if(e.pointerId!==pointer)return;set(e);e.preventDefault()},{passive:false});
   const end=e=>{if(e.pointerId!==pointer)return;pointer=null;el.classList.remove('live');nub.style.transform='translate(-50%,-50%)';if(kind==='move'){explorer.touchMove.set(0,0);explorer.touchMoveMag=0;explorer.movePointer=null;explorer.mobileNav=false;document.body.classList.remove('navigating','deck-using')}else{explorer.touchLook.set(0,0);explorer.touchLookMag=0;explorer.lookPointer=null}e.preventDefault()};
   el.addEventListener('pointerup',end,{passive:false});el.addEventListener('pointercancel',end,{passive:false});
@@ -1997,6 +1997,8 @@ function lockHeadNow(){rig.mesh.updateMatrixWorld(true);headLockQ.copy(rig.by.he
 $('#headBtn').onclick=()=>{headLock=!headLock;$('#headBtn').classList.toggle('on',headLock);$('#headBtn').textContent=headLock?'AUTO GAZE':'FREE HEAD';updateReadout()};
 $('#tiltBtn').onclick=()=>{if(motion.permissionState==='blocked'||(motion.enabled&&!motion.hasSample&&tiltEmbedded())){if(openTiltTopLevel())return}setTiltEnabled(!motion.enabled)};
 $('#viewBtn').onclick=()=>{view3d=!view3d;controls.enabled=view3d;document.body.classList.toggle('free-camera',view3d);const b=$('#viewBtn');b.classList.toggle('on',view3d);b.textContent=view3d?'FREE':'CAM';if(!view3d)fitPerformanceCamera();else{controls.target.set(locomotion.root.x,1.03,locomotion.root.z);controls.update()}};
+// taking the drive stick means travelling: the free camera yields to the follow cam
+window.__exitFreeCam=()=>{if(view3d)$('#viewBtn').click()};
 $('#styleBtn').onclick=()=>{ink=!ink;$('#styleBtn').classList.toggle('on',ink);rig.mesh.material=ink?new THREE.MeshBasicMaterial({color:0x000000}):rig.mesh.userData.whiteMat;rig.outline.visible=!ink};
 rig.mesh.userData.whiteMat=rig.mesh.material;
 $('#resetBtn').onclick=()=>resetAll();$('#quickReset').onclick=()=>{if(view3d){view3d=false;controls.enabled=false;document.body.classList.remove('free-camera');$('#viewBtn').classList.remove('on');$('#viewBtn').textContent='CAM'}resetAll()};
@@ -2299,7 +2301,16 @@ const on=(sel,fn)=>{const el=$(sel);if(el)el.onclick=fn};
   on('#strikerBtn',()=>chat.say('/striker'));
 }
 on('#saveBtn',saveWorld);
-on('#ballBtn',()=>{if(ball.state==='hero')throwBall();else takeBall();updateWorldUI()});
+on('#ballBtn',()=>{
+  if(ball.state==='hero')throwBall();
+  else if(!takeBall()){
+    // the tap always answers: the ball is his, or it is somewhere to walk to
+    const d=Math.hypot(ball.p.x-locomotion.root.x,ball.p.z-locomotion.root.z);
+    openLog();
+    chat.line('world',ball.state==='dog'?'Argos holds the ball — his choice':'the ball lies '+d.toFixed(1)+' m away — walk to it');
+  }
+  updateWorldUI();
+});
 on('#feedBtn',()=>{feedBowl();updateWorldUI()});
 // ---- THE CITIZENS ANNOUNCE THEMSELVES — floating names over the actors and
 // the dwelling (Everybody · Argos · Ingold ▼), projected through the one

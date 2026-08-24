@@ -1,0 +1,2300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>ARGOS &middot; living animal runtime v2.3</title>
+<style>
+  :root{ --paper:#f2ecdf; --ink:#171a1e; --ink-2:#4a4d52; --line:1.5px; --win:#1f6b3a; --sec:#8a6a22; }
+  *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; overflow:hidden; background:var(--paper); color:var(--ink);
+    font:12px/1.45 ui-monospace,"IBM Plex Mono",Menlo,Consolas,monospace; }
+  #stage{ position:fixed; inset:0; width:100%; height:100%; touch-action:none; }
+  header{ position:fixed; top:0; left:0; right:0; padding:12px 14px 8px; pointer-events:none; z-index:4; }
+  .wordmark{ font-size:15px; font-weight:700; letter-spacing:.34em; }
+  .wordmark small{ font-weight:400; letter-spacing:.08em; color:var(--ink-2); margin-left:8px; font-size:10px; }
+  .mark{ display:inline-block; width:9px; height:9px; border:var(--line) solid var(--ink);
+    vertical-align:-1px; margin-right:7px; position:relative; }
+  .mark::after{ content:""; position:absolute; inset:2px; background:var(--ink); }
+  #facts{ margin-top:3px; font-size:10px; letter-spacing:.06em; color:var(--ink-2); }
+  #mind{ position:fixed; right:8px; top:12px; width:296px; max-height:62%; overflow:auto; z-index:5;
+    background:rgba(247,242,230,.93); border:var(--line) solid #cfc6b0; border-radius:2px; padding:7px 8px; }
+  .ttl{ font-size:9px; letter-spacing:.22em; color:var(--ink-2); margin:2px 0 4px; }
+  .bh{ display:flex; align-items:center; gap:5px; font-size:10px; padding:1px 0; color:var(--ink-2); }
+  .bh.win{ color:var(--win); font-weight:700; }
+  .bh.sec{ color:var(--sec); }
+  .bh .bn{ width:56px; }
+  .bh .bar,.iv .bar{ flex:1 1 auto; height:7px; background:#e3dbc8; border-radius:1px; overflow:hidden; }
+  .bh .bar i{ display:block; height:100%; background:currentColor; }
+  .iv .bar i{ display:block; height:100%; background:#4a4d52; }
+  .bh .bv{ width:32px; text-align:right; }
+  .bh .bd{ width:86px; font-size:8px; text-align:right; overflow:hidden; white-space:nowrap; }
+  .iv{ display:flex; align-items:center; gap:5px; font-size:10px; padding:1px 0; color:var(--ink-2); }
+  .iv .k{ width:74px; } .iv .v{ width:32px; text-align:right; }
+  #held{ font-size:9px; color:var(--ink-2); margin-top:5px; border-top:var(--line) solid #cfc6b0; padding-top:4px; }
+  #dock{ position:fixed; left:0; right:0; bottom:0; z-index:4;
+    padding:8px 10px calc(10px + env(safe-area-inset-bottom));
+    background:linear-gradient(to top, var(--paper) 80%, rgba(242,236,223,0)); }
+  .row{ display:flex; gap:6px; overflow-x:auto; padding:3px 2px; scrollbar-width:none; align-items:center; }
+  .row::-webkit-scrollbar{ display:none; }
+  .lbl{ flex:0 0 auto; font-size:9px; letter-spacing:.18em; color:var(--ink-2); width:52px; text-align:right; padding-right:2px; }
+  button.chip{ flex:0 0 auto; font:inherit; font-size:11px; letter-spacing:.09em; color:var(--ink);
+    background:transparent; border:var(--line) solid var(--ink); border-radius:2px; padding:6px 10px; cursor:pointer; }
+  button.chip.on{ background:var(--ink); color:var(--paper); }
+  button.chip.act{ border-style:dashed; }
+  #chatWrap{ position:fixed; left:10px; bottom:112px; width:min(52vw,420px); z-index:5; }
+  #chatLog{ max-height:24vh; overflow:auto; display:flex; flex-direction:column; gap:2px; margin-bottom:5px; }
+  .line{ font-size:11px; line-height:1.4; padding:2px 6px; border-radius:2px; width:fit-content; max-width:100%; }
+  .line.you{ color:var(--ink); background:rgba(247,242,230,.9); }
+  .line.dog{ color:#6b4a1f; background:rgba(232,214,175,.85); font-style:italic; }
+  #progWrap{ display:flex; align-items:flex-start; gap:5px; margin-bottom:5px; flex-wrap:wrap; }
+  .via{ font-size:8px; letter-spacing:.18em; color:var(--ink-2); padding-top:3px; }
+  #prog{ display:flex; gap:4px; flex-wrap:wrap; }
+  #prog span{ font-size:9px; padding:2px 5px; border-radius:2px; background:rgba(247,242,230,.9); border:1px solid #cfc6b0; }
+  #prog .up{ color:#1f6b3a; } #prog .dn{ color:#8a2f22; }
+  #prog .pb{ color:#7a4a12; border-color:#c9a45e; }
+  #prog .pc{ color:#2c4a6b; border-color:#9db4c9; }
+  #say{ width:100%; font:inherit; font-size:12px; padding:8px 10px; border-radius:2px;
+    border:var(--line) solid var(--ink); background:rgba(247,242,230,.94); color:var(--ink); }
+  #say:focus{ outline:none; border-color:#7a4a12; }
+  #status{ margin-top:5px; font-size:10px; letter-spacing:.05em; color:var(--ink-2); min-height:14px; padding-left:56px; }
+  #status.err{ color:#8a2f22; }
+  @media (max-width:760px){ #mind{ width:230px; max-height:40%; } #chatWrap{ width:calc(100vw - 20px); bottom:118px; } #chatLog{ max-height:18vh; } }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+
+<div id="mind" style="display:none">
+  <div class="ttl">COMPETING BEHAVIOURS &middot; WINNER CLAIMS DOFs</div>
+  <div id="mindPanel"></div>
+  <div class="ttl" style="margin-top:7px">INTERNAL VARIABLES</div>
+  <div id="ivPanel"></div>
+  <div class="ttl" style="margin-top:7px">STANDING REQUESTS</div>
+  <div id="prefLine" class="iv" style="font-size:10px">&mdash;</div>
+  <div id="held">&mdash;</div>
+</div>
+
+<div id="chatWrap">
+  <div id="chatLog"></div>
+  <div id="progWrap"><span id="progVia" class="via">—</span><div id="prog"></div></div>
+  <input id="say" placeholder="say something to Argos…" autocomplete="off" spellcheck="false">
+</div>
+
+<div id="dock">
+  <div class="row" id="actRow"><span class="lbl">WORLD</span></div>
+  <div class="row" id="trainRow"><span class="lbl">TRAIN</span></div>
+  <div class="row" id="sysRow"><span class="lbl">STATE</span><button class="chip act" id="mindBtn">MIND</button></div>
+  <div id="status">ready</div>
+</div>
+
+<script>
+/*==PURE-BEGIN==*/
+/* HALF-DOG ARGOS — shared geometry/render core, same lineage as HALF-HERO:
+   own math, own z-buffer software rasterizer, no GPU, no dependencies. */
+"use strict";
+var SEG_RADIAL = 10, CAP_RINGS = 4, MAX_KEYS = 16;
+function assert(c, m){ if(!c){ throw new Error("HALF-HERO invariant: " + m); } }
+var DEG = Math.PI/180;
+
+/* ================= math (owned, so everything is testable) ================= */
+function v3(x,y,z){ return [x,y,z]; }
+function vsub(a,b){ return [a[0]-b[0],a[1]-b[1],a[2]-b[2]]; }
+function vcross(a,b){ return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
+function vdot(a,b){ return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; }
+function vlen(a){ return Math.sqrt(vdot(a,a)); }
+function vnorm(a){ var l=vlen(a)||1; return [a[0]/l,a[1]/l,a[2]/l]; }
+function quatFromEulerXYZ(ex,ey,ez){
+  var x=ex*DEG/2, y=ey*DEG/2, z=ez*DEG/2;
+  var c1=Math.cos(x), s1=Math.sin(x), c2=Math.cos(y), s2=Math.sin(y), c3=Math.cos(z), s3=Math.sin(z);
+  return [ s1*c2*c3 + c1*s2*s3, c1*s2*c3 - s1*c2*s3, c1*c2*s3 + s1*s2*c3, c1*c2*c3 - s1*s2*s3 ];
+}
+function qmul(a,b){
+  return [ a[3]*b[0]+a[0]*b[3]+a[1]*b[2]-a[2]*b[1],
+           a[3]*b[1]-a[0]*b[2]+a[1]*b[3]+a[2]*b[0],
+           a[3]*b[2]+a[0]*b[1]-a[1]*b[0]+a[2]*b[3],
+           a[3]*b[3]-a[0]*b[0]-a[1]*b[1]-a[2]*b[2] ];
+}
+function qnlerp(a,b,t){
+  var d=a[0]*b[0]+a[1]*b[1]+a[2]*b[2]+a[3]*b[3],s=d<0?-1:1;
+  var q=[a[0]+(s*b[0]-a[0])*t,a[1]+(s*b[1]-a[1])*t,a[2]+(s*b[2]-a[2])*t,a[3]+(s*b[3]-a[3])*t];
+  var n=Math.hypot(q[0],q[1],q[2],q[3])||1;
+  return [q[0]/n,q[1]/n,q[2]/n,q[3]/n];
+}
+function mIdent(){ return [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]; }
+function mCompose(t, q, s){                      /* column-major 4x4 */
+  var x=q[0],y=q[1],z=q[2],w=q[3];
+  var x2=x+x, y2=y+y, z2=z+z;
+  var xx=x*x2, xy=x*y2, xz=x*z2, yy=y*y2, yz=y*z2, zz=z*z2;
+  var wx=w*x2, wy=w*y2, wz=w*z2;
+  var sx=s[0], sy=s[1], sz=s[2];
+  return [
+    (1-(yy+zz))*sx, (xy+wz)*sx, (xz-wy)*sx, 0,
+    (xy-wz)*sy, (1-(xx+zz))*sy, (yz+wx)*sy, 0,
+    (xz+wy)*sz, (yz-wx)*sz, (1-(xx+yy))*sz, 0,
+    t[0], t[1], t[2], 1
+  ];
+}
+function mMul(a,b){                               /* a*b */
+  var o=new Array(16);
+  for(var c=0;c<4;c++){
+    for(var r=0;r<4;r++){
+      o[c*4+r] = a[r]*b[c*4] + a[4+r]*b[c*4+1] + a[8+r]*b[c*4+2] + a[12+r]*b[c*4+3];
+    }
+  }
+  return o;
+}
+function mApply(m,p){
+  var x=p[0],y=p[1],z=p[2];
+  var w = m[3]*x + m[7]*y + m[11]*z + m[15];
+  if(w === 0){ w = 1; }
+  return [ (m[0]*x+m[4]*y+m[8]*z+m[12])/w,
+           (m[1]*x+m[5]*y+m[9]*z+m[13])/w,
+           (m[2]*x+m[6]*y+m[10]*z+m[14])/w ];
+}
+function mLookAt(eye, tgt, up){
+  var z = vnorm(vsub(eye, tgt));
+  var x = vnorm(vcross(up, z));
+  var y = vcross(z, x);
+  return [ x[0], y[0], z[0], 0,
+           x[1], y[1], z[1], 0,
+           x[2], y[2], z[2], 0,
+           -vdot(x,eye), -vdot(y,eye), -vdot(z,eye), 1 ];
+}
+function mPersp(fovDeg, aspect, near, far){
+  var f = 1/Math.tan(fovDeg*DEG/2);
+  return [ f/aspect,0,0,0,  0,f,0,0,  0,0,(far+near)/(near-far),-1,  0,0,(2*far*near)/(near-far),0 ];
+}
+
+/* ================= geometry ================= */
+function geoBox(dims, off){
+  var w=dims[0]/2, h=dims[1]/2, d=dims[2]/2, ox=off[0], oy=off[1], oz=off[2];
+  var F = [
+    { n:[ 1,0,0], c:[[ w,-h,-d],[ w, h,-d],[ w, h, d],[ w,-h, d]] },
+    { n:[-1,0,0], c:[[-w,-h, d],[-w, h, d],[-w, h,-d],[-w,-h,-d]] },
+    { n:[0, 1,0], c:[[-w, h,-d],[-w, h, d],[ w, h, d],[ w, h,-d]] },
+    { n:[0,-1,0], c:[[-w,-h, d],[-w,-h,-d],[ w,-h,-d],[ w,-h, d]] },
+    { n:[0,0, 1], c:[[-w,-h, d],[ w,-h, d],[ w, h, d],[-w, h, d]] },
+    { n:[0,0,-1], c:[[ w,-h,-d],[-w,-h,-d],[-w, h,-d],[ w, h,-d]] } ];
+  var pos=[], nrm=[], idx=[], f, v;
+  for(f=0; f<6; f++){
+    var base=f*4;
+    for(v=0; v<4; v++){
+      pos.push(F[f].c[v][0]+ox, F[f].c[v][1]+oy, F[f].c[v][2]+oz);
+      nrm.push(F[f].n[0], F[f].n[1], F[f].n[2]);
+    }
+    idx.push(base, base+1, base+2, base, base+2, base+3);
+  }
+  return { pos:new Float32Array(pos), nrm:new Float32Array(nrm), idx:new Uint16Array(idx) };
+}
+function geoCapsule(r, h, off){
+  var ox=off[0], oy=off[1], oz=off[2], rows=[], i, j;
+  for(i=0; i<=CAP_RINGS; i++){ rows.push({ phi:(Math.PI/2)*(1-i/CAP_RINGS), yc:+h/2 }); }
+  for(i=0; i<=CAP_RINGS; i++){ rows.push({ phi:-(Math.PI/2)*(i/CAP_RINGS), yc:-h/2 }); }
+  var pos=[], nrm=[], idx=[];
+  for(i=0; i<rows.length; i++){
+    var sp=Math.sin(rows[i].phi), cp=Math.cos(rows[i].phi);
+    for(j=0; j<=SEG_RADIAL; j++){
+      var th=(j/SEG_RADIAL)*Math.PI*2;
+      var nx=Math.cos(th)*cp, ny=sp, nz=Math.sin(th)*cp;
+      pos.push(nx*r+ox, ny*r+rows[i].yc+oy, nz*r+oz);
+      nrm.push(nx, ny, nz);
+    }
+  }
+  var W=SEG_RADIAL+1;
+  for(i=0; i<rows.length-1; i++){
+    for(j=0; j<SEG_RADIAL; j++){ var a=i*W+j, b=a+W; idx.push(a, a+1, b, a+1, b+1, b); }
+  }
+  return { pos:new Float32Array(pos), nrm:new Float32Array(nrm), idx:new Uint16Array(idx) };
+}
+function swapYZ(g){
+  var i, p = g.pos, n = g.nrm;
+  for(i=0;i<p.length;i+=3){
+    var y=p[i+1], z=p[i+2];
+    p[i+1] = z; p[i+2] = -y;
+    var ny=n[i+1], nz=n[i+2];
+    n[i+1] = nz; n[i+2] = -ny;
+  }
+  return g;
+}
+function geoForSolid(s){
+  if(s.kind==="box"){ return geoBox(s.dims, s.off); }
+  if(s.kind==="capsule"){
+    if(s.axis === "z"){                       /* fore-and-aft: torso, neck, tail */
+      var g = geoCapsule(s.r, s.h, [s.off[0], -s.off[2], s.off[1]]);
+      return swapYZ(g);
+    }
+    return geoCapsule(s.r, s.h, s.off);
+  }
+  if(s.kind==="sphere"){ return geoCapsule(s.r, 0, s.off); }
+  throw new Error("unknown solid kind: " + s.kind);
+}
+function solidAsSegment(s){
+  if(s.kind==="sphere"){ return { a:s.off.slice(), b:s.off.slice(), r:s.r }; }
+  if(s.kind==="capsule"){
+    if(s.axis === "z"){
+      return { a:[s.off[0],s.off[1],s.off[2]+s.h/2], b:[s.off[0],s.off[1],s.off[2]-s.h/2], r:s.r };
+    }
+    return { a:[s.off[0],s.off[1]+s.h/2,s.off[2]], b:[s.off[0],s.off[1]-s.h/2,s.off[2]], r:s.r };
+  }
+  var d=s.dims, axis=0;
+  if(d[1]>=d[0] && d[1]>=d[2]){ axis=1; } else if(d[2]>=d[0] && d[2]>=d[1]){ axis=2; }
+  var sorted=[d[0],d[1],d[2]].slice().sort(function(x,y){return y-x;});
+  var r=sorted[1]/2, half=Math.max(d[axis]/2 - r, 0.004);
+  var a=s.off.slice(), b=s.off.slice();
+  a[axis]+=half; b[axis]-=half;
+  return { a:a, b:b, r:r };
+}
+
+/* ================= CONTOUR REGISTER =================
+   Adapted from neuroglow: a head described by stacked profile contours instead of
+   tone. Planes cut the mesh on an axis; each triangle crossing a plane yields one
+   segment. Form is drawn by section lines, which is the ink register's own logic. */
+function contourSegments(mesh, axis, count, lo, hi){
+  var P = mesh.pos, I = mesh.idx, segs = [], k, s;
+  var ai = axis === "x" ? 0 : (axis === "y" ? 1 : 2);
+  if(lo === undefined){
+    lo = 9e9; hi = -9e9;
+    for(k = ai; k < P.length; k += 3){
+      if(P[k] < lo){ lo = P[k]; }
+      if(P[k] > hi){ hi = P[k]; }
+    }
+    lo += (hi-lo)*0.04; hi -= (hi-lo)*0.04;
+  }
+  for(s = 0; s < count; s++){
+    var plane = lo + (hi-lo) * (count === 1 ? 0.5 : s/(count-1));
+    for(k = 0; k < I.length; k += 3){
+      var a = I[k]*3, b = I[k+1]*3, c = I[k+2]*3;
+      var da = P[a+ai]-plane, db = P[b+ai]-plane, dc = P[c+ai]-plane;
+      var pts = [], e;
+      var edges = [[a,b,da,db],[b,c,db,dc],[c,a,dc,da]];
+      for(e = 0; e < 3; e++){
+        var d0 = edges[e][2], d1 = edges[e][3];
+        if((d0 <= 0 && d1 > 0) || (d0 > 0 && d1 <= 0)){
+          var t = d0/(d0-d1), i0 = edges[e][0], i1 = edges[e][1];
+          pts.push([ P[i0]+(P[i1]-P[i0])*t, P[i0+1]+(P[i1+1]-P[i0+1])*t, P[i0+2]+(P[i1+2]-P[i0+2])*t ]);
+        }
+      }
+      if(pts.length === 2){ segs.push({ a:pts[0], b:pts[1], plane:plane, axis:axis }); }
+    }
+  }
+  return segs;
+}
+/* draw contours through the same camera the rasterizer uses (depth-faded, ink) */
+function renderContours(ctx, W, H, cam, entries, opts){
+  opts = opts || {};
+  var view = mLookAt(cam.pos, cam.target, [0,1,0]);
+  var proj = mPersp(cam.fov, W/H, 0.05, 60);
+  var vp = mMul(proj, view), i, e;
+  if(!opts.keepBackground){ ctx.fillStyle = opts.paper || "#f2ecdf"; ctx.fillRect(0,0,W,H); }
+  ctx.lineCap = "round";
+  ctx.lineWidth = opts.weight || Math.max(1, W/460);
+  for(e = 0; e < entries.length; e++){
+    var segs = entries[e].segs, M = entries[e].world;
+    var near = 9e9, far = -9e9, zs = [];
+    for(i = 0; i < segs.length; i++){
+      var wm = mApply(M, [(segs[i].a[0]+segs[i].b[0])/2, (segs[i].a[1]+segs[i].b[1])/2, (segs[i].a[2]+segs[i].b[2])/2]);
+      var z = mApply(view, wm)[2];
+      zs.push(z);
+      if(z < near){ near = z; }
+      if(z > far){ far = z; }
+    }
+    for(i = 0; i < segs.length; i++){
+      var wa = mApply(M, segs[i].a), wb = mApply(M, segs[i].b);
+      var ca = mApply(vp, wa), cb = mApply(vp, wb);
+      var x0 = (ca[0]+1)/2*W, y0 = (1-ca[1])/2*H, x1 = (cb[0]+1)/2*W, y1 = (1-cb[1])/2*H;
+      var t = far === near ? 1 : (zs[i]-near)/(far-near);      /* nearer = darker */
+      var alpha = 0.20 + 0.80*t;
+      ctx.strokeStyle = "rgba(19,21,24," + alpha.toFixed(3) + ")";
+      ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+    }
+  }
+  return entries.length;
+}
+/* ---------------- z-buffered software rasterizer ---------------- */
+function makeCam(pos, target, fovDeg){ return { pos:pos, target:target, fov:fovDeg }; }
+var SKIN_RGB = [231,218,196], INK_RGB = [19,21,24];
+function shadeLevels(t, lamb, levels){
+  var base = t > 0.5 ? INK_RGB : SKIN_RGB;
+  var q = lamb;                               /* stable light, no animated colour bands */
+  var s = 0.52 + 0.48*q;                 /* ambient floor: unlit backs must still read as form */
+  return [ base[0]*s, base[1]*s, base[2]*s ];
+}
+function renderScene(ctx, W, H, cam, rigs, opts){
+  opts = opts || {};
+  var levels = opts.levels || 12;
+  var view = mLookAt(cam.pos, cam.target, [0,1,0]);
+  var proj = mPersp(cam.fov, W/H, 0.05, 60);
+  var vp = mMul(proj, view);
+  var light = vnorm([-0.45, 0.72, 0.85]);
+  /* keepBackground composites onto whatever is already on the canvas (the stage),
+     instead of clearing to paper — the rasterizer owns pixels, not the whole frame */
+  var img = opts.keepBackground ? ctx.getImageData(0, 0, W, H) : ctx.createImageData(W, H);
+  var buf = img.data;
+  var paper = opts.paperRGB || [242,236,223];
+  var i, j;
+  if(!opts.keepBackground){
+    for(i=0;i<W*H;i++){
+      buf[i*4]=paper[0]; buf[i*4+1]=paper[1]; buf[i*4+2]=paper[2]; buf[i*4+3]=255;
+    }
+  }
+  var zbuf = new Float32Array(W*H);
+  for(i=0;i<zbuf.length;i++){ zbuf[i] = -Infinity; }
+  var sx=new Float32Array(3), sy=new Float32Array(3), sz=new Float32Array(3);
+
+  function drawMesh(mesh, world, matTone, flatRGB){
+    var np = mesh.pos.length/3, k;   /* k is local: the caller's loop counters must survive */
+    var wp = new Float32Array(np*3), wn = new Float32Array(np*3), sp = new Float32Array(np*3);
+    for(k=0;k<np;k++){
+      var p = mApply(world, [mesh.pos[k*3], mesh.pos[k*3+1], mesh.pos[k*3+2]]);
+      wp[k*3]=p[0]; wp[k*3+1]=p[1]; wp[k*3+2]=p[2];
+      var o = mApply(world, [0,0,0]);
+      var q = mApply(world, [mesh.nrm[k*3], mesh.nrm[k*3+1], mesh.nrm[k*3+2]]);
+      var nx=q[0]-o[0], ny=q[1]-o[1], nz=q[2]-o[2];
+      var l = Math.hypot(nx,ny,nz) || 1;
+      wn[k*3]=nx/l; wn[k*3+1]=ny/l; wn[k*3+2]=nz/l;
+      var c = mApply(vp, p);
+      var vz = mApply(view, p)[2];
+      sp[k*3]=(c[0]+1)/2*W; sp[k*3+1]=(1-c[1])/2*H; sp[k*3+2]=vz;
+    }
+    for(k=0;k<mesh.idx.length;k+=3){
+      var a=mesh.idx[k], b=mesh.idx[k+1], c2=mesh.idx[k+2];
+      sx[0]=sp[a*3]; sy[0]=sp[a*3+1]; sz[0]=sp[a*3+2];
+      sx[1]=sp[b*3]; sy[1]=sp[b*3+1]; sz[1]=sp[b*3+2];
+      sx[2]=sp[c2*3]; sy[2]=sp[c2*3+1]; sz[2]=sp[c2*3+2];
+      if(sz[0] > -0.06 || sz[1] > -0.06 || sz[2] > -0.06){ continue; }     /* behind the eye */
+      var area = (sx[1]-sx[0])*(sy[2]-sy[0]) - (sx[2]-sx[0])*(sy[1]-sy[0]);
+      if(area >= 0){
+        if(!mesh.doubleSided){ continue; }
+        /* Marching tetrahedra and skinned deformation can disagree with the
+           primitive rasterizer's historical winding convention. Reorder the
+           projected triangle; the z-buffer still selects only the near skin. */
+        var ti=b;b=c2;c2=ti;
+        var ts=sx[1];sx[1]=sx[2];sx[2]=ts;
+        ts=sy[1];sy[1]=sy[2];sy[2]=ts;
+        ts=sz[1];sz[1]=sz[2];sz[2]=ts;
+        area=-area;
+      }
+      var la = Math.max(0, wn[a*3]*light[0]+wn[a*3+1]*light[1]+wn[a*3+2]*light[2]);
+      var ua = wn[a*3+1], ub = wn[b*3+1], uc = wn[c*3+1];   /* skylight term */
+      var lb = Math.max(0, wn[b*3]*light[0]+wn[b*3+1]*light[1]+wn[b*3+2]*light[2]);
+      var lc = Math.max(0, wn[c2*3]*light[0]+wn[c2*3+1]*light[1]+wn[c2*3+2]*light[2]);
+      var ta = mesh.tone ? mesh.tone[a] : 0, tb = mesh.tone ? mesh.tone[b] : 0,
+          tc = mesh.tone ? mesh.tone[c2] : 0;
+      var x0=Math.max(0, Math.floor(Math.min(sx[0],sx[1],sx[2]))),
+          x1=Math.min(W-1, Math.ceil(Math.max(sx[0],sx[1],sx[2]))),
+          y0=Math.max(0, Math.floor(Math.min(sy[0],sy[1],sy[2]))),
+          y1=Math.min(H-1, Math.ceil(Math.max(sy[0],sy[1],sy[2])));
+      if(x1<x0 || y1<y0){ continue; }
+      var inv = 1/area;
+      for(var jj=y0; jj<=y1; jj++){
+        for(var ii=x0; ii<=x1; ii++){
+          var pxc=ii+0.5, pyc=jj+0.5;
+          var w0=((sx[1]-pxc)*(sy[2]-pyc)-(sx[2]-pxc)*(sy[1]-pyc))*inv;
+          /* Conservative edge coverage prevents white pinholes between adjacent
+             marching-surface triangles after projection. */
+          if(w0 < -0.025){ continue; }
+          var w1=((sx[2]-pxc)*(sy[0]-pyc)-(sx[0]-pxc)*(sy[2]-pyc))*inv;
+          if(w1 < -0.025){ continue; }
+          var w2=1-w0-w1;
+          if(w2 < -0.025){ continue; }
+          var zz = w0*sz[0]+w1*sz[1]+w2*sz[2];
+          var di = jj*W+ii;
+          if(zz <= zbuf[di]){ continue; }
+          zbuf[di]=zz;
+          var lam = w0*la + w1*lb + w2*lc;                 /* smooth shading */
+          var tn  = w0*ta + w1*tb + w2*tc;                 /* tone resolved per pixel */
+          var up = w0*ua + w1*ub + w2*uc;
+          var rgb = flatRGB ? shadeFlat(flatRGB, lam, levels, up)
+                            : shadeLevels(tn > 0.5 ? 1 : 0, lam, levels);
+          buf[di*4]=rgb[0]; buf[di*4+1]=rgb[1]; buf[di*4+2]=rgb[2];
+        }
+      }
+    }
+  }
+  /* Warm key from the front-left plus a cool sky fill from above — the Niu Lai light:
+     soft, high ambient, no harsh terminator, so COLOUR carries the form. With no
+     textures at all, the lighting and the palette are the entire material. */
+  function shadeFlat(rgb, lamb, lv, up){
+    var q = lamb;                             /* continuous Lambert: breathing cannot pulse colour */
+    var warm = 0.46 + 0.54*q;
+    var sky  = 0.55 + 0.45*Math.max(0, up || 0);
+    var r2 = rgb[0]*(warm*0.90 + sky*0.16);
+    var g2 = rgb[1]*(warm*0.88 + sky*0.17);
+    var b2 = rgb[2]*(warm*0.84 + sky*0.22);
+    return [Math.min(255,r2), Math.min(255,g2), Math.min(255,b2)];
+  }
+
+  /* ground as two triangles */
+  if(opts.ground !== false){
+    var g = { pos:new Float32Array([-3.4,0,-3.4, 3.4,0,-3.4, 3.4,0,3.4, -3.4,0,3.4]),
+              nrm:new Float32Array([0,1,0, 0,1,0, 0,1,0, 0,1,0]),
+              idx:new Uint16Array([0,2,1, 0,3,2]), tone:null };
+    drawMesh(g, mIdent(), 0, [233,225,207]);
+  }
+  for(var r=0;r<rigs.length;r++){
+    var rig = rigs[r];
+    updateWorld(rig);
+    if(rig.sculpt){
+      updateSculpt(rig);
+      for(var sm=0;sm<rig.sculpt.parts.length;sm++){
+        var sculptPart=rig.sculpt.parts[sm];
+        drawMesh(sculptPart, mIdent(), null, MAT_RGB_DOG[sculptPart.mat]);
+      }
+    }
+    for(i=0;i<rig.order.length;i++){
+      var node = rig.nodes[rig.order[i]];
+      if(node.skipRender || node.sculpted){ continue; }
+      if(!node.mesh){
+        node.mesh = geoForSolid(node.solid);
+        node.mesh.tone = null;
+        /* shape is baked into the GEOMETRY, never into the node transform — a
+           non-uniform node scale shears the children of any bone that rotates */
+        if(node.shape){
+          var sp = node.mesh.pos, sn = node.mesh.nrm, si;
+          for(si=0; si<sp.length; si+=3){
+            sp[si] *= node.shape[0]; sp[si+1] *= node.shape[1]; sp[si+2] *= node.shape[2];
+            sn[si] /= node.shape[0]; sn[si+1] /= node.shape[1]; sn[si+2] /= node.shape[2];
+            var ln = Math.hypot(sn[si], sn[si+1], sn[si+2]) || 1;
+            sn[si] /= ln; sn[si+1] /= ln; sn[si+2] /= ln;
+          }
+        }
+      }
+      drawMesh(node.mesh, node.world, null, MAT_RGB_DOG[node.mat]);
+    }
+    /* (the human's sculpted-head branch lives in HALF-HERO; a dog is all bones) */
+    for(var pn in rig.props){
+      if(!rig.props.hasOwnProperty(pn) || !rig.props[pn].visible){ continue; }
+      var pr = rig.props[pn];
+      if(!pr.mesh){ pr.mesh = geoForSolid(pr.solid); }
+      if(rig.nodes[pr.bone]){ drawMesh(pr.mesh, mMul(rig.nodes[pr.bone].world, mCompose(pr.t, pr.q, [1,1,1])), null, MAT_RGB_DOG[pr.mat]); }
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return 1;
+}
+var MAT_RGB = [[44,58,72],[52,52,57],[231,218,196],[19,21,24],[248,245,236]];
+
+/* ================= ARGOS — the body =================
+   A quadruped in the HALF-HERO idiom: rigid solids on a named bone tree, so the
+   same rasterizer, contour register and GLB packer carry him. +Z is forward. */
+/* Palette after Niu Lai: a warm saturated coat against a PALE muzzle and pink
+   extremities. The charm there comes from the colour contrast and the big soft eye,
+   not from surface detail — which suits a renderer that has no textures at all. */
+var D_MAT = [
+  { name:"COAT",   color:[0.847,0.463,0.153,1], css:"#d87627" },
+  { name:"BELLY",  color:[0.956,0.878,0.741,1], css:"#f4e0bd" },
+  { name:"MUZZLE", color:[0.968,0.827,0.784,1], css:"#f7d3c8" },
+  { name:"INK",    color:[0.106,0.094,0.086,1], css:"#1b1816" },
+  { name:"EYE",    color:[0.988,0.980,0.965,1], css:"#fcfaf6" },
+  { name:"IRIS",   color:[0.353,0.196,0.098,1], css:"#5a3219" },
+  { name:"NOSE",   color:[0.018,0.016,0.014,1], css:"#050403" },
+  { name:"PAD",    color:[0.851,0.596,0.553,1], css:"#d9988d" },
+  { name:"MOUTH",  color:[0.075,0.025,0.022,1], css:"#130706" },
+  { name:"TOOTH",  color:[0.965,0.918,0.790,1], css:"#f6eaca" },
+  { name:"TONGUE", color:[0.710,0.275,0.310,1], css:"#b5464f" }
+];
+var C_COAT=0, C_BELLY=1, C_MUZZLE=2, C_INK=3, C_EYE=4, C_IRIS=5, C_NOSE=6, C_PAD=7,
+    C_MOUTH=8, C_TOOTH=9, C_TONGUE=10;
+
+/* Proportions taken from his ARGOS 3D RIG REFERENCE sheet, which states them as
+   ratios of shoulder height: body length (nose to tail base) 1.25, head height 0.35,
+   tail 0.55. Shoulder height is set to a Labrador's 0.56 m and everything derives. */
+var SHOULDER_H = 0.56;
+var DOG_PROPORTIONS = { bodyLength:1.25, headHeight:0.35, tailLength:0.55 };
+
+var DOG_BONES = [
+  /* ---- TRUNK: a horizontal barrel, not a stack of spheres ----
+     Per-bone scale makes the ribcage LONG and NARROW (deep chest, tucked waist),
+     which is the single change that turns a pile of masses into a quadruped. */
+  { name:"pelvis",     parent:null,       t:[0,0.442,-0.180], s:[0.86,0.92,1.00],
+    solid:{kind:"capsule", axis:"z", r:0.098, h:0.085, off:[0,-0.008,0.030], mat:C_COAT} },
+  { name:"loin",       parent:"pelvis",   t:[0,0.004,0.100],  s:[0.74,0.82,1.00],
+    solid:{kind:"capsule", axis:"z", r:0.098, h:0.115, off:[0,-0.004,0.050], mat:C_COAT} },
+  { name:"ribcage",    parent:"loin",     t:[0,0.016,0.158],  s:[0.80,1.06,1.00],
+    solid:{kind:"capsule", axis:"z", r:0.112, h:0.130, off:[0,-0.014,0.040], mat:C_COAT} },
+  { name:"brisket",    parent:"ribcage",  t:[0,-0.062,0.020], s:[0.78,0.90,1.00],
+    solid:{kind:"capsule", axis:"z", r:0.070, h:0.130, off:[0,0,0.010], mat:C_COAT} },
+  { name:"withers",    parent:"ribcage",  t:[0,0.070,0.062],  s:[0.86,0.86,1.00],
+    solid:{kind:"capsule", axis:"z", r:0.074, h:0.090, off:[0,-0.014,-0.010], mat:C_COAT} },
+  { name:"leftHaunch", parent:"pelvis",   t:[0.050,-0.014,-0.006], s:[0.72,1.02,1.10],
+    solid:{kind:"sphere",  r:0.088, off:[0,0,0], mat:C_COAT} },
+  { name:"rightHaunch",parent:"pelvis",   t:[-0.050,-0.014,-0.006], s:[0.72,1.02,1.10],
+    solid:{kind:"sphere",  r:0.088, off:[0,0,0], mat:C_COAT} },
+  { name:"leftShoulder", parent:"ribcage", t:[0.056,0.006,0.080], s:[0.62,1.00,1.10],
+    solid:{kind:"sphere",  r:0.072, off:[0,0,0], mat:C_COAT} },
+  { name:"rightShoulder",parent:"ribcage", t:[-0.056,0.006,0.080], s:[0.62,1.00,1.10],
+    solid:{kind:"sphere",  r:0.072, off:[0,0,0], mat:C_COAT} },
+
+  /* ---- NECK projects FORWARD from the shoulders, not up like a torso ---- */
+  { name:"neck",       parent:"withers",  t:[0,0.026,0.062],  s:[0.92,0.92,1.00],
+    solid:{kind:"capsule", axis:"z", r:0.058, h:0.105, off:[0,0.020,0.058], mat:C_COAT} },
+  { name:"head",       parent:"neck",     t:[0,0.050,0.100],  s:[0.92,0.96,1.00],
+    solid:{kind:"sphere",  r:0.083, off:[0,0.006,0.008], mat:C_COAT} },
+  { name:"brow",       parent:"head",     t:[0,0.036,0.040],  s:[1.00,0.70,0.80],
+    solid:{kind:"capsule", axis:"x", r:0.030, h:0.052, off:[0,0,0], mat:C_COAT} },
+  { name:"muzzle",     parent:"head",     t:[0,-0.028,0.062],
+    solid:{kind:"capsule", axis:"z", r:0.042, h:0.056, off:[0,0,0.032], mat:C_MUZZLE} },
+  /* A readable black nose cap. It sits beyond the muzzle instead of intersecting
+     its middle, so it cannot disappear inside the pale muzzle from 3/4 views. */
+  { name:"nose",       parent:"muzzle",   t:[0,0.006,0.090], s:[1.18,0.88,0.78],
+    solid:{kind:"sphere",  r:0.033, off:[0,0,0], mat:C_NOSE} },
+  { name:"jaw",        parent:"muzzle",   t:[0,-0.028,0.004],
+    solid:{kind:"capsule", axis:"z", r:0.030, h:0.034, off:[0,-0.006,0.020], mat:C_MUZZLE} },
+  { name:"chin",       parent:"jaw",      t:[0,-0.008,0.006],
+    solid:{kind:"capsule", axis:"z", r:0.024, h:0.022, off:[0,0,0.012], mat:C_BELLY} },
+  /* Mouth anatomy is a separate readable layer inside the continuous face skin.
+     The cavity stays with the skull; lower teeth and tongue follow the jaw. */
+  { name:"mouthCavity",parent:"muzzle",   t:[0,-0.030,0.050], s:[0.82,0.24,0.62],
+    solid:{kind:"capsule", axis:"z", r:0.026, h:0.034, off:[0,0,0.004], mat:C_MOUTH} },
+  { name:"upperTeeth", parent:"muzzle",   t:[0,-0.039,0.064],
+    solid:{kind:"box", dims:[0.042,0.009,0.012], off:[0,0,0], mat:C_TOOTH} },
+  { name:"leftFang",   parent:"muzzle",   t:[0.018,-0.043,0.067],
+    solid:{kind:"capsule", axis:"y", r:0.0038, h:0.008, off:[0,-0.003,0], mat:C_TOOTH} },
+  { name:"rightFang",  parent:"muzzle",   t:[-0.018,-0.043,0.067],
+    solid:{kind:"capsule", axis:"y", r:0.0038, h:0.008, off:[0,-0.003,0], mat:C_TOOTH} },
+  { name:"lowerTeeth", parent:"jaw",      t:[0,0.021,0.050],
+    solid:{kind:"box", dims:[0.038,0.008,0.011], off:[0,0,0], mat:C_TOOTH} },
+  { name:"tongue",     parent:"jaw",      t:[0,0.007,0.038], s:[0.66,0.24,0.62],
+    solid:{kind:"capsule", axis:"z", r:0.018, h:0.030, off:[0,0,0.008], mat:C_TONGUE} },
+  { name:"chest",      parent:"brisket",  t:[0,-0.008,0.034], s:[0.72,0.90,1.00],
+    solid:{kind:"capsule", axis:"z", r:0.050, h:0.062, off:[0,0,0.008], mat:C_BELLY} },
+  { name:"leftEye",    parent:"head",     t:[0.040,0.026,0.055],
+    solid:{kind:"sphere",  r:0.021, off:[0,0,0], mat:C_EYE} },
+  { name:"rightEye",   parent:"head",     t:[-0.040,0.026,0.055],
+    solid:{kind:"sphere",  r:0.021, off:[0,0,0], mat:C_EYE} },
+  { name:"leftIris",   parent:"leftEye",  t:[0.001,0,0.013],
+    solid:{kind:"sphere",  r:0.014, off:[0,0,0], mat:C_IRIS} },
+  { name:"rightIris",  parent:"rightEye", t:[-0.001,0,0.013],
+    solid:{kind:"sphere",  r:0.014, off:[0,0,0], mat:C_IRIS} },
+  { name:"leftPupil",  parent:"leftIris", t:[0,0,0.008],
+    solid:{kind:"sphere",  r:0.008, off:[0,0,0], mat:C_INK} },
+  { name:"rightPupil", parent:"rightIris",t:[0,0,0.008],
+    solid:{kind:"sphere",  r:0.008, off:[0,0,0], mat:C_INK} },
+  { name:"leftBrow",   parent:"head",     t:[0.038,0.054,0.046],
+    solid:{kind:"box",  dims:[0.034,0.010,0.015], off:[0,0,0], mat:C_INK} },
+  { name:"rightBrow",  parent:"head",     t:[-0.038,0.054,0.046],
+    solid:{kind:"box",  dims:[0.034,0.010,0.015], off:[0,0,0], mat:C_INK} },
+  /* floppy ears: flat flaps hanging beside the cheek */
+  { name:"leftEar",    parent:"head",     t:[0.070,0.040,-0.006], s:[0.50,1.00,0.90],
+    solid:{kind:"capsule", axis:"y", r:0.046, h:0.090, off:[0.010,-0.080,-0.012], mat:C_COAT} },
+  { name:"rightEar",   parent:"head",     t:[-0.070,0.040,-0.006], s:[0.50,1.00,0.90],
+    solid:{kind:"capsule", axis:"y", r:0.046, h:0.090, off:[-0.010,-0.080,-0.012], mat:C_COAT} },
+
+  { name:"tail1",      parent:"pelvis",   t:[0,0.048,-0.078],
+    solid:{kind:"capsule", axis:"z", r:0.024, h:0.060, off:[0,0,-0.038], mat:C_COAT} },
+  { name:"tail2",      parent:"tail1",    t:[0,-0.016,-0.094],
+    solid:{kind:"capsule", axis:"z", r:0.018, h:0.084, off:[0,0,-0.046], mat:C_COAT} },
+  { name:"tail3",      parent:"tail2",    t:[0,-0.028,-0.114],
+    solid:{kind:"capsule", axis:"z", r:0.012, h:0.108, off:[0,0,-0.056], mat:C_COAT} },
+
+  /* ---- LEGS: continuous chains. Segments OVERLAP at every joint so the limb
+     reads as one thing; front legs pulled back and in under the shoulder. ---- */
+  { name:"leftFrontHip",  parent:"ribcage",        t:[0.060,-0.024,0.052],
+    solid:{kind:"capsule", r:0.040, h:0.088, off:[0,-0.048,0], mat:C_COAT} },
+  { name:"leftFrontUpper",parent:"leftFrontHip",   t:[0,-0.140,-0.002],
+    solid:{kind:"capsule", r:0.038, h:0.104, off:[0,-0.058,0], mat:C_COAT} },
+  { name:"leftFrontLower",parent:"leftFrontUpper", t:[0,-0.150,0],       s:[0.80,1.00,0.86],
+    solid:{kind:"capsule", r:0.029, h:0.108, off:[0,-0.058,0], mat:C_COAT} },
+  { name:"leftFrontPaw",  parent:"leftFrontLower", t:[0,-0.126,0],
+    solid:{kind:"box",  dims:[0.052,0.032,0.096], off:[0,-0.015,0.034], mat:C_COAT} },
+  { name:"leftFrontPad",  parent:"leftFrontPaw",   t:[0,-0.032,0.016],
+    solid:{kind:"box",  dims:[0.044,0.010,0.058], off:[0,0,0], mat:C_PAD} },
+  { name:"rightFrontHip",  parent:"ribcage",         t:[-0.060,-0.024,0.052],
+    solid:{kind:"capsule", r:0.040, h:0.088, off:[0,-0.048,0], mat:C_COAT} },
+  { name:"rightFrontUpper",parent:"rightFrontHip",   t:[0,-0.140,-0.002],
+    solid:{kind:"capsule", r:0.038, h:0.104, off:[0,-0.058,0], mat:C_COAT} },
+  { name:"rightFrontLower",parent:"rightFrontUpper", t:[0,-0.150,0],      s:[0.80,1.00,0.86],
+    solid:{kind:"capsule", r:0.029, h:0.108, off:[0,-0.058,0], mat:C_COAT} },
+  { name:"rightFrontPaw",  parent:"rightFrontLower", t:[0,-0.126,0],
+    solid:{kind:"box",  dims:[0.052,0.032,0.096], off:[0,-0.015,0.034], mat:C_COAT} },
+  { name:"rightFrontPad",  parent:"rightFrontPaw",   t:[0,-0.032,0.016],
+    solid:{kind:"box",  dims:[0.044,0.010,0.058], off:[0,0,0], mat:C_PAD} },
+  /* rear: thigh, then a LONG tibia and a distinct METATARSUS — the hock zigzag */
+  { name:"leftRearHip",  parent:"pelvis",        t:[0.050,-0.030,-0.004],
+    solid:{kind:"capsule", r:0.046, h:0.098, off:[0,-0.052,0], mat:C_COAT} },
+  { name:"leftRearUpper",parent:"leftRearHip",   t:[0,-0.132,-0.012],
+    solid:{kind:"capsule", r:0.040, h:0.100, off:[0,-0.054,0], mat:C_COAT} },
+  { name:"leftRearLower",parent:"leftRearUpper", t:[0,-0.138,0.022],
+    solid:{kind:"capsule", r:0.028, h:0.100, off:[0,-0.054,0], mat:C_COAT} },
+  { name:"leftRearPaw",  parent:"leftRearLower", t:[0,-0.116,-0.010],
+    solid:{kind:"box",  dims:[0.050,0.030,0.090], off:[0,-0.014,0.032], mat:C_COAT} },
+  { name:"leftRearPad",  parent:"leftRearPaw",   t:[0,-0.030,0.014],
+    solid:{kind:"box",  dims:[0.042,0.010,0.056], off:[0,0,0], mat:C_PAD} },
+  { name:"rightRearHip",  parent:"pelvis",         t:[-0.050,-0.030,-0.004],
+    solid:{kind:"capsule", r:0.046, h:0.098, off:[0,-0.052,0], mat:C_COAT} },
+  { name:"rightRearUpper",parent:"rightRearHip",   t:[0,-0.132,-0.012],
+    solid:{kind:"capsule", r:0.040, h:0.100, off:[0,-0.054,0], mat:C_COAT} },
+  { name:"rightRearLower",parent:"rightRearUpper", t:[0,-0.138,0.022],
+    solid:{kind:"capsule", r:0.028, h:0.100, off:[0,-0.054,0], mat:C_COAT} },
+  { name:"rightRearPaw",  parent:"rightRearLower", t:[0,-0.116,-0.010],
+    solid:{kind:"box",  dims:[0.050,0.030,0.090], off:[0,-0.014,0.032], mat:C_COAT} },
+  { name:"rightRearPad",  parent:"rightRearPaw",   t:[0,-0.030,0.014],
+    solid:{kind:"box",  dims:[0.042,0.010,0.056], off:[0,0,0], mat:C_PAD} }
+];
+
+/* ================= DEGREES OF FREEDOM =================
+   Blumberg's point: the body is a contested resource. A motor skill runs only if
+   the DOFs it needs are free. Walking owns the legs; watching owns the head; the
+   tail and ears stay available to whatever else is still motivated. */
+var DOF = ["legs","spine","head","gaze","ears","tail","jaw"];
+var DOG_BONE_DOF = {
+  legs:["leftFrontHip","leftFrontUpper","leftFrontLower","leftFrontPaw",
+        "rightFrontHip","rightFrontUpper","rightFrontLower","rightFrontPaw",
+        "leftRearHip","leftRearUpper","leftRearLower","leftRearPaw",
+        "rightRearHip","rightRearUpper","rightRearLower","rightRearPaw"],
+  spine:["pelvis","loin","ribcage","withers","brisket","leftHaunch","rightHaunch","leftShoulder","rightShoulder","chest"],
+  head:["neck","head","brow","leftBrow","rightBrow"],
+  gaze:["leftEye","rightEye","leftIris","rightIris","leftPupil","rightPupil"],
+  ears:["leftEar","rightEar"],
+  tail:["tail1","tail2","tail3"],
+  jaw:["jaw","muzzle","nose","mouthCavity","upperTeeth","leftFang","rightFang","lowerTeeth","tongue"]
+};
+
+/* ================= INTERNAL VARIABLES =================
+   Coarse motivational quantities that drift and decay toward baseline. One
+   invisible variable must produce distributed VISIBLE evidence (ears, tail, gait). */
+function newInternals(){
+  return { hunger:0.35, thirst:0.30, happiness:0.55, aggression:0.10,
+           fatigue:0.20, fetchDesire:0.45, guilt:0.0 };
+}
+var IV_BASELINE = { hunger:0.5, thirst:0.5, happiness:0.5, aggression:0.05,
+                    fatigue:0.3, fetchDesire:0.4, guilt:0.0 };
+var IV_DRIFT    = { hunger:0.012, thirst:0.016, happiness:0.06, aggression:0.10,
+                    fatigue:0.010, fetchDesire:0.03, guilt:0.25 };
+function updateInternals(iv, dt, events){
+  var k;
+  for(k in iv){
+    if(!iv.hasOwnProperty(k)) continue;
+    if(k === "hunger" || k === "thirst" || k === "fatigue"){
+      iv[k] = clamp01(iv[k] + IV_DRIFT[k]*dt*0.35);          /* these RISE with time */
+    } else {
+      var b = IV_BASELINE[k];
+      iv[k] = iv[k] + (b - iv[k]) * (1 - Math.exp(-IV_DRIFT[k]*dt));
+    }
+  }
+  if(events){
+    for(k in events){ if(events.hasOwnProperty(k) && iv[k] !== undefined){ iv[k] = clamp01(iv[k] + events[k]); } }
+  }
+  return iv;
+}
+function clamp01(v){ return v < 0 ? 0 : (v > 1 ? 1 : v); }
+
+/* ================= RELEASING MECHANISMS =================
+   The world does not issue commands; it offers OPPORTUNITY VALUES. A mechanism
+   recognises a meaningful condition and scores it — the score biases behaviour,
+   it never calls it. */
+function releasers(world){
+  var r = {};
+  var dBall  = world.ball  ? dist2(world.dog, world.ball)  : 99;
+  var dHuman = world.human ? dist2(world.dog, world.human) : 99;
+  var dBowl  = world.bowl  ? dist2(world.dog, world.bowl)  : 99;
+  r.ballSeen     = world.ball ? falloff(dBall, 6.0) : 0;
+  r.ballAtPaw    = world.ball ? (dBall < 0.45 ? 1 : 0) : 0;
+  r.humanNear    = world.human ? falloff(dHuman, 5.0) : 0;
+  r.humanAtHand  = world.human ? (dHuman < 1.3 ? 1 : 0) : 0;
+  r.handExtended = (world.handPose === "extended" && dHuman < 1.6) ? 1 : 0;
+  r.handHigh     = (world.handPose === "high" && dHuman < 1.8) ? 1 : 0;
+  r.handLure     = (world.handPose === "lure" && dHuman < 2.2) ? 1 : 0;
+  r.bowlSeen     = world.bowl ? falloff(dBowl, 6.0) : 0;
+  r.bowlAtNose   = world.bowl ? (dBowl < 0.55 ? 1 : 0) : 0;
+  r.carryingBall = world.carrying ? 1 : 0;
+  r.cue          = world.cue || "";
+  return r;
+}
+function dist2(a,b){ return Math.hypot(a[0]-b[0], a[2]-b[2]); }
+function falloff(d, range){ return d >= range ? 0 : 1 - d/range; }
+
+/* ================= BEHAVIOURS =================
+   Each behaviour scores its own relevance from internal need AND external
+   opportunity in a common currency, declares the DOFs it needs, and may also
+   issue SECONDARY commands — the way a losing motivation stays visible. */
+var BEHAVIORS = [
+  { name:"DRINK", group:"CONSUME", dofs:["legs","spine","head","gaze","jaw"],
+    relevance:function(iv,rm){ return iv.thirst * (0.25 + 0.75*rm.bowlSeen) * (1 - 0.5*iv.fatigue); },
+    satisfied:function(iv,rm){ return rm.bowlAtNose && iv.thirst < 0.15; },
+    act:function(iv,rm){ return { move: rm.bowlAtNose ? "stop" : "toBowl",
+                                  head: rm.bowlAtNose ? "down" : "toward",
+                                  jaw: rm.bowlAtNose ? "lap" : "closed" }; },
+    effect:function(iv,dt,rm){ if(rm.bowlAtNose){ iv.thirst = clamp01(iv.thirst - 0.30*dt); } } },
+  { name:"EAT", group:"CONSUME", dofs:["legs","spine","head","gaze","jaw"],
+    relevance:function(iv,rm){ return iv.hunger * (0.20 + 0.80*rm.bowlSeen); },
+    satisfied:function(iv,rm){ return rm.bowlAtNose && iv.hunger < 0.15; },
+    act:function(iv,rm){ return { move: rm.bowlAtNose ? "stop" : "toBowl",
+                                  head: rm.bowlAtNose ? "down" : "toward", jaw:"chew" }; },
+    effect:function(iv,dt,rm){ if(rm.bowlAtNose){ iv.hunger = clamp01(iv.hunger - 0.25*dt); } } },
+  { name:"FETCH", group:"SOCIAL", dofs:["legs","spine","head","gaze","jaw","tail"],
+    relevance:function(iv,rm){
+      if(rm.carryingBall){ return 0.55 + 0.45*rm.humanNear; }
+      return iv.fetchDesire * (0.15 + 0.85*rm.ballSeen) * (0.45 + 0.55*rm.humanNear) * (1 - 0.6*iv.fatigue);
+    },
+    satisfied:function(iv,rm){ return rm.carryingBall && rm.humanAtHand; },
+    act:function(iv,rm){ return rm.carryingBall
+        ? { move:"toHuman", head:"toward", jaw:"hold", tail:"wag" }
+        : { move:"toBall",  head:"toward", jaw: rm.ballAtPaw ? "grab" : "open", tail:"wag" }; } },
+  { name:"BEG", group:"SOCIAL", dofs:["legs","spine","head","gaze","tail","ears"],
+    relevance:function(iv,rm){ return (0.30 + 0.70*iv.hunger) * rm.handHigh * (0.4 + 0.6*rm.humanNear); },
+    satisfied:function(){ return false; },
+    act:function(){ return { move:"sitUp", head:"toward", tail:"wag" }; } },
+  { name:"SHAKE", group:"SOCIAL", dofs:["legs","spine","head","gaze","tail"],
+    relevance:function(iv,rm){ return (0.35 + 0.65*iv.happiness) * rm.handExtended; },
+    satisfied:function(){ return false; },
+    act:function(){ return { move:"sitPaw", head:"toward", tail:"wag" }; } },
+  { name:"FOLLOW", group:"SOCIAL", dofs:["legs","spine","head","gaze","tail","ears"],
+    relevance:function(iv,rm){ return (0.20 + 0.55*iv.happiness) * rm.humanNear * (1 - 0.7*iv.fatigue) * 0.55; },
+    satisfied:function(iv,rm){ return rm.humanAtHand; },
+    act:function(){ return { move:"toHuman", head:"toward", tail:"wag" }; } },
+  { name:"LURE", group:"TRAIN", dofs:["legs","spine","head","gaze","tail"],
+    relevance:function(iv,rm){ return rm.handLure * (0.55 + 0.45*iv.happiness); },
+    satisfied:function(){ return false; },
+    act:function(){ return { move:"toLure", head:"toward", tail:"wag" }; } },
+  { name:"SIT", group:"REST", dofs:["legs","spine"],
+    relevance:function(iv,rm){ return 0.16 + 0.45*iv.fatigue; },
+    satisfied:function(){ return false; },
+    act:function(){ return { move:"sit", head:"free" }; } },
+  { name:"SLEEP", group:"REST", dofs:["legs","spine","head","gaze","ears","tail"],
+    relevance:function(iv,rm){ return Math.max(0, iv.fatigue - 0.55) * 2.0 * (1 - rm.humanNear*0.5); },
+    satisfied:function(iv){ return iv.fatigue < 0.2; },
+    act:function(){ return { move:"lie", head:"down", ears:"slack", tail:"still" }; },
+    effect:function(iv,dt){ iv.fatigue = clamp01(iv.fatigue - 0.10*dt); } },
+  { name:"WANDER", group:"REST", dofs:["legs","spine"],
+    relevance:function(iv,rm){ return 0.12 * (1 - iv.fatigue); },
+    satisfied:function(){ return false; },
+    act:function(){ return { move:"wander", head:"free" }; } }
+];
+
+/* ================= ARBITRATION =================
+   Mutual inhibition gives decisive action; an INTEREST term stops the winner from
+   holding forever; hysteresis stops it flapping between near-equal rivals. */
+var ARB = { inhibition:0.35, hysteresis:0.22, interestDecay:0.055, interestRecover:0.10,
+            minHold:0.7 };
+function newMind(){
+  var m = { iv:newInternals(), interest:{}, winner:null, held:0, values:{}, learn:{}, credit:[],
+            prefs:{}, prefDecay:0.16, lastProgram:null };
+  for(var i=0;i<BEHAVIORS.length;i++){ m.interest[BEHAVIORS[i].name] = 1; }
+  return m;
+}
+function behaviorByName(n){
+  for(var i=0;i<BEHAVIORS.length;i++){ if(BEHAVIORS[i].name === n){ return BEHAVIORS[i]; } }
+  return null;
+}
+/* learned value: context (cue) x action reliability, Terence-style */
+function learnedBias(mind, name, rm){
+  var ctx = rm.cue || "";
+  if(!ctx){ return 1; }
+  var rec = mind.learn[ctx + "|" + name];
+  if(!rec || rec.n < 1){ return 1; }
+  return 1 + 1.9 * (rec.r / rec.n);
+}
+function arbitrate(mind, rm, dt){
+  var i, vals = {}, best = null, bestV = -1;
+  for(i=0;i<BEHAVIORS.length;i++){
+    var b = BEHAVIORS[i];
+    var v = Math.max(0, b.relevance(mind.iv, rm)) * mind.interest[b.name] * learnedBias(mind, b.name, rm);
+    v *= 1 + (mind.prefs[b.name] || 0);            /* asking is a BIAS, never a command */
+    if(mind.winner === b.name){ v *= (1 + ARB.hysteresis); }     /* the winner defends its hold */
+    vals[b.name] = v;
+    if(v > bestV){ bestV = v; best = b; }
+  }
+  /* mutual inhibition: the leader suppresses the rest for the NEXT round */
+  for(i=0;i<BEHAVIORS.length;i++){
+    var nm = BEHAVIORS[i].name;
+    if(nm !== best.name){ vals[nm] *= (1 - ARB.inhibition); }
+  }
+  mind.values = vals;
+  var switching = (mind.winner !== best.name);
+  if(switching && mind.held < ARB.minHold && mind.winner){
+    var cur = behaviorByName(mind.winner);
+    var curDone = cur.satisfied(mind.iv, rm);
+    if(!curDone && bestV < vals[mind.winner] * 1.6){ best = cur; switching = false; }   /* persistence */
+  }
+  if(switching){ mind.winner = best.name; mind.held = 0; }
+  else { mind.held += dt; }
+  /* interest: the active behaviour tires, the idle ones recover */
+  for(i=0;i<BEHAVIORS.length;i++){
+    var n2 = BEHAVIORS[i].name;
+    if(n2 === mind.winner){ mind.interest[n2] = Math.max(0.25, mind.interest[n2] - ARB.interestDecay*dt); }
+    else { mind.interest[n2] = Math.min(1, mind.interest[n2] + ARB.interestRecover*dt); }
+  }
+  if(behaviorByName(mind.winner).satisfied(mind.iv, rm)){ mind.interest[mind.winner] = 0.25; }
+  for(i=0;i<BEHAVIORS.length;i++){                 /* preferences fade — he forgets */
+    var pn = BEHAVIORS[i].name;
+    if(mind.prefs[pn]){
+      mind.prefs[pn] *= Math.exp(-mind.prefDecay*dt);
+      if(Math.abs(mind.prefs[pn]) < 0.01){ delete mind.prefs[pn]; }
+    }
+  }
+  return mind.winner;
+}
+
+/* ================= MOTOR ARBITRATION =================
+   The winner issues PRIMARY commands and claims its DOFs. Runners-up may still
+   issue SECONDARY commands on whatever DOFs remain free — which is how a dog
+   walks to the water bowl while still watching the ball. */
+function motorCommands(mind, rm){
+  var claimed = {}, primary = null, secondary = [], i, d;
+  var win = behaviorByName(mind.winner);
+  primary = { name:win.name, cmd:win.act(mind.iv, rm), dofs:win.dofs.slice() };
+  for(i=0;i<win.dofs.length;i++){ claimed[win.dofs[i]] = win.name; }
+  var ranked = BEHAVIORS.slice().sort(function(a,b){ return (mind.values[b.name]||0)-(mind.values[a.name]||0); });
+  for(i=0;i<ranked.length;i++){
+    var b = ranked[i];
+    if(b.name === win.name){ continue; }
+    if((mind.values[b.name]||0) < 0.06){ continue; }
+    var free = [];
+    for(d=0; d<b.dofs.length; d++){ if(!claimed[b.dofs[d]]){ free.push(b.dofs[d]); } }
+    if(!free.length){ continue; }
+    secondary.push({ name:b.name, cmd:b.act(mind.iv, rm), dofs:free });
+    for(d=0; d<free.length; d++){ claimed[free[d]] = b.name; }
+  }
+  return { primary:primary, secondary:secondary, claimed:claimed };
+}
+
+/* ================= EXPRESSION =================
+   Blumberg's intentionality requirement: a human must be able to READ the
+   motivational state. Ears, tail, gait and gaze carry it, monotonically. */
+function expression(iv, mind){
+  return {
+    tailWag:   clamp01(iv.happiness*1.25 - iv.fatigue*0.35),   /* wag rate/amplitude */
+    tailHeight:clamp01(0.30 + iv.happiness*0.7 - iv.guilt*0.8),
+    earBack:   clamp01(iv.aggression*0.75 + iv.guilt*0.6 - iv.happiness*0.25),
+    headLow:   clamp01(iv.guilt*0.7 + iv.fatigue*0.45 - iv.happiness*0.2),
+    gaitEnergy:clamp01(0.35 + iv.happiness*0.6 - iv.fatigue*0.5)
+  };
+}
+
+/* ================= LEARNING (Terence layer) =================
+   The click marks temporal proximity. Credit goes to what was happening inside a
+   short window — not to arbitrary distant causes. A cue becomes meaningful only
+   because a context x action pair keeps paying off. */
+var CREDIT_WINDOW = 1.6;
+function noteAction(mind, t, cue, action){
+  mind.credit.push({ t:t, cue:cue || "", action:action });
+  while(mind.credit.length && t - mind.credit[0].t > CREDIT_WINDOW * 2){ mind.credit.shift(); }
+}
+function clicker(mind, t, reward){
+  var i, marked = [];
+  for(i=mind.credit.length-1; i>=0; i--){
+    if(t - mind.credit[i].t > CREDIT_WINDOW){ break; }
+    marked.push(mind.credit[i]);
+  }
+  for(i=0;i<marked.length;i++){
+    var key = marked[i].cue + "|" + marked[i].action;
+    var rec = mind.learn[key] || (mind.learn[key] = { n:0, r:0 });
+    rec.n += 1;
+    rec.r += reward;
+  }
+  mind.iv.happiness = clamp01(mind.iv.happiness + 0.18*reward);
+  return marked.length;
+}
+function reliability(mind, cue, action){
+  var rec = mind.learn[(cue||"") + "|" + action];
+  return rec && rec.n ? rec.r/rec.n : 0;
+}
+
+var DOG_STRIDE = 0.62;
+/* ================= MOTION =================
+   Legs are not authored as angles — a paw follows a TRAJECTORY in body space and
+   the leg is solved to reach it. During stance the target moves backward exactly
+   as fast as the body moves forward, so a planted paw is stationary in the world
+   BY CONSTRUCTION rather than by tuning. */
+
+var STAND_SLACK = 0.900;      /* legs carry a natural bend; the body sits onto it */
+/* scale is permitted ONLY on bones that never rotate under IK */
+var LEG_GEOM = {                                   /* link lengths, from the bone table */
+  /* L2 ends at the ANKLE (the last joint the IK controls); `pad` is the fixed drop
+     from ankle to the ground contact, added to the target instead of the chain —
+     mixing them made the solver aim at a point the chain could not hold. */
+  /* +1 is the canine/elbow branch: upper limb returns slightly back while the
+     forearm and metacarpus reach FORWARD.  -1 mirrors the chain and leaves the
+     paws hanging behind the wrists even when the toe mesh itself points +Z. */
+  front:{ L1:0.290, L2:0.126, pad:0.037, rest:[0.052, 0, 0.052], knee:+1 },
+  rear: { L1:0.270, L2:0.116, A:0.133, B:0.140, C:0.116, pad:0.037, rest:[0.050, 0, -0.004], knee:+1 }
+};
+var LEGS = [
+  { key:"leftFront",  side:1, kind:"front" },
+  { key:"rightFront", side:-1, kind:"front" },
+  { key:"leftRear",   side:1, kind:"rear"  },
+  { key:"rightRear",  side:-1, kind:"rear"  }
+];
+/* Footfall tables. Phase offsets are FRACTIONS OF A CYCLE; duty is the fraction of
+   the cycle a paw spends on the ground. Walk = four separate beats (lateral
+   sequence, duty > .5 so three feet are always down); trot = diagonal pairs in
+   unison; canter = a rolling three-beat with a suspension. */
+var GAITS = {
+  /* cycle = METRES OF GROUND per stride cycle. Phase is derived from distance
+     travelled inside applyGait, so the lock between gait and ground is structural. */
+  WALK:  { offsets:{ leftFront:0.00, rightRear:0.25, rightFront:0.50, leftRear:0.75 },
+           duty:0.66, lift:0.034, cycle:0.33, bob:0.010, spineSway:2.4, minSpeed:0.05 },
+  TROT:  { offsets:{ leftFront:0.00, rightRear:0.00, rightFront:0.50, leftRear:0.50 },
+           duty:0.46, lift:0.052, cycle:0.46, bob:0.022, spineSway:1.2, minSpeed:0.95 },
+  CANTER:{ offsets:{ leftRear:0.00, rightRear:0.12, leftFront:0.45, rightFront:0.57 },
+           duty:0.34, lift:0.074, cycle:0.62, bob:0.040, spineSway:0.8, minSpeed:2.0 }
+};
+function gaitForSpeed(v){
+  if(v >= GAITS.CANTER.minSpeed){ return "CANTER"; }
+  if(v >= GAITS.TROT.minSpeed){ return "TROT"; }
+  return "WALK";
+}
+/* analytic two-link solve: hip angle + knee angle that put the paw on target.
+   target is in the leg's own root frame (x lateral, y up, z forward). */
+function solveLeg(L1, L2, target, kneeSign){
+  var dz = target[2], dy = target[1];
+  var d = Math.hypot(dy, dz);
+  var reach = L1 + L2 - 1e-4;
+  if(d > reach){ d = reach; }
+  if(d < 1e-4){ d = 1e-4; }
+  var cosK = (L1*L1 + L2*L2 - d*d) / (2*L1*L2);
+  cosK = Math.max(-1, Math.min(1, cosK));
+  var knee = Math.PI - Math.acos(cosK);                  /* interior -> joint bend */
+  var cosA = (L1*L1 + d*d - L2*L2) / (2*L1*d);
+  cosA = Math.max(-1, Math.min(1, cosA));
+  var a = Math.acos(cosA);
+  var base = Math.atan2(-dz, -dy);   /* +X rotation swings a hanging limb toward -Z,
+                                        so a target FORWARD needs a NEGATIVE hip angle */
+  return { hip:(base + kneeSign*a), knee:(-kneeSign*knee) };
+}
+/* Canine rear leg: THREE links and two opposing bends.
+   hip -> stifle projects forward; stifle -> hock returns backward; hock -> paw
+   projects forward again. A human-style two-link knee cannot represent this. */
+function solveRearLeg(geom,target,seed){
+  var L=[geom.A,geom.B,geom.C],a=seed?seed.slice():[-24*DEG,58*DEG,-42*DEG];
+  var lo=[-72*DEG,8*DEG,-125*DEG],hi=[48*DEG,118*DEG,-28*DEG];
+  function fk(){
+    var p=[[0,0]],cy=0,cz=0,ang=0;
+    for(var i=0;i<3;i++){ang+=a[i];cy-=Math.cos(ang)*L[i];cz-=Math.sin(ang)*L[i];p.push([cy,cz]);}
+    return p;
+  }
+  for(var it=0;it<18;it++){
+    for(var j=2;j>=0;j--){
+      var p=fk(),q=p[j],e=p[3],ve=[e[1]-q[1],e[0]-q[0]],vt=[target[1]-q[1],target[0]-q[0]];
+      var cross=ve[0]*vt[1]-ve[1]*vt[0],dot=ve[0]*vt[0]+ve[1]*vt[1];
+      a[j]-=Math.atan2(cross,dot);a[j]=Math.max(lo[j],Math.min(hi[j],a[j]));
+    }
+  }
+  return {hip:a[0],stifle:a[1],hock:a[2],angles:a};
+}
+/* the paw trajectory for one leg at cycle phase p */
+function footTarget(g, p, standY){
+  /* During stance the body advances duty x cycle metres, so the paw must travel
+     back by exactly that much in body space — then it is world-stationary. */
+  var travel = g.cycle * g.duty, z, y;
+  if(p < g.duty){
+    var s = p / g.duty;
+    z = (0.5 - s) * travel;
+    y = 0;
+  } else {
+    var s2 = (p - g.duty) / (1 - g.duty);
+    z = (-0.5 + s2) * travel;
+    y = Math.sin(s2*Math.PI) * g.lift;
+  }
+  return [z, standY + y];
+}
+var _hipRest = null, _geomFitted = false;
+/* Per-bone scale PROPAGATES to child offsets, so the table's numbers are not the
+   limb's real lengths any more. Measure the built rest limb once and use that —
+   deriving beats duplicating, and this was worth ~20% foot slide. */
+function fitLegGeom(){
+  if(_geomFitted){ return; }
+  _geomFitted = true;
+  var r = buildDog();
+  resetRig(r); updateWorld(r);
+  var i;
+  for(i=0;i<LEGS.length;i++){
+    var leg = LEGS[i], g = LEG_GEOM[leg.kind];
+    var hip   = mApply(r.nodes[leg.key+"Hip"].world, [0,0,0]);
+    var upper = mApply(r.nodes[leg.key+"Upper"].world, [0,0,0]);
+    var lower = mApply(r.nodes[leg.key+"Lower"].world, [0,0,0]);
+    var paw   = mApply(r.nodes[leg.key+"Paw"].world, [0,0,0]);
+    var pad   = mApply(r.nodes[leg.key+"Pad"].world, [0,-0.005,0]);
+    g.L1  = Math.hypot(hip[0]-lower[0], hip[1]-lower[1], hip[2]-lower[2]);
+    g.L2  = Math.hypot(lower[0]-paw[0], lower[1]-paw[1], lower[2]-paw[2]);
+    g.pad = paw[1] - pad[1];
+    if(leg.kind==="rear"){
+      g.A=Math.hypot(hip[0]-upper[0],hip[1]-upper[1],hip[2]-upper[2]);
+      g.B=Math.hypot(upper[0]-lower[0],upper[1]-lower[1],upper[2]-lower[2]);
+      g.C=Math.hypot(lower[0]-paw[0],lower[1]-paw[1],lower[2]-paw[2]);
+    }
+  }
+}
+function hipRestOffsets(){
+  fitLegGeom();
+  if(_hipRest){ return _hipRest; }
+  var r = buildDog();
+  resetRig(r); updateWorld(r);
+  _hipRest = {};
+  for(var i=0;i<LEGS.length;i++){
+    _hipRest[LEGS[i].key] = mApply(r.nodes[LEGS[i].key+"Hip"].world, [0,0,0]);
+  }
+  return _hipRest;
+}
+function applyGait(rig, gaitName, distance, speed, out){
+  var g = GAITS[gaitName] || GAITS.WALK;
+  var phase = ((distance / g.cycle) % 1 + 1) % 1;        /* derived, never passed in */
+  var i, planted = {};
+  /* PASS 1 — the body layer moves the hips, so it must be posed first */
+  var bob = Math.sin(phase*Math.PI*4) * g.bob;
+  var drop = (1 - STAND_SLACK) * (LEG_GEOM.front.L1 + LEG_GEOM.front.L2) + LEG_GEOM.front.pad;
+  rig.nodes.pelvis.t[1] = rig.nodes.pelvis.rest[1] + bob - drop;
+  poseBone(rig, "loin", 0, Math.sin(phase*Math.PI*2)*g.spineSway, 0);
+  poseBone(rig, "ribcage", 0, -Math.sin(phase*Math.PI*2)*g.spineSway*0.7, 0);
+  /* Solve in BODY space. Using the live root here would fold one frame of the
+     body's own travel into the hip measurement — which is exactly one frame of
+     foot slide, the whole bug. */
+  var savedRoot = { t:rig.root.t, q:rig.root.q, s:rig.root.s };
+  rig.root = { t:[0,0,0], q:[0,0,0,1], s:[1,1,1] };
+  updateWorld(rig);
+  var rest = hipRestOffsets();
+  /* PASS 2 — solve each leg against the hip's ACTUAL position, so the bob and sway
+     do not drag the planted paw along with them */
+  for(i=0;i<LEGS.length;i++){
+    var leg = LEGS[i], geom = LEG_GEOM[leg.kind];
+    var p = ((phase + g.offsets[leg.key]) % 1 + 1) % 1;
+    var Mh = rig.nodes[leg.key+"Hip"].world;
+    var hipNow = mApply(Mh, [0,0,0]);
+    var fwd = vnorm(vsub(mApply(Mh, [0,0,1]), hipNow));
+    var hipRef = rest[leg.key];
+    /* compensate the BOB and sway only — the deliberate ride-height drop must NOT
+       be cancelled, or the legs re-extend and the paws hover */
+    var dY = hipNow[1] - (hipRef[1] - drop), dZ = hipNow[2] - hipRef[2];
+    var standY = -(geom.L1 + geom.L2) * STAND_SLACK;
+    var ft = footTarget(g, p, standY);
+    ft[1] += geom.pad;                       /* the ankle rides one pad above the ground */
+    var toeUp = p < g.duty ? 0 : 0.24;              /* flat in stance, toe up in swing */
+    var gErr = 0, gp;
+    for(gp=0;gp<(leg.kind==="rear"?1:3);gp++){
+      var ty=ft[1]-dY-gErr,tz=ft[0]-dZ,sol;
+      if(leg.kind==="rear"){
+        sol=solveRearLeg(geom,[ty,tz]);
+        poseBone(rig,leg.key+"Hip",sol.hip/DEG,0,0);
+        poseBone(rig,leg.key+"Upper",sol.stifle/DEG,0,0);
+        poseBone(rig,leg.key+"Lower",sol.hock/DEG,0,0);
+        rig.nodes[leg.key+"Paw"].baseAngle=-(sol.hip+sol.stifle+sol.hock+Math.atan2(fwd[1],fwd[2]));
+      }else{
+        sol=solveLeg(geom.L1,geom.L2,[0,ty,tz],geom.knee);
+        poseBone(rig,leg.key+"Hip",sol.hip/DEG,0,0);
+        poseBone(rig,leg.key+"Upper",0,0,0);
+        poseBone(rig,leg.key+"Lower",sol.knee/DEG,0,0);
+        rig.nodes[leg.key+"Paw"].baseAngle=-(sol.hip+sol.knee+Math.atan2(fwd[1],fwd[2]));
+      }
+      levelPaw(rig, leg, toeUp);
+      if(p >= g.duty){ break; }                     /* swing: nothing to stand on */
+      var pe = mApply(rig.nodes[leg.key+"Pad"].world, [0,-0.005,0])[1];
+      if(Math.abs(pe) < 0.0012){ break; }
+      gErr = Math.max(-0.09, Math.min(0.09, gErr + pe));
+    }
+    planted[leg.key] = p < g.duty;
+    if(planted[leg.key]){ snapPawToFloor(rig,leg); }
+  }
+  rig.root = savedRoot;
+  if(out){ out.planted = planted; out.gait = gaitName; out.phase = phase; }
+  return planted;
+}
+function contactState(rig,motion,tolerance){
+  updateWorld(rig);
+  var tol=tolerance===undefined?.006:tolerance,feet={},count=0;
+  for(var i=0;i<LEGS.length;i++){
+    var leg=LEGS[i],p=mApply(rig.nodes[leg.key+"Pad"].world,[0,-0.005,0]);
+    var intended=!motion||!motion.planted||motion.planted[leg.key]!==false;
+    var grounded=intended&&Math.abs(p[1])<=tol;
+    feet[leg.key]={grounded:grounded,intended:intended,height:p[1],position:p};
+    if(grounded)count++;
+  }
+  return {feet:feet,groundedCount:count,supported:count>=2};
+}
+/* ---- one solver for every posture ----
+   A leg is never posed by angle. Give it a GROUND POINT in body space and it is
+   solved to put the pad there. Standing, sitting and lying differ only in where
+   the body is and where the four contact points are — which is why the paws can no
+   longer sink through the floor when the body drops. */
+function solveLegOnce(rig, leg, groundZ, lift, tiltFix){
+  var geom = LEG_GEOM[leg.kind];
+  var M = rig.nodes[leg.key+"Hip"].world;
+  var hipNow = mApply(M, [0,0,0]);
+  /* The target must be expressed in the HIP'S OWN FRAME — pitching the trunk rotates
+     that frame, and feeding it a world-space vector is what made the forelegs float
+     the moment the dog sat down. */
+  var up  = vnorm(vsub(mApply(M, [0,1,0]), hipNow));
+  var fwd = vnorm(vsub(mApply(M, [0,0,1]), hipNow));
+  var wy = -hipNow[1] + geom.pad + (lift||0);
+  var wz = groundZ - hipNow[2];
+  var world = [0, wy, wz];
+  var dy = vdot(world, up), dz = vdot(world, fwd);
+  var reach = (leg.kind==="rear"?geom.A+geom.B+geom.C:geom.L1+geom.L2)-0.002;
+  var floor = leg.kind==="rear"?.075:Math.abs(geom.L1-geom.L2)+0.004;
+  var d = Math.hypot(dy, dz), sc = 1;
+  if(d > reach){ sc = reach/d; }
+  else if(d < floor){ sc = floor/d; }
+  var sol,sum;
+  if(leg.kind==="rear"){
+    sol=solveRearLeg(geom,[dy*sc,dz*sc]);sum=sol.hip+sol.stifle+sol.hock;
+    poseBone(rig,leg.key+"Hip",sol.hip/DEG,0,0);
+    poseBone(rig,leg.key+"Upper",sol.stifle/DEG,0,0);
+    poseBone(rig,leg.key+"Lower",sol.hock/DEG,0,0);
+  }else{
+    sol=solveLeg(geom.L1,geom.L2,[0,dy*sc,dz*sc],geom.knee);sum=sol.hip+sol.knee;
+    poseBone(rig,leg.key+"Hip",sol.hip/DEG,0,0);
+    poseBone(rig,leg.key+"Upper",0,0,0);
+    poseBone(rig,leg.key+"Lower",sol.knee/DEG,0,0);
+  }
+  /* the paw is levelled against the WORLD, not the hip frame — otherwise a pitched
+     trunk tilts the foot and lifts the pad off the floor */
+  var framePitch = Math.atan2(fwd[1], fwd[2]);
+  poseBone(rig,leg.key+"Paw",-(sum+framePitch)/DEG,0,0);
+  rig.nodes[leg.key+"Paw"].baseAngle=-(sum+framePitch);
+  return { clamped: sc !== 1, hip:hipNow };
+}
+/* The real limb carries small fore-aft offsets INSIDE the chain that a planar
+   two-link solve cannot represent. Rather than model them, solve → MEASURE the pad →
+   correct, twice. Closure beats a better formula here. */
+function pawWorldPitch(rig, leg){
+  var M = rig.nodes[leg.key+"Paw"].world;
+  var o = mApply(M, [0,0,0]), f = mApply(M, [0,0,1]);
+  return Math.atan2(f[1]-o[1], f[2]-o[2]);          /* + = toes up */
+}
+/* THE FOOT MUST LIE FLAT. Rotating the paw only changes the paw's own angle, so this
+   is exact in one shot: pose it at zero, read the pitch it inherited from the chain,
+   and cancel exactly that. Doing it INSIDE the height loop made the two corrections
+   fight — rotating the foot moves the pad, which moves the height error. */
+/* ONE correction, applied last. The algebraic cancel -(hip+knee+framePitch) sets the
+   base; this measures whatever world pitch the foot still has and subtracts exactly
+   that. Iterating it (or re-solving the leg between passes) makes the corrections
+   fight and flips the foot — three attempts proved it. */
+function levelPaw(rig, leg, extra){
+  var base = rig.nodes[leg.key+"Paw"].baseAngle || 0;
+  poseBone(rig, leg.key+"Paw", (base + (extra||0))*180/Math.PI, 0, 0);
+  updateWorld(rig);
+  var p = pawWorldPitch(rig, leg);
+  poseBone(rig, leg.key+"Paw", (base + (extra||0) + p)*180/Math.PI, 0, 0);
+  updateWorld(rig);
+}
+function snapPawToFloor(rig,leg){
+  /* IK can finish a few millimetres long/short when a bent hock is near its reach
+     limit. Apply that tiny residual at the paw in its parent's local frame. This
+     preserves the solved knee and guarantees a forward, floor-contacting foot. */
+  updateWorld(rig);
+  var n=rig.nodes[leg.key+"Paw"],py=mApply(rig.nodes[leg.key+"Pad"].world,[0,-0.005,0])[1];
+  if(Math.abs(py)>.15)return; /* full down/lie transitions can begin well above ground */
+  var pm=rig.nodes[n.parent].world,dy=-py;
+  n.t[0]+=dy*pm[1];n.t[1]+=dy*pm[5];n.t[2]+=dy*pm[9];
+  updateWorld(rig);
+}
+function solveLegToGround(rig, leg, groundZ, lift, toeUp){
+  /* Order matters: LEVEL the foot first, THEN measure the pad — levelling moves the
+     pad, so measuring before it corrects against a height the foot no longer has.
+     KNOWN DEFECT, tracked below: mid-transition the interpolated body pose can put
+     the ground point out of the leg's reach, and the foot hovers. The endpoints are
+     exact; the cure is to interpolate CONTACTS rather than parameters. */
+  var res, pass, err = 0;
+  var passes=leg.kind==="rear"?1:5; /* rear CCD already owns its three-link shape */
+  for(pass=0;pass<passes;pass++){
+    res = solveLegOnce(rig, leg, groundZ, (lift||0) - err);
+    levelPaw(rig, leg, toeUp);
+    var padY = mApply(rig.nodes[leg.key+"Pad"].world, [0,-0.005,0])[1];
+    if(Math.abs(padY) < 0.0012){ break; }
+    err = Math.max(-0.09, Math.min(0.09, err + padY));   /* bounded: a runaway folded LIE */
+  }
+  snapPawToFloor(rig,leg);
+  return res;
+}
+function applyStance(rig){
+  fitLegGeom();
+  var i, drop = (1 - STAND_SLACK) * (LEG_GEOM.front.L1 + LEG_GEOM.front.L2) + LEG_GEOM.front.pad;
+  rig.nodes.pelvis.t[1] = rig.nodes.pelvis.rest[1] - drop;
+  updateWorld(rig);
+  for(i=0;i<LEGS.length;i++){
+    var leg = LEGS[i];
+    solveLegToGround(rig, leg, mApply(rig.nodes[leg.key+"Hip"].world,[0,0,0])[2], 0);
+  }
+}
+
+/* ================= POSTURES =================
+   SIT: haunches down and back, forelegs straight and vertical, chest upright.
+   LIE: everything lower, forelegs folded forward, hocks flat.
+   Both are BODY placement + four contact points; the legs follow. */
+/* A sitting dog does not sink — it rotates about its front feet: haunches to the
+   floor, chest still up on straight forelegs. So the trunk is PITCHED nose-up by
+   the angle that puts the shoulder back at standing height, rather than the whole
+   body being translated down. */
+var POSTURE = {
+  /* Tuned against the RENDER, not only the score: the hock-penalised optimum
+     (pitch -40) scored better but reared the dog onto its haunches, nose up. This
+     pair reads as a sit and a lie. Known defect kept visible in the laws: the hock
+     passes ~75mm below the floor in a full sit — the rear contact should really be
+     the HOCK, not the pad, which is the next fix. */
+  sit: { pitch:-36, sink:0.100, rearZ:0.140, frontZ:-0.040, neck:4 },
+  /* In a sphinx/down pose the wrists are well AHEAD of the chest; hind limbs
+     retain the stifle-forward / hock-back fold instead of becoming human knees. */
+  lie: { pitch:-11, sink:0.185, rearZ:0.025, frontZ:0.340, neck:11 }
+};
+function applyPosture(rig, sit, lie){
+  var s = Math.max(0, Math.min(1, sit)), l = Math.max(0, Math.min(1, lie)), i;
+  if(s < 0.004 && l < 0.004){ return; }
+  var S = POSTURE.sit, L = POSTURE.lie;
+  var pitch = S.pitch*s + L.pitch*l, neck = S.neck*s + L.neck*l;
+  var sink  = S.sink*s + L.sink*l;
+  /* the SHOULDER is the pivot: a sitting dog folds its hindquarters to the floor
+     while the forelegs stay planted and straight. So pitch the trunk, then cancel
+     whatever that did to the front hip — rotate about the frame that must not move. */
+  var frontBefore = mApply(rig.nodes.leftFrontHip.world, [0,0,0]);
+  poseBone(rig, "loin", pitch*0.62, 0, 0);
+  poseBone(rig, "ribcage", pitch*0.38, 0, 0);
+  addBone(rig, "neck", neck, 0, 0);
+  updateWorld(rig);
+  var frontAfter = mApply(rig.nodes.leftFrontHip.world, [0,0,0]);
+  rig.nodes.pelvis.t[1] += (frontBefore[1] - frontAfter[1]) - sink;
+  rig.nodes.pelvis.t[2] += (frontBefore[2] - frontAfter[2]);
+  updateWorld(rig);
+  for(i=0;i<LEGS.length;i++){
+    var leg = LEGS[i];
+    var restZ = mApply(rig.nodes[leg.key+"Hip"].world, [0,0,0])[2];
+    var fwd = (leg.kind === "rear") ? (S.rearZ*s + L.rearZ*l) : (S.frontZ*s + L.frontZ*l);
+    solveLegToGround(rig, leg, restZ + fwd, 0);
+  }
+  /* A canine down is not a low stand.  The humerus goes down/back, the forearm
+     reaches down/forward, and the metacarpus lies forward along the floor.  The
+     old two-link target put the wrist ahead but curled the last segment back,
+     which is why the render looked like reversed hands.  Blend to an authored
+     three-segment forelimb only for DOWN, then lift the body to its actual pads. */
+  if(l>.001){
+    var w=l*l*(3-2*l),front=["leftFront","rightFront"];
+    for(i=0;i<front.length;i++){
+      var k=front[i];
+      rig.nodes[k+"Hip"].q=qnlerp(rig.nodes[k+"Hip"].q,quatFromEulerXYZ(25,0,0),w);
+      rig.nodes[k+"Upper"].q=qnlerp(rig.nodes[k+"Upper"].q,quatFromEulerXYZ(-70,0,0),w);
+      rig.nodes[k+"Lower"].q=qnlerp(rig.nodes[k+"Lower"].q,quatFromEulerXYZ(-45,0,0),w);
+      updateWorld(rig);
+      rig.nodes[k+"Paw"].baseAngle=Math.PI/2;
+      levelPaw(rig,{key:k,kind:"front"},0);
+    }
+    updateWorld(rig);
+    var py=0;
+    for(i=0;i<front.length;i++)py+=mApply(rig.nodes[front[i]+"Pad"].world,[0,-0.005,0])[1];
+    rig.nodes.pelvis.t[1]-=(py/front.length)*w;
+    updateWorld(rig);
+    /* The chest correction moves the rump too; re-close the hind contacts. */
+    for(i=0;i<LEGS.length;i++)if(LEGS[i].kind==="rear"){
+      var rz=mApply(rig.nodes[LEGS[i].key+"Hip"].world,[0,0,0])[2]+S.rearZ*s+L.rearZ*l;
+      solveLegToGround(rig,LEGS[i],rz,0);
+    }
+  }
+}
+function addBone(rig, name, ex, ey, ez){
+  var n = rig.nodes[name];
+  if(!n){ return; }
+  n.q = qmul(n.q, quatFromEulerXYZ(ex||0, ey||0, ez||0));
+}
+function setMouth(rig,amount){
+  var a=clamp01(amount||0),e=a*a*(3-2*a);
+  addBone(rig,"jaw",34*e,0,0);
+  /* Closed: a narrow mouth line. Open: a modest cavity and a small pink tongue.
+     Scaling these interior pieces with jaw aperture prevents the black cavity
+     from sitting on the face like a giant tongue when the mouth is closed. */
+  if(rig.nodes.mouthCavity)rig.nodes.mouthCavity.s=[1,.22+1.10*e,.62+.48*e];
+  if(rig.nodes.upperTeeth)rig.nodes.upperTeeth.s=[1,.30+.70*e,.55+.45*e];
+  if(rig.nodes.lowerTeeth)rig.nodes.lowerTeeth.s=[1,.30+.70*e,.55+.45*e];
+  if(rig.nodes.leftFang)rig.nodes.leftFang.s=[1,.35+.65*e,1];
+  if(rig.nodes.rightFang)rig.nodes.rightFang.s=[1,.35+.65*e,1];
+  if(rig.nodes.tongue){
+    rig.nodes.tongue.s=[.88,.18+.82*e,.32+.68*e];
+    rig.nodes.tongue.t[2]+=Math.max(0,e-.72)*.010;
+  }
+  return e;
+}
+
+/* ================= IDLE LIFE =================
+   A still dog is never a static dog. Breath, weight shift, ear flicks, blinks and
+   a slow head wander run on independent clocks so nothing beats in lockstep. */
+function newIdle(){
+  return { t:0, blinkAt:1.5 + Math.random()*3, blinkUntil:-1,
+           flickAt:2 + Math.random()*4, flickUntil:-1, flickSide:1,
+           sniffUntil:-1, shakeUntil:-1, breathPhase:Math.random()*6.28 };
+}
+function updateIdle(idle, dt, arousal){
+  idle.t += dt;
+  idle.breathPhase += dt * (1.1 + 1.6*arousal);
+  if(idle.t > idle.blinkAt){ idle.blinkUntil = idle.t + 0.11; idle.blinkAt = idle.t + 1.6 + Math.random()*4.5; }
+  if(idle.t > idle.flickAt){ idle.flickUntil = idle.t + 0.22; idle.flickSide = Math.random() < 0.5 ? 1 : -1;
+                             idle.flickAt = idle.t + 2.0 + Math.random()*5.5*(1-0.5*arousal); }
+  return idle;
+}
+function applyIdle(rig, idle, arousal, freeHead){
+  var br = Math.sin(idle.breathPhase);
+  addBone(rig, "ribcage", br*0.65, 0, 0);      /* breath is posture, never material-changing scale */
+  rig.nodes.ribcage.t[1] += br*0.0012;
+  addBone(rig, "loin", 0, Math.sin(idle.t*0.31)*1.4, 0);     /* weight shift */
+  rig.nodes.pelvis.t[1] += Math.sin(idle.t*0.27)*0.004;
+  if(freeHead){                                               /* head wander, slow */
+    addBone(rig, "neck", Math.sin(idle.t*0.23)*2.4, Math.sin(idle.t*0.17)*3.6, 0);
+    addBone(rig, "head", Math.sin(idle.t*0.41)*1.6, Math.sin(idle.t*0.29)*2.2, 0);
+  }
+  var blink = idle.t < idle.blinkUntil ? 1 : 0;
+  rig.nodes.leftEye.s  = [1, 1 - 0.88*blink, 1];
+  rig.nodes.rightEye.s = [1, 1 - 0.88*blink, 1];
+  if(idle.t < idle.flickUntil){                               /* ear flick */
+    var e = idle.flickSide > 0 ? "leftEar" : "rightEar";
+    addBone(rig, e, -26, 0, idle.flickSide*16);
+  }
+  return { blink:blink, breath:br };
+}
+
+/* ================= ACTION CLIPS =================
+   Short, phase-driven motor skills the behaviour system can call. Each returns the
+   DOFs it needs so the arbiter can refuse it when the body is busy. */
+var CLIPS_DOG = {
+  BARK:    { dur:0.42, dofs:["jaw","head","spine"] },
+  SNIFF:   { dur:1.60, dofs:["head","gaze","jaw"] },
+  SHAKEOFF:{ dur:0.90, dofs:["spine","head","ears","tail"] },
+  SCRATCH: { dur:1.30, dofs:["legs","head"] },
+  PAW:     { dur:0.70, dofs:["legs"] }
+};
+function applyClip(rig, name, u){                       /* u = 0..1 through the clip */
+  var k;
+  if(name === "BARK"){
+    k = Math.sin(Math.min(1,u*1.6)*Math.PI);
+    addBone(rig, "jaw", 34*k, 0, 0);
+    addBone(rig, "neck", -12*k, 0, 0);
+    addBone(rig, "ribcage", -5*k, 0, 0);
+  } else if(name === "SNIFF"){
+    k = Math.sin(u*Math.PI);
+    addBone(rig, "neck", 34*k, 0, 0);
+    addBone(rig, "head", 16*k, Math.sin(u*Math.PI*6)*5, 0);
+    addBone(rig, "jaw", 5 + Math.sin(u*Math.PI*11)*4, 0, 0);
+  } else if(name === "SHAKEOFF"){
+    var w = Math.sin(u*Math.PI);                        /* a ripple travelling head to tail */
+    addBone(rig, "head",  Math.sin(u*Math.PI*12)*22*w, 0, Math.sin(u*Math.PI*12)*26*w);
+    addBone(rig, "neck",  0, 0, Math.sin(u*Math.PI*12 - 0.6)*20*w);
+    addBone(rig, "ribcage", 0, 0, Math.sin(u*Math.PI*12 - 1.2)*15*w);
+    addBone(rig, "loin", 0, 0, Math.sin(u*Math.PI*12 - 1.8)*12*w);
+    addBone(rig, "leftEar",  Math.sin(u*Math.PI*12)*30*w, 0, 0);
+    addBone(rig, "rightEar", Math.sin(u*Math.PI*12+1)*30*w, 0, 0);
+  } else if(name === "SCRATCH"){
+    var w2 = Math.sin(Math.min(1, u*1.3)*Math.PI);
+    addBone(rig, "leftRearHip",   -122*w2, 0, 20*w2);
+    addBone(rig, "leftRearUpper",   58*w2 + Math.sin(u*Math.PI*16)*18*w2, 0, 0);
+    addBone(rig, "leftRearLower",   78*w2, 0, 0);
+    addBone(rig, "neck", 10*w2, 14*w2, 0);
+    addBone(rig, "head", 0, 10*w2, -8*w2);
+  } else if(name === "PAW"){
+    var w3 = Math.sin(u*Math.PI);
+    addBone(rig, "rightFrontHip",   -62*w3, 0, 0);
+    addBone(rig, "rightFrontUpper",  34*w3, 0, 0);
+    addBone(rig, "rightFrontLower", -18*w3, 0, 0);
+  }
+}
+
+/* ================= rig: scene graph over the dog table ================= */
+function buildDog(){
+  var nodes = {}, order = [], i;
+  for(i=0;i<DOG_BONES.length;i++){
+    var b = DOG_BONES[i];
+    nodes[b.name] = { name:b.name, parent:b.parent, rest:b.t.slice(),
+                      shape:(b.s ? b.s.slice() : null),   /* baked into geometry */
+                      restS:[1,1,1],
+                      t:b.t.slice(), q:[0,0,0,1], s:[1,1,1],
+                      seg:solidAsSegment(b.solid), solid:b.solid, mat:b.solid.mat,
+                      world:mIdent() };
+    order.push(b.name);
+  }
+  var rig={ nodes:nodes, order:order, root:{ t:[0,0,0], q:[0,0,0,1], s:[1,1,1] }, props:{} };
+  updateWorld(rig);
+  rig.sculpt=buildSculpt(rig);
+  return rig;
+}
+function resetRig(rig){
+  for(var i=0;i<rig.order.length;i++){
+    var n = rig.nodes[rig.order[i]];
+    n.t = n.rest.slice(); n.q = [0,0,0,1]; n.s = (n.restS ? n.restS.slice() : [1,1,1]);
+  }
+}
+function poseBone(rig, name, ex, ey, ez){
+  var n = rig.nodes[name];
+  if(!n){ return; }
+  n.q = quatFromEulerXYZ(ex, ey, ez);
+}
+function updateWorld(rig){
+  var rootM = mCompose(rig.root.t, rig.root.q, rig.root.s), i;
+  for(i=0;i<rig.order.length;i++){
+    var n = rig.nodes[rig.order[i]];
+    n.world = mMul(n.parent ? rig.nodes[n.parent].world : rootM, mCompose(n.t, n.q, n.s));
+  }
+  return rig;
+}
+function dogStats(){
+  var tris=0, i;
+  for(i=0;i<DOG_BONES.length;i++){ tris += geoForSolid(DOG_BONES[i].solid).idx.length/3; }
+  return { bones:DOG_BONES.length, tris:tris };
+}
+/* paw soles must rest on the ground — the quadruped version of soles-at-zero */
+function soleHeight(){
+  var byName={}, i;
+  for(i=0;i<DOG_BONES.length;i++){ byName[DOG_BONES[i].name]=DOG_BONES[i]; }
+  function worldY(n){
+    var y=0, b=byName[n], hops=0;
+    while(b){ y += b.t[1]; b = b.parent ? byName[b.parent] : null; if(++hops>40) throw new Error("cycle"); }
+    return y;
+  }
+  var p = byName.leftFrontPaw;
+  return worldY("leftFrontPaw") + p.solid.off[1] - p.solid.dims[1]/2;
+}
+var MAT_RGB_DOG = [[216,118,39],[244,224,189],[247,211,200],[27,24,22],[252,250,246],[90,50,25],[5,4,3],[217,152,141],[18,5,5],[246,234,202],[181,70,79]];
+
+/* ================= CONTINUOUS ARGOS SCULPT =================
+   The bone solids are design handles, collision proxies and IK references. They are
+   not the visible animal. In the neutral pose we convert those handles to a smooth
+   implicit field, extract one watertight surface, then bind every surface vertex to
+   the hidden bone tree. Animation moves the bones; blended skinning deforms the one
+   animal skin. Eyes, brows and the black nose remain crisp surface details. */
+var SCULPT_DETAIL={nose:1,leftEye:1,rightEye:1,leftIris:1,rightIris:1,leftPupil:1,rightPupil:1,leftBrow:1,rightBrow:1,mouthCavity:1,upperTeeth:1,leftFang:1,rightFang:1,lowerTeeth:1,tongue:1};
+var SCULPT_OMIT={leftFrontPad:1,rightFrontPad:1,leftRearPad:1,rightRearPad:1,brow:1};
+function sculptBranch(name){
+  if(/^leftFront/.test(name))return "LF";
+  if(/^rightFront/.test(name))return "RF";
+  if(/^leftRear/.test(name))return "LR";
+  if(/^rightRear/.test(name))return "RR";
+  if(/^tail/.test(name))return "TAIL";
+  if(/^(neck|head|muzzle|jaw|chin|mouth|upperTeeth|lowerTeeth|tongue|leftEar|rightEar)/.test(name))return "HEAD";
+  return "TORSO";
+}
+function mApplyVector(m,p){
+  return [m[0]*p[0]+m[4]*p[1]+m[8]*p[2],m[1]*p[0]+m[5]*p[1]+m[9]*p[2],m[2]*p[0]+m[6]*p[1]+m[10]*p[2]];
+}
+function ellipsoidDistance(p,s){
+  var dx=(p[0]-s.c[0])/s.r[0],dy=(p[1]-s.c[1])/s.r[1],dz=(p[2]-s.c[2])/s.r[2];
+  return (Math.sqrt(dx*dx+dy*dy+dz*dz)-1)*Math.min(s.r[0],s.r[1],s.r[2]);
+}
+function smoothMin(a,b,k){
+  var h=Math.max(0,Math.min(1,0.5+0.5*(b-a)/k));
+  return (b*(1-h)+a*h)-k*h*(1-h);
+}
+function sculptSources(rig){
+  var src=[],i,j;
+  for(i=0;i<rig.order.length;i++){
+    var n=rig.nodes[rig.order[i]],name=n.name;
+    if(SCULPT_DETAIL[name]||SCULPT_OMIT[name]){continue;}
+    var so=n.solid,sh=n.shape||[1,1,1],off=so.off||[0,0,0];
+    var base=[off[0]*sh[0],off[1]*sh[1],off[2]*sh[2]];
+    if(so.kind==="box"){
+      var bc=mApply(n.world,base);
+      src.push({c:bc,r:[Math.max(.014,so.dims[0]*sh[0]*.56),Math.max(.014,so.dims[1]*sh[1]*.68),Math.max(.014,so.dims[2]*sh[2]*.56)],bone:name,branch:sculptBranch(name),mat:n.mat});
+    }else{
+      var axis=so.kind==="sphere"?null:(so.axis==="z"?2:1);
+      var count=axis===null?1:Math.max(3,Math.ceil(so.h/(Math.max(.012,so.r)*1.15))+1);
+      for(j=0;j<count;j++){
+        var u=count===1?0:(j/(count-1)-.5),q=base.slice();
+        if(axis!==null){q[axis]+=u*so.h*sh[axis];}
+        var c=mApply(n.world,q);
+        src.push({c:c,r:[Math.max(.012,so.r*sh[0]),Math.max(.012,so.r*sh[1]),Math.max(.012,so.r*sh[2])],bone:name,branch:sculptBranch(name),mat:n.mat});
+      }
+    }
+  }
+  return src;
+}
+function fieldAt(p,src){
+  /* Smooth within an anatomical mass, but do not melt neighbouring legs into
+     each other. Each limb is unioned to the torso with only a hair of smoothing. */
+  var groups={},mat=C_COAT,best=1e9;
+  for(var i=0;i<src.length;i++){
+    var q=ellipsoidDistance(p,src[i]);
+    if(q<best){best=q;mat=src[i].mat;}
+    var b=src[i].branch;
+    groups[b]=groups[b]===undefined?q:smoothMin(groups[b],q,.010);
+  }
+  var d=1e9;
+  if(groups.TORSO!==undefined)d=groups.TORSO;
+  if(groups.HEAD!==undefined)d=smoothMin(d,groups.HEAD,.013);
+  if(groups.TAIL!==undefined)d=smoothMin(d,groups.TAIL,.010);
+  var limbs=["LF","RF","LR","RR"];
+  for(i=0;i<limbs.length;i++)if(groups[limbs[i]]!==undefined)d=smoothMin(d,groups[limbs[i]],.0025);
+  return {d:d,mat:mat};
+}
+function skinAt(p,src,boneIndex,boneCount){
+  /* First decide which anatomical branch owns this piece of surface. Weighting
+     may blend into the torso at a joint, never sideways into the other leg. */
+  var owner="TORSO",ownerBone="pelvis",ownerD=1e9,i;
+  for(i=0;i<src.length;i++){
+    var oq=Math.abs(ellipsoidDistance(p,src[i]));
+    if(oq<ownerD){ownerD=oq;owner=src[i].branch;ownerBone=src[i].bone;}
+  }
+  if(/Paw$/.test(ownerBone)){
+    var pbi=boneIndex[ownerBone];return {ids:[pbi,pbi,pbi,pbi],ws:[1,0,0,0]};
+  }
+  var d=new Float32Array(boneCount);for(i=0;i<boneCount;i++)d[i]=1e9;
+  for(i=0;i<src.length;i++){
+    if(src[i].branch!==owner && !(owner!=="TORSO"&&src[i].branch==="TORSO"))continue;
+    var bi=boneIndex[src[i].bone],sd=Math.abs(ellipsoidDistance(p,src[i]));
+    var cd=Math.hypot(p[0]-src[i].c[0],p[1]-src[i].c[1],p[2]-src[i].c[2]);
+    var q=sd+cd*.10;
+    if(q<d[bi])d[bi]=q;
+  }
+  var ids=[0,0,0,0],ws=[0,0,0,0],used={};
+  for(var k=0;k<4;k++){
+    var best=-1,bd=1e9;
+    for(i=0;i<boneCount;i++)if(!used[i]&&d[i]<bd){bd=d[i];best=i;}
+    if(best<0||bd>1e8){best=ids[0];bd=k?1e9:0;}used[best]=1;ids[k]=best;ws[k]=bd>1e8?0:Math.exp(-bd/.026);
+  }
+  var sum=ws[0]+ws[1]+ws[2]+ws[3]||1;for(i=0;i<4;i++)ws[i]/=sum;
+  return {ids:ids,ws:ws};
+}
+function buildSculpt(rig){
+  var src=sculptSources(rig),boneNames=rig.order.slice(),boneIndex={},restOrigins=[],i;
+  for(i=0;i<boneNames.length;i++){boneIndex[boneNames[i]]=i;var m=rig.nodes[boneNames[i]].world;restOrigins.push([m[12],m[13],m[14]]);}
+  var lo=[1e9,1e9,1e9],hi=[-1e9,-1e9,-1e9];
+  for(i=0;i<src.length;i++)for(var a=0;a<3;a++){lo[a]=Math.min(lo[a],src[i].c[a]-src[i].r[a]-.035);hi[a]=Math.max(hi[a],src[i].c[a]+src[i].r[a]+.035);}
+  /* The software rasterizer benefits more from a clean ~10k-triangle skin than
+     a 26k-triangle skin rendered into a tiny buffer. */
+  var NX=23,NY=29,NZ=33,n=NX*NY*NZ,vals=new Float32Array(n),mats=new Uint8Array(n),pts=new Array(n);
+  function gi(x,y,z){return x+NX*(y+NY*z);}
+  for(var z=0;z<NZ;z++)for(var y=0;y<NY;y++)for(var x=0;x<NX;x++){
+    var id=gi(x,y,z),p=[lo[0]+(hi[0]-lo[0])*x/(NX-1),lo[1]+(hi[1]-lo[1])*y/(NY-1),lo[2]+(hi[2]-lo[2])*z/(NZ-1)],f=fieldAt(p,src);
+    pts[id]=p;vals[id]=f.d;mats[id]=f.mat;
+  }
+  var byMat={},T=[[0,5,1,6],[0,1,2,6],[0,2,3,6],[0,3,7,6],[0,7,4,6],[0,4,5,6]],C=[[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]];
+  function part(mat){return byMat[mat]||(byMat[mat]={mat:mat,rest:[],pos:[],nrm:[],idx:[],bones:[],weights:[]});}
+  function interp(pa,pb,va,vb){var t=va/(va-vb||1e-9);return [pa[0]+(pb[0]-pa[0])*t,pa[1]+(pb[1]-pa[1])*t,pa[2]+(pb[2]-pa[2])*t];}
+  function emit(a,b,c,mat){
+    var cen=[(a[0]+b[0]+c[0])/3,(a[1]+b[1]+c[1])/3,(a[2]+b[2]+c[2])/3],eps=.002;
+    var grad=[fieldAt([cen[0]+eps,cen[1],cen[2]],src).d-fieldAt([cen[0]-eps,cen[1],cen[2]],src).d,fieldAt([cen[0],cen[1]+eps,cen[2]],src).d-fieldAt([cen[0],cen[1]-eps,cen[2]],src).d,fieldAt([cen[0],cen[1],cen[2]+eps],src).d-fieldAt([cen[0],cen[1],cen[2]-eps],src).d];
+    var nn=vnorm(vcross(vsub(b,a),vsub(c,a)));if(vdot(nn,grad)<0){var q=b;b=c;c=q;nn=vnorm(vcross(vsub(b,a),vsub(c,a)));}
+    var out=part(mat),vv=[a,b,c];
+    for(var vi=0;vi<3;vi++){
+      var v=vv[vi],sk=skinAt(v,src,boneIndex,boneNames.length),base=out.rest.length/3;
+      /* SDF gradient normals remove the noisy per-triangle glitter/faceting. */
+      var gn=vnorm([fieldAt([v[0]+eps,v[1],v[2]],src).d-fieldAt([v[0]-eps,v[1],v[2]],src).d,
+                    fieldAt([v[0],v[1]+eps,v[2]],src).d-fieldAt([v[0],v[1]-eps,v[2]],src).d,
+                    fieldAt([v[0],v[1],v[2]+eps],src).d-fieldAt([v[0],v[1],v[2]-eps],src).d]);
+      out.rest.push(v[0],v[1],v[2]);out.pos.push(v[0],v[1],v[2]);out.nrm.push(gn[0],gn[1],gn[2]);out.idx.push(base);
+      for(var w=0;w<4;w++){out.bones.push(sk.ids[w]);out.weights.push(sk.ws[w]);}
+    }
+  }
+  for(z=0;z<NZ-1;z++)for(y=0;y<NY-1;y++)for(x=0;x<NX-1;x++){
+    var cp=[],cv=[],cm=[];for(i=0;i<8;i++){var cc=C[i],ii=gi(x+cc[0],y+cc[1],z+cc[2]);cp[i]=pts[ii];cv[i]=vals[ii];cm[i]=mats[ii];}
+    for(i=0;i<6;i++){
+      var tet=T[i],inside=[],outside=[];
+      for(var tv=0;tv<4;tv++)(cv[tet[tv]]<0?inside:outside).push(tet[tv]);
+      if(inside.length===0||inside.length===4)continue;
+      function cut(aa,bb){return interp(cp[aa],cp[bb],cv[aa],cv[bb]);}
+      if(inside.length===1||inside.length===3){
+        var solo=inside.length===1?inside[0]:outside[0],other=inside.length===1?outside:inside;
+        var a0=cut(solo,other[0]),a1=cut(solo,other[1]),a2=cut(solo,other[2]);
+        var ac=[(a0[0]+a1[0]+a2[0])/3,(a0[1]+a1[1]+a2[1])/3,(a0[2]+a1[2]+a2[2])/3];
+        emit(a0,a1,a2,fieldAt(ac,src).mat);
+      }else{
+        /* Two-in/two-out is a quad. Order around its perimeter; discovery-order
+           triangulation makes a bow tie and leaves the surface full of holes. */
+        var q0=cut(inside[0],outside[0]),q1=cut(inside[0],outside[1]),
+            q2=cut(inside[1],outside[1]),q3=cut(inside[1],outside[0]);
+        var qc=[(q0[0]+q1[0]+q2[0]+q3[0])/4,(q0[1]+q1[1]+q2[1]+q3[1])/4,(q0[2]+q1[2]+q2[2]+q3[2])/4],qm=fieldAt(qc,src).mat;
+        emit(q0,q1,q2,qm);emit(q0,q2,q3,qm);
+      }
+    }
+  }
+  var parts=[];for(var mk in byMat){var o=byMat[mk];o.rest=new Float32Array(o.rest);o.pos=new Float32Array(o.pos);o.nrm=new Float32Array(o.nrm);o.idx=new Uint32Array(o.idx);o.bones=new Uint16Array(o.bones);o.weights=new Float32Array(o.weights);o.tone=null;o.doubleSided=true;parts.push(o);}
+  for(i=0;i<rig.order.length;i++){var nm=rig.order[i];if(!SCULPT_DETAIL[nm]&&!SCULPT_OMIT[nm])rig.nodes[nm].sculpted=true;else if(SCULPT_OMIT[nm])rig.nodes[nm].skipRender=true;}
+  return {parts:parts,boneNames:boneNames,restOrigins:restOrigins,triangles:parts.reduce(function(s,p){return s+p.idx.length/3;},0)};
+}
+function updateSculpt(rig){
+  var sc=rig.sculpt;
+  for(var pi=0;pi<sc.parts.length;pi++){
+    var p=sc.parts[pi],vc=p.rest.length/3;
+    for(var i=0;i<vc;i++){
+      var rx=p.rest[i*3],ry=p.rest[i*3+1],rz=p.rest[i*3+2],ox=0,oy=0,oz=0,nx=0,ny=0,nz=0;
+      for(var k=0;k<4;k++){
+        var w=p.weights[i*4+k];if(w<=0)continue;var bi=p.bones[i*4+k],name=sc.boneNames[bi],bm=rig.nodes[name].world,ro=sc.restOrigins[bi];
+        var q=mApply(bm,[rx-ro[0],ry-ro[1],rz-ro[2]]),nv=mApplyVector(bm,[p.nrm[i*3],p.nrm[i*3+1],p.nrm[i*3+2]]);
+        ox+=q[0]*w;oy+=q[1]*w;oz+=q[2]*w;nx+=nv[0]*w;ny+=nv[1]*w;nz+=nv[2]*w;
+      }
+      var nl=Math.hypot(nx,ny,nz)||1;p.pos[i*3]=ox;p.pos[i*3+1]=oy;p.pos[i*3+2]=oz;p.nrm[i*3]=nx/nl;p.nrm[i*3+1]=ny/nl;p.nrm[i*3+2]=nz/nl;
+    }
+  }
+}
+
+/* merge the posed solids into one world-space mesh: the contour register must cut
+   the ANIMAL, not each capsule separately (per-solid slices read as confetti). */
+function mergeWorld(rig){
+  if(rig.sculpt){
+    updateWorld(rig);updateSculpt(rig);
+    var sp=[],si=[],sb=0;
+    for(var pp=0;pp<rig.sculpt.parts.length;pp++){var part=rig.sculpt.parts[pp];for(var pv=0;pv<part.pos.length;pv++)sp.push(part.pos[pv]);for(var px=0;px<part.idx.length;px++)si.push(sb+part.idx[px]);sb+=part.pos.length/3;}
+    return {pos:new Float32Array(sp),idx:new Uint32Array(si)};
+  }
+  var pos=[], idx=[], base=0, i, k;
+  for(i=0;i<rig.order.length;i++){
+    var n = rig.nodes[rig.order[i]];
+    if(!n.gmesh){ n.gmesh = geoForSolid(n.solid); }
+    var g = n.gmesh;
+    for(k=0;k<g.pos.length;k+=3){
+      var p = mApply(n.world, [g.pos[k], g.pos[k+1], g.pos[k+2]]);
+      pos.push(p[0], p[1], p[2]);
+    }
+    for(k=0;k<g.idx.length;k++){ idx.push(base + g.idx[k]); }
+    base += g.pos.length/3;
+  }
+  return { pos:new Float32Array(pos), idx:new Uint32Array(idx) };
+}
+/* ================= WORD → WORLD =================
+   An utterance is not an instruction to play an animation. It is translated into a
+   PROGRAM over the dog's own world-model — pushes on internal variables, biases on
+   behaviours, an optional cue to associate — and that program then COMPETES in the
+   same arbitration as everything else. The dog may decline. Blumberg's rule
+   (direction as preference) and the word-to-world thesis meet exactly here. */
+var PROGRAM_SCHEMA = {
+  iv: "pushes on internal variables, -1..1 each: " +
+      "hunger, thirst, happiness, aggression, fatigue, fetchDesire, guilt",
+  prefer: "behaviour biases, -1..2 each: DRINK EAT FETCH BEG SHAKE FOLLOW LURE SIT SLEEP WANDER",
+  cue: "a short word to associate with whatever he does next, or empty",
+  reading: "one short sentence: how the dog UNDERSTOOD it, in his terms"
+};
+function emptyProgram(){ return { iv:{}, prefer:{}, cue:"", reading:"" }; }
+/* the offline reading — a small deterministic grammar so the instrument works with
+   no network at all, and so the LLM has something to be compared against */
+var WORD_RULES = [
+  { re:/\b(sit|sit down|settle)\b/i,          prefer:{ SIT:1.5 }, iv:{ fatigue:0.05 } },
+  { re:/\b(lie|lay|down|rest|sleep|nap)\b/i,  prefer:{ SLEEP:1.3, SIT:0.4 }, iv:{ fatigue:0.25 } },
+  { re:/\b(fetch|ball|throw|catch|play)\b/i,  prefer:{ FETCH:1.6 }, iv:{ fetchDesire:0.35, happiness:0.1 } },
+  { re:/\b(come|here|heel|follow)\b/i,        prefer:{ FOLLOW:1.4 } },
+  { re:/\b(shake|paw|hand)\b/i,               prefer:{ SHAKE:1.4 } },
+  { re:/\b(beg|treat|snack|please)\b/i,       prefer:{ BEG:1.2 }, iv:{ hunger:0.15 } },
+  { re:/\b(eat|food|dinner|hungry)\b/i,       prefer:{ EAT:1.2 }, iv:{ hunger:0.3 } },
+  { re:/\b(drink|water|thirsty)\b/i,          prefer:{ DRINK:1.2 }, iv:{ thirst:0.3 } },
+  { re:/\b(good boy|good dog|well done|clever)\b/i, iv:{ happiness:0.35, guilt:-0.3 } },
+  { re:/\b(bad|no|stop|naughty|drop it)\b/i,  iv:{ guilt:0.5, happiness:-0.25 }, prefer:{ SIT:0.5 } },
+  { re:/\b(walk|outside|wander|explore)\b/i,  prefer:{ WANDER:1.2 }, iv:{ fatigue:-0.1 } },
+  { re:/\b(calm|easy|quiet|relax)\b/i,        iv:{ aggression:-0.3, happiness:0.1 }, prefer:{ SIT:0.6 } }
+];
+function readOffline(text){
+  var p = emptyProgram(), i, k, hit = 0;
+  for(i=0;i<WORD_RULES.length;i++){
+    var R = WORD_RULES[i];
+    if(!R.re.test(text)){ continue; }
+    hit++;
+    for(k in (R.prefer||{})){ p.prefer[k] = (p.prefer[k]||0) + R.prefer[k]; }
+    for(k in (R.iv||{})){ p.iv[k] = (p.iv[k]||0) + R.iv[k]; }
+  }
+  if(/\b(sit|come|fetch|shake|down|stay)\b/i.test(text)){
+    p.cue = (text.match(/\b(sit|come|fetch|shake|down|stay)\b/i)[0] || "").toLowerCase();
+  }
+  p.reading = hit ? "heard something he knows" : "heard a voice, understood nothing in particular";
+  if(!hit){ p.iv.happiness = 0.08; }              /* being spoken to is mildly nice */
+  return p;
+}
+/* apply a program: pushes land on the variables, biases become preferences */
+function runProgram(mind, prog, world){
+  var k, p = prog || emptyProgram();
+  for(k in (p.iv||{})){
+    if(mind.iv[k] === undefined){ continue; }
+    mind.iv[k] = clamp01(mind.iv[k] + Math.max(-1, Math.min(1, p.iv[k])));
+  }
+  for(k in (p.prefer||{})){
+    if(!behaviorByName(k)){ continue; }
+    mind.prefs[k] = Math.max(-0.9, Math.min(2, (mind.prefs[k]||0) + p.prefer[k]));
+  }
+  if(world && p.cue){ world.cue = String(p.cue).slice(0,24); }
+  mind.lastProgram = p;
+  return p;
+}
+var AR = { DOG_BONES:DOG_BONES, mergeWorld:mergeWorld, PROGRAM_SCHEMA:PROGRAM_SCHEMA,
+  emptyProgram:emptyProgram, readOffline:readOffline, runProgram:runProgram, WORD_RULES:WORD_RULES, D_MAT:D_MAT, DOF:DOF, DOG_BONE_DOF:DOG_BONE_DOF,
+  BEHAVIORS:BEHAVIORS, ARB:ARB, newMind:newMind, newInternals:newInternals,
+  updateInternals:updateInternals, releasers:releasers, arbitrate:arbitrate,
+  motorCommands:motorCommands, expression:expression, behaviorByName:behaviorByName,
+  noteAction:noteAction, clicker:clicker, reliability:reliability, CREDIT_WINDOW:CREDIT_WINDOW,
+  buildDog:buildDog, DOG_PROPORTIONS:DOG_PROPORTIONS, SHOULDER_H:SHOULDER_H, resetRig:resetRig, poseBone:poseBone, updateWorld:updateWorld,
+  applyGait:applyGait, applyStance:applyStance, STAND_SLACK:STAND_SLACK, POSTURE:POSTURE, solveLegToGround:solveLegToGround, contactState:contactState, gaitForSpeed:gaitForSpeed, GAITS:GAITS, LEGS:LEGS, LEG_GEOM:LEG_GEOM,
+  solveLeg:solveLeg, solveRearLeg:solveRearLeg, footTarget:footTarget, fitLegGeom:fitLegGeom, pawWorldPitch:pawWorldPitch, levelPaw:levelPaw, hipRestOffsets:hipRestOffsets, applyPosture:applyPosture, addBone:addBone, setMouth:setMouth,
+  newIdle:newIdle, updateIdle:updateIdle, applyIdle:applyIdle, CLIPS_DOG:CLIPS_DOG, applyClip:applyClip,
+  DOG_STRIDE:DOG_STRIDE, dogStats:dogStats, soleHeight:soleHeight,
+  renderScene:renderScene, makeCam:makeCam, contourSegments:contourSegments,
+  renderContours:renderContours, geoForSolid:geoForSolid, solidAsSegment:solidAsSegment,
+  mApply:mApply, mMul:mMul, mCompose:mCompose, mIdent:mIdent, quatFromEulerXYZ:quatFromEulerXYZ,
+  clamp01:clamp01, learnedBias:learnedBias };
+if(typeof window !== "undefined"){ window.AR = AR; }
+/*==PURE-END==*/
+
+</script>
+<script type="module">
+/* ARGOS — the viewer. The point is not that he moves; it is that you can SEE WHY.
+   The right panel shows the competition itself: every behaviour's current value,
+   the winner, which degrees of freedom it claimed, and what the losers are still
+   saying with the parts of the body it did not take. */
+const statusEl = document.getElementById("status");
+function status(m, err){ statusEl.textContent = m; statusEl.className = err ? "err" : ""; }
+
+const canvas = document.getElementById("stage");
+const ctx = canvas.getContext("2d");
+const off = document.createElement("canvas");
+const offCtx = off.getContext("2d");
+const dpr = Math.min(window.devicePixelRatio || 1, 2);
+let W = 2, H = 2, register = "TONE";
+
+const rig = AR.buildDog();
+const mind = AR.newMind();
+const idle = AR.newIdle();
+let clip = null, clipT = 0, startupAge = 0, mouthAmount = 0, latestState = null;
+const gameControl = { autonomy:true, moveTarget:null, moveVector:null, moveSpeed:1.2, lookTarget:null, mouth:null, pose:null };
+const characterListeners = new Map();
+const characterEvents = [];
+function emitCharacterEvent(type, detail={}){
+  const event={ type, time:clock, ...detail };
+  characterEvents.push(event); if(characterEvents.length>64)characterEvents.shift();
+  const set=characterListeners.get(type); if(set)for(const fn of set){try{fn(event);}catch(e){}}
+  try{ window.dispatchEvent(new CustomEvent("argos:"+type,{detail:event})); }catch(e){}
+  return event;
+}
+
+/* Procedural fallback audio plus a sample override hook. No animation depends on
+   audio latency; animation emits semantic events and the sound layer listens. */
+const ArgosAudio = (()=>{
+  let ac=null,master=null,noise=null; const samples=new Map();
+  function unlock(){
+    if(!ac){ ac=new (window.AudioContext||window.webkitAudioContext)();master=ac.createGain();master.gain.value=.34;master.connect(ac.destination); }
+    if(ac.state==="suspended")ac.resume(); return ac;
+  }
+  function noiseBuffer(){
+    if(noise)return noise; const c=unlock(),b=c.createBuffer(1,c.sampleRate,c.sampleRate),d=b.getChannelData(0);
+    for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*(1-i/d.length); return noise=b;
+  }
+  function env(g,t,a,d,peak){g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(.0001,t+a+d);}
+  function source(buf,t,g){const s=ac.createBufferSource();s.buffer=buf;s.connect(g);s.start(t);return s;}
+  function synth(name,intensity){
+    const c=unlock(),t=c.currentTime,level=Math.max(.08,Math.min(1,intensity||.7));
+    if(name==="bark"){
+      const g=c.createGain(),f=c.createBiquadFilter();f.type="bandpass";f.frequency.value=520;f.Q.value=.8;f.connect(g);g.connect(master);env(g,t,.008,.24,.55*level);source(noiseBuffer(),t,f).stop(t+.27);
+      const o=c.createOscillator(),og=c.createGain();o.type="sawtooth";o.frequency.setValueAtTime(185,t);o.frequency.exponentialRampToValueAtTime(78,t+.20);o.connect(og);og.connect(master);env(og,t,.006,.20,.20*level);o.start(t);o.stop(t+.22);
+    }else if(name==="step"){
+      const g=c.createGain(),f=c.createBiquadFilter();f.type="lowpass";f.frequency.value=260;f.Q.value=.7;f.connect(g);g.connect(master);env(g,t,.002,.055,.12*level);source(noiseBuffer(),t,f).stop(t+.07);
+    }else if(name==="sniff"){
+      const g=c.createGain(),f=c.createBiquadFilter();f.type="highpass";f.frequency.value=1100;f.connect(g);g.connect(master);env(g,t,.004,.11,.14*level);source(noiseBuffer(),t,f).stop(t+.13);
+    }else if(name==="whine"){
+      const o=c.createOscillator(),g=c.createGain();o.type="sine";o.frequency.setValueAtTime(510,t);o.frequency.linearRampToValueAtTime(650,t+.35);o.connect(g);g.connect(master);env(g,t,.04,.42,.10*level);o.start(t);o.stop(t+.48);
+    }
+  }
+  function play(name,intensity=.7){
+    const b=samples.get(name);if(!b){synth(name,intensity);return;}
+    const c=unlock(),s=c.createBufferSource(),g=c.createGain();s.buffer=b;g.gain.value=intensity;s.connect(g);g.connect(master);s.start();
+  }
+  async function registerSample(name,sourceData){
+    const c=unlock(),ab=sourceData instanceof ArrayBuffer?sourceData:await fetch(sourceData).then(r=>r.arrayBuffer());
+    samples.set(name,await c.decodeAudioData(ab.slice(0)));return true;
+  }
+  return {unlock,play,registerSample,setVolume:v=>{unlock();master.gain.value=Math.max(0,Math.min(1,v));}};
+})();
+document.addEventListener("pointerdown",()=>ArgosAudio.unlock(),{once:true,passive:true});
+
+function playClip(name,source="system"){
+  const spec=AR.CLIPS_DOG[name]; if(!spec)return false;
+  if(spec.dofs.includes("legs") && speed>.06)return false; /* never steal a support leg */
+  clip=name;clipT=0;emitCharacterEvent("animation",{name,source});
+  if(name==="BARK")ArgosAudio.play("bark",.9); else if(name==="SNIFF")ArgosAudio.play("sniff",.55);
+  return true;
+}
+const world = {
+  dog:[0,0,0], heading:0, human:[1.4,0,1.1], ball:null, bowl:[-1.8,0,-1.2],
+  handPose:"none", carrying:false, cue:"", lure:[1.4,0,1.1]
+};
+let clock = 0, gaitDist = 0, speed = 0, lastGait = "STAND", sitAmount = 0, lieAmount = 0, wagPhase = 0, headYaw = 0, gazeYaw = 0;
+let lastWinner = "", winnerSince = 0;
+let lastFootContacts = {leftFront:true,rightFront:true,leftRear:true,rightRear:true};
+let rootVelocity=[0,0];
+let last=performance.now(),running=true,panelT=0,manualMode=false,lastMC=null,lastEX=null;
+
+/* ---------- the motor system: commands in, body out ---------- */
+function towards(target, dt, maxSpeed){
+  const dx = target[0]-world.dog[0], dz = target[2]-world.dog[2];
+  const d = Math.hypot(dx,dz);
+  if(d < 0.02){ return 0; }
+  const want = Math.atan2(dx,dz);
+  let diff = want - world.heading;
+  while(diff > Math.PI) diff -= Math.PI*2;
+  while(diff < -Math.PI) diff += Math.PI*2;
+  world.heading += Math.max(-2.6*dt, Math.min(2.6*dt, diff));    /* body turns last */
+  return Math.min(maxSpeed, d*1.8); /* translation waits for verified paw support */
+}
+function aimAt(target, dt){
+  const dx = target[0]-world.dog[0], dz = target[2]-world.dog[2];
+  let want = Math.atan2(dx,dz) - world.heading;
+  while(want > Math.PI) want -= Math.PI*2;
+  while(want < -Math.PI) want += Math.PI*2;
+  const clampY = Math.max(-0.78, Math.min(0.78, want));
+  const gWant=startupAge<.55?0:clampY,hWant=startupAge<.80?0:clampY;
+  const gs=Math.max(-3.2*dt,Math.min(3.2*dt,(gWant-gazeYaw)*(1-Math.exp(-dt/.08))));
+  const hs=Math.max(-.90*dt,Math.min(.90*dt,(hWant-headYaw)*(1-Math.exp(-dt/.28))));
+  gazeYaw+=gs;headYaw+=hs; /* rate limits prevent the opening-frame head spin */
+}
+function applyMotor(mc, ex, dt){
+  const c = mc.primary.cmd;
+  let moving = 0;
+  const autoTarget = c.move === "toBall" && world.ball ? world.ball
+               : c.move === "toBowl" && world.bowl ? world.bowl
+               : (c.move === "toHuman" || c.move === "toLure") ? (c.move === "toLure" ? world.lure : world.human)
+               : null;
+  const target = gameControl.moveTarget || (gameControl.autonomy ? autoTarget : null);
+  if(gameControl.moveVector){
+    const mv=gameControl.moveVector,aim=[world.dog[0]+mv[0],0,world.dog[2]+mv[1]];
+    moving=towards(aim,dt,gameControl.moveSpeed);
+  }else if(target){ moving = towards(target, dt, gameControl.moveTarget?gameControl.moveSpeed:(0.6 + 1.5*ex.gaitEnergy)); }
+  else if(c.move === "wander"){
+    if(gameControl.autonomy){world.heading += Math.sin(clock*0.4)*0.5*dt;moving=.35;}
+  }
+  speed += (moving - speed) * (1 - Math.exp(-dt/0.12));
+  const wantSit = gameControl.pose!==null ? (gameControl.pose==="sit"?1:0) : (c.move === "sit" || c.move === "sitUp" || c.move === "sitPaw") ? 1 : 0;
+  const wantLie = gameControl.pose!==null ? (gameControl.pose==="lie"?1:0) : (c.move === "lie") ? 1 : 0;
+  sitAmount += (wantSit - sitAmount) * (1 - Math.exp(-dt/0.30));
+  lieAmount += (wantLie - lieAmount) * (1 - Math.exp(-dt/0.45));
+
+  /* gaze target: whatever the winner cares about, else the human */
+  let look = gameControl.lookTarget || world.human;
+  if(!gameControl.lookTarget){
+    if(c.move === "toBall" && world.ball) look = world.ball;
+    else if(c.move === "toBowl" && world.bowl) look = world.bowl;
+    else if(c.move === "toLure") look = world.lure;
+  }
+  aimAt(look, dt);
+
+  /* ---- pose the body: gait or stance, then posture, then idle life ---- */
+  AR.resetRig(rig);
+  gaitDist += Math.hypot(rootVelocity[0],rootVelocity[1])*dt; /* phase follows travelled ground */
+  const arousal = AR.clamp01(mind.iv.happiness*0.6 + (1-mind.iv.fatigue)*0.4);
+  const motion = {};
+  if(speed > 0.06){
+    const g = AR.gaitForSpeed(speed);
+    AR.applyGait(rig, g, gaitDist, speed, motion);
+    lastGait = g;
+  } else {
+    AR.applyStance(rig);
+    lastGait = "STAND";
+  }
+  AR.applyPosture(rig, sitAmount, lieAmount);
+  AR.updateIdle(idle, dt, arousal);
+  const idleOut = AR.applyIdle(rig, idle, arousal, c.head === "free");
+  if(clip){
+    clipT += dt;
+    const spec = AR.CLIPS_DOG[clip];
+    if(clipT >= spec.dur){ clip = null; }
+    else { AR.applyClip(rig, clip, clipT/spec.dur); }
+  }
+  if(c.move === "sitUp" && sitAmount > 0.4){                    /* beg */
+    for(const side of ["left","right"]){
+      AR.addBone(rig, side+"FrontHip", -78);
+      AR.addBone(rig, side+"FrontUpper", 62);
+    }
+    AR.addBone(rig, "spine", -26);
+  }
+  if(c.move === "sitPaw" && sitAmount > 0.3){ AR.applyClip(rig, "PAW", 0.5); }
+
+  /* head + gaze */
+  const headDown = (c.head === "down" ? 1 : 0)*0.7 + ex.headLow*0.5;
+  AR.addBone(rig, "neck", 16*headDown, headYaw*34, 0);
+  AR.addBone(rig, "head", 10*headDown, headYaw*22, 0);
+  AR.addBone(rig, "leftEye",  0, gazeYaw*26, 0);
+  AR.addBone(rig, "rightEye", 0, gazeYaw*26, 0);
+  /* jaw */
+  const jawOpen = gameControl.mouth!==null ? gameControl.mouth : c.jaw === "lap" ? (0.5+0.5*Math.sin(clock*11)) :
+                  c.jaw === "chew" ? (0.5+0.5*Math.sin(clock*7)) :
+                  c.jaw === "open" ? 0.55 : c.jaw === "grab" ? 0.8 : 0;
+  mouthAmount += (jawOpen-mouthAmount)*(1-Math.exp(-dt/.075));
+  AR.setMouth(rig,mouthAmount);
+
+  /* ---- the expressive DOFs: whoever holds them speaks ---- */
+  const holder = {};
+  for(const d of mc.primary.dofs){ holder[d] = mc.primary; }
+  for(const s of mc.secondary){ for(const d of s.dofs){ holder[d] = s; } }
+  const tailSpeaker = holder.tail, earSpeaker = holder.ears;
+  const wantsWag = tailSpeaker && tailSpeaker.cmd && tailSpeaker.cmd.tail === "wag";
+  const still = tailSpeaker && tailSpeaker.cmd && tailSpeaker.cmd.tail === "still";
+  const wagRate = still ? 0 : (wantsWag ? 7 + 6*ex.tailWag : 2.2 + 3*ex.tailWag);
+  wagPhase += wagRate*dt;
+  const wagAmp = still ? 0 : (wantsWag ? 26 + 16*ex.tailWag : 8 + 14*ex.tailWag);
+  const tailUp = -34 + 60*ex.tailHeight;
+  AR.addBone(rig, "tail1", tailUp, Math.sin(wagPhase)*wagAmp, 0);
+  AR.addBone(rig, "tail2", tailUp*0.4, Math.sin(wagPhase-0.5)*wagAmp*0.9, 0);
+  AR.addBone(rig, "tail3", tailUp*0.2, Math.sin(wagPhase-1.0)*wagAmp*0.7, 0);
+  const slack = earSpeaker && earSpeaker.cmd && earSpeaker.cmd.ears === "slack" ? 1 : 0;
+  const back = Math.max(ex.earBack, slack);
+  AR.addBone(rig, "leftEar",  -18 + 62*back, 0,  10 - 26*back);
+  AR.addBone(rig, "rightEar", -18 + 62*back, 0, -10 + 26*back);
+
+  /* Root motion is earned by support. Pose first, measure every paw, then allow
+     translation only while two or more intended stance feet are truly grounded. */
+  AR.updateWorld(rig);
+  const contacts=AR.contactState(rig,motion,.0075);
+  const canDrive=contacts.supported&&sitAmount<.12&&lieAmount<.12;
+  const driveSpeed=canDrive?speed:0;
+  if(contacts.supported){
+    /* Feet create or remove horizontal momentum only while planted. */
+    const tx=Math.sin(world.heading)*driveSpeed,tz=Math.cos(world.heading)*driveSpeed,a=1-Math.exp(-dt/0.075);
+    rootVelocity[0]+=(tx-rootVelocity[0])*a;rootVelocity[1]+=(tz-rootVelocity[1])*a;
+  }else{
+    /* A canter's suspension carries existing momentum but cannot steer or accelerate. */
+    rootVelocity[0]*=Math.exp(-dt*.08);rootVelocity[1]*=Math.exp(-dt*.08);
+  }
+  world.dog[0]+=rootVelocity[0]*dt;world.dog[2]+=rootVelocity[1]*dt;
+  for(const key of Object.keys(contacts.feet)){
+    const down=contacts.feet[key].grounded;
+    if(down&&!lastFootContacts[key]){
+      emitCharacterEvent("footstep",{foot:key,position:contacts.feet[key].position,speed});
+      ArgosAudio.play("step",Math.min(1,.28+speed*.28));
+    }
+    lastFootContacts[key]=down;
+  }
+  rig.root.t = [world.dog[0], 0, world.dog[2]];
+  rig.root.q = AR.quatFromEulerXYZ(0, world.heading*180/Math.PI, 0);
+  AR.updateWorld(rig);
+  latestState={position:world.dog.slice(),heading:world.heading,speed,velocity:[rootVelocity[0],0,rootVelocity[1]],grounded:contacts.supported,
+    contacts:contacts.feet,gait:lastGait,behavior:mind.winner,internals:{...mind.iv},mouth:mouthAmount,
+    clip,canDrive,animationTime:gaitDist};
+  return { tailSpeaker, earSpeaker, contacts, canDrive };
+}
+
+/* ---------- scene extras: ball, bowl, the human's hand ---------- */
+function marker(pos, r, rgb){
+  return { pos, r, rgb };
+}
+function drawStage(c2, iw, ih){
+  var sky = c2.createLinearGradient(0, 0, 0, ih*0.62);
+  sky.addColorStop(0, "#cfe3ef");
+  sky.addColorStop(1, "#f2e6cf");
+  c2.fillStyle = sky; c2.fillRect(0, 0, iw, ih);
+  var g = c2.createLinearGradient(0, ih*0.52, 0, ih);
+  g.addColorStop(0, "#cdd6a6");
+  g.addColorStop(1, "#a8b47f");
+  c2.fillStyle = g; c2.fillRect(0, ih*0.55, iw, ih*0.45);
+}
+function drawExtras(cam, iw, ih, c2){
+  /* drawn after the rasterizer as flat discs — cheap, and they read at any size */
+  const view = AR.makeCam(cam.pos, cam.target, cam.fov);
+  function P(p){
+    const eye=cam.pos, tgt=cam.target;
+    const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+    const cr=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+    const dt2=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+    const nz=a=>{const l=Math.hypot(a[0],a[1],a[2])||1;return[a[0]/l,a[1]/l,a[2]/l];};
+    const z=nz(sub(eye,tgt)), x=nz(cr([0,1,0],z)), y=cr(z,x);
+    const V=[x[0],y[0],z[0],0, x[1],y[1],z[1],0, x[2],y[2],z[2],0, -dt2(x,eye),-dt2(y,eye),-dt2(z,eye),1];
+    const f=1/Math.tan(cam.fov*Math.PI/180/2);
+    const PR=[f/(iw/ih),0,0,0, 0,f,0,0, 0,0,-1.001,-1, 0,0,-0.1,0];
+    const cc=AR.mApply(AR.mMul(PR,V), p);
+    return { x:(cc[0]+1)/2*iw, y:(1-cc[1])/2*ih };
+  }
+  /* a soft contact shadow is what actually seats him on the ground */
+  const sp = P([world.dog[0], 0.001, world.dog[2]]);
+  const se = P([world.dog[0]+0.34, 0.001, world.dog[2]]);
+  const sr = Math.max(3, Math.hypot(se.x-sp.x, se.y-sp.y));
+  const sg = c2.createRadialGradient(sp.x, sp.y, sr*0.15, sp.x, sp.y, sr);
+  sg.addColorStop(0, "rgba(74,72,48,.42)");
+  sg.addColorStop(1, "rgba(74,72,48,0)");
+  c2.fillStyle = sg;
+  c2.beginPath(); c2.ellipse(sp.x, sp.y, sr, sr*0.34, 0, 0, 6.2832); c2.fill();
+  const items = [];
+  if(world.ball && !world.carrying){ items.push([world.ball, 0.055, "#a8392b"]); }
+  if(world.bowl){ items.push([[world.bowl[0],0.03,world.bowl[2]], 0.10, "#3c4a58"]); }
+  items.push([[world.human[0], 0.02, world.human[2]], 0.13, "#2c3a48"]);
+  if(world.handPose !== "none"){ items.push([world.lure, 0.05, "#1f6b3a"]); }
+  for(const [p, r, col] of items){
+    const s = P(p), e = P([p[0]+r, p[1], p[2]]);
+    const rr = Math.max(2, Math.hypot(e.x-s.x, e.y-s.y));
+    c2.fillStyle = col;
+    c2.beginPath(); c2.ellipse(s.x, s.y, rr, rr*0.55, 0, 0, 6.2832); c2.fill();
+  }
+}
+
+/* ---------- camera ---------- */
+let camYaw = 0.5, camDist = 3.2;
+function camera(){
+  const f = [world.dog[0], 0.42, world.dog[2]];
+  return AR.makeCam([f[0]+Math.sin(camYaw)*camDist, 1.05, f[2]+Math.cos(camYaw)*camDist], f, 32);
+}
+
+/* ---------- the readout: why he is doing what he is doing ---------- */
+function drawPanel(mc, ex){
+  const box = document.getElementById("mindPanel");
+  const rows = AR.BEHAVIORS.slice().sort((a,b)=>(mind.values[b.name]||0)-(mind.values[a.name]||0));
+  let html = "";
+  const max = Math.max(0.001, ...rows.map(r => mind.values[r.name]||0));
+  for(const b of rows){
+    const v = mind.values[b.name] || 0;
+    const win = b.name === mind.winner;
+    const sec = mc.secondary.find(s => s.name === b.name);
+    html += '<div class="bh' + (win ? " win" : (sec ? " sec" : "")) + '">' +
+            '<span class="bn">' + b.name + '</span>' +
+            '<span class="bar"><i style="width:' + Math.round(v/max*100) + '%"></i></span>' +
+            '<span class="bv">' + v.toFixed(2) + '</span>' +
+            '<span class="bd">' + (win ? mc.primary.dofs.join(",") : (sec ? sec.dofs.join(",") : "")) + '</span>' +
+            '</div>';
+  }
+  box.innerHTML = html;
+  const iv = mind.iv;
+  document.getElementById("ivPanel").innerHTML =
+    Object.keys(iv).map(k =>
+      '<div class="iv"><span class="k">' + k + '</span><span class="bar"><i style="width:' +
+      Math.round(iv[k]*100) + '%"></i></span><span class="v">' + iv[k].toFixed(2) + '</span></div>').join("");
+  const pf = Object.keys(mind.prefs || {});
+  document.getElementById("prefLine").textContent = pf.length
+    ? pf.map(k => k + " ×" + (1+mind.prefs[k]).toFixed(2)).join("  ")
+    : "no standing requests";
+  document.getElementById("held").textContent =
+    mind.winner + " for " + mind.held.toFixed(1) + "s · " + lastGait +
+    (clip ? " · " + clip : "") + " · tail: " +
+    (mc.secondary.find(s=>s.dofs.includes("tail"))?.name || (mc.primary.dofs.includes("tail") ? mc.primary.name : "—")) +
+    " · ears: " +
+    (mc.secondary.find(s=>s.dofs.includes("ears"))?.name || (mc.primary.dofs.includes("ears") ? mc.primary.name : "—"));
+}
+
+/* ---------- SPEAK: an utterance becomes a program over his motivations ----------
+   The LLM does not choose an action. It translates what you said into pushes on the
+   dog's own variables and biases on his behaviours; the arbitration then decides
+   what he actually does, and may decide against you. */
+let thinking = false, llmTranslator = null;
+function stateForPrompt(){
+  const iv = mind.iv;
+  return Object.keys(iv).map(k => k + " " + iv[k].toFixed(2)).join(", ") +
+         "; currently " + mind.winner +
+         "; ball " + (world.ball ? "on the ground" : "put away") +
+         "; human " + (Math.hypot(world.dog[0]-world.human[0], world.dog[2]-world.human[2]) < 1.5 ? "close" : "away");
+}
+async function translate(text){
+  if(typeof llmTranslator!=="function")throw new Error("No translator connected");
+  const context={state:latestState||{},internals:{...mind.iv},behaviors:AR.BEHAVIORS.map(b=>b.name),schema:AR.PROGRAM_SCHEMA};
+  const result=await llmTranslator(text,context);
+  return typeof result==="string"?JSON.parse(result.replace(/```json|```/g,"").trim()):result;
+}
+async function speak(text){
+  if(!text || thinking){ return; }
+  thinking = true;
+  addLine("you", text);
+  status("he is listening...");
+  let prog = null, via = "offline";
+  try {
+    prog = await translate(text);
+    via = "translated";
+  } catch(e){
+    prog = AR.readOffline(text);                 /* works with no network at all */
+  }
+  AR.runProgram(mind, prog, world);
+  showProgram(prog, via);
+  addLine("dog", prog.reading || "…");
+  thinking = false;
+  status(via === "translated" ? "word became world" : "no model reachable — used the built-in grammar");
+}
+function addLine(who, text){
+  const log = document.getElementById("chatLog");
+  const d = document.createElement("div");
+  d.className = "line " + who;
+  d.textContent = (who === "you" ? "› " : "— ") + text;
+  log.appendChild(d);
+  while(log.children.length > 40){ log.removeChild(log.firstChild); }
+  log.scrollTop = log.scrollHeight;
+}
+function showProgram(p, via){
+  const box = document.getElementById("prog");
+  const bits = [];
+  for(const k in (p.iv||{})){
+    const v = p.iv[k];
+    bits.push('<span class="pv ' + (v >= 0 ? "up" : "dn") + '">' + k + " " + (v>=0?"+":"") + Number(v).toFixed(2) + "</span>");
+  }
+  for(const k in (p.prefer||{})){
+    bits.push('<span class="pb">' + k + " ×" + (1+Number(p.prefer[k])).toFixed(2) + "</span>");
+  }
+  if(p.cue){ bits.push('<span class="pc">cue "' + p.cue + '"</span>'); }
+  box.innerHTML = bits.length ? bits.join("") : '<span class="pv">nothing moved</span>';
+  document.getElementById("progVia").textContent = via;
+}
+
+/* ---------- stable host contract: brain -> intent -> motor -> contact -> events ----------
+   A game never needs to edit a bone. It supplies intentions/sensors and reads one
+   coherent state packet. Film tools can drive mouth/pose/clips through the same API. */
+const ArgosCharacter = Object.freeze({
+  version:"2.3.0",
+  rig,
+  mind,
+  world,
+  setAutonomy(on){gameControl.autonomy=!!on;return this;},
+  moveTo(position,speedValue=1.2){gameControl.moveTarget=[+position[0],0,+position[2]];gameControl.moveVector=null;gameControl.moveSpeed=Math.max(0,Math.min(2.8,+speedValue||0));return this;},
+  setMoveVector(x,z,speedValue=1.2){const l=Math.hypot(x,z);gameControl.moveVector=l>.001?[x/l,z/l]:null;gameControl.moveTarget=null;gameControl.moveSpeed=Math.max(0,Math.min(2.8,+speedValue||0));return this;},
+  stop(){gameControl.moveTarget=null;gameControl.moveVector=null;return this;},
+  lookAt(position){gameControl.lookTarget=position?[+position[0],+position[1]||0,+position[2]]:null;return this;},
+  setPose(name){if(![null,"stand","sit","lie"].includes(name))throw new Error("pose must be stand, sit, lie, or null");gameControl.pose=name;return this;},
+  setMouth(open){gameControl.mouth=open===null?null:Math.max(0,Math.min(1,+open||0));return this;},
+  play(name){return playClip(String(name).toUpperCase(),"host");},
+  speak,
+  applyProgram(program){const p=AR.runProgram(mind,program,world);emitCharacterEvent("program",{program:p});return p;},
+  setSensors(patch){if(!patch||typeof patch!=="object")return this;for(const k of ["human","ball","bowl","lure","handPose","carrying","cue"]){if(k in patch)world[k]=patch[k];}return this;},
+  setTranslator(fn){llmTranslator=typeof fn==="function"?fn:null;return this;},
+  registerSound(name,source){return ArgosAudio.registerSample(name,source);},
+  setVolume(value){ArgosAudio.setVolume(value);return this;},
+  pause(){manualMode=true;return this;},
+  resume(){if(!manualMode)return this;manualMode=false;last=performance.now();if(running)requestAnimationFrame(frame);return this;},
+  step(dt,sensors){manualMode=true;if(sensors)this.setSensors(sensors);return simulationStep(Math.max(0,Math.min(.05,+dt||0))).state;},
+  getState(){return latestState?structuredClone(latestState):null;},
+  drainEvents(){return characterEvents.splice(0,characterEvents.length);},
+  on(type,fn){if(!characterListeners.has(type))characterListeners.set(type,new Set());characterListeners.get(type).add(fn);return()=>characterListeners.get(type)?.delete(fn);}
+});
+window.ArgosCharacter=ArgosCharacter;
+window.dispatchEvent(new CustomEvent("argos:ready",{detail:{character:ArgosCharacter,version:ArgosCharacter.version}}));
+
+/* ---------- controls ---------- */
+function chip(row, label, fn, dashed){
+  const b = document.createElement("button");
+  b.className = "chip" + (dashed ? " act" : "");
+  b.textContent = label;
+  b.addEventListener("click", () => fn(b));
+  document.getElementById(row).appendChild(b);
+  return b;
+}
+chip("actRow", "THROW BALL", () => {
+  const a = world.heading + (Math.random()-0.5)*1.2;
+  world.ball = [world.dog[0]+Math.sin(a)*3.2, 0, world.dog[2]+Math.cos(a)*3.2];
+  world.carrying = false;
+  status("ball thrown — watch FETCH climb, it is not commanded");
+}, true);
+chip("actRow", "HAND OUT", b => {
+  world.handPose = world.handPose === "extended" ? "none" : "extended";
+  world.lure = [world.human[0], 0.5, world.human[2]];
+  b.classList.toggle("on", world.handPose === "extended");
+  status(world.handPose === "extended" ? "hand extended — an opportunity, not an order" : "hand down");
+}, true);
+chip("actRow", "HAND HIGH", b => {
+  world.handPose = world.handPose === "high" ? "none" : "high";
+  b.classList.toggle("on", world.handPose === "high");
+  status(world.handPose === "high" ? "hand high — BEG gets more relevant when he is hungry" : "hand down");
+}, true);
+chip("actRow", "LURE", b => {
+  world.handPose = world.handPose === "lure" ? "none" : "lure";
+  b.classList.toggle("on", world.handPose === "lure");
+  status(world.handPose === "lure" ? "drag on the ground to move the lure" : "lure away");
+}, true);
+chip("trainRow", "CLICK + TREAT", () => {
+  const n = AR.clicker(mind, clock, 1);
+  status("click · credited " + n + " recent moment" + (n===1?"":"s") +
+         " (cue \"" + (world.cue||"—") + "\" → " + mind.winner + ")");
+}, true);
+for(const cue of ["sit","come","shake"]){
+  chip("trainRow", 'SAY "' + cue.toUpperCase() + '"', () => {
+    world.cue = cue;
+    setTimeout(() => { if(world.cue === cue) world.cue = ""; }, 1400);
+    status('said "' + cue + '" — meaningless until clicking makes it pay');
+  }, true);
+}
+chip("trainRow", "WHAT HE LEARNED", () => {
+  const keys = Object.keys(mind.learn);
+  if(!keys.length){ status("nothing yet — say a cue, wait for the action, then click"); return; }
+  status(keys.map(k => k.replace("|", " → ") + " " + (mind.learn[k].r/mind.learn[k].n).toFixed(2)).join("   "));
+}, true);
+chip("sysRow", "REGISTER: TONE", b => {
+  register = register === "TONE" ? "CONTOUR" : "TONE";
+  b.textContent = "REGISTER: " + register;
+}, true);
+chip("trainRow", "BARK", () => { playClip("BARK"); status("bark"); }, true);
+chip("trainRow", "SNIFF", () => { playClip("SNIFF"); status("sniffing"); }, true);
+chip("trainRow", "MOUTH", b => {
+  gameControl.mouth=gameControl.mouth===null?1:null;b.classList.toggle("on",gameControl.mouth!==null);
+  status(gameControl.mouth===null?"mouth returned to behavior control":"mouth open · teeth, tongue and cavity visible");
+}, true);
+chip("trainRow", "SHAKE OFF", () => { playClip("SHAKEOFF"); status("shaking off"); }, true);
+chip("sysRow", "TIRE HIM", () => { mind.iv.fatigue = Math.min(1, mind.iv.fatigue + 0.35); status("fatigue up"); }, true);
+chip("sysRow", "SCOLD", () => { mind.iv.guilt = 1; mind.iv.happiness = Math.max(0, mind.iv.happiness-0.3);
+  status("guilt spikes — watch the tail drop and the head lower, no animation played"); }, true);
+chip("sysRow", "PRAISE", () => { mind.iv.happiness = Math.min(1, mind.iv.happiness + 0.35);
+  status("happiness up — the tail speaks for it"); }, true);
+
+document.getElementById("say").addEventListener("keydown", e => {
+  if(e.key !== "Enter"){ return; }
+  const v = e.target.value.trim();
+  e.target.value = "";
+  speak(v);
+});
+document.getElementById("mindBtn").addEventListener("click", e => {
+  const p = document.getElementById("mind");
+  const on = p.style.display === "block";
+  p.style.display = on ? "none" : "block";
+  e.target.classList.toggle("on", !on);
+});
+let drag = null;
+canvas.addEventListener("pointerdown", e => { canvas.setPointerCapture(e.pointerId); drag = { x:e.clientX, y:e.clientY }; });
+canvas.addEventListener("pointermove", e => {
+  if(!drag){ return; }
+  if(world.handPose === "lure"){
+    world.lure[0] += (e.clientX - drag.x) * 0.006;
+    world.lure[2] += (e.clientY - drag.y) * 0.006;
+  } else {
+    camYaw -= (e.clientX - drag.x) * 0.007;
+  }
+  drag.x = e.clientX; drag.y = e.clientY;
+});
+canvas.addEventListener("pointerup", () => { drag = null; });
+
+/* ---------- loop ---------- */
+function resize(){ W = window.innerWidth*dpr; H = window.innerHeight*dpr; canvas.width = W; canvas.height = H; }
+window.addEventListener("resize", resize);
+resize();
+const st = AR.dogStats();   /* the header is gone; the stage is the whole frame now */
+
+function simulationStep(dt){
+  clock+=dt;startupAge+=dt;
+  world.dog=[world.dog[0],0,world.dog[2]];
+  const rm=AR.releasers(world);
+  AR.updateInternals(mind.iv,dt);
+  const win=AR.arbitrate(mind,rm,dt);
+  if(win!==lastWinner){
+    AR.noteAction(mind,clock,world.cue,win);lastWinner=win;winnerSince=clock;
+    emitCharacterEvent("behavior",{name:win});
+    if(win==="FETCH"&&Math.random()<.5)playClip("BARK","brain");
+    if(win==="EAT"||win==="DRINK")playClip("SNIFF","brain");
+  }
+  if(startupAge>2&&!clip&&speed<.04&&(!latestState||latestState.grounded)&&Math.random()<dt*.035)
+    playClip(Math.random()<.58?"SHAKEOFF":"SCRATCH","idle");
+  lastMC=AR.motorCommands(mind,rm);lastEX=AR.expression(mind.iv,mind);
+  applyMotor(lastMC,lastEX,dt);
+  if(world.ball&&!world.carrying&&Math.hypot(world.dog[0]-world.ball[0],world.dog[2]-world.ball[2])<.45&&mind.winner==="FETCH"){
+    world.carrying=true;mind.iv.happiness=AR.clamp01(mind.iv.happiness+.12);emitCharacterEvent("pickup",{object:"ball"});
+  }
+  if(world.carrying&&Math.hypot(world.dog[0]-world.human[0],world.dog[2]-world.human[2])<1.2){
+    world.carrying=false;world.ball=null;mind.iv.fetchDesire=AR.clamp01(mind.iv.fetchDesire-.35);mind.iv.happiness=AR.clamp01(mind.iv.happiness+.2);
+    emitCharacterEvent("deliver",{object:"ball"});status("he brought it back — fetchDesire drops, happiness rises");
+  }
+  return {state:latestState,motor:lastMC,expression:lastEX};
+}
+document.addEventListener("visibilitychange", () => {
+  running = !document.hidden;
+  if(running&&!manualMode){ last = performance.now(); requestAnimationFrame(frame); }
+});
+function frame(now){
+  if(!running||manualMode){ return; }
+  const dt = Math.min((now-last)/1000, 0.05);
+  last=now;const step=simulationStep(dt),mc=step.motor,ex=step.expression;
+
+  const cam = camera();
+  if(register === "CONTOUR"){
+    const iw = 320, ih = Math.max(2, Math.round(iw*H/W));
+    if(off.width !== iw){ off.width = iw; }
+    if(off.height !== ih){ off.height = ih; }
+    const body = AR.mergeWorld(rig);
+    AR.renderContours(offCtx, iw, ih, cam,
+      [{ segs:AR.contourSegments(body, "y", 26), world:AR.mIdent() }], { weight:1 });
+    drawExtras(cam, iw, ih, offCtx);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(off, 0, 0, W, H);
+  } else {
+    /* Render near display resolution. The old fixed 420px buffer created the
+       blocky image and magnified every missed raster pixel into a square hole. */
+    const cssW = W / Math.max(1, dpr);
+    const iw = Math.max(480, Math.min(900, Math.round(cssW * 1.25)));
+    const ih = Math.max(2, Math.round(iw*H/W));
+    if(off.width !== iw){ off.width = iw; }
+    if(off.height !== ih){ off.height = ih; }
+    drawStage(offCtx, iw, ih);
+    AR.renderScene(offCtx, iw, ih, cam, [rig], { keepBackground:true });
+    drawExtras(cam, iw, ih, offCtx);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(off, 0, 0, W, H);
+  }
+  panelT += dt;
+  if(panelT > 0.12){ drawPanel(mc, ex); panelT = 0; }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+status("he has his own agenda — throw the ball and watch FETCH compete, do not expect obedience");
+</script>
+</body>
+</html>

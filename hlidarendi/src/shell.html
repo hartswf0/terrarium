@@ -237,8 +237,10 @@ body.menu-open #menuFab .x{display:inline}
 body.menu-open #playFab{display:none!important}
 body.play-mode #readout,body.play-mode #tiltViz{display:none!important}
 body.diag-open #readout{display:block!important}
-/* the travel stick lives in the drive corner, as it does in the standing world */
+/* the travel stick lives in the drive corner, as it does in the standing world —
+   and it is the corner-most control: grabbing the corner always drives */
 #deckL{justify-content:flex-end;padding-bottom:10px}
+#deckL .deckItem[data-role="move"]{order:99}
 #driveHint{position:fixed;z-index:24;left:10px;bottom:max(8px,env(safe-area-inset-bottom,0px));font:700 8px/1 "IBM Plex Mono",monospace;letter-spacing:.08em;color:#04110d;background:var(--teal);border-radius:4px!important;padding:4px 7px;pointer-events:none;opacity:.85}
 body.navigating #driveHint,body.deck-using #driveHint{opacity:0;transition:opacity .2s}
 /* the toolbars — sectioned intents, each group expanding leftward from its toggle */

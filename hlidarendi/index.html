@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HLIÐARENDI</title>
+<meta name="description" content="A body. A dog. A dwelling. A place. A research world for attachment to an autonomous artificial animal.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --earth:#151713; --bone:#E9E4D8; --moss:#596650; --iron:#70726B;
+  --oxide:#A34F35; --amber:#D29A3A;
+  --serif:"Cormorant Garamond",Georgia,serif;
+  --sans:"Inter",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--earth);color:var(--bone);font:16px/1.65 var(--sans);
+  -webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:880px;margin:0 auto;padding:0 24px}
+/* ── threshold ── */
+header{min-height:92vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:80px 24px 60px;position:relative}
+.mark{width:84px;height:104px;margin-bottom:44px}
+.mark rect{fill:var(--bone)}
+.mark circle{fill:var(--amber)}
+h1{font-family:var(--serif);font-weight:500;font-size:clamp(38px,7vw,64px);
+  letter-spacing:.32em;text-indent:.32em;line-height:1.1}
+.sub{margin-top:18px;font-family:var(--mono);font-size:11px;letter-spacing:.42em;
+  text-indent:.42em;color:var(--iron);text-transform:uppercase}
+.ask{margin-top:56px;font-family:var(--serif);font-style:italic;font-weight:400;
+  font-size:clamp(20px,3.2vw,27px);color:var(--bone);max-width:560px;line-height:1.5}
+.beat{margin-top:34px;font-family:var(--mono);font-size:12px;line-height:2.3;color:var(--iron)}
+.beat b{color:var(--bone);font-weight:500}
+.vow{margin-top:52px;font-family:var(--mono);font-size:12px;letter-spacing:.34em;
+  text-indent:.34em;color:var(--amber)}
+.down{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);
+  color:var(--iron);font-family:var(--mono);font-size:11px;letter-spacing:.2em}
+/* ── sections ── */
+section{padding:84px 0;border-top:1px solid #2a2d26}
+.kicker{font-family:var(--mono);font-size:10px;letter-spacing:.4em;color:var(--moss);
+  text-transform:uppercase;margin-bottom:14px}
+h2{font-family:var(--serif);font-weight:500;font-size:clamp(26px,4vw,36px);
+  letter-spacing:.04em;margin-bottom:22px}
+p{max-width:620px;color:#c8c3b6;margin-bottom:16px}
+p b{color:var(--bone);font-weight:600}
+pre{font-family:var(--mono);font-size:12px;line-height:1.75;color:var(--iron);
+  background:#101210;border:1px solid #262922;border-left:2px solid var(--moss);
+  padding:20px 24px;overflow-x:auto;margin:28px 0;max-width:620px}
+pre em{font-style:normal;color:var(--amber)}
+/* ── doors (cards) ── */
+.doors{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:36px}
+.door{display:block;border:1px solid #2e312a;background:#181a16;padding:22px 22px 18px;
+  transition:border-color .18s,background .18s;position:relative}
+.door:hover{border-color:var(--amber);background:#1b1e18}
+.door .k{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.32em;color:var(--moss);
+  text-transform:uppercase}
+.door .t{display:block}
+.door:hover .k{color:var(--amber)}
+.door .t{font-family:var(--serif);font-size:22px;font-weight:500;margin:8px 0 6px;color:var(--bone)}
+.door .d{font-size:12.5px;line-height:1.6;color:var(--iron)}
+.door.prime{border-color:#4b4234}
+.door.prime .t{color:var(--amber)}
+/* ── the four dogs ── */
+.dogs{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-top:34px}
+.dog{border-top:2px solid var(--moss);padding-top:14px}
+.dog.oxide{border-top-color:var(--oxide)}
+.dog h3{font-family:var(--mono);font-size:12px;letter-spacing:.24em;font-weight:600;color:var(--bone)}
+.dog .q{font-family:var(--serif);font-style:italic;font-size:19px;margin:8px 0 8px;color:var(--bone)}
+.dog .s{font-size:12.5px;color:var(--iron);line-height:1.6}
+.dog .from{font-family:var(--mono);font-size:10px;color:var(--moss);letter-spacing:.12em;margin-top:8px}
+/* ── kennel list ── */
+.works{margin-top:30px;border-top:1px solid #2a2d26}
+.work{display:flex;gap:18px;align-items:baseline;padding:15px 4px;border-bottom:1px solid #2a2d26;
+  transition:background .15s}
+.work:hover{background:#181a16}
+.work .n{font-family:var(--mono);font-size:11px;color:var(--moss);flex:0 0 34px}
+.work .t{font-family:var(--serif);font-size:19px;color:var(--bone);flex:0 0 auto;min-width:0}
+.work .d{font-size:12px;color:var(--iron);margin-left:auto;text-align:right}
+.work:hover .t{color:var(--amber)}
+/* ── laws / footer ── */
+.laws{font-family:var(--mono);font-size:13px;line-height:2.1;color:var(--bone);letter-spacing:.06em}
+footer{padding:70px 24px 60px;border-top:1px solid #2a2d26;text-align:center}
+footer .m{font-family:var(--mono);font-size:10px;letter-spacing:.3em;color:var(--iron)}
+footer .vow{margin-top:22px}
+.credit{margin-top:30px;font-size:11px;color:#4a4d45;line-height:1.9}
+.credit a{color:var(--iron);border-bottom:1px solid #33362f}
+.credit a:hover{color:var(--amber)}
+@media(max-width:640px){
+  .work{flex-wrap:wrap}.work .d{margin-left:52px;text-align:left;flex-basis:100%}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <svg class="mark" viewBox="0 0 84 104" aria-hidden="true">
+    <rect x="6"  y="0" width="14" height="104"/>
+    <rect x="64" y="0" width="14" height="104"/>
+    <circle cx="42" cy="76" r="5.5"/>
+  </svg>
+  <h1>HLIÐARENDI</h1>
+  <div class="sub">The Dog at the Threshold</div>
+  <div class="ask">What does it mean to love a character that can refuse you?</div>
+  <div class="beat">A person calls.<br>A dog looks.<br><b>A pause.</b></div>
+  <div class="vow">NOT COMMANDED. CHOSEN.</div>
+  <div class="down">↓</div>
+</header>
+
+<div class="wrap">
+
+<section id="enter">
+  <div class="kicker">Enter</div>
+  <h2>One person. One dog. One dwelling. One place.</h2>
+  <p>Everybody wakes beside the trailer at the real Hlíðarendi — a baked
+  kilometre of Fljótshlíð under his feet, the Markarfljót plain below. Argos
+  is nearby. The call is not a command. The dog hears it. The dog decides.</p>
+  <div class="doors">
+    <a class="door prime" href="HLIDARENDI.html">
+      <span class="k">Play · phone-first</span>
+      <span class="t">HLIÐARENDI</span>
+      <div class="d">The dwelling, the ground, the body, the dog. Feed him,
+      throw the ball, build on the land, call on other places. He answers
+      for himself.</div>
+    </a>
+    <a class="door" href="../unset-04-hartsoe-iii.html">
+      <span class="k">The standing world</span>
+      <span class="t">Terrarium III</span>
+      <div class="d">The host world. Argos and Everybody live here as its
+      first legged species — walk the body, and the dog plays the real ball
+      back.</div>
+    </a>
+    <a class="door" href="hlidarendi.trig.json" download>
+      <span class="k">Cartridge</span>
+      <span class="t">The Trailer</span>
+      <div class="d">The dwelling as a cartridge. Drag it onto the standing
+      world — loading is playing. It seats on the real land and brings the
+      dog.</div>
+    </a>
+  </div>
+</section>
+
+<section id="dogs">
+  <div class="kicker">The lineage</div>
+  <h2>Four dogs, one creature</h2>
+  <p>The dog is not a skin applied to an agent architecture. Three dogs are
+  the standard; the fourth is the way to build it.</p>
+  <div class="dogs">
+    <div class="dog">
+      <h3>ARGOS</h3>
+      <div class="q">Who are you?</div>
+      <div class="s">Odysseus returns disguised and altered. His dog knows
+      him anyway. Recognition beneath representation.</div>
+      <div class="from">THE ODYSSEY</div>
+    </div>
+    <div class="dog">
+      <h3>SÁMR</h3>
+      <div class="q">What do you intend?</div>
+      <div class="s">He tells Gunnar's friends from his enemies — whether a
+      visitor means the household well or ill.</div>
+      <div class="from">NJÁLS SAGA</div>
+    </div>
+    <div class="dog">
+      <h3>GOODYEAR</h3>
+      <div class="q">Should I trust you?</div>
+      <div class="s">The robot can be programmed to care for the dog. The
+      dog is not programmed to accept the robot.</div>
+      <div class="from">FINCH</div>
+    </div>
+    <div class="dog oxide">
+      <h3>SILAS</h3>
+      <div class="q">Can I act with you without becoming your puppet?</div>
+      <div class="s">Motivations, releasing mechanisms, competing behaviors —
+      directability without the destruction of autonomy.</div>
+      <div class="from">MIT MEDIA LAB</div>
+    </div>
+  </div>
+  <pre>
+CALL
+  ↓
+PERCEPTION
+  ↓
+MEANING
+  ↓
+MOTIVATION
+  ↓
+<em>CHOICE</em>
+  ↓
+BODY
+  ↓
+WORLD
+  ↓
+HISTORY</pre>
+  <p>A request enters the dog's world as evidence. It biases his behavior.
+  It never bypasses him. If he is frightened, he may hesitate. If he is
+  eating, he may only glance over. If the years have been good between you,
+  he may already be running.</p>
+</section>
+
+<section id="ground">
+  <div class="kicker">The ground rules</div>
+  <h2>One world, answered once</h2>
+  <pre>
+BODY
+  +
+DOG
+  +
+DWELLING
+  +
+PLACE
+  =
+RELATIONSHIP</pre>
+  <p><b>There is one ground.</b> Everybody's foot and Argos's paw ask the
+  same terrain what they touch. The trailer's rendered walls, its collision,
+  and its openings derive from one element table. The ball he chases is the
+  ball you threw.</p>
+  <p><b>Contact drives motion.</b> Walking requires feet. No paws down means
+  no dog translation. Embodiment is not an animation style; it is a
+  constraint on action.</p>
+  <p><b>The world remembers.</b> Feeding, calling, walking, playing fetch,
+  leaving, and returning accumulate. Save. Reload. The place, the actors,
+  and the history remain.</p>
+</section>
+
+<section id="kennel">
+  <div class="kicker">The bodies of work</div>
+  <h2>Every stage of the animal</h2>
+  <p>The creature was raised in the open. Each stage still runs.</p>
+  <div class="works">
+    <a class="work" href="argos/argos.html">
+      <span class="n">01</span>
+      <span class="t">ARGOS · half-dog</span>
+      <span class="d">the game contract — mind, gaits, paw traction, word rules</span>
+    </a>
+    <a class="work" href="argos/argoshalfdogintegrated.html">
+      <span class="n">02</span>
+      <span class="t">ARGOS · unified half-dog</span>
+      <span class="d">the world contract — move targets, gaze, state, quality</span>
+    </a>
+    <a class="work" href="argos/ARGOSHALFDOGSCULPTEDv01.html">
+      <span class="n">03</span>
+      <span class="t">ARGOS · living animal runtime v2.3</span>
+      <span class="d">the sculpted anatomy — the latest animal</span>
+    </a>
+    <a class="work" href="sources/everybody-explorer-whole-body-v16.html">
+      <span class="n">04</span>
+      <span class="t">EVERYBODY · explorer v16</span>
+      <span class="d">the whole-body human — locomotion earned through feet</span>
+    </a>
+    <a class="work" href="sources/ingold-trailer.html">
+      <span class="n">05</span>
+      <span class="t">INGOLD · the trailer</span>
+      <span class="d">the dwelling as committed operations — 314 members, one door</span>
+    </a>
+    <a class="work" href="HLIDARENDI.html">
+      <span class="n">06</span>
+      <span class="t">HLIÐARENDI</span>
+      <span class="d">all of them, mutually consequential, on the real hillside</span>
+    </a>
+  </div>
+</section>
+
+<section id="research">
+  <div class="kicker">The research</div>
+  <h2>Attachment, when the other can say no</h2>
+  <p>A character that always obeys can demonstrate responsiveness. A
+  character that could refuse but chooses to return may produce something
+  closer to relationship. HLIÐARENDI is built to make that proposition
+  testable — through recognition, repetition, embodiment, memory, place,
+  partial opacity, and voluntary response.</p>
+  <div class="doors">
+    <a class="door" href="https://github.com/hartswf0/terrarium/blob/main/hlidarendi/THE-DOG-AT-THE-THRESHOLD.md">
+      <span class="k">Argument</span>
+      <span class="t">The Dog at the Threshold</span>
+      <div class="d">The research question, the four dogs, the first
+      experiment, what counts as success.</div>
+    </a>
+    <a class="door" href="https://github.com/hartswf0/terrarium/blob/main/hlidarendi/SILAS.md">
+      <span class="k">Architecture</span>
+      <span class="t">The Silas Threshold</span>
+      <div class="d">How the creature is built without being destroyed:
+      releasers, drives, arbitration, the five laws, the four tests.</div>
+    </a>
+    <a class="door" href="https://github.com/hartswf0/terrarium/blob/main/hlidarendi/MISSION.md">
+      <span class="k">Mission</span>
+      <span class="t">The Lore</span>
+      <div class="d">The lineage and the mission — read before the
+      engineering. It decides what not to simplify away.</div>
+    </a>
+    <a class="door" href="https://github.com/hartswf0/terrarium/blob/main/hlidarendi/SPEC.md">
+      <span class="k">Specification</span>
+      <span class="t">The Spec</span>
+      <div class="d">The engineering specification: contracts, adapters,
+      BOOT 0, the acceptance loop.</div>
+    </a>
+    <a class="door" href="https://github.com/hartswf0/terrarium/blob/main/hlidarendi/UPSTREAM.md">
+      <span class="k">Port</span>
+      <span class="t">Upstream</span>
+      <div class="d">How the organism rides into the standing world: the
+      species seam, embodiment, the living ground.</div>
+    </a>
+    <a class="door" href="https://github.com/hartswf0/terrarium/blob/main/hlidarendi/WORKSHOP.md">
+      <span class="k">Workshop</span>
+      <span class="t">When a Character Chooses You Back</span>
+      <div class="d">Work-in-progress abstract — love in games, studied
+      through a dog who may not come.</div>
+    </a>
+  </div>
+</section>
+
+<section id="north">
+  <div class="kicker">North star</div>
+  <h2>The questions the build must keep answering</h2>
+  <pre>
+Did the foot find the ground?
+
+Did the dog see what happened?
+
+Did the structure constrain the action?
+
+Did the animal have some choice?
+
+Did the human have to use their body?
+
+Did their previous interaction matter?
+
+Did the world remember?
+
+When they came home,
+<em>was it still their home?</em></pre>
+</section>
+
+</div>
+
+<footer>
+  <div class="m">HLIÐARENDI · A BODY · A DOG · A DWELLING · A PLACE</div>
+  <div class="vow">NOT COMMANDED. CHOSEN.</div>
+  <div class="credit">
+    Part of <a href="../">Terrarium</a> — places that keep their conditions
+    visible, contestable, and available for reconstruction.<br>
+    Ground: AWS Terrain Tiles · Imagery © Esri, Maxar, Earthstar Geographics ·
+    Ways &amp; buildings © OpenStreetMap contributors ·
+    <a href="https://github.com/hartswf0/terrarium/tree/main/hlidarendi">source</a>
+  </div>
+</footer>
+
+</body>
+</html>
