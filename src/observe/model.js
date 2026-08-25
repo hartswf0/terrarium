@@ -3,8 +3,9 @@
 // These records are deliberately NOT Terrarium entities. An external source may
 // be visible to the world without being admitted into PLACE. Observation is what
 // a source supplied; Signal is a proposition derived from evidence; Condition is
-// a temporary state supported by signals. Crossing into the journal is a separate
-// explicit operation in retain.js.
+// a temporary state supported by signals; Interpretant is what that condition
+// means FOR a particular actor under declared relations. Crossing into the
+// journal is a separate explicit operation in retain.js.
 
 export const OBSERVATION_EPISTEMIC = Object.freeze([
   'OBSERVED', 'MEASURED', 'REPORTED', 'IMPORTED',
@@ -39,6 +40,12 @@ function time(value, name, allowNull = true) {
 function confidence(value = 1) {
   const n = Number(value);
   if (!Number.isFinite(n) || n < 0 || n > 1) throw new Error('Geonosis confidence must be between 0 and 1');
+  return n;
+}
+
+function signed(value = 0) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < -1 || n > 1) throw new Error('Geonosis valence must be between -1 and 1');
   return n;
 }
 
@@ -116,8 +123,45 @@ export function makeCondition(props) {
   });
 }
 
+/**
+ * What evidence means for one actor. Interpretants are not universal labels:
+ * the same condition may be inviting, dangerous, irrelevant, or imperceptible
+ * to different actors. `basis[]` names the relations that license the reading
+ * (e.g. perceivable, affects, usedBy); no basis means no interpretant.
+ */
+export function makeInterpretant(props) {
+  const epistemic = props.epistemic || 'INFERRED';
+  if (!SIG_SET.has(epistemic)) throw new Error(`invalid interpretant epistemic state ${epistemic}`);
+  const validFrom = time(props.validFrom ?? Date.now(), 'validFrom', false);
+  const expiresAt = time(props.expiresAt, 'expiresAt');
+  if (expiresAt != null && expiresAt < validFrom) throw new Error('interpretant cannot expire before it begins');
+  const basis = list(props.basis);
+  if (!basis.length) throw new Error('Geonosis interpretant requires a declared relational basis');
+  return Object.freeze({
+    id: String(required(props.id, 'interpretant id')),
+    actor: String(required(props.actor, 'interpretant actor')),
+    actorKind: props.actorKind ? String(props.actorKind).toUpperCase() : 'ACTOR',
+    subject: String(required(props.subject, 'interpretant subject')),
+    sign: String(required(props.sign, 'interpretant sign')),
+    value: jsonCopy(props.value),
+    valence: signed(props.valence),
+    strength: confidence(props.strength),
+    epistemic,
+    derivedFrom: list(props.derivedFrom),
+    basis,
+    validFrom,
+    expiresAt,
+    address: list(props.address),
+    props: jsonCopy(props.props || {}),
+  });
+}
+
 export function conditionAlive(condition, now = Date.now()) {
   return !condition.expiresAt || now <= condition.expiresAt;
+}
+
+export function interpretantAlive(interpretant, now = Date.now()) {
+  return !interpretant.expiresAt || now <= interpretant.expiresAt;
 }
 
 export function observationEvidence(observation) {
