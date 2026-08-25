@@ -6,12 +6,11 @@ const LOOKS={
  GOODYEAR:{key:'goodyear',accent:'#c19d5c',palette:[[222,200,156],[241,226,194],[232,207,177],[44,38,31],[251,248,238],[106,70,35],[8,7,6],[191,145,125],[23,7,6],[245,235,207],[177,76,86]]},
  SILAS:{key:'silas',accent:'#58676d',palette:[[88,103,109],[169,181,179],[147,163,164],[24,29,31],[236,241,238],[112,158,165],[5,7,8],[92,109,111],[13,18,19],[229,232,218],[145,74,78]]}
 };
-const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
 export class DogLab{
  constructor(exp,key){this.exp=exp;this.key=key;this.char=null;this.win=null;this.history=[];this.relations=new Map();this.time=0;this.ready=false;this.lastState=null;this.token=0;}
  boot(){const f=$('#animal');f.src=RUNTIME_SRC;f.addEventListener('load',()=>this.attach(f),{once:true});}
  attach(frame){let win,doc;try{win=frame.contentWindow;doc=frame.contentDocument}catch(e){return this.fail('Serve HALF-DOG from the same origin as the dog runtime.')}this.win=win;
-  const finish=()=>{const c=win.ArgosCharacter;if(!c)return false;this.char=c;this.ready=true;this.strip(doc);this.look();this.mobileCamera();this.exp.init(this);this.render();return true};
+  const finish=()=>{const c=win.ArgosCharacter;if(!c)return false;this.char=c;this.ready=true;this.strip(doc);this.look();this.mobileCamera();this.exp.init(this);this.render();this._last=0;requestAnimationFrame(t=>this.loop(t));return true};
   if(finish())return;win.addEventListener('argos:ready',finish,{once:true});setTimeout(()=>{if(!this.ready)this.fail('Dog runtime did not start.')},2600);
  }
  strip(doc){const s=doc.createElement('style');s.textContent='header,#mind,#chatWrap,#dock{display:none!important}#stage{inset:0!important;width:100%!important;height:100%!important}html,body{overflow:hidden!important}';doc.head.appendChild(s)}
@@ -35,4 +34,4 @@ export class DogLab{
  renderState(){const box=$('#state');box.innerHTML='';for(const [k,v] of (this.exp.state?.(this,this.lastState)||[])){const d=document.createElement('div');d.innerHTML=`${k}<b>${v}</b>`;box.appendChild(d)}}
  loop(ts){if(!this.ready)return;const t=ts/1000,dt=this._last?Math.min(.05,t-this._last):.016;this._last=t;this.time+=dt;this.lastState=this.char.getState?.()||this.lastState;this.exp.update?.(this,dt,this.lastState);this.render();requestAnimationFrame(x=>this.loop(x))}
 }
-export function mountLab(exp,key){const lab=new DogLab(exp,key);document.title=exp.title+' · HALF-DOG';const strip=$('#dogstrip');for(const k of ['argos','samr','goodyear','silas']){const a=document.createElement('a');a.href='./lab.html?dog='+k;a.className=k===key?'on':'';strip.appendChild(a)}$('#whyBtn').onclick=()=>$('#whyPanel').classList.toggle('open');lab.boot();window.lab=lab;requestAnimationFrame(t=>lab.loop(t));}
+export function mountLab(exp,key){const lab=new DogLab(exp,key);document.title=exp.title+' · HALF-DOG';const strip=$('#dogstrip');for(const k of ['argos','samr','goodyear','silas']){const a=document.createElement('a');a.href='./lab.html?dog='+k;a.className=k===key?'on':'';strip.appendChild(a)}$('#whyBtn').onclick=()=>$('#whyPanel').classList.toggle('open');lab.boot();window.lab=lab;}
