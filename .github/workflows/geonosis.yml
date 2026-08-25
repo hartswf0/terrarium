@@ -12,6 +12,7 @@ on:
       - 'tests/live-water.mjs'
       - 'tests/interpretants.mjs'
       - 'tests/water-relations.mjs'
+      - 'tests/nldi-water.mjs'
       - '.github/workflows/geonosis.yml'
 
 permissions:
@@ -36,3 +37,5 @@ jobs:
         run: node tests/interpretants.mjs
       - name: Gauge to watercourse candidate relations
         run: node tests/water-relations.mjs
+      - name: NLDI network linkage and measures gate
+        run: node tests/nldi-water.mjs
