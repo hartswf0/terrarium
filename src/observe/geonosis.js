@@ -8,6 +8,7 @@ import {
   makeObservation, makeSignal, makeCondition, makeInterpretant,
   conditionAlive, interpretantAlive,
 } from './model.js';
+import { makeRelation } from './relation.js';
 import { makeSourcePolicy, retentionDecision } from './source-policy.js';
 
 /**
@@ -31,6 +32,7 @@ export class Geonosis {
     this.observations = new Map();
     this.signals = new Map();
     this.conditions = new Map();
+    this.relations = new Map();
     this.interpretants = new Map();
     this.observers = new Set();
   }
@@ -85,10 +87,24 @@ export class Geonosis {
     return record;
   }
 
+  relate(props) {
+    const record = makeRelation(props);
+    for (const id of record.derivedFrom) {
+      if (!this.observations.has(id) && !this.signals.has(id)
+          && !this.conditions.has(id) && !this.relations.has(id)) {
+        throw new Error(`Geonosis relation ${record.id} cites missing evidence ${id}`);
+      }
+    }
+    this.relations.set(record.id, record);
+    this.notify('relation', record);
+    return record;
+  }
+
   interpret(props) {
     const record = makeInterpretant(props);
     for (const id of record.derivedFrom) {
-      if (!this.conditions.has(id) && !this.signals.has(id) && !this.observations.has(id)) {
+      if (!this.conditions.has(id) && !this.signals.has(id)
+          && !this.observations.has(id) && !this.relations.has(id)) {
         throw new Error(`Geonosis interpretant ${record.id} cites missing evidence ${id}`);
       }
     }
@@ -121,6 +137,7 @@ export class Geonosis {
       observations: [...this.observations.values()].filter((x) => x.providerRecordId === subject || x.rawProperties?.subject === subject),
       signals: [...this.signals.values()].filter((x) => x.subject === subject),
       conditions: [...this.conditions.values()].filter((x) => x.subject === subject),
+      relations: [...this.relations.values()].filter((x) => x.from === subject || x.to === subject),
       interpretants: [...this.interpretants.values()].filter((x) => x.subject === subject),
     };
   }
@@ -136,6 +153,7 @@ export class Geonosis {
       observations: [...this.observations.values()].filter(match),
       signals: [...this.signals.values()].filter(match),
       conditions: [...this.conditions.values()].filter(match),
+      relations: [...this.relations.values()].filter(match),
       interpretants: [...this.interpretants.values()].filter(match),
     };
   }
@@ -180,6 +198,7 @@ export class Geonosis {
       observations,
       signals: [...this.signals.values()],
       conditions: [...this.conditions.values()],
+      relations: [...this.relations.values()],
       interpretants: [...this.interpretants.values()],
     });
   }
@@ -192,6 +211,7 @@ export class Geonosis {
     for (const observation of data.observations || []) g.observe(observation);
     for (const signal of data.signals || []) g.signal(signal);
     for (const condition of data.conditions || []) g.condition(condition);
+    for (const relation of data.relations || []) g.relate(relation);
     for (const interpretant of data.interpretants || []) g.interpret(interpretant);
     return g;
   }
