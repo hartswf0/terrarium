@@ -8,6 +8,7 @@
 import { BUS } from '../core/bus.js';
 import { Geonosis } from './geonosis.js';
 import { harvestUSGSWater } from './adapters/usgs-water.js';
+import { candidateWatercourseRelations } from './watercourse-relations.js';
 
 export const GEONOSIS = new Geonosis();
 
@@ -89,12 +90,17 @@ export async function refreshWater(world = currentWorld(), {
     bbox,
     now,
     fetchImpl,
-    // A gauge location is still WGS84 evidence; converting it to local metres
-    // is useful for proximity/attention, but ICOSA assignment remains the Atlas's
-    // job and is deliberately not invented here.
+    // ICOSA assignment remains the Atlas's job and is deliberately not invented here.
     addressFor: null,
     trend: { relativeThreshold: 0.05, expiresAfterMs: 90 * 60 * 1000 },
   }).then((result) => {
+    // Geometry may propose a gauge↔mapped-water relation. It may never certify
+    // one. The relation type itself remains `candidate_measures` and therefore
+    // cannot license simulation or an actor risk interpretant.
+    result.relations = [];
+    for (const row of result.rows || []) {
+      result.relations.push(...candidateWatercourseRelations(GEONOSIS, world, row.observation));
+    }
     STATE.result = result;
     STATE.status = result.state;
     STATE.checkedAt = now;
@@ -160,7 +166,10 @@ export function describeWater(result = STATE.result, geonosis = GEONOSIS) {
     : result.state === 'PARTIAL_STALE' ? 'Some USGS water observations are stale.'
       : 'USGS water observations are current.';
   if (!lines.length) return `${prefix} The returned measurements did not contain numeric streamflow or gage-height values.`;
-  return `${prefix}\n${lines.slice(0, 6).join('\n')}\nTrends are site-relative measurements, not flood-severity claims.`;
+  const candidateNote = result.relations?.length
+    ? `\n${result.relations.length} gauge-to-mapped-water alignment${result.relations.length === 1 ? ' is' : 's are'} only candidate relations; proximity is not hydrologic causality.`
+    : '';
+  return `${prefix}\n${lines.slice(0, 6).join('\n')}\nTrends are site-relative measurements, not flood-severity claims.${candidateNote}`;
 }
 
 BUS.register('water-now',
