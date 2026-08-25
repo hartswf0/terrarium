@@ -19,7 +19,7 @@ CONDITION
   ↓
 DIFFERENCE
   ↓
-INTERPRETANT        (next)
+INTERPRETANT
   ↓
 STATEMENT           (next)
 
@@ -56,7 +56,7 @@ Signals cite `derivedFrom[]`. Missing evidence is an error. A source policy may 
 A temporary active state supported by evidence:
 
 ```text
-creek → HIGH_FLOW
+creek → FLOW_RISING
 road → ACTIVE
 shade → SPARSE
 ```
@@ -78,6 +78,30 @@ Conditions have `began`, `lastSeen`, `expiresAt`, strength and support. Expiry r
 
 The model does not detect these. The model may later interpret them.
 
+### Interpretant
+
+What a condition means **for one actor**. Interpretants carry actor, actor kind, sign, value, valence, strength, evidence, expiry, and a declared relational `basis[]`.
+
+No relation means no interpretation. A gauge that happens to be geographically near a dog does not become something the dog can perceive. A civic system does not govern a stream merely because they share a cell.
+
+Current cautious water rules deliberately stop at attention/salience:
+
+```text
+FLOW_RISING
+  + perceivable relation
+      → DOG   water_motion_salience
+
+FLOW_RISING
+  + usedBy relation
+      → HUMAN water_change_attention
+
+FLOW_RISING
+  + governs relation
+      → CIVIC hydrologic_change_attention
+```
+
+They do **not** infer danger, safety, attraction, fear, or behavior. Those require additional relations and actor state.
+
 ## Source policy
 
 Access is not permission.
@@ -97,7 +121,7 @@ retention   = EPHEMERAL | SNAPSHOT | MIRROR | REFERENCE
 
 This means serialization itself cannot silently turn a live-only source into a cached dataset.
 
-`catalog.js` contains a deliberately conservative first keyless core. Exact product/service terms still belong in each future adapter.
+`catalog.js` contains a deliberately conservative first keyless core. Exact product/service terms still belong in each adapter.
 
 ## ICOSA
 
@@ -109,7 +133,7 @@ Adapters may attach deepest known addresses such as:
 F08.031274
 ```
 
-`Geonosis.byAddress('F08', { descendants: true })` finds descendants without physically duplicating every record into every ancestor cell. Higher-cell manifests/aggregates can be generated later.
+`Geonosis.byAddress('F08.03', { descendants: true })` finds `F08.031274` without physically duplicating the record into every ancestor. ICOSA ancestry is face + refinement path, not filesystem segmentation.
 
 No H3/S2 ontology is introduced here. If a provider arrives in H3/S2, that is ingest geometry to translate, not another sovereign spatial system.
 
@@ -126,6 +150,61 @@ An observation may become a Terrarium deed only when:
 5. the original observation is retained as evidence.
 
 EPHEMERAL/REFERENCE sources are refused at this gate. They can later support authored testimony/reference workflows, but their source-derived observation payload is not smuggled into `Place`.
+
+## First living organ — USGS Water
+
+`src/observe/adapters/usgs-water.js` is the first real live adapter.
+
+It uses the modern USGS Water OGC API:
+
+```text
+latest-continuous  → newest streamflow / gage-height measurements
+continuous         → recent history
+```
+
+The keyless core asks for parameter `00060` (streamflow/discharge) and `00065` (gage height). The adapter preserves measurement time, site/time-series identity, value, unit, approval status, qualifier, geometry, source URL and public-domain provenance.
+
+It explicitly distinguishes:
+
+```text
+CURRENT
+PARTIAL_STALE
+STALE
+NO_GAUGE_COVERAGE
+UNAVAILABLE
+```
+
+`NO_GAUGE_COVERAGE` never means `NO_WATER`.
+
+Recent history can derive temporary `FLOW_RISING`, `FLOW_FALLING`, `STAGE_RISING`, and `STAGE_FALLING` conditions. These are site-relative change detectors, **not flood-severity classifications**.
+
+## Terrarium live-water bridge
+
+`src/observe/live-water.js` mounts beside `app.js`; it does not enter `World`.
+
+For a real Terrarium:
+
+```text
+Place bbox
+  ↓
+nearby USGS search window
+  ↓
+Geonosis observations/signals/conditions
+  ↓
+BUS: “water now”
+```
+
+The browser notices a changed world on a cheap clock and refreshes water on a patient 15-minute clock. Synthetic worlds refuse to invent a real sensor neighborhood. Gauge points can be transformed into Terrarium-local metres for later spatial reasoning without becoming canonical entities.
+
+The first visible interface is language, not a dashboard:
+
+```text
+water now
+what is the water doing?
+creek now
+```
+
+The answer names freshness, measured values and site-relative trends while preserving source absence/failure distinctions.
 
 ## Weather, trace, deed
 
@@ -144,7 +223,7 @@ Aircraft positions should not create journal transactions every few seconds. A l
 
 ### A source changes authentication
 
-Only its adapter/source policy changes. Observation, signal, condition and Terrarium semantics remain stable.
+Only its adapter/source policy changes. Observation, signal, condition, interpretant and Terrarium semantics remain stable.
 
 ### A source becomes non-cacheable
 
@@ -156,15 +235,24 @@ Existing permitted snapshots remain dated evidence. New acquisition reports unav
 
 ### A new actor arrives
 
-DOG, HUMAN, CAR or CIVIC interpretation should consume conditions/signals, not provider APIs. The actor therefore never needs to know that heat came from NWS, stream stage from USGS, or a road from OSM.
+DOG, HUMAN, CAR or CIVIC interpretation consumes conditions/signals plus declared relations, not provider APIs. The actor never needs to know that stream stage came from USGS or a road from OSM.
+
+### A gauge is near a creek
+
+Proximity alone does not let the gauge alter creek physics or creature behavior. A hydrologic relation must be established first. This is why the existing `runWater` simulator is deliberately untouched by the first USGS adapter.
 
 ## Tests
 
 ```sh
 node tests/geonosis.mjs
+node tests/usgs-water.mjs
+node tests/live-water.mjs
+node tests/interpretants.mjs
 ```
 
-The foundation tests pin:
+GitHub Actions runs the same stack on Node 24.
+
+The tests pin:
 
 - seeing does not mutate Terrarium;
 - derived claims require evidence;
@@ -175,7 +263,14 @@ The foundation tests pin:
 - rhythm can become rupture;
 - ICOSA ancestor queries do not require duplicated records;
 - snapshots obey retention policy;
-- admission into `Place` is explicit and policy-gated.
+- admission into `Place` is explicit and policy-gated;
+- USGS empty coverage is not water absence;
+- stale, unavailable and current water remain distinct;
+- nonnumeric sensor states do not become invented numbers;
+- live water works without a World mutation surface;
+- actor interpretation requires an explicit relational basis;
+- one condition can yield distinct actor-specific signs;
+- interpretants expire with the conditions that license them.
 
 ## Next organs
 
@@ -183,12 +278,11 @@ Do not add a dashboard first.
 
 The next implementation order is:
 
-1. source adapter contract (`fetch → normalize → observations`);
-2. one live environmental adapter (USGS Water or NWS);
-3. one moving actor adapter (adsb.lol or GTFS-RT);
-4. condition reducers (HIGH_FLOW, HEAT, ROAD_ACTIVE, etc.);
-5. actor-specific INTERPRETANT;
-6. Statements of Importance;
-7. compiled ICOSA cell manifests for offline/mobile use.
+1. establish gauge ↔ stream / watershed relations without equating proximity with causality;
+2. add an open weather/rain source so hydrology can acquire upstream causes;
+3. add actor state/wants so interpretants can become real affordances rather than generic salience;
+4. add one moving actor source (GTFS-RT or adsb.lol);
+5. build Statements of Importance from deterministic difference + interpretant structures;
+6. compile ICOSA cell manifests for offline/mobile use.
 
 The test is not how many feeds Terrarium can display. The test is whether external evidence can alter what beings encounter without erasing where that evidence came from.
