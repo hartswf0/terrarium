@@ -18,6 +18,13 @@ export const LIVING_GROUND = {
     ],
     overpass: ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'],
     nominatim: 'https://nominatim.openstreetmap.org/search',
+    // THE LIVE CONDITIONS — keyless, attribution-only feeds. The land you are
+    // standing on is not a backdrop: it is shaking, and things are crossing
+    // the sky above it, right now. (Source list read off bilawalsidhu's
+    // gods-eye-view, MIT; the code there is CesiumJS-bound and stays there —
+    // what travels is the list and the registration, which is ours already.)
+    quakes: 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson',
+    adsb: (lat, lon, nm) => 'https://api.adsb.lol/v2/lat/' + lat.toFixed(4) + '/lon/' + lon.toFixed(4) + '/dist/' + Math.round(nm),
   },
   // ---- web-mercator: lon/lat ↔ global pixels at zoom z (256px tiles)
   lonToPx(lon, z) { return (lon + 180) / 360 * Math.pow(2, z) * 256; },
@@ -101,6 +108,70 @@ export const LIVING_GROUND = {
       const main = /^(primary|secondary|tertiary|trunk|motorway)/.test(t);
       stroke(rd.pts, main ? 'rgba(238,234,226,.95)' : 'rgba(205,196,178,.8)', main ? 2.6 : 1.2);
     }
+  },
+  // ---- REGISTRATION: any lat/lon becomes a place on this ground, and any
+  // place on this ground becomes a lat/lon. The window's own mercator meta is
+  // the only authority — nothing here re-derives the height or the extent.
+  localXZ(T, lat, lon) {
+    const g = T.geo; if (!g) throw new Error('no geographic registration');
+    const W = this.windowPx(T);
+    const i = this.lonToPx(lon, g.z) - W.x0, j = this.latToPx(lat, g.z) - W.y0;
+    return { x: (i - T.cx) * T.res, z: (j - T.cy) * T.res };
+  },
+  latLonAt(T, x, z) {
+    const g = T.geo; if (!g) throw new Error('no geographic registration');
+    const W = this.windowPx(T);
+    return { lat: this.pxToLat(W.y0 + z / T.res + T.cy, g.z), lon: this.pxToLon(W.x0 + x / T.res + T.cx, g.z) };
+  },
+  // great-circle offset — true metres and true bearing, no mercator stretch,
+  // so a contact 300 km off still lies in exactly the right direction
+  geoDelta(lat0, lon0, lat, lon) {
+    const R = 6371000, r = Math.PI / 180;
+    const dLat = (lat - lat0) * r, dLon = (lon - lon0) * r;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat0 * r) * Math.cos(lat * r) * Math.sin(dLon / 2) ** 2;
+    const d = 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+    const y = Math.sin(dLon) * Math.cos(lat * r);
+    const x = Math.cos(lat0 * r) * Math.sin(lat * r) - Math.sin(lat0 * r) * Math.cos(lat * r) * Math.cos(dLon);
+    return { d, brg: Math.atan2(y, x) };
+  },
+  // ---- THE GROUND IS SHAKING: USGS, last 24 h, public domain, keyless
+  async quakes(T, withinKm) {
+    const g = T.geo; if (!g) throw new Error('no geographic registration');
+    const r = await fetch(this.sources.quakes, { headers: { accept: 'application/json' } });
+    if (!r.ok) throw new Error('quakes ' + r.status);
+    const j = await r.json();
+    const cap = (withinKm || 600) * 1000, out = [];
+    for (const f of (j.features || [])) {
+      const c = f.geometry && f.geometry.coordinates; if (!c) continue;
+      const lon = +c[0], lat = +c[1], depth = +c[2] || 0;
+      const dd = this.geoDelta(g.lat, g.lon, lat, lon);
+      if (dd.d > cap) continue;
+      out.push({ lat, lon, depthKm: depth, mag: +(f.properties && f.properties.mag) || 0,
+        place: (f.properties && f.properties.place) || '', time: (f.properties && f.properties.time) || 0,
+        d: dd.d, brg: dd.brg });
+    }
+    out.sort((a, b) => a.d - b.d);
+    return out;
+  },
+  // ---- THINGS CROSSING THE SKY: adsb.lol, keyless, attribution-only
+  async aircraft(T, withinKm) {
+    const g = T.geo; if (!g) throw new Error('no geographic registration');
+    const nm = Math.max(5, Math.min(250, (withinKm || 180) / 1.852));
+    const r = await fetch(this.sources.adsb(g.lat, g.lon, nm), { headers: { accept: 'application/json' } });
+    if (!r.ok) throw new Error('aircraft ' + r.status);
+    const j = await r.json();
+    const list = j.ac || j.aircraft || [];
+    const out = [];
+    for (const a of list) {
+      const lat = +a.lat, lon = +a.lon; if (!isFinite(lat) || !isFinite(lon)) continue;
+      const altFt = +(a.alt_baro === 'ground' ? 0 : a.alt_baro || a.alt_geom || 0);
+      const dd = this.geoDelta(g.lat, g.lon, lat, lon);
+      out.push({ lat, lon, altM: altFt * 0.3048, track: (+a.track || 0) * Math.PI / 180,
+        flight: String(a.flight || a.r || a.hex || '').trim(), d: dd.d, brg: dd.brg,
+        gs: +a.gs || 0 });
+    }
+    out.sort((a, b) => a.d - b.d);
+    return out;
   },
   async geocode(name) {
     const r = await fetch(this.sources.nominatim + '?format=json&limit=1&q=' + encodeURIComponent(name), { headers: { 'accept': 'application/json' } });

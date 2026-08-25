@@ -568,6 +568,103 @@ const GAMES={mode:null,strokes:0,captures:0,steals:0,_stealCool:0,carrying:false
     }
   }
 };
+// ============================================================================
+// THE LIVE CONDITIONS — a place that keeps its conditions visible. Keyless
+// public feeds registered onto THIS ground through the same mercator meta the
+// imagery uses: the quakes under Iceland (USGS, last 24 h, public domain) and
+// the aircraft crossing the sky above you (adsb.lol). Distant contacts are
+// PRESENTED, never faked — true bearing, true elevation angle, range squashed
+// into the world's depth, the same law the dog's own nose already uses. What
+// arrives is evidence, not spectacle: a quake close enough to feel shakes the
+// ground and enters Argos's mind as a reason to come to you.
+// ============================================================================
+const LIVE={
+  on:false,quakes:[],planes:[],shake:0,shakeT:0,shakeT0:1,_at:0,_busy:false,_seen:new Set(),
+  group:null,
+  init(){if(!this.group){this.group=new THREE.Group();this.group.name='LIVE.CONDITIONS';scene.add(this.group)}},
+  present(d){const near=260,cap=1150;return d<=near?d:near+(cap-near)*(1-Math.exp(-(d-near)/60000))},
+  clear(){this.init();for(const c of [...this.group.children]){this.group.remove(c);
+    c.traverse&&c.traverse(o=>{o.geometry&&o.geometry.dispose();o.material&&o.material.dispose&&o.material.dispose()})}},
+  toggle(){this.on=!this.on;this.init();this.group.visible=this.on;
+    if(this.on){chat.line('world','listening to the land…');this.refresh()}
+    else{this.clear();chat.line('world','the live conditions rest')}
+    return this.on},
+  async refresh(){
+    if(this._busy||!TERRAIN.geo)return false;
+    this._busy=true;this._at=performance.now();
+    let got=0;
+    try{this.quakes=await LIVING_GROUND.quakes(TERRAIN,600);got++}
+    catch(e){chat.line('world','the seismograph line is closed here — '+String(e.message||e).slice(0,34))}
+    try{this.planes=await LIVING_GROUND.aircraft(TERRAIN,180);got++}
+    catch(e){chat.line('world','the sky line is closed here — '+String(e.message||e).slice(0,34))}
+    this._busy=false;
+    if(got){this.draw();
+      chat.line('world','the land answers — '+this.quakes.length+' quake'+(this.quakes.length===1?'':'s')+' in 24 h, '
+        +this.planes.length+' aircraft aloft · quakes © USGS · aircraft © adsb.lol');
+      const q=this.quakes[0];
+      if(q)chat.line('world','nearest tremor M'+q.mag.toFixed(1)+' · '+(q.d/1000).toFixed(0)+' km '+compass(q.brg)+' · '+q.place.slice(0,40));
+    }
+    return !!got;
+  },
+  draw(){
+    this.clear();
+    for(const q of this.quakes.slice(0,40)){
+      const p=this.present(q.d),x=Math.sin(q.brg)*p,z=-Math.cos(q.brg)*p;
+      const gy=terrainH(x,z);
+      const m=q.mag,col=m>=5?0xc0392b:m>=3?0xa34f35:0xd29a3a;
+      const g=new THREE.Group();
+      const ring=new THREE.Mesh(new THREE.TorusGeometry(1.1+m*0.5,.09,8,26),
+        new THREE.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:1.1,roughness:.6,transparent:true,opacity:.95,fog:false}));
+      ring.rotation.x=Math.PI/2;g.add(ring);
+      const pin=new THREE.Mesh(new THREE.CylinderGeometry(.11,.11,1.2+m*1.1,8),
+        new THREE.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:.9,roughness:.7,fog:false}));
+      pin.position.y=(1.2+m*1.1)/2;g.add(pin);
+      // a presented contact keeps its apparent size: a reading you can read,
+      // not a speck that vanishes with the range it stands for
+      g.scale.setScalar(clamp(p/90,1,9));
+      g.position.set(x,gy,z);g.userData.live={kind:'quake',q};this.group.add(g);
+    }
+    for(const a of this.planes.slice(0,60)){
+      const p=this.present(a.d),k=p/Math.max(1,a.d);
+      const x=Math.sin(a.brg)*p,z=-Math.cos(a.brg)*p;
+      const y=terrainH(0,0)+Math.max(24,a.altM*k);
+      const body=new THREE.Mesh(new THREE.ConeGeometry(1.5,6.5,4),
+        new THREE.MeshStandardMaterial({color:0xe9e4d8,emissive:0xbcd6dd,emissiveIntensity:.8,roughness:.5,fog:false}));
+      body.rotation.x=Math.PI/2;
+      const wing=new THREE.Mesh(new THREE.BoxGeometry(9,.4,1.5),
+        new THREE.MeshStandardMaterial({color:0xe9e4d8,emissive:0xbcd6dd,emissiveIntensity:.5,roughness:.6,fog:false}));
+      const g=new THREE.Group();g.add(body);g.add(wing);
+      g.scale.setScalar(clamp(p/110,1,9));
+      g.position.set(x,y,z);g.rotation.y=a.track;
+      g.userData.live={kind:'plane',a};this.group.add(g);
+    }
+  },
+  tick(dt){
+    // a tremor is not a flicker: it rolls through, then dies away
+    if(this.shakeT>0){this.shakeT=Math.max(0,this.shakeT-dt);
+      this.shake=this.shakeA*Math.pow(this.shakeT/this.shakeT0,1.7)}
+    else this.shake=0;
+    if(!this.on)return;
+    if(!this._busy&&performance.now()-this._at>90000)this.refresh();
+    // consequence: a tremor close enough to feel is felt — and he feels it too
+    for(const q of this.quakes){
+      if(q.d>80000||q.mag<3)continue;
+      const id=q.time+':'+q.mag;if(this._seen.has(id))continue;
+      this._seen.add(id);
+      this.shakeA=Math.min(.55,(q.mag-2.5)*.16);
+      this.shakeT0=this.shakeT=1.8+Math.max(0,q.mag-3)*.6;   // the roll, then the fade
+      buzz('quake',[24,40,24],1200);
+      chat.line('world','the ground moves — M'+q.mag.toFixed(1)+' '+(q.d/1000).toFixed(0)+' km '+compass(q.brg));
+      try{argos.mind.prefs.FOLLOW=Math.max(argos.mind.prefs.FOLLOW||0,1.2);
+        argos.mind.prefs.SLEEP=-.6;argos.mind.prefs.WANDER=-.4;
+        argos.mind.iv.happiness=Math.max(0,(argos.mind.iv.happiness||0)-.15);
+        chat.line('dog','WOOF')}catch(e){}
+      break;
+    }
+  }
+};
+function compass(brg){const d=((brg*180/Math.PI)%360+360)%360;
+  return ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'][Math.round(d/22.5)%16]}
 // kicking is always on: run into the ball and it goes — and the rig's bumper
 // is a bigger boot than any foot
 function stepKick(){
@@ -1000,6 +1097,7 @@ function worldStep(dt){
   stepBall(dt);
   stepKick();
   STRIKER.step();
+  LIVE.tick(dt);
   WEATHER.step(dt);
   _fadeAcc+=dt;if(_fadeAcc>.05){_fadeAcc=0;updateStructFade()}
   _uiAcc+=dt;if(_uiAcc>.22){_uiAcc=0;updateWorldUI()}
@@ -2529,11 +2627,11 @@ requestAnimationFrame(resize);
 requestAnimationFrame(()=>{try{resize();rig.mesh.updateMatrixWorld(true);renderer.render(scene,camera)}catch(e){console.error('INITIAL RENDER',e)}});
 
 let last=performance.now();lockHeadNow();
-function tick(t){requestAnimationFrame(tick);let dt=Math.min(.025,Math.max(0,(t-last)/1000));last=t;updateExplorer(dt);worldStep(dt);updateMotorPrior(dt);support.position.x=locomotion.root.x;support.position.z=locomotion.root.z;support.position.y=groundYAt(locomotion.root.x,locomotion.root.z)+.003;updateDog(t,dt);updateExplorerCamera(dt); updateGame(dt);updateDataPlayback(dt);if(motionPlayer.active&&motionPlayer.mixer){motionPlayer.mixer.update(dt);enforceAnimationAnatomy();muscleFilterPose(dt);updateViz();const auxNow=performance.now();tick._auxAt??=0;if(!IS_TOUCH||auxNow-tick._auxAt>48){tick._auxAt=auxNow;updateDataBus();updateReadout()}window.__hudTick&&window.__hudTick();renderer.render(scene,camera);return}
+function tick(t){requestAnimationFrame(tick);let dt=Math.min(.025,Math.max(0,(t-last)/1000));last=t;updateExplorer(dt);worldStep(dt);updateMotorPrior(dt);support.position.x=locomotion.root.x;support.position.z=locomotion.root.z;support.position.y=groundYAt(locomotion.root.x,locomotion.root.z)+.003;updateDog(t,dt);updateExplorerCamera(dt); updateGame(dt);updateDataPlayback(dt);if(motionPlayer.active&&motionPlayer.mixer){motionPlayer.mixer.update(dt);enforceAnimationAnatomy();muscleFilterPose(dt);updateViz();const auxNow=performance.now();tick._auxAt??=0;if(!IS_TOUCH||auxNow-tick._auxAt>48){tick._auxAt=auxNow;updateDataBus();updateReadout()}window.__hudTick&&window.__hudTick();if(LIVE.shake>0){camera.position.x+=(Math.random()*2-1)*LIVE.shake;camera.position.y+=(Math.random()*2-1)*LIVE.shake*.6;camera.position.z+=(Math.random()*2-1)*LIVE.shake}renderer.render(scene,camera);return}
 // Mobile renders every frame but solves the expensive collision-aware body at 40 Hz.
 // This preserves responsive sticks/camera while cutting repeated IK/capsule work.
 tick._solveAcc=(tick._solveAcc||0)+dt;if(IS_TOUCH&&tick._solveAcc<1/40){renderer.render(scene,camera);return}if(IS_TOUCH){dt=Math.min(.04,tick._solveAcc);tick._solveAcc=0}else tick._solveAcc=0;
-relaxJoyBases(dt);const sm=1-Math.exp(-dt*5.5);motion.pitch=lerp(motion.pitch,motion.enabled?motion.targetPitch:0,sm);motion.roll=lerp(motion.roll,motion.enabled?motion.targetRoll:0,sm);const nd=Math.exp(-dt*8.5);motion.nudge.L.multiplyScalar(nd);motion.nudge.R.multiplyScalar(nd);motion.nudge.body.multiplyScalar(nd);const hs=1-Math.exp(-dt*(headCtl.pointer!=null?11.5:6.2));headDyn.x=lerp(headDyn.x,resistedAxis(headCtl.x,.05,2.0),hs);headDyn.y=lerp(headDyn.y,resistedAxis(headCtl.y,.05,2.0),hs);if(headCtl.pointer==null)headCtl.wind=lerp(headCtl.wind,0,1-Math.exp(-dt*4.1));headDyn.roll=lerp(headDyn.roll,resistedAxis(headCtl.wind,.02,1.7),1-Math.exp(-dt*5.4));headDyn.lead=lerp(headDyn.lead,headCtl.lead,1-Math.exp(-dt*(headCtl.pointer!=null?8.5:4.2)));headDyn.faceX=lerp(headDyn.faceX,headCtl.faceX,1-Math.exp(-dt*8.0));headDyn.faceY=lerp(headDyn.faceY,headCtl.faceY,1-Math.exp(-dt*8.0));limits.leftHand=limits.rightHand=limits.pelvis=limits.head=false;contacts.leftHand=contacts.rightHand=contacts.leftFoot=contacts.rightFoot=contacts.pelvis=false;let des=desiredTargets();updateWholeBodyLocomotion(des,dt);des=desiredTargets();const m=MODE[mode];const prevLH=dyn.leftHand.p.clone(),prevRH=dyn.rightHand.p.clone(),prevPel=dyn.pelvis.p.clone(),prevLF=dynFeet.left.p.clone(),prevRF=dynFeet.right.p.clone();spring(dyn.leftHand,des.leftHand,dt,m.freq*.82,Math.max(1.18,m.damp+.22),m.gravity);spring(dyn.rightHand,des.rightHand,dt,m.freq*.82,Math.max(1.18,m.damp+.22),m.gravity);spring(dyn.pelvis,des.pelvis,dt,m.freq+1.2,1.16,0);spring(dynFeet.left,des.leftFoot,dt,5.6,1.18,0);spring(dynFeet.right,des.rightFoot,dt,5.6,1.18,0);clampVecStep(dyn.leftHand.p,prevLH,0.88*dt);clampVecStep(dyn.rightHand.p,prevRH,0.88*dt);const travelSpeed=locomotion.walking>.08?Math.max(.9,explorer.speed):0;const pelvisStep=travelSpeed?Math.max(1.35,travelSpeed*1.18):.66,footStep=travelSpeed?Math.max(1.8,travelSpeed*1.65):.74;clampVecStep(dyn.pelvis.p,prevPel,pelvisStep*dt);clampVecStep(dynFeet.left.p,prevLF,footStep*dt);clampVecStep(dynFeet.right.p,prevRF,footStep*dt);clampVel(dyn.leftHand.v,1.45);clampVel(dyn.rightHand.v,1.45);clampVel(dyn.pelvis.v,travelSpeed?Math.max(1.6,travelSpeed*1.35):1.0);clampVel(dynFeet.left.v,travelSpeed?Math.max(2.0,travelSpeed*1.8):1.05);clampVel(dynFeet.right.v,travelSpeed?Math.max(2.0,travelSpeed*1.8):1.05);solveRig(des,dt);updateViz();tick._teleAt??=0;const teleNow=performance.now();if(!IS_TOUCH||teleNow-tick._teleAt>32){tick._teleAt=teleNow;updateControllerTelemetry()}tick._hapAt??=0;const hapNow=performance.now();if(!IS_TOUCH||!explorer.mobileNav||hapNow-tick._hapAt>66){tick._hapAt=hapNow;updateHaptics()}const auxNow=performance.now();tick._auxAt??=0;if(!IS_TOUCH||!explorer.mobileNav||auxNow-tick._auxAt>48){tick._auxAt=auxNow;updateDataBus();updateReadout()}window.__hudTick&&window.__hudTick();renderer.render(scene,camera)}requestAnimationFrame(tick);
+relaxJoyBases(dt);const sm=1-Math.exp(-dt*5.5);motion.pitch=lerp(motion.pitch,motion.enabled?motion.targetPitch:0,sm);motion.roll=lerp(motion.roll,motion.enabled?motion.targetRoll:0,sm);const nd=Math.exp(-dt*8.5);motion.nudge.L.multiplyScalar(nd);motion.nudge.R.multiplyScalar(nd);motion.nudge.body.multiplyScalar(nd);const hs=1-Math.exp(-dt*(headCtl.pointer!=null?11.5:6.2));headDyn.x=lerp(headDyn.x,resistedAxis(headCtl.x,.05,2.0),hs);headDyn.y=lerp(headDyn.y,resistedAxis(headCtl.y,.05,2.0),hs);if(headCtl.pointer==null)headCtl.wind=lerp(headCtl.wind,0,1-Math.exp(-dt*4.1));headDyn.roll=lerp(headDyn.roll,resistedAxis(headCtl.wind,.02,1.7),1-Math.exp(-dt*5.4));headDyn.lead=lerp(headDyn.lead,headCtl.lead,1-Math.exp(-dt*(headCtl.pointer!=null?8.5:4.2)));headDyn.faceX=lerp(headDyn.faceX,headCtl.faceX,1-Math.exp(-dt*8.0));headDyn.faceY=lerp(headDyn.faceY,headCtl.faceY,1-Math.exp(-dt*8.0));limits.leftHand=limits.rightHand=limits.pelvis=limits.head=false;contacts.leftHand=contacts.rightHand=contacts.leftFoot=contacts.rightFoot=contacts.pelvis=false;let des=desiredTargets();updateWholeBodyLocomotion(des,dt);des=desiredTargets();const m=MODE[mode];const prevLH=dyn.leftHand.p.clone(),prevRH=dyn.rightHand.p.clone(),prevPel=dyn.pelvis.p.clone(),prevLF=dynFeet.left.p.clone(),prevRF=dynFeet.right.p.clone();spring(dyn.leftHand,des.leftHand,dt,m.freq*.82,Math.max(1.18,m.damp+.22),m.gravity);spring(dyn.rightHand,des.rightHand,dt,m.freq*.82,Math.max(1.18,m.damp+.22),m.gravity);spring(dyn.pelvis,des.pelvis,dt,m.freq+1.2,1.16,0);spring(dynFeet.left,des.leftFoot,dt,5.6,1.18,0);spring(dynFeet.right,des.rightFoot,dt,5.6,1.18,0);clampVecStep(dyn.leftHand.p,prevLH,0.88*dt);clampVecStep(dyn.rightHand.p,prevRH,0.88*dt);const travelSpeed=locomotion.walking>.08?Math.max(.9,explorer.speed):0;const pelvisStep=travelSpeed?Math.max(1.35,travelSpeed*1.18):.66,footStep=travelSpeed?Math.max(1.8,travelSpeed*1.65):.74;clampVecStep(dyn.pelvis.p,prevPel,pelvisStep*dt);clampVecStep(dynFeet.left.p,prevLF,footStep*dt);clampVecStep(dynFeet.right.p,prevRF,footStep*dt);clampVel(dyn.leftHand.v,1.45);clampVel(dyn.rightHand.v,1.45);clampVel(dyn.pelvis.v,travelSpeed?Math.max(1.6,travelSpeed*1.35):1.0);clampVel(dynFeet.left.v,travelSpeed?Math.max(2.0,travelSpeed*1.8):1.05);clampVel(dynFeet.right.v,travelSpeed?Math.max(2.0,travelSpeed*1.8):1.05);solveRig(des,dt);updateViz();tick._teleAt??=0;const teleNow=performance.now();if(!IS_TOUCH||teleNow-tick._teleAt>32){tick._teleAt=teleNow;updateControllerTelemetry()}tick._hapAt??=0;const hapNow=performance.now();if(!IS_TOUCH||!explorer.mobileNav||hapNow-tick._hapAt>66){tick._hapAt=hapNow;updateHaptics()}const auxNow=performance.now();tick._auxAt??=0;if(!IS_TOUCH||!explorer.mobileNav||auxNow-tick._auxAt>48){tick._auxAt=auxNow;updateDataBus();updateReadout()}window.__hudTick&&window.__hudTick();if(LIVE.shake>0){camera.position.x+=(Math.random()*2-1)*LIVE.shake;camera.position.y+=(Math.random()*2-1)*LIVE.shake*.6;camera.position.z+=(Math.random()*2-1)*LIVE.shake}renderer.render(scene,camera)}requestAnimationFrame(tick);
 
 
 // ---------------------------------------------------------------------------
@@ -2665,6 +2763,7 @@ const chat={
       else if(cmd==='feed')r=feedBowl()?'the bowl is full':'stand by the bowl first (or it is already full)';
       else if(cmd==='ball')r=ball.state==='hero'?(throwBall()?'thrown':'…'):(takeBall()?'you have the ball':'the ball is not at hand');
       else if(cmd==='door')r='door.entry — wall W, plan 72..108, the only way in';
+      else if(cmd==='live'){r=null;LIVE.toggle()}
       else if(cmd==='golf'){GAMES.mode==='golf'?GAMES.end():GAMES.start('golf');r=null}
       else if(cmd==='ctf'){GAMES.mode==='ctf'?GAMES.end():GAMES.start('ctf');r=null}
       else if(cmd==='deed'){const nm=text.slice(6).trim();
@@ -2692,7 +2791,7 @@ const chat={
         else{try{localStorage.setItem('hlidarendi.ai.key',k2)}catch(e){}r='agent line configured — /build speaks to Claude now'}window.__refreshAI?.()}
       else if(WEATHER.presets[cmd])r=WEATHER.set(cmd)?('the sky turns — '+cmd):'…';
       else if(cmd==='forget'){try{localStorage.removeItem('hlidarendi.v1')}catch(e){}r='forgotten — next visit starts fresh'}
-      else if(cmd==='help')r='/build <words> (a tower, a trailer, a truck…) · games: /striker /golf /ctf · land: /place <name> /goto <lat> <lon> /deed <name> · /ai <key|off> /save /reset /feed /ball /forget · sky: /dawn /day /dusk /night /fog /rain · the RIG: DRIVE (or E), HITCH at the home’s tongue to haul, roll over the ball to stow it, FIRE launches';
+      else if(cmd==='help')r='/build <words> (a tower, a trailer, a truck…) · games: /striker /golf /ctf · /live (quakes + aircraft on this land) · land: /place <name> /goto <lat> <lon> /deed <name> · /ai <key|off> /save /reset /feed /ball /forget · sky: /dawn /day /dusk /night /fog /rain · the RIG: DRIVE (or E), HITCH at the home’s tongue to haul, roll over the ball to stow it, FIRE launches';
       chat.line('world',r);updateWorldUI();return null;
     }
     let prog=null;
@@ -2741,6 +2840,7 @@ const on=(sel,fn)=>{const el=$(sel);if(el)el.onclick=fn};
     else if(k==='dress'){chat.line('world','calling on the living ground…');
       dressWorld().then(t=>chat.line('world','dressed — '+t+' tiles · imagery © Esri · ways © OpenStreetMap'))
         .catch(e2=>chat.line('world','the imagery line is closed here — '+String(e2.message||e2).slice(0,40)))}
+    else if(k==='live')LIVE.toggle();
     else if(k==='save'){saveWorld();chat.line('world','the land is kept')}
   });
   // deeds you keep yourself join the land list (/deed <name>)
@@ -2926,6 +3026,6 @@ window.HLIDARENDI={
   save:saveWorld,restore:restoreWorld,takeBall,throwBall,feedBowl,placeHero,chat,
   forge:FORGE,build:buildFromWords,striker:STRIKER,goto:gotoPlace,ground:LIVING_GROUND,dress:dressWorld,
   truck:TRUCK,rig:{board:boardTruck,exit:exitTruck,hitch:hitchTrailer,drop:unhitchTrailer,spawn:spawnVehicle},fleet:FLEET,
-  games:GAMES,bond:BOND,trailerOffset:TRAILER,
+  games:GAMES,live:LIVE,bond:BOND,trailerOffset:TRAILER,
   snapshot:()=>INTEGRATION.snapshot()
 };

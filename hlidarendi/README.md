@@ -79,6 +79,17 @@ rig rolls off the line (up to five stand in the world; boarding a parked
 one exchanges bodies); ask for *a trailer* and a caravan shell stands.
 **/deed <name>** keeps the land under you in the ▲ list forever.
 
+**THE LIVE CONDITIONS** — **/live** (or ◉ in the ▲ list) listens to the
+land you are actually standing on: the earthquakes under Iceland from the
+last 24 hours (USGS, public domain) and the aircraft crossing the sky
+above you (adsb.lol), registered by true great-circle bearing from this
+window's own latitude and longitude. Distant contacts are presented, not
+faked — true bearing, true elevation angle, range squashed into the
+world's depth, real distance and magnitude always stated — the same law
+the dog's nose uses on a scent. A tremor close enough to feel rolls
+through the ground, and reaches Argos as a reason to come and find you.
+Sources and terms: [DATA.md](DATA.md).
+
 **THE RIG** — Thunder Rigs' gift stands in the yard, and it drives by
 Thunder Rigs' OWN car law, ported from unset-04: the stick points the way
 (camera-relative), the nose follows it, momentum drifts you through the
