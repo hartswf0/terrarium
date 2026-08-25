@@ -10,6 +10,7 @@ on:
       - 'tests/geonosis.mjs'
       - 'tests/usgs-water.mjs'
       - 'tests/live-water.mjs'
+      - 'tests/interpretants.mjs'
       - '.github/workflows/geonosis.yml'
 
 permissions:
@@ -30,3 +31,5 @@ jobs:
         run: node tests/usgs-water.mjs
       - name: Terrarium live water bridge
         run: node tests/live-water.mjs
+      - name: Actor interpretants
+        run: node tests/interpretants.mjs
