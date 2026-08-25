@@ -119,8 +119,8 @@ function fmtValue(signal) {
   return `${Number(signal.value).toLocaleString(undefined, { maximumFractionDigits: 2 })}${unit}`;
 }
 
-function siteName(subject) {
-  const rows = GEONOSIS.bySubject(subject).observations;
+function siteName(subject, geonosis) {
+  const rows = geonosis.bySubject(subject).observations;
   for (let i = rows.length - 1; i >= 0; i--) {
     const n = rows[i].rawProperties?.monitoringLocationName;
     if (n) return n;
@@ -153,7 +153,7 @@ export function describeWater(result = STATE.result, geonosis = GEONOSIS) {
   for (const [subject, signals] of bySubject) {
     const values = signals.map((s) => `${s.predicate.replace(/_/g, ' ')} ${fmtValue(s)}`).join(' · ');
     const trends = (conditionBySubject.get(subject) || []).map((c) => c.state.replace(/_/g, ' ').toLowerCase());
-    lines.push(`${siteName(subject)} — ${values}${trends.length ? ` · ${trends.join(', ')}` : ''}`);
+    lines.push(`${siteName(subject, geonosis)} — ${values}${trends.length ? ` · ${trends.join(', ')}` : ''}`);
   }
 
   const prefix = result.state === 'STALE' ? 'USGS water observations are stale.'
@@ -163,18 +163,12 @@ export function describeWater(result = STATE.result, geonosis = GEONOSIS) {
   return `${prefix}\n${lines.slice(0, 6).join('\n')}\nTrends are site-relative measurements, not flood-severity claims.`;
 }
 
-async function answerWater() {
-  const world = currentWorld();
-  const result = await refreshWater(world, { force: STATE.world !== world });
-  return describeWater(result);
-}
-
 BUS.register('water-now',
   (lower) => /^(?:water now|what(?:'s| is) the water doing|how(?:'s| is) the water|water status|river now|creek now)\??$/.exec(lower),
   () => {
     // BUS is synchronous by contract. Give an immediate state, then refresh in
     // the background of this browser turn; the next utterance sees the answer.
-    // The promise is exposed through TERRA.GEONOSIS.refresh for deliberate use.
+    // The promise is exposed through GEONOSIS_WATER.refresh for deliberate use.
     const world = currentWorld();
     if (STATE.world !== world || Date.now() >= STATE.nextAt) {
       refreshWater(world).catch(() => {});
