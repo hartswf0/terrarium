@@ -5,7 +5,7 @@
 // Terrarium deed, reindex, branch mutation, or journal entry.
 
 import { makeObservation, makeSignal, makeCondition, conditionAlive } from './model.js';
-import { makeSourcePolicy } from './source-policy.js';
+import { makeSourcePolicy, retentionDecision } from './source-policy.js';
 
 export class Geonosis {
   constructor() {
@@ -20,15 +20,14 @@ export class Geonosis {
   notify(kind, record) { for (const fn of this.observers) fn(kind, record); }
 
   registerSource(props) {
-    const policy = props?.retention ? makeSourcePolicy(props) : props;
-    if (!policy?.id) throw new Error('Geonosis source needs an id');
+    const policy = makeSourcePolicy(props);
     this.sources.set(policy.id, policy);
     this.notify('source', policy);
     return policy;
   }
 
   observe(props) {
-    const record = props?.provider && Object.isFrozen(props) ? props : makeObservation(props);
+    const record = makeObservation(props);
     if (!this.sources.has(record.provider)) {
       throw new Error(`Geonosis observation ${record.id} names unregistered source ${record.provider}`);
     }
@@ -38,11 +37,17 @@ export class Geonosis {
   }
 
   signal(props) {
-    const record = props?.predicate && Object.isFrozen(props) ? props : makeSignal(props);
+    const record = makeSignal(props);
     for (const id of record.derivedFrom) {
-      if (!this.observations.has(id) && !this.signals.has(id)) {
-        throw new Error(`Geonosis signal ${record.id} cites missing evidence ${id}`);
+      const observation = this.observations.get(id);
+      if (observation) {
+        const source = this.sources.get(observation.provider);
+        if (source && !source.mayDerive) {
+          throw new Error(`Geonosis source ${source.id} forbids derived signals`);
+        }
+        continue;
       }
+      if (!this.signals.has(id)) throw new Error(`Geonosis signal ${record.id} cites missing evidence ${id}`);
     }
     this.signals.set(record.id, record);
     this.notify('signal', record);
@@ -50,7 +55,7 @@ export class Geonosis {
   }
 
   condition(props) {
-    const record = props?.state && Object.isFrozen(props) ? props : makeCondition(props);
+    const record = makeCondition(props);
     for (const id of record.supportedBy) {
       if (!this.signals.has(id) && !this.observations.has(id)) {
         throw new Error(`Geonosis condition ${record.id} cites missing support ${id}`);
@@ -91,11 +96,44 @@ export class Geonosis {
     };
   }
 
+  /**
+   * Durable snapshots obey each source's retention law.
+   * MIRROR keeps the complete observation; SNAPSHOT keeps normalized geometry
+   * but strips provider-specific raw properties; EPHEMERAL and REFERENCE keep
+   * only a citation stub so derived claims can remain auditable without quietly
+   * caching the source payload.
+   */
   snapshot() {
+    const observations = [...this.observations.values()].map((record) => {
+      const policy = this.sources.get(record.provider);
+      const decision = retentionDecision(policy);
+      if (decision.persistRaw) return { ...record, payloadState: 'FULL' };
+      if (decision.persistNormalized) {
+        return { ...record, rawProperties: {}, payloadState: 'NORMALIZED' };
+      }
+      return {
+        id: record.id,
+        provider: record.provider,
+        providerRecordId: record.providerRecordId,
+        geometry: null,
+        observedAt: record.observedAt,
+        retrievedAt: record.retrievedAt,
+        rawProperties: {},
+        sourceUrl: record.sourceUrl,
+        license: record.license,
+        method: record.method,
+        resolution: null,
+        freshness: 'REFERENCE',
+        epistemic: record.epistemic,
+        payloadState: 'REFERENCE',
+        address: [],
+      };
+    });
+
     return JSON.stringify({
       version: 1,
       sources: [...this.sources.values()],
-      observations: [...this.observations.values()],
+      observations,
       signals: [...this.signals.values()],
       conditions: [...this.conditions.values()],
     });
@@ -106,9 +144,9 @@ export class Geonosis {
     if (!data || data.version !== 1) throw new Error('unsupported Geonosis snapshot');
     const g = new Geonosis();
     for (const source of data.sources || []) g.registerSource(source);
-    for (const observation of data.observations || []) g.observe(makeObservation(observation));
-    for (const signal of data.signals || []) g.signal(makeSignal(signal));
-    for (const condition of data.conditions || []) g.condition(makeCondition(condition));
+    for (const observation of data.observations || []) g.observe(observation);
+    for (const signal of data.signals || []) g.signal(signal);
+    for (const condition of data.conditions || []) g.condition(condition);
     return g;
   }
 }
