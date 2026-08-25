@@ -123,6 +123,25 @@ function evaluateCandidate(world, candidate, linkage, opts) {
 }
 
 /**
+ * One NWIS site often publishes several parameter series at the same instant.
+ * Each measurement observation may create a candidate edge to the same OSM
+ * target. That is repeated evidence, not spatial ambiguity, so collapse by
+ * relation target before deciding whether two different mapped channels compete.
+ */
+function uniqueCandidates(pool) {
+  const byTarget = new Map();
+  for (const candidate of pool || []) {
+    const key = candidate.to || candidate.props?.terrariumEntityId || candidate.id;
+    const prev = byTarget.get(key);
+    if (!prev || candidate.confidence > prev.confidence
+        || (candidate.confidence === prev.confidence && candidateDistance(candidate) < candidateDistance(prev))) {
+      byTarget.set(key, candidate);
+    }
+  }
+  return [...byTarget.values()];
+}
+
+/**
  * Upgrade one site's candidate relation to `measures` only when:
  *   1. NLDI itself has a coherent site↔flowline linkage (matching COMID),
  *   2. the OSM candidate is close to the gauge,
@@ -147,9 +166,10 @@ export function upgradeNLDIMeasuresRelation(geonosis, world, measurementObservat
   const subject = measurementObservation.rawProperties?.subject
     || measurementObservation.providerRecordId
     || measurementObservation.id;
-  const pool = candidates || [...geonosis.relations.values()].filter((r) =>
+  const rawPool = candidates || [...geonosis.relations.values()].filter((r) =>
     r.kind === 'candidate_measures' && r.from === subject
   );
+  const pool = uniqueCandidates(rawPool);
   if (!pool.length) return { state: 'NO_CANDIDATE', relation: null, evaluated: [] };
 
   const opts = {
