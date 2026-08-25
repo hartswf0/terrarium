@@ -84,6 +84,7 @@ await test('one feature becomes immutable measurement evidence plus a numeric si
   });
   assert.equal(row.observation.provider, 'usgs-water');
   assert.equal(row.observation.epistemic, 'MEASURED');
+  assert.equal(row.observation.method, 'api:latest-continuous');
   assert.equal(row.observation.rawProperties.approvalStatus, 'Provisional');
   assert.deepEqual(row.observation.address, ['F08.0312']);
   assert.equal(row.signal.subject, 'usgs-water:site:USGS-02336000');
@@ -106,6 +107,17 @@ await test('successful empty collection means no gauge coverage, not no water', 
   assert.equal(state.state, 'NO_GAUGE_COVERAGE');
   assert.equal(g.signals.size, 0);
   assert.equal(g.conditions.size, 0);
+});
+
+await test('USGS Water source is public-domain and mirrorable, without requiring a key', () => {
+  const g = new Geonosis();
+  ingestUSGSWaterCollection(g, collection([feature()]), { retrievedAt: NOW });
+  const source = g.sources.get('usgs-water');
+  assert.equal(source.keyRequired, false);
+  assert.equal(source.retention, 'MIRROR');
+  assert.match(source.license, /public domain/i);
+  const saved = JSON.parse(g.snapshot());
+  assert.equal(saved.observations[0].payloadState, 'FULL');
 });
 
 await test('freshness distinguishes current, partial stale, and stale without deleting evidence', () => {
@@ -141,8 +153,9 @@ await test('recent history can become an expiring FLOW_RISING condition without 
     id: `h${i}`,
     time: `2026-08-25T${hhmm}:00Z`,
     value: String(values[i]),
-  }))), { retrievedAt: NOW });
+  }))), { retrievedAt: NOW, collection: 'continuous' });
   const made = conditionWaterTrends(g, rows, { relativeThreshold: 0.05 });
+  assert.equal(rows[0].observation.method, 'api:continuous');
   assert.equal(made.length, 1);
   assert.equal(made[0].state, 'FLOW_RISING');
   assert.match(made[0].props.classification, /not flood severity/);
@@ -173,6 +186,8 @@ await test('full harvester performs latest then history and leaves both as Geono
   assert.equal(calls, 2);
   assert.equal(result.state, 'CURRENT');
   assert.equal(result.historyState, 'CURRENT');
+  assert.equal(result.rows[0].observation.method, 'api:latest-continuous');
+  assert.equal(result.historyRows[0].observation.method, 'api:continuous');
   assert.equal(result.conditions[0].state, 'FLOW_RISING');
   assert.ok(g.observations.size >= 4);
   assert.ok(g.signals.size >= 4);
