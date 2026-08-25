@@ -7,6 +7,21 @@
 import { makeObservation, makeSignal, makeCondition, conditionAlive } from './model.js';
 import { makeSourcePolicy, retentionDecision } from './source-policy.js';
 
+/**
+ * ICOSA ancestry is refinement inside a face, not filesystem segmentation.
+ * F08.03 contains F08.0312 because both share face F08 and 0312 refines 03.
+ * Unknown address syntaxes fall back to exact equality rather than guessing.
+ */
+export function addressContains(ancestor, candidate) {
+  const parse = (value) => {
+    const m = /^(F\d{2})(?:\.([A-Za-z0-9]+))?$/.exec(String(value || ''));
+    return m ? { face: m[1], path: m[2] || '' } : null;
+  };
+  const a = parse(ancestor), c = parse(candidate);
+  if (!a || !c) return String(ancestor) === String(candidate);
+  return a.face === c.face && c.path.startsWith(a.path);
+}
+
 export class Geonosis {
   constructor() {
     this.sources = new Map();
@@ -88,7 +103,7 @@ export class Geonosis {
 
   /** Address queries work before Terrarium owns an ICOSA implementation. */
   byAddress(address, { descendants = false } = {}) {
-    const match = (record) => (record.address || []).some((a) => descendants ? a === address || a.startsWith(`${address}.`) : a === address);
+    const match = (record) => (record.address || []).some((a) => descendants ? addressContains(address, a) : a === address);
     return {
       observations: [...this.observations.values()].filter(match),
       signals: [...this.signals.values()].filter(match),
