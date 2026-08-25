@@ -1,0 +1,37 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><title>HALF-DOG</title><style>
+:root{--paper:#f2ecdf;--ink:#171a1e;--muted:#68655f;--line:#b8ae9a;--green:#1f6b3a;--red:#8a2f22;--gold:#8a6a22;--dog-accent:#171a1e}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;height:100dvh;overflow:hidden;background:var(--paper);color:var(--ink);font:12px/1.3 ui-monospace,"IBM Plex Mono",Menlo,Consolas,monospace}
+button,a{font:inherit;color:inherit}
+#app{position:fixed;inset:0;display:grid;grid-template-rows:minmax(0,1fr) auto}
+#world{position:relative;min-height:0;overflow:hidden;border-bottom:1px solid var(--ink)}
+#animal{position:absolute;inset:0;width:100%;height:100%;border:0;background:var(--paper)}
+header{position:absolute;z-index:5;left:0;right:0;top:0;padding:calc(8px + env(safe-area-inset-top)) 9px 7px;pointer-events:none;display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.headleft{display:flex;gap:7px;align-items:flex-start}
+#back{pointer-events:auto;text-decoration:none;border:1px solid var(--ink);width:38px;height:38px;display:grid;place-items:center;background:rgba(242,236,223,.94);font-size:18px}
+h1{font-size:14px;letter-spacing:.22em;line-height:1.1;margin-top:2px}
+#sub{font-size:8px;color:var(--muted);letter-spacing:.06em;margin-top:4px;max-width:52vw}
+.headright{display:flex;gap:4px}
+#look,#status{font-size:8px;letter-spacing:.08em;border:1px solid var(--line);background:rgba(242,236,223,.94);padding:4px 6px;white-space:nowrap}
+#look{border-color:var(--dog-accent)}#status.bad{border-color:var(--red);color:var(--red)}
+#dock{min-height:0;background:var(--paper);padding-bottom:env(safe-area-inset-bottom)}
+#state,#controls{display:flex;gap:5px;align-items:center;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;padding:5px 7px;border-bottom:1px solid var(--line)}
+#state::-webkit-scrollbar,#controls::-webkit-scrollbar{display:none}
+.datum{flex:0 0 auto;border:1px solid var(--line);padding:4px 6px;min-width:76px;height:34px}
+.datum b{display:block;font-size:7px;letter-spacing:.1em;color:var(--muted);font-weight:600}.datum span{display:block;font-size:9px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.datum.good{border-color:var(--green)}.datum.bad{border-color:var(--red)}.datum.warn{border-color:var(--gold)}
+button.chip{flex:0 0 auto;border:1px solid var(--ink);background:transparent;padding:0 10px;height:40px;min-width:44px;cursor:pointer;touch-action:manipulation}
+button.chip.good{border-color:var(--green);color:var(--green)}button.chip.bad{border-color:var(--red);color:var(--red)}button.chip:active{background:var(--ink);color:var(--paper)}
+.sep{width:1px;height:24px;background:var(--line);flex:0 0 auto}
+#trace{display:grid;grid-template-columns:1.2fr 1fr;min-height:64px;max-height:76px}
+.box{min-width:0;padding:6px 7px;overflow:hidden}.box+.box{border-left:1px solid var(--line)}
+.label{font-size:7px;letter-spacing:.16em;color:var(--muted);margin-bottom:3px}
+#causal{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:9px}
+#events{display:flex;flex-direction:column;gap:1px;font-size:8px;color:var(--muted);max-height:44px;overflow:hidden}#events b{color:var(--ink)}
+@media(max-width:680px){#sub,#look{display:none}#trace{grid-template-columns:1fr;min-height:54px;max-height:60px}.eventsBox{display:none}.box+.box{border-left:0}}
+@media(max-height:650px){#trace{display:none}button.chip{height:38px}}
+@media(pointer:coarse){button.chip,#back{min-height:44px}}
+</style></head><body>
+<div id="app"><section id="world"><iframe id="animal" title="shared HALF-DOG runtime"></iframe><header><div class="headleft"><a id="back" href="./half-dog.html" aria-label="Back">‹</a><div><h1 id="title">DOG</h1><div id="sub"></div></div></div><div class="headright"><div id="look"></div><div id="status">LOADING</div></div></header></section>
+<section id="dock"><div id="state"></div><div id="controls"></div><div id="trace"><div class="box"><div class="label">CAUSE</div><div id="causal">—</div></div><div class="box eventsBox"><div class="label">OBSERVATIONS</div><div id="events"></div></div></div></section></div>
+<script type="module">import {mountLab} from "./doglab-host.js";import {EXPERIMENTS} from "./experiments.js";const key=(new URLSearchParams(location.search).get("dog")||"argos").toLowerCase();mountLab(EXPERIMENTS[key]||EXPERIMENTS.argos);</script></body></html>
