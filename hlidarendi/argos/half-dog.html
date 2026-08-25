@@ -45,7 +45,9 @@ if(!MODELS[active])active='argos';
 let E=null,base=null;
 function captureBase(dog){
   if(base)return;
-  base={groupScale:dog.scale.toArray(),children:dog.children.map(o=>({o,scale:o.scale.toArray(),pos:o.position.toArray(),rot:[o.rotation.x,o.rotation.y,o.rotation.z]}))};
+  const seen=new Set(),materials=[];
+  dog.traverse(o=>{if(!o.isMesh||!o.material||seen.has(o.material))return;seen.add(o.material);const hex=o.material.color?.getHex?.();materials.push({mat:o.material,kind:hex===0x4a2c1b?'dark':hex===0xe68b91?'pink':'fur'});});
+  base={groupScale:dog.scale.toArray(),children:dog.children.map(o=>({o,scale:o.scale.toArray(),pos:o.position.toArray(),rot:[o.rotation.x,o.rotation.y,o.rotation.z]})),materials};
 }
 function resetShape(dog){
   captureBase(dog);
@@ -59,14 +61,10 @@ function meshRoles(dog){
   const head=spheres.filter(o=>o.position.z>.15&&o.position.y>.20).sort((a,b)=>(b.geometry?.parameters?.radius||0)-(a.geometry?.parameters?.radius||0))[0];
   return {meshes,body,head};
 }
-function recolor(roles,m){
-  const mats=new Set(roles.meshes.map(o=>o.material).filter(Boolean));
-  for(const mat of mats){
-    const hex=mat.color?.getHex?.();
-    if(hex===0xb9722e)mat.color.setHex(m.fur);
-    else if(hex===0x4a2c1b)mat.color.setHex(m.dark);
-    else if(hex===0xe68b91)mat.color.setHex(m.pink);
-    else if(mat.color)mat.color.setHex(m.fur);
+function recolor(m){
+  for(const rec of base.materials){
+    const mat=rec.mat;
+    if(mat.color)mat.color.setHex(rec.kind==='dark'?m.dark:rec.kind==='pink'?m.pink:m.fur);
     if('metalness' in mat)mat.metalness=m.metal;
     if('roughness' in mat)mat.roughness=m.rough;
     mat.needsUpdate=true;
@@ -77,7 +75,7 @@ function applyDog(key){
   const m=MODELS[key]||MODELS.argos,dog=E.dog.group;
   resetShape(dog);
   const roles=meshRoles(dog);
-  recolor(roles,m);
+  recolor(m);
   dog.scale.set(...m.scale);
   if(roles.body)roles.body.scale.set(...m.body);
   if(roles.head)roles.head.scale.set(...m.head);
