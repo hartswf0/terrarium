@@ -2,7 +2,7 @@
 
 > The world can be observed without every observation becoming the world.
 
-Geonosis is Terrarium's perceptual membrane: the layer that receives heterogeneous external evidence, preserves its provenance and temporal state, derives contestable signals and temporary conditions, and only crosses into Terrarium's canonical `Place` through an explicit authored admission.
+Geonosis is Terrarium's perceptual membrane: the layer that receives heterogeneous external evidence, preserves its provenance and temporal state, derives contestable signals, relations and temporary conditions, and only crosses into Terrarium's canonical `Place` through an explicit authored admission.
 
 ## Theory skeleton
 
@@ -14,6 +14,8 @@ SOURCE POLICY
 OBSERVATION
   ↓
 SIGNAL
+  ↓
+RELATION
   ↓
 CONDITION
   ↓
@@ -31,7 +33,7 @@ GEONOSIS --------------------------------------→ TERRARIUM PLACE
                                                 relations
 ```
 
-Terrarium remains sovereign. `src/observe/` deliberately does not import `World` or `Place`, except `retain.js`, the one explicit membrane crossing.
+Terrarium remains sovereign. `src/observe/` deliberately does not import `World` or `Place`, except `retain.js`, the one explicit membrane crossing. Modules that compare external evidence with Terrarium geometry receive a world as a read-only argument; they do not mutate it.
 
 ## The primitives
 
@@ -50,6 +52,18 @@ subject + predicate + value
 ```
 
 Signals cite `derivedFrom[]`. Missing evidence is an error. A source policy may also forbid derivation.
+
+### Relation
+
+An evidence-backed graph edge:
+
+```text
+from + kind + to
+```
+
+A relation carries epistemic state, confidence, evidence, declared basis, time and optional ICOSA address. Endpoints are identifiers, not proof. A Geonosis subject may therefore relate to a Terrarium entity without copying that entity into a second world model.
+
+This is where uncertainty stays visible. `candidate_measures` is not `measures`; `near` is not `affects`; `inside the same cell` is not `governs`.
 
 ### Condition
 
@@ -178,6 +192,35 @@ UNAVAILABLE
 
 Recent history can derive temporary `FLOW_RISING`, `FLOW_FALLING`, `STAGE_RISING`, and `STAGE_FALLING` conditions. These are site-relative change detectors, **not flood-severity classifications**.
 
+## Gauge ↔ mapped watercourse candidates
+
+Terrarium already imports OSM rivers, streams, canals, drains and water polygons into local-metre geometry. `src/observe/watercourse-relations.js` can therefore compare a gauge point with the standing hydrography.
+
+It deliberately produces only:
+
+```text
+USGS gauge
+  ↓
+candidate_measures
+  ↓
+Terrarium OSM water entity
+```
+
+The edge preserves:
+
+- source observation evidence;
+- local distance;
+- optional name agreement;
+- confidence;
+- target Terrarium entity ID/type/subtype/name;
+- `INFERRED` epistemic state;
+- `CANDIDATE` status;
+- an explicit warning that proximity is not hydrologic causality.
+
+Ambiguous geometry remains several ranked candidate edges. Nothing silently picks the nearest creek as truth.
+
+`candidate_measures` is intentionally **not** a legal interpretant basis and cannot drive `runWater`. A later stage must establish a stronger watershed/network relation before measured gauge change may alter local affordances or simulation.
+
 ## Terrarium live-water bridge
 
 `src/observe/live-water.js` mounts beside `app.js`; it does not enter `World`.
@@ -191,10 +234,12 @@ nearby USGS search window
   ↓
 Geonosis observations/signals/conditions
   ↓
+candidate gauge↔watercourse relations
+  ↓
 BUS: “water now”
 ```
 
-The browser notices a changed world on a cheap clock and refreshes water on a patient 15-minute clock. Synthetic worlds refuse to invent a real sensor neighborhood. Gauge points can be transformed into Terrarium-local metres for later spatial reasoning without becoming canonical entities.
+The browser notices a changed world on a cheap clock and refreshes water on a patient 15-minute clock. Synthetic worlds refuse to invent a real sensor neighborhood. Gauge points can be transformed into Terrarium-local metres for spatial reasoning without becoming canonical entities.
 
 The first visible interface is language, not a dashboard:
 
@@ -204,7 +249,7 @@ what is the water doing?
 creek now
 ```
 
-The answer names freshness, measured values and site-relative trends while preserving source absence/failure distinctions.
+The answer names freshness, measured values and site-relative trends while preserving source absence/failure distinctions. If a gauge aligns with local mapped hydrography, the language explicitly calls the relation a candidate rather than a causal link.
 
 ## Weather, trace, deed
 
@@ -223,7 +268,7 @@ Aircraft positions should not create journal transactions every few seconds. A l
 
 ### A source changes authentication
 
-Only its adapter/source policy changes. Observation, signal, condition, interpretant and Terrarium semantics remain stable.
+Only its adapter/source policy changes. Observation, signal, relation, condition, interpretant and Terrarium semantics remain stable.
 
 ### A source becomes non-cacheable
 
@@ -239,7 +284,7 @@ DOG, HUMAN, CAR or CIVIC interpretation consumes conditions/signals plus declare
 
 ### A gauge is near a creek
 
-Proximity alone does not let the gauge alter creek physics or creature behavior. A hydrologic relation must be established first. This is why the existing `runWater` simulator is deliberately untouched by the first USGS adapter.
+Geonosis may write `candidate_measures` with distance/confidence. It may not write `measures`, `affects`, `upstream_of`, flood depth, crossing danger or dog behavior from proximity alone.
 
 ## Tests
 
@@ -248,6 +293,7 @@ node tests/geonosis.mjs
 node tests/usgs-water.mjs
 node tests/live-water.mjs
 node tests/interpretants.mjs
+node tests/water-relations.mjs
 ```
 
 GitHub Actions runs the same stack on Node 24.
@@ -270,7 +316,11 @@ The tests pin:
 - live water works without a World mutation surface;
 - actor interpretation requires an explicit relational basis;
 - one condition can yield distinct actor-specific signs;
-- interpretants expire with the conditions that license them.
+- interpretants expire with the conditions that license them;
+- gauge proximity produces candidate relations only;
+- distant gauges produce no local relation;
+- ambiguous hydrography stays ambiguous;
+- candidate gauge relations cannot become actor perceptibility.
 
 ## Next organs
 
@@ -278,11 +328,11 @@ Do not add a dashboard first.
 
 The next implementation order is:
 
-1. establish gauge ↔ stream / watershed relations without equating proximity with causality;
+1. upgrade gauge candidates only when watershed/network/name evidence can establish a stronger `measures` relation;
 2. add an open weather/rain source so hydrology can acquire upstream causes;
 3. add actor state/wants so interpretants can become real affordances rather than generic salience;
 4. add one moving actor source (GTFS-RT or adsb.lol);
-5. build Statements of Importance from deterministic difference + interpretant structures;
+5. build Statements of Importance from deterministic difference + relation + interpretant structures;
 6. compile ICOSA cell manifests for offline/mobile use.
 
 The test is not how many feeds Terrarium can display. The test is whether external evidence can alter what beings encounter without erasing where that evidence came from.
