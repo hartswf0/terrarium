@@ -10,8 +10,6 @@ const DOG_LOOKS={
   SILAS:{label:"synthetic graphite",accent:"#58676d",palette:[[88,103,109],[169,181,179],[147,163,164],[24,29,31],[236,241,238],[112,158,165],[5,7,8],[92,109,111],[13,18,19],[229,232,218],[145,74,78]]}
 };
 
-const fmt=v=>typeof v==="number"?v.toFixed(2):String(v);
-
 export class DogLab {
   constructor(exp){
     this.exp=exp; this.char=null; this.history=[]; this.relations=new Map();
@@ -50,7 +48,7 @@ export class DogLab {
   }
 
   applyLook(win){
-    const look=DOG_LOOKS[this.exp.title]||DOG_LOOKS.ARGOS;
+    const look=DOG_LOOKS[this.exp.title==="SÁMR"?"SAMR":this.exp.title]||DOG_LOOKS.ARGOS;
     if(Array.isArray(win.MAT_RGB_DOG)){
       for(let i=0;i<look.palette.length;i++) win.MAT_RGB_DOG[i]=look.palette[i].slice();
     }
