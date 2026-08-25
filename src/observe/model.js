@@ -15,8 +15,11 @@ export const SIGNAL_EPISTEMIC = Object.freeze([
   'DISPUTED', 'CONFIRMED',
 ]);
 
+export const PAYLOAD_STATE = Object.freeze(['FULL', 'NORMALIZED', 'REFERENCE']);
+
 const OBS_SET = new Set(OBSERVATION_EPISTEMIC);
 const SIG_SET = new Set(SIGNAL_EPISTEMIC);
+const PAYLOAD_SET = new Set(PAYLOAD_STATE);
 
 function required(value, name) {
   if (value === undefined || value === null || value === '') throw new Error(`Geonosis ${name} is required`);
@@ -49,7 +52,9 @@ function list(value) { return Object.freeze([...(value || [])]); }
 /** Exactly what an external source told us, with enough provenance to audit it. */
 export function makeObservation(props) {
   const epistemic = props.epistemic || 'OBSERVED';
+  const payloadState = props.payloadState || 'FULL';
   if (!OBS_SET.has(epistemic)) throw new Error(`invalid observation epistemic state ${epistemic}`);
+  if (!PAYLOAD_SET.has(payloadState)) throw new Error(`invalid observation payload state ${payloadState}`);
   return Object.freeze({
     id: String(required(props.id, 'observation id')),
     provider: String(required(props.provider, 'provider')),
@@ -64,6 +69,7 @@ export function makeObservation(props) {
     resolution: jsonCopy(props.resolution),
     freshness: props.freshness || null,
     epistemic,
+    payloadState,
     address: list(props.address),
   });
 }
@@ -124,5 +130,6 @@ export function observationEvidence(observation) {
     retrievedAt: observation.retrievedAt,
     sourceUrl: observation.sourceUrl,
     license: observation.license,
+    payloadState: observation.payloadState,
   };
 }
