@@ -11,6 +11,7 @@ on:
       - 'tests/usgs-water.mjs'
       - 'tests/live-water.mjs'
       - 'tests/interpretants.mjs'
+      - 'tests/water-relations.mjs'
       - '.github/workflows/geonosis.yml'
 
 permissions:
@@ -33,3 +34,5 @@ jobs:
         run: node tests/live-water.mjs
       - name: Actor interpretants
         run: node tests/interpretants.mjs
+      - name: Gauge to watercourse candidate relations
+        run: node tests/water-relations.mjs
