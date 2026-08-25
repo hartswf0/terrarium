@@ -24,10 +24,11 @@ export const CORE_SOURCES = Object.freeze([
   }),
   makeSourcePolicy({
     id: 'usgs-water', name: 'USGS Water Data',
-    acquisition: 'LIVE', retention: 'SNAPSHOT', keyRequired: false,
-    license: 'U.S. public data', attribution: 'U.S. Geological Survey',
+    acquisition: 'LIVE', retention: 'MIRROR', keyRequired: false,
+    license: 'U.S. public domain', attribution: 'U.S. Geological Survey',
     sourceUrl: 'https://api.waterdata.usgs.gov/', mayRedistribute: true, mayDerive: true,
-    notes: 'Current OGC-style Water Data APIs; policy checked 2026-08-25.',
+    cacheTtlMs: 15 * 60 * 1000,
+    notes: 'Modern OGC Water Data APIs. Data are U.S. Government public-domain work. API key is optional for higher rate limits; keyless core remains valid. Policy checked 2026-08-25.',
   }),
   makeSourcePolicy({
     id: 'usaspending', name: 'USAspending',
