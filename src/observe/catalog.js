@@ -31,6 +31,14 @@ export const CORE_SOURCES = Object.freeze([
     notes: 'Modern OGC Water Data APIs. Data are U.S. Government public-domain work. API key is optional for higher rate limits; keyless core remains valid. Policy checked 2026-08-25.',
   }),
   makeSourcePolicy({
+    id: 'usgs-nldi', name: 'USGS Network Linked Data Index',
+    acquisition: 'LIVE', retention: 'MIRROR', keyRequired: false,
+    license: 'U.S. public domain', attribution: 'U.S. Geological Survey',
+    sourceUrl: 'https://api.water.usgs.gov/nldi/linked-data', mayRedistribute: true, mayDerive: true,
+    cacheTtlMs: 24 * 60 * 60 * 1000,
+    notes: 'NWIS sites indexed to NHDPlusV2 with comid/reachcode, basin and network navigation. Used as network evidence, not as a replacement world geometry. API checked 2026-08-25.',
+  }),
+  makeSourcePolicy({
     id: 'usaspending', name: 'USAspending',
     acquisition: 'LIVE', retention: 'SNAPSHOT', keyRequired: false,
     license: 'U.S. federal public data', attribution: 'USAspending.gov',
