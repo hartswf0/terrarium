@@ -219,7 +219,59 @@ The edge preserves:
 
 Ambiguous geometry remains several ranked candidate edges. Nothing silently picks the nearest creek as truth.
 
-`candidate_measures` is intentionally **not** a legal interpretant basis and cannot drive `runWater`. A later stage must establish a stronger watershed/network relation before measured gauge change may alter local affordances or simulation.
+`candidate_measures` is intentionally **not** a legal interpretant basis and cannot drive `runWater`.
+
+## Network-linked measurements — USGS NLDI
+
+`src/observe/adapters/usgs-nldi.js` and `src/observe/watercourse-network.js` establish the stronger relation that proximity alone could not earn.
+
+NLDI is a separate public-domain Geonosis source. It indexes NWIS surface-water sites onto the NHDPlusV2 hydrologic network and exposes site `comid`, reachcode, linear measure and hydrolocation flowline geometry.
+
+The gate is deliberately conjunctive:
+
+```text
+USGS measurement site
+        ↓
+NLDI nwissite record
+        ↓
+site COMID
+        =
+hydrolocation COMID
+        ↓
+NHDPlus flowline geometry
+        ≈
+Terrarium OSM water path
+        ↓
+measures
+```
+
+A `measures` relation is emitted only when all of these hold:
+
+1. NLDI knows the NWIS site;
+2. the NLDI site record and hydrolocation agree on COMID;
+3. a local OSM watercourse candidate is close enough to the gauge;
+4. the OSM path aligns with the NHD flowline over enough of its local extent;
+5. no equally plausible mapped channel remains unresolved.
+
+The result is `DERIVED`, not `CONFIRMED`. USGS/NLDI is authoritative about the network linkage, but Terrarium's target remains an OSM representation of that reach.
+
+`measures` therefore means:
+
+> this mapped watercourse segment is the network-aligned representation of the reach measured by this gauge.
+
+It still does **not** mean:
+
+- flood severity;
+- hazard;
+- safe/unsafe crossing;
+- upstream causality beyond the network evidence present;
+- predicted local depth;
+- dog fear, attraction or avoidance;
+- permission to alter `runWater` without another explicit model bridge.
+
+Several sensor parameter series at one site do not become fake spatial ambiguity. Candidate edges are deduplicated by mapped target before the network decision. Conversely, two distinct mapped channels with equally strong NHD alignment remain `AMBIGUOUS` and no `measures` edge is created.
+
+Failure is also compositional. If NLDI is unavailable, the USGS measurement remains current and its `candidate_measures` edge remains evidence. One source cannot erase another source's valid observation.
 
 ## Terrarium live-water bridge
 
@@ -236,6 +288,10 @@ Geonosis observations/signals/conditions
   ↓
 candidate gauge↔watercourse relations
   ↓
+optional NLDI/NHD network gate
+  ↓
+measures relation when earned
+  ↓
 BUS: “water now”
 ```
 
@@ -249,7 +305,7 @@ what is the water doing?
 creek now
 ```
 
-The answer names freshness, measured values and site-relative trends while preserving source absence/failure distinctions. If a gauge aligns with local mapped hydrography, the language explicitly calls the relation a candidate rather than a causal link.
+The answer names freshness, measured values and site-relative trends while preserving source absence/failure distinctions. It says whether gauge↔mapped-water relations are still candidates, ambiguous, network-mismatched, unavailable, not indexed, or network-linked through NLDI/NHDPlus.
 
 ## Weather, trace, deed
 
@@ -286,6 +342,14 @@ DOG, HUMAN, CAR or CIVIC interpretation consumes conditions/signals plus declare
 
 Geonosis may write `candidate_measures` with distance/confidence. It may not write `measures`, `affects`, `upstream_of`, flood depth, crossing danger or dog behavior from proximity alone.
 
+### NLDI links the gauge to a reach
+
+Geonosis may write `measures` only after COMID agreement plus NHD↔OSM geometry alignment and ambiguity checks. The stronger edge still does not become hazard, simulation output or actor behavior by itself.
+
+### NLDI fails while USGS Water succeeds
+
+The measurement remains current. Candidate geometry remains visible. Network linkage is marked unavailable and no stronger relation is fabricated.
+
 ## Tests
 
 ```sh
@@ -294,6 +358,8 @@ node tests/usgs-water.mjs
 node tests/live-water.mjs
 node tests/interpretants.mjs
 node tests/water-relations.mjs
+node tests/nldi-water.mjs
+node tests/live-water-network.mjs
 ```
 
 GitHub Actions runs the same stack on Node 24.
@@ -320,7 +386,14 @@ The tests pin:
 - gauge proximity produces candidate relations only;
 - distant gauges produce no local relation;
 - ambiguous hydrography stays ambiguous;
-- candidate gauge relations cannot become actor perceptibility.
+- candidate gauge relations cannot become actor perceptibility;
+- NLDI site and hydrolocation COMIDs must agree;
+- NHD flowline geometry must align with the mapped OSM path;
+- network disagreement cannot be silently upgraded;
+- duplicate parameter series do not create fake spatial ambiguity;
+- equally plausible distinct mapped channels remain ambiguous;
+- NLDI failure cannot erase or downgrade a valid USGS measurement;
+- the live bridge can produce one network-linked `measures` edge without mutating PLACE.
 
 ## Next organs
 
@@ -328,8 +401,8 @@ Do not add a dashboard first.
 
 The next implementation order is:
 
-1. upgrade gauge candidates only when watershed/network/name evidence can establish a stronger `measures` relation;
-2. add an open weather/rain source so hydrology can acquire upstream causes;
+1. add an open weather/rain source so hydrology can acquire upstream causes;
+2. relate rainfall cells/forecasts to watershed or catchment geometry rather than merely to nearby gauges;
 3. add actor state/wants so interpretants can become real affordances rather than generic salience;
 4. add one moving actor source (GTFS-RT or adsb.lol);
 5. build Statements of Importance from deterministic difference + relation + interpretant structures;
