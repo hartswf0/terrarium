@@ -89,7 +89,11 @@ export function ensureUSGSWaterSource(geonosis) {
 export function normalizeUSGSWaterFeature(feature, {
   retrievedAt = Date.now(),
   addressFor = null,
+  collection = USGS_LATEST_COLLECTION,
 } = {}) {
+  if (![USGS_LATEST_COLLECTION, USGS_CONTINUOUS_COLLECTION].includes(collection)) {
+    throw new Error(`unsupported USGS water collection ${collection}`);
+  }
   const p = feature?.properties || {};
   const series = p.time_series_id || p.timeseries_id || feature?.id;
   const site = p.monitoring_location_id;
@@ -109,10 +113,10 @@ export function normalizeUSGSWaterFeature(feature, {
     geometry,
     observedAt,
     retrievedAt,
-    method: 'api:latest-continuous',
+    method: `api:${collection}`,
     epistemic: 'MEASURED',
     license: 'U.S. public domain',
-    sourceUrl: `${BASE}/${USGS_LATEST_COLLECTION}`,
+    sourceUrl: `${BASE}/${collection}`,
     freshness: null,
     address,
     rawProperties: {
@@ -335,7 +339,11 @@ export async function harvestUSGSWater(geonosis, {
     return { state: 'UNAVAILABLE', error: error.message, latestUrl, rows: [], conditions: [] };
   }
 
-  const latestRows = ingestUSGSWaterCollection(geonosis, latestCollection, { retrievedAt: now, addressFor });
+  const latestRows = ingestUSGSWaterCollection(geonosis, latestCollection, {
+    retrievedAt: now,
+    addressFor,
+    collection: USGS_LATEST_COLLECTION,
+  });
   const freshness = waterFreshness(latestRows, { now, maxAgeMs });
   if (!latestRows.length || !includeHistory) {
     return { state: freshness.state, freshness, latestUrl, rows: latestRows, historyRows: [], conditions: [] };
@@ -354,7 +362,11 @@ export async function harvestUSGSWater(geonosis, {
   let historyState = 'CURRENT';
   try {
     const historyCollection = await fetchJSON(historyUrl, { fetchImpl, timeoutMs });
-    historyRows = ingestUSGSWaterCollection(geonosis, historyCollection, { retrievedAt: now, addressFor });
+    historyRows = ingestUSGSWaterCollection(geonosis, historyCollection, {
+      retrievedAt: now,
+      addressFor,
+      collection: USGS_CONTINUOUS_COLLECTION,
+    });
   } catch (error) {
     historyState = 'UNAVAILABLE';
   }
