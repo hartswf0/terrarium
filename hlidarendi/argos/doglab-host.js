@@ -31,6 +31,7 @@ export class DogLab {
       this.char=c; this.ready=true;
       this.stripRuntimeChrome(doc);
       this.applyLook(win);
+      this.applyMobileCamera(win);
       this.exp.init(this);
       this.mountControls();
       this.add("RUNTIME","ArgosCharacter "+c.version+" attached");
@@ -55,6 +56,36 @@ export class DogLab {
     document.documentElement.style.setProperty("--dog-accent",look.accent);
     const badge=document.getElementById("look");
     if(badge) badge.textContent=look.label.toUpperCase();
+  }
+
+  applyMobileCamera(win){
+    const AR=win.AR;
+    if(!AR || typeof AR.makeCam!=="function" || AR.__halfDogCameraPatched) return;
+    const baseMakeCam=AR.makeCam;
+    AR.__halfDogCameraPatched=true;
+    AR.makeCam=(pos,target,fov)=>{
+      /* The runtime's native camera is 32° vertical. On a tall phone that makes
+         the horizontal view extremely narrow, so a quadruped centered at the
+         pelvis can still sit mostly outside frame. Preserve a 44° horizontal
+         field in portrait and aim slightly forward into the middle of the body. */
+      if(Math.abs((+fov||0)-32)<0.001 && win.ArgosCharacter?.world){
+        const aspect=Math.max(.36,win.innerWidth/Math.max(1,win.innerHeight));
+        const hFov=44*Math.PI/180;
+        const portraitVFov=2*Math.atan(Math.tan(hFov/2)/aspect)*180/Math.PI;
+        const nextFov=aspect<1 ? Math.min(76,Math.max(44,portraitVFov)) : fov;
+        const heading=+win.ArgosCharacter.world.heading||0;
+        const forward=aspect<1 ? .14 : .08;
+        const sx=Math.sin(heading)*forward;
+        const sz=Math.cos(heading)*forward;
+        const sy=aspect<1 ? -.035 : 0;
+        return baseMakeCam(
+          [pos[0]+sx,pos[1]+sy,pos[2]+sz],
+          [target[0]+sx,target[1]+sy,target[2]+sz],
+          nextFov
+        );
+      }
+      return baseMakeCam(pos,target,fov);
+    };
   }
 
   fail(msg){ $("#status").textContent=msg; $("#status").classList.add("bad"); }
