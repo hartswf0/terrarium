@@ -4,7 +4,10 @@
 // committing. Adapters may fill this store at high frequency without causing a
 // Terrarium deed, reindex, branch mutation, or journal entry.
 
-import { makeObservation, makeSignal, makeCondition, conditionAlive } from './model.js';
+import {
+  makeObservation, makeSignal, makeCondition, makeInterpretant,
+  conditionAlive, interpretantAlive,
+} from './model.js';
 import { makeSourcePolicy, retentionDecision } from './source-policy.js';
 
 /**
@@ -28,6 +31,7 @@ export class Geonosis {
     this.observations = new Map();
     this.signals = new Map();
     this.conditions = new Map();
+    this.interpretants = new Map();
     this.observers = new Set();
   }
 
@@ -81,6 +85,18 @@ export class Geonosis {
     return record;
   }
 
+  interpret(props) {
+    const record = makeInterpretant(props);
+    for (const id of record.derivedFrom) {
+      if (!this.conditions.has(id) && !this.signals.has(id) && !this.observations.has(id)) {
+        throw new Error(`Geonosis interpretant ${record.id} cites missing evidence ${id}`);
+      }
+    }
+    this.interpretants.set(record.id, record);
+    this.notify('interpretant', record);
+    return record;
+  }
+
   expire(now = Date.now()) {
     const expired = [];
     for (const [id, condition] of this.conditions) {
@@ -88,6 +104,13 @@ export class Geonosis {
         this.conditions.delete(id);
         expired.push(condition);
         this.notify('expired', condition);
+      }
+    }
+    for (const [id, interpretant] of this.interpretants) {
+      if (!interpretantAlive(interpretant, now)) {
+        this.interpretants.delete(id);
+        expired.push(interpretant);
+        this.notify('expired', interpretant);
       }
     }
     return expired;
@@ -98,7 +121,12 @@ export class Geonosis {
       observations: [...this.observations.values()].filter((x) => x.providerRecordId === subject || x.rawProperties?.subject === subject),
       signals: [...this.signals.values()].filter((x) => x.subject === subject),
       conditions: [...this.conditions.values()].filter((x) => x.subject === subject),
+      interpretants: [...this.interpretants.values()].filter((x) => x.subject === subject),
     };
+  }
+
+  byActor(actor) {
+    return [...this.interpretants.values()].filter((x) => x.actor === actor);
   }
 
   /** Address queries work before Terrarium owns an ICOSA implementation. */
@@ -108,6 +136,7 @@ export class Geonosis {
       observations: [...this.observations.values()].filter(match),
       signals: [...this.signals.values()].filter(match),
       conditions: [...this.conditions.values()].filter(match),
+      interpretants: [...this.interpretants.values()].filter(match),
     };
   }
 
@@ -151,6 +180,7 @@ export class Geonosis {
       observations,
       signals: [...this.signals.values()],
       conditions: [...this.conditions.values()],
+      interpretants: [...this.interpretants.values()],
     });
   }
 
@@ -162,6 +192,7 @@ export class Geonosis {
     for (const observation of data.observations || []) g.observe(observation);
     for (const signal of data.signals || []) g.signal(signal);
     for (const condition of data.conditions || []) g.condition(condition);
+    for (const interpretant of data.interpretants || []) g.interpret(interpretant);
     return g;
   }
 }
