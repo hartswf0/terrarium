@@ -5,9 +5,11 @@ on:
     branches: [geonosis-foundation]
   pull_request:
     paths:
+      - 'engine.html'
       - 'src/observe/**'
       - 'tests/geonosis.mjs'
       - 'tests/usgs-water.mjs'
+      - 'tests/live-water.mjs'
       - '.github/workflows/geonosis.yml'
 
 permissions:
@@ -26,3 +28,5 @@ jobs:
         run: node tests/geonosis.mjs
       - name: USGS Water adapter
         run: node tests/usgs-water.mjs
+      - name: Terrarium live water bridge
+        run: node tests/live-water.mjs
