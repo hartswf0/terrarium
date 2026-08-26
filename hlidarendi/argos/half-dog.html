@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>HALF-DOG · YOU + DOG</title>
+<style>
+:root{--paper:#fff;--ink:#000;--muted:#6d6d6d;--line:rgba(0,0,0,.24)}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;height:100dvh;overflow:hidden;background:var(--paper);color:var(--ink);font-family:ui-monospace,"IBM Plex Mono",Menlo,Consolas,monospace}
+#world{position:fixed;inset:0;width:100%;height:100%;border:0;background:#fff}
+#chrome{position:fixed;z-index:100;left:0;right:0;top:0;padding-top:env(safe-area-inset-top);background:rgba(255,255,255,.92);border-bottom:1px solid var(--ink);backdrop-filter:blur(8px)}
+#topline{height:34px;display:flex;align-items:center;justify-content:space-between;padding:0 8px;border-bottom:1px solid var(--line)}
+#brand{font-size:9px;font-weight:800;letter-spacing:.18em;white-space:nowrap}#brand b{font-size:11px;letter-spacing:.24em}
+#lab{height:26px;display:flex;align-items:center;padding:0 8px;border:1px solid var(--ink);color:inherit;text-decoration:none;font-size:8px;font-weight:800;letter-spacing:.12em;background:#fff}
+#dogs{height:38px;display:grid;grid-template-columns:repeat(4,1fr)}
+#dogs button{appearance:none;border:0;border-right:1px solid var(--line);background:transparent;font:inherit;font-size:9px;font-weight:800;letter-spacing:.08em;color:var(--ink);touch-action:manipulation}
+#dogs button:last-child{border-right:0}#dogs button.on{background:var(--ink);color:var(--paper)}
+#ready{position:fixed;z-index:99;left:50%;top:calc(env(safe-area-inset-top) + 82px);transform:translateX(-50%);padding:4px 7px;background:rgba(255,255,255,.84);border:1px solid var(--line);font-size:7px;letter-spacing:.1em;pointer-events:none;transition:opacity .25s;white-space:nowrap}
+#ready.live{opacity:0}
+@media(min-width:760px){#chrome{right:auto;width:460px;border-right:1px solid var(--ink)}#dogs button{font-size:10px}}
+</style>
+</head>
+<body>
+<iframe id="world" src="../sources/everybody-explorer-whole-body-v16.html" title="HALF-DOG shared player world"></iframe>
+<div id="chrome">
+  <div id="topline"><div id="brand"><b>HALF-DOG</b> · YOU + DOG</div><a id="lab" href="./lab.html?dog=argos">LAB</a></div>
+  <nav id="dogs" aria-label="dog model">
+    <button data-dog="argos">ARGOS</button><button data-dog="samr">SÁMR</button><button data-dog="goodyear">GOODYEAR</button><button data-dog="silas">SILAS</button>
+  </nav>
+</div>
+<div id="ready">LOADING PLAYER + DOG</div>
+<script>
+const MODELS={
+  argos:{label:'ARGOS',fur:0xa66f3e,dark:0x3f2b1d,pink:0xc7817b,scale:[1.24,1.14,1.18],body:[1.00,.90,1.08],head:[.98,.96,.98],metal:0,rough:1},
+  samr:{label:'SÁMR',fur:0x343331,dark:0x111111,pink:0x6f5e57,scale:[1.34,1.30,1.30],body:[1.08,1.04,1.12],head:[1.02,1.03,1.02],metal:0,rough:1},
+  goodyear:{label:'GOODYEAR',fur:0xdac28e,dark:0x5a4630,pink:0xd99d92,scale:[1.18,1.20,1.16],body:[1.04,1.10,.96],head:[1.13,1.12,1.10],metal:0,rough:.96},
+  silas:{label:'SILAS',fur:0x5b696d,dark:0x182024,pink:0x7f9294,scale:[1.27,1.22,1.31],body:[.94,1.00,1.13],head:[.95,1.00,.98],metal:.24,rough:.68}
+};
+const frame=document.getElementById('world'),ready=document.getElementById('ready'),lab=document.getElementById('lab');
+const buttons=[...document.querySelectorAll('[data-dog]')];
+let active=(new URLSearchParams(location.search).get('dog')||'argos').toLowerCase();
+if(!MODELS[active])active='argos';
+let E=null,base=null;
+function captureBase(dog){
+  if(base)return;
+  const seen=new Set(),materials=[];
+  dog.traverse(o=>{if(!o.isMesh||!o.material||seen.has(o.material))return;seen.add(o.material);const hex=o.material.color?.getHex?.();materials.push({mat:o.material,kind:hex===0x4a2c1b?'dark':hex===0xe68b91?'pink':'fur'});});
+  base={groupScale:dog.scale.toArray(),children:dog.children.map(o=>({o,scale:o.scale.toArray(),pos:o.position.toArray(),rot:[o.rotation.x,o.rotation.y,o.rotation.z]})),materials};
+}
+function resetShape(dog){
+  captureBase(dog);
+  dog.scale.set(...base.groupScale);
+  for(const b of base.children){b.o.scale.set(...b.scale);b.o.position.set(...b.pos);b.o.rotation.set(...b.rot);}
+}
+function meshRoles(dog){
+  const meshes=[];dog.traverse(o=>{if(o.isMesh)meshes.push(o)});
+  const body=meshes.find(o=>o.geometry?.type==='CapsuleGeometry');
+  const spheres=meshes.filter(o=>o.geometry?.type==='SphereGeometry');
+  const head=spheres.filter(o=>o.position.z>.15&&o.position.y>.20).sort((a,b)=>(b.geometry?.parameters?.radius||0)-(a.geometry?.parameters?.radius||0))[0];
+  return {meshes,body,head};
+}
+function recolor(m){
+  for(const rec of base.materials){
+    const mat=rec.mat;
+    if(mat.color)mat.color.setHex(rec.kind==='dark'?m.dark:rec.kind==='pink'?m.pink:m.fur);
+    if('metalness' in mat)mat.metalness=m.metal;
+    if('roughness' in mat)mat.roughness=m.rough;
+    mat.needsUpdate=true;
+  }
+}
+function applyDog(key){
+  if(!E)return;
+  const m=MODELS[key]||MODELS.argos,dog=E.dog.group;
+  resetShape(dog);
+  const roles=meshRoles(dog);
+  recolor(m);
+  dog.scale.set(...m.scale);
+  if(roles.body)roles.body.scale.set(...m.body);
+  if(roles.head)roles.head.scale.set(...m.head);
+  E.dog.mind.model=key;
+  active=key;
+  for(const b of buttons)b.classList.toggle('on',b.dataset.dog===key);
+  lab.href='./lab.html?dog='+encodeURIComponent(key);
+  history.replaceState(null,'','?dog='+encodeURIComponent(key));
+  document.title='HALF-DOG · '+m.label;
+}
+function simplifyInner(doc){
+  if(doc.getElementById('halfDogWorldPatch'))return;
+  const s=doc.createElement('style');s.id='halfDogWorldPatch';
+  s.textContent=`
+    #top,#readout,#help,#bottom,#atlasLegend{display:none!important}
+    #joys{inset:0!important}
+    #navLayer{inset:0!important}
+    .controlDeck{top:calc(env(safe-area-inset-top,0px) + 78px)!important;bottom:max(3px,env(safe-area-inset-bottom,0px))!important}
+    #headDock{top:calc(env(safe-area-inset-top,0px) + 154px)!important}
+  `;
+  doc.head.appendChild(s);
+}
+function attach(){
+  const win=frame.contentWindow,doc=frame.contentDocument;
+  if(!win||!doc)return;
+  simplifyInner(doc);
+  const tryReady=()=>{
+    if(!win.EVERYBODY){setTimeout(tryReady,40);return;}
+    E=win.EVERYBODY;
+    try{E.mobile?.travel?.();E.head?.(true);}catch(_){ }
+    applyDog(active);
+    ready.textContent='PLAYER + '+MODELS[active].label+' · SAME WORLD';
+    setTimeout(()=>ready.classList.add('live'),850);
+  };
+  tryReady();
+}
+frame.addEventListener('load',attach,{once:true});
+buttons.forEach(b=>b.addEventListener('click',()=>applyDog(b.dataset.dog)));
+buttons.forEach(b=>b.classList.toggle('on',b.dataset.dog===active));
+lab.href='./lab.html?dog='+encodeURIComponent(active);
+</script>
+</body>
+</html>
