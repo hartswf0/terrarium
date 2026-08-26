@@ -77,7 +77,20 @@ the rig: roll gently over it and the bed takes it, FIRE launches it down
 the road for the dog to chase. Ask the AGENT for *a truck* and a drivable
 rig rolls off the line (up to five stand in the world; boarding a parked
 one exchanges bodies); ask for *a trailer* and a caravan shell stands.
-**/deed <name>** keeps the land under you in the ▲ list forever.
+**/deed <name>** keeps the land under you in the ▲ list forever. **/what**
+tells you, at any time, what there is to do here.
+
+**ARGOS IS A COMPANION, NOT A TENANT.** If you are out on the land and he
+is indoors, being with you outweighs the couch and he takes the door and
+comes out — through a funnel, because a doorway is a 0.9 m slot and you
+cannot enter a slot on the diagonal. **FEED** works from your hand when
+you are near him (the plainest bond there is, and it needs no galley) or
+fills the bowl at the galley. He **asks to play**: rested, fond of you and
+holding nothing, he drops into a play bow and waits for the throw — then
+fetches on his own legs and brings it back near your feet. And **FIRE is
+never a dead button**: with the ball carried off, stowed or lost, you pick
+up a stone and throw that instead — it strikes what it hits, and it can
+knock the ball on.
 
 **THE LIVE CONDITIONS** — **/live** (or ◉ in the ▲ list) listens to the
 land you are actually standing on: the earthquakes under Iceland from the
@@ -101,9 +114,14 @@ height you choose; the LOOK stick re-aims and re-frames it, and letting go
 lets the eye swing back. Towing, it climbs and rides off the shoulder so
 the load never becomes the view. **The household starts coupled**: the rig
 stands at the home's north tongue, nose to the open land, already hitched —
-take the wheel and the whole dwelling comes with you. (The trailer keeps
-its bearing on the skids rather than swinging in behind the rig; its
-collision boxes, door and plan stay exactly true that way.) **A rig does
+take the wheel and the whole dwelling comes with you. **The home swings in behind the rig like a real trailer**: it has a
+BEARING now, and its boxes live in its own frame, so every occupancy
+question crosses into that frame and back — rotation costs nothing in
+accuracy, and the door, deck and plan stay exactly true at any angle. The
+tongue is inextensible: the home's centre trails the hitch at a fixed
+length with its nose always pointing AT the hitch, and a body that always
+points at the thing pulling it cannot jackknife (measured: 29° worst hitch
+angle through a hard turn, 0.00 m tongue gap). **A rig does
 not collide with its own load** — while hitched, the home's boxes stay
 solid for everyone else but cannot shove the thing towing them, and the
 loaded nose swings toward the stick instead of snapping to it: six tonnes

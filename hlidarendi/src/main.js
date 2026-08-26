@@ -95,33 +95,43 @@ for(const b of SOLIDS){b.climb=false;b.trailer=true} // furniture blocks; the fl
 // that feedback (drag the load into the cab, get pushed, get kicked) is what
 // spins a tow rig out. The load stays solid for everyone else, always.
 const TOW={skip:false};
-const BLOCKERS=SOLIDS.filter(s=>s.kind==='wall'||s.kind==='glass'||s.kind==='fixture'||s.kind==='frame');
+// THE HOME HAS A BEARING. Its boxes live in the HOME'S OWN FRAME and never
+// move; every query crosses into that frame and back. Rotation therefore costs
+// nothing in accuracy — a circle is round in any frame, so the same exact
+// axis-aligned test serves a home standing square or a home swung in behind a
+// rig. This is what lets the load follow the tongue instead of crabbing.
+const HOME_B=SOLIDS.filter(s=>s.kind==='wall'||s.kind==='glass'||s.kind==='fixture'||s.kind==='frame');
 const TOPS=SOLIDS.filter(s=>s.kind==='step');
-// ---- THE HOME CAN BE HAULED. One offset moves the WHOLE dwelling — the
-// rendered members, the collision boxes, the door, the plan datum — because
-// they all derive from the one element table. The boxes stay axis-aligned:
-// a towed home slides on its skids, keeping its bearing.
-const SOLIDS0=SOLIDS.map(s=>({min:s.min.slice(),max:s.max.slice()}));
-const DOOR0={x:DOOR.x,z0:DOOR.z0,z1:DOOR.z1};
+const BLOCKERS=[];                         // world-frame occupancy: OSM, forged builds
 const TR0={x:TR.x,z:TR.z};
-const TRAILER={ox:0,oz:0,oy:0,moveBowl:null,group:null};
-function applyTrailerOffset(ox,oz,oy){
-  TRAILER.ox=ox;TRAILER.oz=oz;TRAILER.oy=oy;
-  TR.x=TR0.x+ox;TR.z=TR0.z+oz;
-  for(let i=0;i<SOLIDS.length;i++){const s=SOLIDS[i],o=SOLIDS0[i];
-    s.min[0]=o.min[0]+ox;s.max[0]=o.max[0]+ox;
-    s.min[1]=o.min[1]+oy;s.max[1]=o.max[1]+oy;
-    s.min[2]=o.min[2]+oz;s.max[2]=o.max[2]+oz;}
-  DOOR.x=DOOR0.x+ox;DOOR.z0=DOOR0.z0+oz;DOOR.z1=DOOR0.z1+oz;
-  if(TRAILER.group)TRAILER.group.position.set(ox,oy,oz);
-  if(TRAILER.moveBowl)TRAILER.moveBowl(ox,oz,oy);
+const DOOR0={x:DOOR.x,z0:DOOR.z0,z1:DOOR.z1};
+const TRAILER={ox:0,oz:0,oy:0,yaw:0,cos:1,sin:0,moveBowl:null,pivot:null};
+function homeOf(x,z){                      // world → the home's frame
+  const dx=x-TR.x,dz=z-TR.z,c=TRAILER.cos,sn=TRAILER.sin;
+  return{x:TR0.x+dx*c+dz*sn, z:TR0.z-dx*sn+dz*c};
 }
+function worldOf(hx,hz){                   // the home's frame → world
+  const dx=hx-TR0.x,dz=hz-TR0.z,c=TRAILER.cos,sn=TRAILER.sin;
+  return{x:TR.x+dx*c-dz*sn, z:TR.z+dx*sn+dz*c};
+}
+function worldDir(hx,hz){const c=TRAILER.cos,sn=TRAILER.sin;return{x:hx*c-hz*sn,z:hx*sn+hz*c}}
+function applyTrailerOffset(ox,oz,oy,yaw){
+  TRAILER.ox=ox;TRAILER.oz=oz;TRAILER.oy=oy;
+  if(yaw!=null){TRAILER.yaw=yaw;TRAILER.cos=Math.cos(yaw);TRAILER.sin=Math.sin(yaw)}
+  TR.x=TR0.x+ox;TR.z=TR0.z+oz;
+  if(TRAILER.pivot){TRAILER.pivot.position.set(TR.x,oy,TR.z);TRAILER.pivot.rotation.y=TRAILER.yaw}
+  const dm=worldOf(DOOR0.x,(DOOR0.z0+DOOR0.z1)/2),half=(DOOR0.z1-DOOR0.z0)/2;
+  DOOR.x=dm.x;DOOR.z0=dm.z-half;DOOR.z1=dm.z+half;   // world convenience for radius checks
+  if(TRAILER.moveBowl)TRAILER.moveBowl();
+}
+function trailerHitchWorld(){return worldOf(TR0.x,TR0.z-3.05)}   // the north tongue
 function structSurface(x,z,forDog){
-  const px=(x-TR.x)/IN+50.5,py=(z-TR.z)/IN+120;
+  const h=homeOf(x,z);
+  const px=(h.x-TR0.x)/IN+50.5,py=(h.z-TR0.z)/IN+120;
   let base=null;
   if(px>WT&&px<96.5&&py>4.5&&py<235.5)base=DECK+TRAILER.oy;
   else if(px>-0.5&&px<=WT&&py>72&&py<108)base=DECK+TRAILER.oy; // door.entry threshold: the sill is part of the floor
-  else for(const t of TOPS)if(x>=t.min[0]&&x<=t.max[0]&&z>=t.min[2]&&z<=t.max[2]){base=t.max[1];break}
+  else for(const t of TOPS)if(h.x>=t.min[0]&&h.x<=t.max[0]&&h.z>=t.min[2]&&h.z<=t.max[2]){base=t.max[1]+TRAILER.oy;break}
   return base;
 }
 const PLACE={
@@ -136,10 +146,9 @@ const PLACE={
   door:DOOR, solids:SOLIDS, structure:{id:'structure.ingold',datum:DECK,elements:EL,door:DOOR},
   // circle-vs-box occupancy in a height band; used by the hero root, foot
   // anchors and the ball — same boxes the renderer draws.
-  pushOutCircle(v,r,y0,y1,out,skipClimb){
-    for(const b of BLOCKERS){
+  _pushList(list,v,r,y0,y1,out,skipClimb){
+    for(const b of list){
       if(skipClimb&&b.climb)continue;
-      if(TOW.skip&&b.trailer)continue;      // you are towing this; it cannot hit you
       if(b.max[1]<y0||b.min[1]>y1)continue;
       const cx=clamp(v.x,b.min[0],b.max[0]),cz=clamp(v.z,b.min[2],b.max[2]);
       let dx=v.x-cx,dz=v.z-cz,d=Math.hypot(dx,dz);
@@ -154,33 +163,55 @@ const PLACE={
     }
     return v;
   },
+  pushOutCircle(v,r,y0,y1,out,skipClimb){
+    this._pushList(BLOCKERS,v,r,y0,y1,out,skipClimb);
+    if(!TOW.skip){                                   // the home, asked in its own frame
+      const h=homeOf(v.x,v.z),hv={x:h.x,z:h.z};
+      const o2=out?{hit:false,x:0,z:0,id:null}:null;
+      this._pushList(HOME_B,hv,r,y0-TRAILER.oy,y1-TRAILER.oy,o2,skipClimb);
+      if(hv.x!==h.x||hv.z!==h.z){const w=worldOf(hv.x,hv.z);v.x=w.x;v.z=w.z}
+      if(o2&&o2.hit&&out){const d=worldDir(o2.x,o2.z);out.x=d.x;out.z=d.z;out.hit=true;out.id=o2.id}
+    }
+    return v;
+  },
   dogWalkable(x,z){
     const gy=this.heightAt(x,z),y0=gy+.05,y1=gy+.62;
     for(const b of BLOCKERS){
       if(b.max[1]<y0||b.min[1]>y1)continue;
       if(x>b.min[0]-.14&&x<b.max[0]+.14&&z>b.min[2]-.14&&z<b.max[2]+.14)return false;
     }
+    const h=homeOf(x,z),h0=y0-TRAILER.oy,h1=y1-TRAILER.oy;
+    for(const b of HOME_B){
+      if(b.max[1]<h0||b.min[1]>h1)continue;
+      if(h.x>b.min[0]-.14&&h.x<b.max[0]+.14&&h.z>b.min[2]-.14&&h.z<b.max[2]+.14)return false;
+    }
     return true;
   },
   // wall capsules for the hand/foot collision solver: derived from the SAME
   // boxes, only near the query point, stacked in the actor's height band.
   wallCapsulesNear(p,range){
-    const caps=[];
-    for(const b of BLOCKERS){
-      const ex=b.max[0]-b.min[0],ez=b.max[2]-b.min[2];
-      if(Math.min(ex,ez)>0.35)continue;   // thin solids only: walls and glass, never furniture slabs
-      const cx=clamp(p.x,b.min[0],b.max[0]),cz=clamp(p.z,b.min[2],b.max[2]);
-      if(Math.hypot(p.x-cx,p.z-cz)>range)continue;
-      const longX=ex>=ez;
-      const r=Math.min((longX?ez:ex)/2+.012,.14), y0=Math.min(b.min[1]+r,b.max[1]),y1=Math.max(y0,b.max[1]-r);
-      const n=Math.min(3,Math.max(1,Math.round((y1-y0)/.5)+1));
-      for(let i=0;i<n;i++){
-        const y=n===1?(y0+y1)/2:y0+(y1-y0)*i/(n-1);
-        const a=longX?new THREE.Vector3(b.min[0]+r,y,(b.min[2]+b.max[2])/2):new THREE.Vector3((b.min[0]+b.max[0])/2,y,b.min[2]+r);
-        const c=longX?new THREE.Vector3(b.max[0]-r,y,(b.min[2]+b.max[2])/2):new THREE.Vector3((b.min[0]+b.max[0])/2,y,b.max[2]-r);
-        caps.push({name:b.id,a,b:c,r});
+    const caps=[],h=homeOf(p.x,p.z);
+    const gather=(list,local)=>{
+      const qx=local?h.x:p.x,qz=local?h.z:p.z,dy=local?TRAILER.oy:0;
+      for(const b of list){
+        const ex=b.max[0]-b.min[0],ez=b.max[2]-b.min[2];
+        if(Math.min(ex,ez)>0.35)continue;   // thin solids only: walls and glass, never furniture slabs
+        const cx=clamp(qx,b.min[0],b.max[0]),cz=clamp(qz,b.min[2],b.max[2]);
+        if(Math.hypot(qx-cx,qz-cz)>range)continue;
+        const longX=ex>=ez;
+        const r=Math.min((longX?ez:ex)/2+.012,.14), y0=Math.min(b.min[1]+r,b.max[1]),y1=Math.max(y0,b.max[1]-r);
+        const n=Math.min(3,Math.max(1,Math.round((y1-y0)/.5)+1));
+        for(let i=0;i<n;i++){
+          const y=n===1?(y0+y1)/2:y0+(y1-y0)*i/(n-1);
+          const ax=longX?b.min[0]+r:(b.min[0]+b.max[0])/2, az=longX?(b.min[2]+b.max[2])/2:b.min[2]+r;
+          const bx=longX?b.max[0]-r:(b.min[0]+b.max[0])/2, bz=longX?(b.min[2]+b.max[2])/2:b.max[2]-r;
+          const A=local?worldOf(ax,az):{x:ax,z:az}, Bp=local?worldOf(bx,bz):{x:bx,z:bz};
+          caps.push({name:b.id,a:new THREE.Vector3(A.x,y+dy,A.z),b:new THREE.Vector3(Bp.x,y+dy,Bp.z),r});
+        }
       }
-    }
+    };
+    gather(BLOCKERS,false);
+    gather(HOME_B,true);
     return caps;
   },
   query(kind,payload){
@@ -283,8 +314,10 @@ function memberGroup(lox,loy,loz,hix,hiy,hiz,kind){
   return 'in';
 }
 const structMeshes=[];
-const trailerGroup=new THREE.Group();trailerGroup.name='STRUCTURE.INGOLD';worldGroup.add(trailerGroup);
-TRAILER.group=trailerGroup;
+const trailerPivot=new THREE.Group();trailerPivot.name='STRUCTURE.INGOLD';worldGroup.add(trailerPivot);
+// the members are drawn in the home's own frame; the pivot carries and turns them
+const trailerGroup=new THREE.Group();trailerGroup.position.set(-TR0.x,0,-TR0.z);trailerPivot.add(trailerGroup);
+TRAILER.pivot=trailerPivot;applyTrailerOffset(0,0,0,0);
 {
   const buckets={}; // group|material -> geometries
   const gAABB={};   // group -> world aabb
@@ -330,18 +363,20 @@ TRAILER.group=trailerGroup;
 }
 // walls between the camera and the hero become see-through; same elements, one truth
 function updateStructFade(){
-  const hero=locomotion.root,cx=camera.position.x,cz=camera.position.z;
+  const hero=locomotion.root;
+  const hh=homeOf(hero.x,hero.z),hc=homeOf(camera.position.x,camera.position.z);
+  const cx=hc.x,cz=hc.z,hx=hh.x,hz=hh.z,hy=hero.y-TRAILER.oy;
   const home=insideShell(hero.x,hero.z);
   for(const s of structMeshes){
     let block=false;
     if(s.grp==='roof'){block=home}
     else if(home&&s.grp!=='in'){block=true}
-    else if(s.grp!=='in'&&s.box.max[1]+TRAILER.oy>hero.y+.9){
+    else if(s.grp!=='in'&&s.box.max[1]>hy+.9){
       for(let t=.12;t<.97;t+=.12){
-        const x=lerp(cx,hero.x,t),z=lerp(cz,hero.z,t);
-        if(x>s.box.min[0]+TRAILER.ox-.08&&x<s.box.max[0]+TRAILER.ox+.08&&z>s.box.min[2]+TRAILER.oz-.08&&z<s.box.max[2]+TRAILER.oz+.08){
-          const y=lerp(camera.position.y,hero.y+1.1,t);
-          if(y>s.box.min[1]+TRAILER.oy&&y<s.box.max[1]+TRAILER.oy){block=true;break}
+        const x=lerp(cx,hx,t),z=lerp(cz,hz,t);
+        if(x>s.box.min[0]-.08&&x<s.box.max[0]+.08&&z>s.box.min[2]-.08&&z<s.box.max[2]+.08){
+          const y=lerp(camera.position.y-TRAILER.oy,hy+1.1,t);
+          if(y>s.box.min[1]&&y<s.box.max[1]){block=true;break}
         }
       }
     }
@@ -428,7 +463,7 @@ function standinFor(prompt){
   if(/light|lamp|fire|beacon|star/.test(p))return 'beacon';
   return 'cairn';
 }
-const FORGE_SYS='You are a structure builder for HLIDARENDI, a small standing world. Reply with ONLY one JavaScript function, no fences, no prose:\nfunction build(w, WG, THREE){ ... return w; }\nOne focal structure at the origin. Vocabulary: WG.box(w,h,d,mat) WG.cyl(r,h,mat) WG.cone(r,h,mat) WG.sphere(r,mat) WG.torus(r,t,mat); materials WG.flat(hex,{rough,metal}) WG.matte(hex,rough) WG.lit(hex,intensity); WG.put(mesh,x,y,z,ry) places (y=0 is the ground); WG.solid(mesh,w,h,d) makes it collide; WG.rand(seed) for randomness. Under 60 meshes; every part within 12 units of the origin; scale in metres (a person is 1.7 tall).';
+const FORGE_SYS='You are a structure builder for HLIDARENDI, a small standing world. Reply with ONLY one JavaScript function, no fences, no prose:\nfunction build(w, WG, THREE){ ... return w; }\nOne focal structure at the origin. Vocabulary: WG.box(w,h,d,mat) WG.cyl(r,h,mat) WG.cone(r,h,mat) WG.sphere(r,mat) WG.torus(r,t,mat); materials WG.flat(hex,{rough,metal}) WG.matte(hex,rough) WG.lit(hex,intensity); WG.put(mesh,x,y,z,ry) places (y=0 is the ground); WG.solid(mesh,w,h,d) makes it collide; WG.rand(seed) for randomness. Under 60 meshes; every part within 12 units of the origin; scale in metres (a person is 1.7 tall).\nIf asked for a DWELLING (trailer, caravan, cabin, hut, shed): build it hollow and enterable — a raised floor about 0.4 high, four walls about 2.2 tall with a GAP at least 0.9 wide left in one wall for a door, a roof, and a step outside the gap. Make the walls thin (0.12-0.16) and WG.solid only the walls, floor and step, never the doorway.';
 async function askForgeAI(prompt){
   let key=null;try{key=localStorage.getItem('hlidarendi.ai.key')}catch(e){}
   if(!key)return null;
@@ -665,6 +700,49 @@ const LIVE={
 };
 function compass(brg){const d=((brg*180/Math.PI)%360+360)%360;
   return ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'][Math.round(d/22.5)%16]}
+// ---- THE STONE. FIRE must always answer. With the ball gone — carried off by
+// the dog, stowed in the bed, lost over a ridge — you can still pick up a stone
+// and throw it at the world, and the world answers back.
+const STONE={p:new THREE.Vector3(),v:new THREE.Vector3(),live:false,r:.085,mesh:null};
+{const m=new THREE.Mesh(new THREE.DodecahedronGeometry(.085,0),
+   new THREE.MeshStandardMaterial({color:0x8a8880,roughness:1}));
+ m.visible=false;scene.add(m);STONE.mesh=m}
+function throwStone(){
+  const atWheel=TRUCK.on;
+  rig.mesh.updateMatrixWorld(true);
+  const from=atWheel?new THREE.Vector3(TRUCK.x,TRUCK.group.position.y+1.5,TRUCK.z)
+                    :rig.by.rightHand.getWorldPosition(new THREE.Vector3());
+  const dir=rotateLocalY(new THREE.Vector3(0,0,1),atWheel?TRUCK.yaw:locomotion.heading);
+  STONE.p.copy(from).addScaledVector(dir,.35);
+  const sp=atWheel?12+TRUCK.speed*.6:11.5;
+  STONE.v.set(dir.x*sp,3.4,dir.z*sp);
+  STONE.live=true;STONE.mesh.visible=true;STONE.mesh.position.copy(STONE.p);
+  if(!atWheel)gameCommand('strike');
+  buzz('stone',[10,22,8],320);
+  return true;
+}
+STONE.step=function(dt){
+  if(!this.live)return;
+  this.v.y-=18*dt;
+  const p=this.p.clone().addScaledVector(this.v,dt);
+  const info={hit:false};
+  PLACE.pushOutCircle(p,this.r,p.y-this.r,p.y+this.r,info,false);
+  if(info.hit){
+    chat.line('world','the stone strikes '+(info.id||'the wall')+' — it holds');
+    this.v.multiplyScalar(-.28);buzz('stonehit',[14,26,10],260);
+  }
+  // a struck ball is a struck ball, whatever struck it
+  if(ball.state==='free'&&Math.hypot(p.x-ball.p.x,p.z-ball.p.z)<.45&&Math.abs(p.y-ball.p.y)<.5){
+    ball.v.addScaledVector(this.v,.55);ball.v.y=Math.max(ball.v.y,1.6);
+    GAMES.stroke();chat.line('world','the stone knocks the ball on');
+    try{argos.say('fetch the ball')}catch(e){}
+    this.v.multiplyScalar(-.2);
+  }
+  const gy=PLACE.heightAt(p.x,p.z)+this.r;
+  if(p.y<=gy){p.y=gy;this.v.y*=-.32;this.v.x*=.6;this.v.z*=.6;
+    if(this.v.length()<.7){this.live=false}}
+  this.p.copy(p);this.mesh.position.copy(p);
+};
 // kicking is always on: run into the ball and it goes — and the rig's bumper
 // is a bigger boot than any foot
 function stepKick(){
@@ -720,8 +798,12 @@ function makeTruckBody(color,form){
   const grill=new THREE.Mesh(new THREE.BoxGeometry(1.7,.34,.2),dark);grill.position.set(0,.78+lift,form==='racer'?2.55:2.3);g.add(grill);
   const wheels=[];
   for(const [wx,wz] of [[-.98,1.5],[.98,1.5],[-.98,-1.5],[.98,-1.5]]){
+    // a wheel turns about TWO joints: the kingpin steers, the hub rolls. One
+    // mesh doing both is what makes wheels sit crooked.
+    const pivot=new THREE.Group();pivot.position.set(wx,wr,wz);g.add(pivot);
     const w=new THREE.Mesh(new THREE.CylinderGeometry(wr,wr,.38,14),dark);
-    w.geometry.rotateZ(Math.PI/2);w.position.set(wx,wr,wz);g.add(w);wheels.push(w);
+    w.geometry.rotateZ(Math.PI/2);pivot.add(w);
+    wheels.push({pivot,mesh:w});
   }
   // the driver is seen at the wheel — a silhouette, present only when boarded
   const drv=new THREE.Group();
@@ -805,7 +887,6 @@ function truckPlace(){
   TRUCK.group.rotateZ(Math.atan2(hR-hL,1.9)*.85);
 }
 function truckRear(){const dx=Math.sin(TRUCK.yaw),dz=Math.cos(TRUCK.yaw);return{x:TRUCK.x-dx*2.9,z:TRUCK.z-dz*2.9}}
-function trailerHitchWorld(){return{x:TR.x,z:TR.z-3.05}} // the home's south tongue
 function truckJump(){
   if(!TRUCK.on||(TRUCK.airY||0)>0.02||TRUCK.hitched)return;
   TRUCK.vy=11;TRUCK.airY=0.03;buzz('rigjump',[12,26,10],400); // III's leap, scaled to the hillside
@@ -921,10 +1002,11 @@ function truckStep(dt){
     }
   }
   // wheels tell the story: roll with speed, toe with the drift
-  const driftA=TRUCK.speed>1?normAngle(Math.atan2(TRUCK.vel.x,TRUCK.vel.z)-TRUCK.yaw):0;
-  TRUCK.steerVis=lerp(TRUCK.steerVis||0,clamp(driftA,-.5,.5),1-Math.exp(-dt*8));
-  TRUCK.wheels[0].rotation.y=TRUCK.wheels[1].rotation.y=TRUCK.steerVis;
-  for(const w of TRUCK.wheels)w.rotation.x+=TRUCK.speed*dt/.44;
+  // the front wheels point where you ASK to go, not where the drift happens to be
+  const askA=mag>0.1?normAngle(Math.atan2(dir.x,dir.z)-TRUCK.yaw):0;
+  TRUCK.steerVis=lerp(TRUCK.steerVis||0,clamp(askA,-.52,.52),1-Math.exp(-dt*9));
+  TRUCK.wheels[0].pivot.rotation.y=TRUCK.wheels[1].pivot.rotation.y=TRUCK.steerVis;
+  for(const w of TRUCK.wheels)w.mesh.rotation.x+=TRUCK.speed*dt/.44;
   if(explorer.boostHold&&TRUCK.speed>8)buzz('rigboost',6,500);
   truckPlace();
   // the driver IS the root: camera, dog, labels, striker all read this
@@ -932,10 +1014,15 @@ function truckStep(dt){
   locomotion.heading=TRUCK.yaw;locomotion.headingGoal=TRUCK.yaw;
   explorer.speed=Math.abs(TRUCK.speed);
   if(TRUCK.hitched){
-    const r=truckRear();
-    const ox=r.x-TR0.x,oz=r.z-(TR0.z-3.05);
-    const oy=rawTerrain(TR0.x+ox,TR0.z+oz)-PAD.datum;
-    applyTrailerOffset(ox,oz,oy);
+    // A REAL TOW, not a shove: the tongue is inextensible, so the home's centre
+    // trails the hitch at a fixed length and its nose always points AT the
+    // hitch. That pursuit curve IS a trailer — and a body that always points at
+    // the thing pulling it cannot jackknife.
+    const h=truckRear(),L=3.05;
+    let dx=h.x-TR.x,dz=h.z-TR.z,d=Math.hypot(dx,dz);
+    if(d<1e-4){dx=Math.sin(TRUCK.yaw);dz=Math.cos(TRUCK.yaw);d=1}
+    const cx=h.x-dx/d*L,cz=h.z-dz/d*L;
+    applyTrailerOffset(cx-TR0.x,cz-TR0.z,rawTerrain(cx,cz)-PAD.datum,Math.atan2(dx,-dz));
   }
 }
 // ---- LOCATIONS — call on the world landscape. Fetches the same public
@@ -965,12 +1052,12 @@ async function gotoPlace(lat,lon){
   // the household arrives together: home to origin, new datum, rig and dog
   // in the yard, the ball at your feet — and a mind fresh for the new land
   if(TRUCK.hitched)TRUCK.hitched=false;
-  applyTrailerOffset(0,0,0);
+  applyTrailerOffset(0,0,0,0);
   PAD.datum=rawTerrain(TR.x,TR.z);
   buildTerrainMesh();
   dressWorld().then(t=>chat.line('world','dressed — '+t+' tiles · © Esri · © OpenStreetMap')).catch(()=>{});
   placeHero(0,0,locomotion.heading);
-  argos.world.dog=[TR.x-2.1,0,TR.z-2.4];
+  seatDog(TR.x-2.1,TR.z-2.4);
   TRUCK.x=TR.x-8.5;TRUCK.z=TR.z+7.5;TRUCK.speed=0;truckPlace();
   if(ball.state!=='hero'){ball.state='free';ball.p.set(TR.x-4.2,terrainH(TR.x-4.2,TR.z-1)+ball.r,TR.z-1);ball.v.set(0,0,0)}
   argos.world.carrying=false;
@@ -1027,7 +1114,8 @@ const ball={state:'free',p:new THREE.Vector3(px2w(34),DECK+.055,py2w(146)),v:new
 const bowl={p:new THREE.Vector3(px2w(66),DECK,py2w(102)),food:false,meal:0};
 { // the galley travels with the home
   const BOWL0={x:bowl.p.x,z:bowl.p.z};
-  TRAILER.moveBowl=(ox,oz,oy)=>{bowl.p.set(BOWL0.x+ox,DECK+oy,BOWL0.z+oz);
+  TRAILER.moveBowl=()=>{const w=worldOf(BOWL0.x,BOWL0.z);
+    bowl.p.set(w.x,DECK+TRAILER.oy,w.z);
     bowlMesh.position.copy(bowl.p);bowlMesh.position.y+=.028};
 }
 const ballMesh=new THREE.Mesh(new THREE.SphereGeometry(.055,14,10),new THREE.MeshStandardMaterial({color:0xa8392b,roughness:.7}));
@@ -1070,9 +1158,26 @@ function takeBall(){
   ball.state='hero';buzz('take',8,300);return true;
 }
 function feedBowl(){
-  const d=Math.hypot(bowl.p.x-locomotion.root.x,bowl.p.z-locomotion.root.z);
-  if(d>1.5||bowl.food)return false;
-  bowl.food=true;bowl.meal=4;try{argos.say('dinner time, eat')}catch(e){}gameCommand('crouch',1);setTimeout(()=>gameCommand('crouch',0),650);buzz('feed',[8,20,8],400);return true;
+  const bd=Math.hypot(bowl.p.x-locomotion.root.x,bowl.p.z-locomotion.root.z);
+  if(bd<=1.8&&!bowl.food){
+    bowl.food=true;bowl.meal=4;try{argos.say('dinner time, eat')}catch(e){}
+    gameCommand('crouch',1);setTimeout(()=>gameCommand('crouch',0),650);buzz('feed',[8,20,8],400);
+    chat.line('world','the bowl is filled — he will come when he wants it');return true;
+  }
+  // FROM THE HAND. The plainest bond there is, and it needs no galley: crouch,
+  // hold it out, and he takes it. Feeding is the oldest argument for trust.
+  const d=argos.world.dog,dd=Math.hypot(d[0]-locomotion.root.x,d[2]-locomotion.root.z);
+  if(dd<=2.6){
+    argos.mind.iv.hunger=Math.max(0,(argos.mind.iv.hunger||0)-.35);
+    BOND.v=Math.min(1,BOND.v+.12);
+    argos.mind.prefs.FOLLOW=Math.max(argos.mind.prefs.FOLLOW||0,1.0);
+    try{argos.say('good dog, eat')}catch(e){}
+    gameCommand('crouch',1);setTimeout(()=>gameCommand('crouch',0),650);buzz('feed',[8,20,8],400);
+    chat.line('world','you feed him from your hand — he remembers this');
+    chat.line('dog','WOOF');return true;
+  }
+  chat.line('world',bowl.food?'the bowl is already full — call him to it':'go to him, or to the galley bowl');
+  return false;
 }
 // ---- one clock: the world advances inside the same tick as the body solver
 let _fadeAcc=0,_uiAcc=0;
@@ -1095,6 +1200,7 @@ function worldStep(dt){
   }
   worldStep._pr.copy(locomotion.root);
   stepBall(dt);
+  STONE.step(dt);
   stepKick();
   STRIKER.step();
   LIVE.tick(dt);
@@ -1111,7 +1217,9 @@ function updateWorldUI(){
   $('#ctfBtn')?.classList.toggle('on',GAMES.mode==='ctf');
   bb.classList.toggle('on',ball.state==='hero'||ball.state==='rig'||(ball.state==='free'&&d<=1.35));
   if(fb){const bd=Math.hypot(bowl.p.x-locomotion.root.x,bowl.p.z-locomotion.root.z);
-    fb.textContent=bowl.food?'FED':'FEED';fb.classList.toggle('on',!bowl.food&&bd<=1.5)}
+    const dg=argos.world.dog,dd2=Math.hypot(dg[0]-locomotion.root.x,dg[2]-locomotion.root.z);
+    fb.textContent=(dd2<=2.6)?'HAND':(bowl.food?'FED':'FEED');
+    fb.classList.toggle('on',dd2<=2.6||(!bowl.food&&bd<=1.8))}
 }
 // move the whole standing hero (used by restore); every solver state travels together
 function placeHero(x,z,heading){
@@ -1137,12 +1245,39 @@ const support=new THREE.Mesh(new THREE.RingGeometry(.17,.175,48),new THREE.MeshB
 const DOG_SPAWN=[TR.x-2.1,0,TR.z-2.4];
 const argos=AR.createArgos({});
 argos.world.dog=DOG_SPAWN.slice();
+// SET HIM DOWN, NEVER SWAP HIM OUT. His runtime holds this very array — hand it
+// a different one and he is severed from his own body: the mind keeps deciding
+// while the legs answer to an array nobody reads. Move him in place, and seat
+// him on the ground, or he has no contact to earn traction from.
+function seatDog(x,z){
+  const d=argos.world.dog;
+  d[0]=x;d[2]=z;d[1]=PLACE.ground.heightAtDog(x,z);
+  argos.loco.speed=0;argos.loco.desiredSpeed=0;
+}
 argos.world.human=[0,0,0];
 // The half-dog solves his stance against locally-flat ground. On the real
 // hillside we answer terrain queries with the ground under his BODY, so his
 // pads plant coherently and traction is truly earned; his root still rides
 // the actual terrain height every step.
-argos.setTerrain(()=>{const d=argos.world.dog;return PLACE.ground.heightAtDog(d[0],d[2])});
+// A BODY HAS WIDTH. One sample under his centre leaves the uphill half of him
+// inside the hill — a quarter-metre buried on a real Fljótshlíð slope. He is
+// posed level, so he must stand on the HIGHEST ground his own footprint spans:
+// then nothing of him is ever inside the land, and the worst case is a paw a
+// little light on the downhill side, which is what a real dog looks like.
+argos.setTerrain(()=>{
+  const d=argos.world.dog,hd=(argos.loco&&argos.loco.heading)||0;
+  const fx=Math.sin(hd)*.52,fz=Math.cos(hd)*.52;      // nose/tail
+  const sx=Math.cos(hd)*.26,sz=-Math.sin(hd)*.26;     // flanks
+  const g=PLACE.ground.heightAtDog;
+  const hi=Math.max(g(d[0],d[2]),g(d[0]+fx,d[2]+fz),g(d[0]-fx,d[2]-fz),
+                      g(d[0]+sx,d[2]+sz),g(d[0]-sx,d[2]-sz));
+  // The centre alone buries his uphill half. Standing on the crest of his own
+  // footprint means NO part of him is ever inside the land — the cost is a
+  // downhill paw riding light on steep ground, which is the honest geometry of
+  // a level-posed body on a hill, not a broken world. On flat ground every
+  // sample agrees and this is exactly the ground.
+  return hi;
+});
 argos.setWalkable((x,z)=>PLACE.dogWalkable(x,z));
 // --- skin: AR deforms its marching-tets surface on the CPU in world space;
 //     three.js just displays it. Colors ride per-vertex from the dog's own palette.
@@ -1211,17 +1346,29 @@ function pointingFloorTarget(){
 }
 
 function insideShell(x,z){
-  const px=(x-TR.x)/IN+50.5,py=(z-TR.z)/IN+120;
+  const h=homeOf(x,z);
+  const px=(h.x-TR0.x)/IN+50.5,py=(h.z-TR0.z)/IN+120;
   return px>0&&px<101&&py>0&&py<240;
 }
-const DOOR_MID=(DOOR.z0+DOOR.z1)/2;
+const DOOR_MID0=(DOOR0.z0+DOOR0.z1)/2;
 function routeForDog(target){
   if(!target)return target;
   const d=argos.world.dog,di=insideShell(d[0],d[2]),ti=insideShell(target[0],target[2]);
   if(di===ti)return target;
-  const nearDoor=Math.hypot(d[0]-DOOR.x,d[2]-DOOR_MID)<1.0;
-  if(nearDoor)return [di?DOOR.x-0.85:DOOR.x+0.85,0,DOOR_MID];
-  return [di?DOOR.x+0.55:DOOR.x-0.55,0,DOOR_MID];
+  // HE HAS NO MAP — he steers at one point at a time. A doorway is a 0.9 m slot,
+  // and you cannot enter a slot on the diagonal: so the way through is a funnel.
+  // Get onto the door's lane first, THEN walk the lane through the opening.
+  const hd=homeOf(d[0],d[2]),lane=DOOR_MID0;
+  // the lane tolerance must exceed his own stop distance, or he deadlocks in
+  // the band between "not lined up yet" and "close enough to stop walking"
+  const inX=DOOR0.x+1.05,outX=DOOR0.x-1.05;
+  let hx,hz=lane;
+  if(Math.abs(hd.z-lane)>0.55){                 // off the lane: line up with the door
+    hx=di?Math.min(Math.max(hd.x,inX),DOOR0.x+2.4)
+         :Math.max(Math.min(hd.x,outX),DOOR0.x-2.4);
+  }else hx=di?outX:inX;                         // on the lane: step through
+  const w=worldOf(hx,hz);
+  return [w.x,0,w.z];
 }
 let _dogEatT=0;
 // ---- THE BOND — companionship as accumulated history, never a meter shown.
@@ -1254,6 +1401,25 @@ function updateDog(t,dt){
   if(heroDist<3)BOND.v=Math.min(1,BOND.v+dt*.004);
   BOND.v=Math.max(0,BOND.v-dt*.0004);
   if(BOND._t>1){BOND._t=0;
+    const heroIn=insideShell(hero.x,hero.z),dogIn=insideShell(dd0[0],dd0[2]);
+    // he does not LIVE in there. If you are out on the land and he is indoors,
+    // being with you outweighs the couch — he takes the door and comes out.
+    if(dogIn&&!heroIn){
+      argos.mind.prefs.FOLLOW=Math.max(argos.mind.prefs.FOLLOW||0,1.3);
+      argos.mind.prefs.SLEEP=-.7;argos.mind.prefs.SIT=-.5;argos.mind.prefs.WANDER=-.4;
+      argos.mind.iv.fatigue=Math.min(argos.mind.iv.fatigue||0,.45);
+    }
+    // he ASKS to play: rested, fond of you, and a ball lying about
+    if(!STRIKER.on&&ball.state==='free'&&BOND.v>.25&&(argos.mind.iv.fatigue||0)<.7){
+      const bd2=Math.hypot(ball.p.x-dd0[0],ball.p.z-dd0[2]);
+      if(bd2<34&&heroDist<30)argos.mind.prefs.FETCH=Math.max(argos.mind.prefs.FETCH||0,.7+BOND.v*.8);
+    }
+    // the play bow: near you, idle, ball in your hand — he invites the throw
+    BOND._ask=(BOND._ask||0)+1;
+    if(ball.state==='hero'&&heroDist<7&&BOND._ask>11&&(argos.mind.iv.fatigue||0)<.75){
+      BOND._ask=0;argos.mind.prefs.FETCH=Math.max(argos.mind.prefs.FETCH||0,1.2);
+      chat.line('dog','he drops into a play bow — throw it');buzz('bow',[8,16,8],2000);
+    }
     if(heroDist>6&&!STRIKER.on){
       // the standing pull of the bond — a bias he re-smells every second,
       // stronger for every meal and every returned ball. Never a command:
@@ -1280,7 +1446,7 @@ function updateDog(t,dt){
   if(ball.state==='dog'){
     const m=argos.rig.nodes.muzzle;if(m)ball.p.set(m.world[12],m.world[13]-.04,m.world[14]);
     const home=STRIKER.on?STRIKER.dogGoal:{x:hero.x,z:hero.z};
-    if(Math.hypot(d[0]-home.x,d[2]-home.z)<1.25){
+    if(Math.hypot(d[0]-home.x,d[2]-home.z)<1.85){
       argos.world.carrying=false;ball.state='free';
       const gy=PLACE.heightAt(ball.p.x,ball.p.z);ball.p.y=gy+ball.r;ball.v.set(0,0,0);
       BOND.v=Math.min(1,BOND.v+.06); // he chose to bring it back — that counts
@@ -1299,7 +1465,7 @@ function updateDog(t,dt){
   syncDogVisual();
 }
 function argosReset(){
-  argos.world.dog=[TR.x-2.1,0,TR.z-2.4];
+  seatDog(TR.x-2.1,TR.z-2.4);
   argos.world.carrying=false;argos.world.cue='';
   argos.loco.heading=0;argos.loco.speed=0;argos.loco.desiredSpeed=0;
   if(ball.state==='dog')ball.state='free';
@@ -2697,7 +2863,7 @@ function saveWorld(){
     bowl:{food:bowl.food,meal:bowl.meal},weather:WEATHER.current,
     bond:BOND.v,
     truck:{x:TRUCK.x,z:TRUCK.z,yaw:TRUCK.yaw,hitched:TRUCK.hitched},
-    trailer:{ox:TRAILER.ox,oz:TRAILER.oz},
+    trailer:{ox:TRAILER.ox,oz:TRAILER.oz,yaw:TRAILER.yaw},
     forged:FORGE.structures.map(st=>({id:st.id,code:st.code,anchor:st.anchor})),
     cartridge:INTEGRATION.snapshot()};
   try{localStorage.setItem('hlidarendi.v1',JSON.stringify(rec));readout.textContent='SAVED · THE SITUATION KEEPS';buzz('save',[10,30,10],400);return true}
@@ -2717,7 +2883,7 @@ function restoreWorld(){
     if(typeof rec.bond==='number')BOND.v=clamp(rec.bond,0,1);
     if(rec.trailer&&(rec.trailer.ox||rec.trailer.oz)){
       const oy=rawTerrain(TR0.x+rec.trailer.ox,TR0.z+rec.trailer.oz)-PAD.datum;
-      applyTrailerOffset(rec.trailer.ox,rec.trailer.oz,oy);
+      applyTrailerOffset(rec.trailer.ox,rec.trailer.oz,oy,rec.trailer.yaw||0);
       buildTerrainMesh._keepDress=!!(terrainMesh&&terrainMesh.material.map);
       buildTerrainMesh();
     }
@@ -2764,6 +2930,7 @@ const chat={
       else if(cmd==='ball')r=ball.state==='hero'?(throwBall()?'thrown':'…'):(takeBall()?'you have the ball':'the ball is not at hand');
       else if(cmd==='door')r='door.entry — wall W, plan 72..108, the only way in';
       else if(cmd==='live'){r=null;LIVE.toggle()}
+      else if(cmd==='what'||cmd==='todo'){r=null;tellWhat()}
       else if(cmd==='golf'){GAMES.mode==='golf'?GAMES.end():GAMES.start('golf');r=null}
       else if(cmd==='ctf'){GAMES.mode==='ctf'?GAMES.end():GAMES.start('ctf');r=null}
       else if(cmd==='deed'){const nm=text.slice(6).trim();
@@ -2791,7 +2958,7 @@ const chat={
         else{try{localStorage.setItem('hlidarendi.ai.key',k2)}catch(e){}r='agent line configured — /build speaks to Claude now'}window.__refreshAI?.()}
       else if(WEATHER.presets[cmd])r=WEATHER.set(cmd)?('the sky turns — '+cmd):'…';
       else if(cmd==='forget'){try{localStorage.removeItem('hlidarendi.v1')}catch(e){}r='forgotten — next visit starts fresh'}
-      else if(cmd==='help')r='/build <words> (a tower, a trailer, a truck…) · games: /striker /golf /ctf · /live (quakes + aircraft on this land) · land: /place <name> /goto <lat> <lon> /deed <name> · /ai <key|off> /save /reset /feed /ball /forget · sky: /dawn /day /dusk /night /fog /rain · the RIG: DRIVE (or E), HITCH at the home’s tongue to haul, roll over the ball to stow it, FIRE launches';
+      else if(cmd==='help')r='/what (what there is to do) · /build <words> (a tower, a trailer, a truck…) · games: /striker /golf /ctf · /live (quakes + aircraft on this land) · land: /place <name> /goto <lat> <lon> /deed <name> · /ai <key|off> /save /reset /feed /ball /forget · sky: /dawn /day /dusk /night /fog /rain · the RIG: DRIVE (or E), HITCH at the home’s tongue to haul, roll over the ball to stow it, FIRE launches';
       chat.line('world',r);updateWorldUI();return null;
     }
     let prog=null;
@@ -2808,6 +2975,21 @@ const setLog=v=>{document.body.classList.toggle('log-open',v);$('#sayBtn')?.clas
 const openLog=()=>setLog(true);
 setLog(true);
 chat.line('world','HLIÐARENDI — a body, a dog, a dwelling, a place. Speak, or /help.');
+// WHAT IS THERE TO DO HERE. Not a quest log — a list of the consequential
+// things this world actually supports, in the order they teach each other.
+function tellWhat(){
+  openLog();
+  const lines=[
+    'ARGOS — FEED near him (HAND) or fill the galley bowl; FIRE throws the ball, and he decides whether to fetch. Feeding and returned balls deepen the bond; a deep bond brings him after you across the whole land.',
+    'THE RIG — DRIVE (or E) at the truck. It starts hitched to the home: haul it anywhere, DROP to set it down, and the land levels under the new site.',
+    'BUILD — the 🗲 line forges structures: "a watchtower", "a caravan", "a stone cairn". Say "a red racer rig" at the wheel and the truck itself changes. /ai <key> lets Claude design them.',
+    'THE LAND — ▲ opens the deeds: Gunnar\'s farm, Njáll\'s farm, Þórsmörk. /place <anywhere on earth>, then /deed <name> to keep it.',
+    'GAMES — /striker (the dog plays for himself), /golf (a pin far out), /ctf (he hunts the flag carrier).',
+    'LISTEN — /live shows the real quakes under Iceland and the aircraft overhead. A close tremor shakes the ground and sends him looking for you.'
+  ];
+  chat.line('world','WHAT THERE IS TO DO HERE —');
+  for(const l of lines)chat.line('world','· '+l);
+}
 const on=(sel,fn)=>{const el=$(sel);if(el)el.onclick=fn};
 // ---- THE SHELL — Thunder Rigs' header law: play mode vs menu mode ----------
 // Default is PLAY MODE: a clean screen, just the world and the citizens.
@@ -2954,10 +3136,9 @@ on('#ballBtn',()=>{
     ball.state='rig';buzz('stow',[8,18,8],500); // reach from the cab: the bed takes it
   }
   else if(!takeBall()){
-    // the tap always answers: the ball is his, or it is somewhere to walk to
-    const d=Math.hypot(ball.p.x-locomotion.root.x,ball.p.z-locomotion.root.z);
-    openLog();
-    chat.line('world',ball.state==='dog'?'Argos holds the ball — his choice':'the ball lies '+d.toFixed(1)+' m away — walk to it');
+    // no ball at hand? then a stone. FIRE is never a dead button.
+    throwStone();
+    if(ball.state==='dog')chat.line('world','Argos holds the ball — you throw a stone instead');
   }
   updateWorldUI();
 });
@@ -3013,7 +3194,11 @@ locomotion.root.y=groundYAt(locomotion.root.x,locomotion.root.z);
   TRUCK.hitched=true;truckPlace();
   chat.line('world','the rig stands hitched at the home’s tongue — DRIVE and it all travels');
 }
-restoreWorld();
+const remembered=restoreWorld();
+if(!remembered)setTimeout(()=>{
+  chat.line('world','You are at Hlíðarendi. The rig is hitched to your home; Argos is somewhere about.');
+  chat.line('world','Say /what to see what this place is for — or just walk, and FEED him when you find him.');
+},900);
 updateWorldUI();
 dressWorld().then(t=>{chat.line('world','the living ground answered — '+t+' imagery tiles, ways and buildings · imagery © Esri · ways © OpenStreetMap');})
   .catch(e=>{chat.line('world','the imagery line is closed here — procedural moss stands ('+String(e.message||e).slice(0,40)+')')});
@@ -3026,6 +3211,6 @@ window.HLIDARENDI={
   save:saveWorld,restore:restoreWorld,takeBall,throwBall,feedBowl,placeHero,chat,
   forge:FORGE,build:buildFromWords,striker:STRIKER,goto:gotoPlace,ground:LIVING_GROUND,dress:dressWorld,
   truck:TRUCK,rig:{board:boardTruck,exit:exitTruck,hitch:hitchTrailer,drop:unhitchTrailer,spawn:spawnVehicle},fleet:FLEET,
-  games:GAMES,live:LIVE,bond:BOND,trailerOffset:TRAILER,
+  games:GAMES,live:LIVE,stone:STONE,seatDog,bond:BOND,trailerOffset:TRAILER,
   snapshot:()=>INTEGRATION.snapshot()
 };
