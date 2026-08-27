@@ -176,6 +176,41 @@ places him via `{kind:'actor', species:'argos'}`. The architecture and the
 phased plan for the walking body (possession-based) are in
 [UPSTREAM.md](UPSTREAM.md).
 
+## One ground
+
+`NEVER SOLVE THE SAME PHYSICAL QUESTION TWICE` was written as a law and then
+broken four times over. Everything standing on this hillside — hero, dog,
+rig, home — used to answer *where is the ground* its own way, and the world
+came apart along the seams between those answers. Four faults, each measured
+before and after:
+
+| Fault | Before | After |
+|---|---|---|
+| The levelled pad was read live from a **towed** home, so a 7 m disc of flat ground was dragged across the hillside every frame while the terrain mesh stayed baked where it was | seen ground and felt ground **0.91 m apart** while hauling | **0.000 m**, everywhere |
+| The home's collision frame (`worldOf`) and its rendered frame (`rotation.y`) were **mirror images**; the yaw was stored mirrored so collisions stayed self-consistent — at the cost of the drawn home swinging the wrong way by *twice* the hitch angle | seen home and felt home **5.49 m apart** in a turn | **0.00 m** parked and straight, 0.05 m mid-turn |
+| No fold limit on the tongue and no reaction from the load: reverse swung the cab through 180° and the house came with it | hitch angle **178°** — the trailer on the roof of the cab | capped at **70°**, worst measured 66° |
+| Single-point ground under multi-metre bodies (one sample under a 6 m house), and a four-wheel **average** that sank the chassis into every crest | body corners buried | **0.000 m** penetration, dog · rig · home |
+
+The correction is one module, `CONTACT`, and every body asks it:
+
+- `CONTACT.ground / height / dogHeight` — the land, and the land with the
+  structure over it.
+- `CONTACT.crest(f,x,z,yaw,hl,hw)` — the highest ground a footprint spans,
+  for bodies posed level. Nothing is ever *inside* the hill; the cost is a
+  downhill paw riding light, which is the honest geometry of a level body on
+  a slope.
+- `CONTACT.pose(f,x,z,yaw,hl,hw,tilt)` — `{y,pitch,roll}` for a rigid body:
+  the plane through its contacts, lifted until no contact penetrates.
+- `CONTACT.place(group,pose,…)` — the one order in which a pose is applied.
+
+Two smaller things the same audit turned up: the rig's collision band was cut
+from a single sample under the axle while its body was drawn on four, so a
+wall could pass clean through a rig parked on a rise; and the ball's gravity
+was gated on the ball *already moving*, so a ball at rest hung in the air the
+moment the ground moved out from under it. A world that stops answering the
+instant nothing is happening is exactly what a world with no physics looks
+like.
+
 ## Reading order
 
 The mission sits before the engineering specification. It is not decoration:

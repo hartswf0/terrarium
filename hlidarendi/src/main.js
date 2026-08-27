@@ -72,15 +72,24 @@ function rawTerrain(x,z){
 }
 // the world's vertical datum is FIXED per land (set at boot and at /goto) so
 // hauling the home never re-datums everything standing on the ground.
-const PAD={datum:0};
+// THE PAD IS A PLACE, NOT A PASSENGER. The farmyard is levelled under the
+// home — but the level ground belongs to the SITE, not to the house. Read
+// live from a home under tow, this blend dragged a seven-metre disc of flat
+// ground across the hillside every frame: the terrain MESH is baked once, so
+// the ground you could see and the ground you could stand on drifted apart
+// by metres the moment the rig pulled away, and everything standing near the
+// home — dog, hero, ball, rig — sank through the visible land or floated over
+// it. The pad now belongs to the last site the home was SET DOWN on, and it
+// moves only when the mesh is rebuilt with it. Seen ground and felt ground
+// are the same ground, always.
+const PAD={datum:0,x:TR.x,z:TR.z,h:0};
 function terrainH(x,z){
-  // the farmyard is levelled: blend the real hillside to a flat pad under home
-  const rx=Math.max(0,Math.abs(x-TR.x)-4.0),rz=Math.max(0,Math.abs(z-TR.z)-5.5);
+  const rx=Math.max(0,Math.abs(x-PAD.x)-4.0),rz=Math.max(0,Math.abs(z-PAD.z)-5.5);
   const r=Math.hypot(rx,rz),t=clamp(r/7.0,0,1),mask=t*t*(3-2*t);
-  const pad=rawTerrain(TR.x,TR.z);
-  return pad*(1-mask)+rawTerrain(x,z)*mask - PAD.datum;
+  return PAD.h*(1-mask)+rawTerrain(x,z)*mask - PAD.datum;
 }
-PAD.datum=rawTerrain(TR.x,TR.z);
+function setPad(x,z){PAD.x=x;PAD.z=z;PAD.h=rawTerrain(x,z)}   // call, then rebuild the mesh
+PAD.datum=rawTerrain(TR.x,TR.z);setPad(TR.x,TR.z);
 // STRUCTURE — the element table lives in src/elements.js: ONE authority for the
 // standalone page and the thunder-rigs cartridge alike.
 const DOOR={id:DOOR_PLAN.id,wall:DOOR_PLAN.wall,from:DOOR_PLAN.from,to:DOOR_PLAN.to,
@@ -105,21 +114,32 @@ const TOPS=SOLIDS.filter(s=>s.kind==='step');
 const BLOCKERS=[];                         // world-frame occupancy: OSM, forged builds
 const TR0={x:TR.x,z:TR.z};
 const DOOR0={x:DOOR.x,z0:DOOR.z0,z1:DOOR.z1};
-const TRAILER={ox:0,oz:0,oy:0,yaw:0,cos:1,sin:0,moveBowl:null,pivot:null};
+const TRAILER={ox:0,oz:0,oy:0,yaw:0,cos:1,sin:0,pitch:0,roll:0,moveBowl:null,pivot:null};
+// ONE HANDEDNESS. These transforms and the renderer's own rotation.y must be
+// the SAME rotation — three maps a local +z to (sin y, cos y), so these do too.
+// They used to be each other's mirror, and the frame was made self-consistent
+// by STORING a mirrored yaw: collisions were then right in their own mirrored
+// world while the drawn home swung the opposite way on every turn, by twice
+// the hitch angle. That is what "the trailer jackknifes" looked like, and why
+// the home met walls it was not touching. Seen home and felt home are now the
+// same home at every bearing.
 function homeOf(x,z){                      // world → the home's frame
   const dx=x-TR.x,dz=z-TR.z,c=TRAILER.cos,sn=TRAILER.sin;
-  return{x:TR0.x+dx*c+dz*sn, z:TR0.z-dx*sn+dz*c};
+  return{x:TR0.x+dx*c-dz*sn, z:TR0.z+dx*sn+dz*c};
 }
 function worldOf(hx,hz){                   // the home's frame → world
   const dx=hx-TR0.x,dz=hz-TR0.z,c=TRAILER.cos,sn=TRAILER.sin;
-  return{x:TR.x+dx*c-dz*sn, z:TR.z+dx*sn+dz*c};
+  return{x:TR.x+dx*c+dz*sn, z:TR.z-dx*sn+dz*c};
 }
-function worldDir(hx,hz){const c=TRAILER.cos,sn=TRAILER.sin;return{x:hx*c-hz*sn,z:hx*sn+hz*c}}
-function applyTrailerOffset(ox,oz,oy,yaw){
+function worldDir(hx,hz){const c=TRAILER.cos,sn=TRAILER.sin;return{x:hx*c+hz*sn,z:-hx*sn+hz*c}}
+function applyTrailerOffset(ox,oz,oy,yaw,pitch,roll){
   TRAILER.ox=ox;TRAILER.oz=oz;TRAILER.oy=oy;
   if(yaw!=null){TRAILER.yaw=yaw;TRAILER.cos=Math.cos(yaw);TRAILER.sin=Math.sin(yaw)}
+  TRAILER.pitch=pitch||0;TRAILER.roll=roll||0;   // level on its jacks, leaning on the road
   TR.x=TR0.x+ox;TR.z=TR0.z+oz;
-  if(TRAILER.pivot){TRAILER.pivot.position.set(TR.x,oy,TR.z);TRAILER.pivot.rotation.y=TRAILER.yaw}
+  if(TRAILER.pivot){TRAILER.pivot.position.set(TR.x,oy,TR.z);
+    TRAILER.pivot.rotation.set(0,TRAILER.yaw,0);
+    TRAILER.pivot.rotateX(TRAILER.pitch);TRAILER.pivot.rotateZ(TRAILER.roll)}
   const dm=worldOf(DOOR0.x,(DOOR0.z0+DOOR0.z1)/2),half=(DOOR0.z1-DOOR0.z0)/2;
   DOOR.x=dm.x;DOOR.z0=dm.z-half;DOOR.z1=dm.z+half;   // world convenience for radius checks
   if(TRAILER.moveBowl)TRAILER.moveBowl();
@@ -221,6 +241,53 @@ const PLACE={
   }
 };
 WORLD_BRIDGE.setPlace(PLACE);
+// ══ CONTACT — ONE GROUND, ASKED ONCE ═════════════════════════════════════
+// NEVER SOLVE THE SAME PHYSICAL QUESTION TWICE. Four bodies stand on this
+// hillside — hero, dog, rig, home — and each of them used to answer "where is
+// the ground" in its own way: a centre sample here, a four-wheel average
+// there, one single point under a six-metre house. Four answers to one
+// question is precisely what "everything goes through the ground" feels
+// like. There is one module now, and every body asks it.
+//
+// A BODY HAS EXTENT. One sample under the centre buries whatever half of the
+// body is uphill, and an AVERAGE of four samples sinks the middle of the
+// chassis into every crest it crosses. So a body poses against its own
+// FOOTPRINT: the plane through its contacts gives pitch and roll, then the
+// whole plane is lifted until NO contact is under the land. Nothing is ever
+// inside the hill. The cost is a downhill wheel or paw riding light on steep
+// ground, which is the honest geometry of a rigid body on a slope.
+const CONTACT={
+  ground(x,z){return terrainH(x,z)},                  // bare land
+  height(x,z){return PLACE.ground.heightAt(x,z)},     // land, or the structure over it
+  dogHeight(x,z){return PLACE.ground.heightAtDog(x,z)},
+  // highest ground the footprint spans — for bodies posed level (a dog, a home on jacks)
+  crest(f,x,z,yaw,hl,hw){
+    const dx=Math.sin(yaw),dz=Math.cos(yaw),sx=Math.cos(yaw),sz=-Math.sin(yaw);
+    return Math.max(f(x,z),
+      f(x+dx*hl,z+dz*hl),f(x-dx*hl,z-dz*hl),
+      f(x+sx*hw,z+sz*hw),f(x-sx*hw,z-sz*hw));
+  },
+  // pose a rigid body of half-length hl, half-width hw: {y,pitch,roll}, where
+  // y is the height at which no contact penetrates. tilt damps the lean.
+  pose(f,x,z,yaw,hl,hw,tilt){
+    const dx=Math.sin(yaw),dz=Math.cos(yaw),sx=Math.cos(yaw),sz=-Math.sin(yaw);
+    const hF=f(x+dx*hl,z+dz*hl),hB=f(x-dx*hl,z-dz*hl);
+    const hL=f(x+sx*hw,z+sz*hw),hR=f(x-sx*hw,z-sz*hw);
+    const k=tilt==null?.85:tilt;
+    // local +z is the nose, local +x the L sample: rotateX lowers the nose by
+    // hl·sin(pitch), rotateZ raises the L side by hw·sin(roll)
+    const pitch=Math.atan2(hB-hF,2*hl)*k, roll=Math.atan2(hL-hR,2*hw)*k;
+    const oF=-Math.sin(pitch)*hl,oB=Math.sin(pitch)*hl,oL=Math.sin(roll)*hw,oR=-Math.sin(roll)*hw;
+    const y=Math.max(f(x,z),hF-oF,hB-oB,hL-oL,hR-oR);
+    return{y,pitch,roll};
+  },
+  // apply a pose to a three.js group in the one order every body uses
+  place(g,p,x,z,yaw,lift){
+    g.position.set(x,p.y+(lift||0),z);
+    g.rotation.set(0,yaw,0);
+    g.rotateX(p.pitch);g.rotateZ(p.roll);
+  }
+};
 // ---- terrain + structure views (meshes are views of world state, not authorities)
 const worldGroup=new THREE.Group();scene.add(worldGroup);
 let terrainMesh=null;
@@ -821,12 +888,7 @@ function makeTruckBody(color,form){
 const FLEET=[];
 const RIG_COLORS=[0x2d6f8e,0x596650,0x8e2d3c,0xd29a3a,0x4a4f55];
 function poseFleetRig(r){
-  const dirx=Math.sin(r.yaw),dirz=Math.cos(r.yaw),sx=Math.cos(r.yaw),sz=-Math.sin(r.yaw);
-  const hF=terrainH(r.x+dirx*1.5,r.z+dirz*1.5),hB=terrainH(r.x-dirx*1.5,r.z-dirz*1.5);
-  const hL=terrainH(r.x+sx*.95,r.z+sz*.95),hR=terrainH(r.x-sx*.95,r.z-sz*.95);
-  r.group.position.set(r.x,(hF+hB+hL+hR)/4,r.z);
-  r.group.rotation.set(0,r.yaw,0);
-  r.group.rotateX(Math.atan2(hB-hF,3.0)*.85);r.group.rotateZ(Math.atan2(hR-hL,1.9)*.85);
+  CONTACT.place(r.group,CONTACT.pose(CONTACT.ground,r.x,r.z,r.yaw,1.5,.95),r.x,r.z,r.yaw);
 }
 // words shape the machine, like the HELLO line shapes the rig in the
 // standing world: color words paint it, form words rebuild it
@@ -875,16 +937,13 @@ function adoptRig(f){ // exchange bodies: the fleet rig becomes THE rig, the old
   poseFleetRig(f);
 }
 function truckPlace(){
-  // the rig sits ON the hill, not level above it: four wheel samples give
-  // the pose, so climbing reads as climbing and the drop reads as the drop
-  const dirx=Math.sin(TRUCK.yaw),dirz=Math.cos(TRUCK.yaw);
-  const sx=Math.cos(TRUCK.yaw),sz=-Math.sin(TRUCK.yaw);
-  const hF=terrainH(TRUCK.x+dirx*1.5,TRUCK.z+dirz*1.5),hB=terrainH(TRUCK.x-dirx*1.5,TRUCK.z-dirz*1.5);
-  const hL=terrainH(TRUCK.x+sx*.95,TRUCK.z+sz*.95),hR=terrainH(TRUCK.x-sx*.95,TRUCK.z-sz*.95);
-  TRUCK.group.position.set(TRUCK.x,(hF+hB+hL+hR)/4+(TRUCK.airY||0),TRUCK.z);
-  TRUCK.group.rotation.set(0,TRUCK.yaw,0);
-  TRUCK.group.rotateX(Math.atan2(hB-hF,3.0)*.85);
-  TRUCK.group.rotateZ(Math.atan2(hR-hL,1.9)*.85);
+  // the rig sits ON the hill, not level above it and not sunk into it: the
+  // four wheels give the pose, and TRUCK.y is the ground it actually stands
+  // on — the same number the collision band is cut from, so the rig can no
+  // longer be shoved through a wall it is visually above.
+  const p=CONTACT.pose(CONTACT.ground,TRUCK.x,TRUCK.z,TRUCK.yaw,1.5,.95);
+  TRUCK.y=p.y;TRUCK.pitch=p.pitch;TRUCK.roll=p.roll;
+  CONTACT.place(TRUCK.group,p,TRUCK.x,TRUCK.z,TRUCK.yaw,TRUCK.airY||0);
 }
 function truckRear(){const dx=Math.sin(TRUCK.yaw),dz=Math.cos(TRUCK.yaw);return{x:TRUCK.x-dx*2.9,z:TRUCK.z-dz*2.9}}
 function truckJump(){
@@ -931,10 +990,10 @@ function unhitchTrailer(){
   if(!TRUCK.hitched)return;
   TRUCK.hitched=false;
   // the pad levels itself under the new site; the dressing stays
+  setPad(TR.x,TR.z);                       // the site levels — pad, mesh and queries together
   buildTerrainMesh._keepDress=!!(terrainMesh&&terrainMesh.material.map);
   buildTerrainMesh();
-  const oy=rawTerrain(TR.x,TR.z)-PAD.datum;
-  applyTrailerOffset(TRAILER.ox,TRAILER.oz,oy);
+  applyTrailerOffset(TRAILER.ox,TRAILER.oz,terrainH(TR.x,TR.z));
   buzz('unhitch',[10,24,10],500);
   chat.line('world','the home stands here now — the land levels under it');
 }
@@ -979,7 +1038,10 @@ function truckStep(dt){
   else if(Math.hypot(TRUCK.vel.x,TRUCK.vel.z)>0.5)TRUCK.yaw+=normAngle(Math.atan2(TRUCK.vel.x,TRUCK.vel.z)-TRUCK.yaw)*Math.min(1,10*dt);
   // integrate; walls answer with a bounce
   const v=new THREE.Vector3(TRUCK.x+TRUCK.vel.x*dt,0,TRUCK.z+TRUCK.vel.z*dt);
-  const gy=terrainH(v.x,v.z);const hitI={hit:false};
+  // the band is cut from the rig's OWN contact height, footprint and all —
+  // one sample under the axle let a wall pass clean through a rig parked on a
+  // rise, because the wall's box and the rig's ground disagreed by a metre
+  const gy=CONTACT.pose(CONTACT.ground,v.x,v.z,TRUCK.yaw,1.5,.95).y;const hitI={hit:false};
   TOW.skip=TRUCK.hitched;
   PLACE.pushOutCircle(v,1.15,gy+.25,gy+1.7,hitI);
   TOW.skip=false;
@@ -1008,11 +1070,6 @@ function truckStep(dt){
   TRUCK.wheels[0].pivot.rotation.y=TRUCK.wheels[1].pivot.rotation.y=TRUCK.steerVis;
   for(const w of TRUCK.wheels)w.mesh.rotation.x+=TRUCK.speed*dt/.44;
   if(explorer.boostHold&&TRUCK.speed>8)buzz('rigboost',6,500);
-  truckPlace();
-  // the driver IS the root: camera, dog, labels, striker all read this
-  placeHero(TRUCK.x,TRUCK.z,TRUCK.yaw);
-  locomotion.heading=TRUCK.yaw;locomotion.headingGoal=TRUCK.yaw;
-  explorer.speed=Math.abs(TRUCK.speed);
   if(TRUCK.hitched){
     // A REAL TOW, not a shove: the tongue is inextensible, so the home's centre
     // trails the hitch at a fixed length and its nose always points AT the
@@ -1021,9 +1078,38 @@ function truckStep(dt){
     const h=truckRear(),L=3.05;
     let dx=h.x-TR.x,dz=h.z-TR.z,d=Math.hypot(dx,dz);
     if(d<1e-4){dx=Math.sin(TRUCK.yaw);dz=Math.cos(TRUCK.yaw);d=1}
-    const cx=h.x-dx/d*L,cz=h.z-dz/d*L;
-    applyTrailerOffset(cx-TR0.x,cz-TR0.z,rawTerrain(cx,cz)-PAD.datum,Math.atan2(dx,-dz));
+    // THE TONGUE HAS A LIMIT. A pursuit curve alone cannot jackknife going
+    // forward — but nothing in this world made the rig go forward. Push the
+    // stick back and the car law swings the nose through 180°, the tongue
+    // folds all the way onto the cab, and that IS the jackknife. A real
+    // coupling stops at the fender.
+    let psi=Math.atan2(dx,dz);                       // the home points at the hitch
+    let theta=normAngle(psi-TRUCK.yaw);
+    const LIM=1.22;                                  // 70° — steel meets steel
+    let folded=0;
+    if(theta>LIM){folded=theta-LIM;psi=TRUCK.yaw+LIM;theta=LIM}
+    else if(theta<-LIM){folded=-LIM-theta;psi=TRUCK.yaw-LIM;theta=-LIM}
+    const cx=h.x-Math.sin(psi)*L,cz=h.z-Math.cos(psi)*L;
+    // THE LOAD PUSHES BACK. Six tonnes of house behind the axle is not
+    // scenery: the further the tongue folds the harder it drags the nose
+    // straight and the more speed it eats. Towing should feel like towing.
+    const bite=Math.abs(theta)/LIM;
+    TRUCK.yaw+=normAngle(psi-TRUCK.yaw)*Math.min(.5,dt*(2.2*bite+9*folded));
+    TRUCK.vel.multiplyScalar(Math.exp(-dt*(.35+2.6*bite*bite)));
+    TRUCK.speed=Math.hypot(TRUCK.vel.x,TRUCK.vel.z);
+    if(folded>.05&&TRUCK.speed>4)buzz('fold',[9,16,8],420);
+    // the home rides the ground it is on, over its whole six metres, and
+    // leans with the hill while it rolls — the jacks level it when it lands
+    const tyaw=psi-Math.PI;                          // stored yaw: the home's tongue is its local -z
+    const hp=CONTACT.pose(CONTACT.ground,cx,cz,tyaw,2.9,1.23,.5);
+    applyTrailerOffset(cx-TR0.x,cz-TR0.z,hp.y,tyaw,hp.pitch,hp.roll);
   }
+  // the load has had its say before anything is drawn or followed: pose, then
+  // the driver IS the root — camera, dog, labels and striker all read this
+  truckPlace();
+  placeHero(TRUCK.x,TRUCK.z,TRUCK.yaw);
+  locomotion.heading=TRUCK.yaw;locomotion.headingGoal=TRUCK.yaw;
+  explorer.speed=Math.abs(TRUCK.speed);
 }
 // ---- LOCATIONS — call on the world landscape. Fetches the same public
 // terrarium elevation tiles the bake used; where the network is closed
@@ -1053,7 +1139,7 @@ async function gotoPlace(lat,lon){
   // in the yard, the ball at your feet — and a mind fresh for the new land
   if(TRUCK.hitched)TRUCK.hitched=false;
   applyTrailerOffset(0,0,0,0);
-  PAD.datum=rawTerrain(TR.x,TR.z);
+  PAD.datum=rawTerrain(TR.x,TR.z);setPad(TR.x,TR.z);
   buildTerrainMesh();
   dressWorld().then(t=>chat.line('world','dressed — '+t+' tiles · © Esri · © OpenStreetMap')).catch(()=>{});
   placeHero(0,0,locomotion.heading);
@@ -1127,7 +1213,12 @@ foodMesh.position.copy(bowl.p).y+=.035;foodMesh.visible=false;scene.add(foodMesh
 const _pushInfo={x:0,z:0,hit:false,id:''};
 function stepBall(dt){
   if(ball.state==='hero'){rig.mesh.updateMatrixWorld(true);ball.p.copy(rig.by.rightHand.getWorldPosition(new THREE.Vector3()));ball.v.set(0,0,0)}
-  else if(ball.state==='free'&&ball.v.lengthSq()>1e-6){
+  else if(ball.state==='free'&&(ball.v.lengthSq()>1e-6||ball.p.y>PLACE.heightAt(ball.p.x,ball.p.z)+ball.r+1e-3)){
+    // A BALL AT REST IS ONLY AT REST ON THE GROUND. Gating gravity on "already
+    // moving" left a ball hanging in the air the instant the ground moved out
+    // from under it, or wherever it was set down above the land — the world
+    // quietly stopping the moment nothing was happening is exactly what a
+    // world with no physics looks like. Now the ground is asked either way.
     const N=4,h=dt/N;
     for(let i=0;i<N;i++){
       ball.v.y-=9.8*h;ball.p.addScaledVector(ball.v,h);
@@ -1138,6 +1229,7 @@ function stepBall(dt){
         if(Math.abs(ball.v.y)<.35&&ball.v.lengthSq()<.02){ball.v.set(0,0,0);break}}
     }
   }
+  else if(ball.state==='free'){ball.p.y=PLACE.heightAt(ball.p.x,ball.p.z)+ball.r}  // settled: it rides the ground
   ballMesh.position.copy(ball.p);
   foodMesh.visible=bowl.food;
 }
@@ -1251,7 +1343,7 @@ argos.world.dog=DOG_SPAWN.slice();
 // him on the ground, or he has no contact to earn traction from.
 function seatDog(x,z){
   const d=argos.world.dog;
-  d[0]=x;d[2]=z;d[1]=PLACE.ground.heightAtDog(x,z);
+  d[0]=x;d[2]=z;d[1]=CONTACT.crest(CONTACT.dogHeight,x,z,(argos.loco&&argos.loco.heading)||0,.52,.26);
   argos.loco.speed=0;argos.loco.desiredSpeed=0;
 }
 argos.world.human=[0,0,0];
@@ -1266,11 +1358,7 @@ argos.world.human=[0,0,0];
 // little light on the downhill side, which is what a real dog looks like.
 argos.setTerrain(()=>{
   const d=argos.world.dog,hd=(argos.loco&&argos.loco.heading)||0;
-  const fx=Math.sin(hd)*.52,fz=Math.cos(hd)*.52;      // nose/tail
-  const sx=Math.cos(hd)*.26,sz=-Math.sin(hd)*.26;     // flanks
-  const g=PLACE.ground.heightAtDog;
-  const hi=Math.max(g(d[0],d[2]),g(d[0]+fx,d[2]+fz),g(d[0]-fx,d[2]-fz),
-                      g(d[0]+sx,d[2]+sz),g(d[0]-sx,d[2]-sz));
+  const hi=CONTACT.crest(CONTACT.dogHeight,d[0],d[2],hd,.52,.26);
   // The centre alone buries his uphill half. Standing on the crest of his own
   // footprint means NO part of him is ever inside the land — the cost is a
   // downhill paw riding light on steep ground, which is the honest geometry of
@@ -2882,6 +2970,7 @@ function restoreWorld(){
     if(rec.weather)WEATHER.set(rec.weather);
     if(typeof rec.bond==='number')BOND.v=clamp(rec.bond,0,1);
     if(rec.trailer&&(rec.trailer.ox||rec.trailer.oz)){
+      setPad(TR0.x+rec.trailer.ox,TR0.z+rec.trailer.oz);
       const oy=rawTerrain(TR0.x+rec.trailer.ox,TR0.z+rec.trailer.oz)-PAD.datum;
       applyTrailerOffset(rec.trailer.ox,rec.trailer.oz,oy,rec.trailer.yaw||0);
       buildTerrainMesh._keepDress=!!(terrainMesh&&terrainMesh.material.map);
@@ -3204,7 +3293,7 @@ dressWorld().then(t=>{chat.line('world','the living ground answered — '+t+' im
   .catch(e=>{chat.line('world','the imagery line is closed here — procedural moss stands ('+String(e.message||e).slice(0,40)+')')});
 window.HLIDARENDI={
   place:PLACE,structure:PLACE.structure,door:DOOR,weather:WEATHER,
-  view:{camera,controls},
+  view:{camera,controls,scene},contact:CONTACT,
   actors:{hero:HERO_ACTOR,dog:ARGOS_ACTOR},argos,
   props:{ball,bowl},
   integration:INTEGRATION,
@@ -3212,5 +3301,6 @@ window.HLIDARENDI={
   forge:FORGE,build:buildFromWords,striker:STRIKER,goto:gotoPlace,ground:LIVING_GROUND,dress:dressWorld,
   truck:TRUCK,rig:{board:boardTruck,exit:exitTruck,hitch:hitchTrailer,drop:unhitchTrailer,spawn:spawnVehicle},fleet:FLEET,
   games:GAMES,live:LIVE,stone:STONE,seatDog,bond:BOND,trailerOffset:TRAILER,
+  homeOf,worldOf,
   snapshot:()=>INTEGRATION.snapshot()
 };
