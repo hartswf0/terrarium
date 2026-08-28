@@ -72,23 +72,46 @@ function rawTerrain(x,z){
 }
 // the world's vertical datum is FIXED per land (set at boot and at /goto) so
 // hauling the home never re-datums everything standing on the ground.
-// THE PAD IS A PLACE, NOT A PASSENGER. The farmyard is levelled under the
-// home — but the level ground belongs to the SITE, not to the house. Read
-// live from a home under tow, this blend dragged a seven-metre disc of flat
-// ground across the hillside every frame: the terrain MESH is baked once, so
-// the ground you could see and the ground you could stand on drifted apart
-// by metres the moment the rig pulled away, and everything standing near the
-// home — dog, hero, ball, rig — sank through the visible land or floated over
-// it. The pad now belongs to the last site the home was SET DOWN on, and it
-// moves only when the mesh is rebuilt with it. Seen ground and felt ground
-// are the same ground, always.
+// THE GROUND IS ONE ARRAY, AND THE MESH IS ITS VIEW.
+//
+// The land you SEE is a triangle mesh. If the land you STAND on is a different
+// function — a finer grid, a smoother interpolation, a pad blended live under
+// a moving home — then the two disagree between the places they were checked,
+// and a body standing on one is inside the other. On a hillside cut by gullies
+// that gap is metres, and it is why a dog walking a hollow disappears into the
+// drawn ground while every vertex-by-vertex test says the world is fine.
+//
+// So: ONE array, GROUND — the real hillside with the farmyard's levelled pad
+// already baked into it — and ONE interpolation rule, the very triangles the
+// renderer draws. The mesh is not an approximation of the ground; it IS the
+// ground, and terrainH() reads the same triangle the eye is looking at.
+// THE PAD IS A PLACE, NOT A PASSENGER: it belongs to the site the home was
+// last set DOWN on, and it is re-baked with the mesh when the home lands.
 const PAD={datum:0,x:TR.x,z:TR.z,h:0};
-function terrainH(x,z){
-  const rx=Math.max(0,Math.abs(x-PAD.x)-4.0),rz=Math.max(0,Math.abs(z-PAD.z)-5.5);
-  const r=Math.hypot(rx,rz),t=clamp(r/7.0,0,1),mask=t*t*(3-2*t);
-  return PAD.h*(1-mask)+rawTerrain(x,z)*mask - PAD.datum;
+let GROUND=null;
+function bakeGround(){
+  const n=TERRAIN.n,res=TERRAIN.res;
+  if(!GROUND||GROUND.length!==n*n)GROUND=new Float32Array(n*n);
+  for(let j=0;j<n;j++){
+    const z=(j-TERRAIN.cy)*res, rz=Math.max(0,Math.abs(z-PAD.z)-6.5);
+    for(let i=0;i<n;i++){
+      const x=(i-TERRAIN.cx)*res, rx=Math.max(0,Math.abs(x-PAD.x)-5.0);
+      const r=Math.hypot(rx,rz),t=clamp(r/8.0,0,1),mask=t*t*(3-2*t);
+      GROUND[j*n+i]=PAD.h*(1-mask)+TG[j*n+i]*mask-PAD.datum;
+    }
+  }
 }
-function setPad(x,z){PAD.x=x;PAD.z=z;PAD.h=rawTerrain(x,z)}   // call, then rebuild the mesh
+// three's PlaneGeometry splits every quad on the diagonal from (i,j+1) to
+// (i+1,j). Reading the SAME triangle is what makes seen and felt identical.
+function terrainH(x,z){
+  const n=TERRAIN.n;
+  const gi=clamp(TERRAIN.cx+x/TERRAIN.res,0,n-1.0001),gj=clamp(TERRAIN.cy+z/TERRAIN.res,0,n-1.0001);
+  const i0=Math.floor(gi),j0=Math.floor(gj),fx=gi-i0,fz=gj-j0;
+  const h00=GROUND[j0*n+i0],h10=GROUND[j0*n+i0+1],h01=GROUND[(j0+1)*n+i0],h11=GROUND[(j0+1)*n+i0+1];
+  return fx+fz<=1 ? h00+fx*(h10-h00)+fz*(h01-h00)
+                  : h11+(1-fx)*(h01-h11)+(1-fz)*(h10-h11);
+}
+function setPad(x,z){PAD.x=x;PAD.z=z;PAD.h=rawTerrain(x,z);bakeGround()}
 PAD.datum=rawTerrain(TR.x,TR.z);setPad(TR.x,TR.z);
 // STRUCTURE — the element table lives in src/elements.js: ONE authority for the
 // standalone page and the thunder-rigs cartridge alike.
@@ -159,7 +182,9 @@ const PLACE={
   ground:{
     heightAt(x,z){const s=structSurface(x,z);return s!=null?s:terrainH(x,z)},
     heightAtDog(x,z){const s=structSurface(x,z,true);return s!=null?s:terrainH(x,z)},
-    normalAt(x,z){const d=.14,h=this.heightAt,dx=(h(x+d,z)-h(x-d,z))/(2*d),dz=(h(x,z+d)-h(x,z-d))/(2*d),l=Math.hypot(dx,1,dz);return[-dx/l,1/l,-dz/l]}
+    // wide enough to cross a facet: a normal read inside one triangle is a
+    // step function, and a rig climbing on it would twitch at every edge
+    normalAt(x,z){const d=1.1,h=this.heightAt,dx=(h(x+d,z)-h(x-d,z))/(2*d),dz=(h(x,z+d)-h(x,z-d))/(2*d),l=Math.hypot(dx,1,dz);return[-dx/l,1/l,-dz/l]}
   },
   heightAt(x,z){return this.ground.heightAt(x,z)},
   surfaceAt(x,z){return{y:this.ground.heightAt(x,z),normal:this.ground.normalAt(x,z)}},
@@ -294,14 +319,20 @@ let terrainMesh=null;
 function buildTerrainMesh(){
   let keepMap=null;
   if(terrainMesh){keepMap=terrainMesh.material.map||null;worldGroup.remove(terrainMesh);terrainMesh.geometry.dispose();terrainMesh.material.dispose()}
-  const SZ=TERRAIN.n*TERRAIN.res*0.96,N=150,g=new THREE.PlaneGeometry(SZ,SZ,N,N);g.rotateX(-Math.PI/2);
-  const cxOff=(TERRAIN.n/2-TERRAIN.cx)*TERRAIN.res,czOff=(TERRAIN.n/2-TERRAIN.cy)*TERRAIN.res;
+  // ONE VERTEX PER HEIGHT. The plane's grid is the ground's grid — vertex
+  // (ix,iy) lands exactly on node (ix,iy) — so the drawn surface is the same
+  // piecewise-linear field terrainH() reads. Nothing is resampled, nothing
+  // is approximated, and nothing can walk between the two.
+  const NG=TERRAIN.n,N=NG-1,SZ=N*TERRAIN.res,g=new THREE.PlaneGeometry(SZ,SZ,N,N);g.rotateX(-Math.PI/2);
+  const cxOff=SZ/2-TERRAIN.cx*TERRAIN.res,czOff=SZ/2-TERRAIN.cy*TERRAIN.res;
   g.translate(cxOff,0,czOff);
   const pos=g.attributes.position,col=[];
   const jit=(x,z)=>{const v=Math.sin(x*12.9898+z*78.233)*43758.5453;return v-Math.floor(v)};
+  const at=(i,j)=>GROUND[clamp(j,0,NG-1)*NG+clamp(i,0,NG-1)];
   for(let i=0;i<pos.count;i++){
-    const x=pos.getX(i),z=pos.getZ(i),h=terrainH(x,z);pos.setY(i,h);
-    const d=2.4,sl=Math.hypot(terrainH(x+d,z)-terrainH(x-d,z),terrainH(x,z+d)-terrainH(x,z-d))/(2*d);
+    const ix=i%NG,iy=(i/NG)|0;
+    const x=pos.getX(i),z=pos.getZ(i),h=at(ix,iy);pos.setY(i,h);
+    const d=TERRAIN.res,sl=Math.hypot(at(ix+1,iy)-at(ix-1,iy),at(ix,iy+1)-at(ix,iy-1))/(2*d);
     const n=jit(x,z)*.05-.025;
     let r,gr,b;
     if(h<-46){r=.46;gr=.44;b=.39}                                   // Markarfljót outwash plain
@@ -530,19 +561,181 @@ function standinFor(prompt){
   if(/light|lamp|fire|beacon|star/.test(p))return 'beacon';
   return 'cairn';
 }
+// ══ THE AGENT LINE — one place the world talks to a model ════════════════
+// A key typed into a chat command is not a setting, and a model that can only
+// forge a cairn is not an agent. AI is the single seam: where the line goes,
+// which dialect it speaks, which model answers — and every call in the page
+// goes through AI.ask, so there is exactly one thing to configure and one
+// thing to blame when it fails.
+const AI={
+  key:'',model:'claude-opus-5',base:'https://api.anthropic.com/v1/messages',dialect:'anthropic',
+  load(){
+    try{
+      const raw=localStorage.getItem('hlidarendi.ai');
+      if(raw)Object.assign(this,JSON.parse(raw));
+      else{const k=localStorage.getItem('hlidarendi.ai.key');if(k)this.key=k}  // the old one-line key
+    }catch(e){}
+    if(!this.base)this.base='https://api.anthropic.com/v1/messages';
+    if(!this.model)this.model='claude-opus-5';
+    return this;
+  },
+  save(){try{localStorage.setItem('hlidarendi.ai',JSON.stringify(
+    {key:this.key,model:this.model,base:this.base,dialect:this.dialect}));
+    localStorage.removeItem('hlidarendi.ai.key')}catch(e){}return this},
+  // DISCONNECT means disconnected: a custom endpoint counts as a line whether
+  // or not a key was typed, so clearing the key alone would leave it open
+  off(){this.key='';this.base='https://api.anthropic.com/v1/messages';this.dialect='anthropic';
+    try{localStorage.removeItem('hlidarendi.ai');localStorage.removeItem('hlidarendi.ai.key')}catch(e){}},
+  // a proxy may hold the key itself, so a custom endpoint counts as connected
+  on(){return !!this.key||(this.dialect!=='anthropic'&&!!this.base)},
+  headers(){
+    const h={'content-type':'application/json'};
+    if(this.dialect==='openai'){if(this.key)h['authorization']='Bearer '+this.key}
+    else{if(this.key)h['x-api-key']=this.key;h['anthropic-version']='2023-06-01';
+      if(this.dialect==='anthropic')h['anthropic-dangerous-direct-browser-access']='true'}
+    return h;
+  },
+  body(system,user,maxTok){
+    if(this.dialect==='openai')return{model:this.model,max_tokens:maxTok,
+      messages:[{role:'system',content:system},{role:'user',content:user}]};
+    return{model:this.model,max_tokens:maxTok,system,messages:[{role:'user',content:user}]};
+  },
+  // both shapes come home as plain text: an Anthropic content array or an
+  // OpenAI choice. A gateway that answers either one works here unchanged.
+  text(j){
+    if(Array.isArray(j?.content))return j.content.filter(b=>b.type==='text').map(b=>b.text).join('\n');
+    const c=j?.choices?.[0]?.message?.content;
+    if(typeof c==='string')return c;
+    if(Array.isArray(c))return c.map(b=>b.text||'').join('\n');
+    return '';
+  },
+  async ask(system,user,maxTok){
+    if(!this.on())throw new Error('no agent line — open AI and connect one');
+    let r;
+    try{r=await fetch(this.base,{method:'POST',headers:this.headers(),body:JSON.stringify(this.body(system,user,maxTok||1500))})}
+    catch(e){throw new Error('the line did not open (network or CORS) — '+String(e.message||e).slice(0,80))}
+    if(!r.ok){
+      let d='';try{d=(await r.text()).slice(0,180)}catch(e){}
+      throw new Error('HTTP '+r.status+(d?' — '+d:''));
+    }
+    const t=this.text(await r.json());
+    if(!t)throw new Error('the model answered with nothing this page could read');
+    return t;
+  },
+  async test(){
+    const t=await this.ask('Reply with exactly: HLIDARENDI','say the word',32);
+    return t.trim().slice(0,60);
+  }
+}.load();
 const FORGE_SYS='You are a structure builder for HLIDARENDI, a small standing world. Reply with ONLY one JavaScript function, no fences, no prose:\nfunction build(w, WG, THREE){ ... return w; }\nOne focal structure at the origin. Vocabulary: WG.box(w,h,d,mat) WG.cyl(r,h,mat) WG.cone(r,h,mat) WG.sphere(r,mat) WG.torus(r,t,mat); materials WG.flat(hex,{rough,metal}) WG.matte(hex,rough) WG.lit(hex,intensity); WG.put(mesh,x,y,z,ry) places (y=0 is the ground); WG.solid(mesh,w,h,d) makes it collide; WG.rand(seed) for randomness. Under 60 meshes; every part within 12 units of the origin; scale in metres (a person is 1.7 tall).\nIf asked for a DWELLING (trailer, caravan, cabin, hut, shed): build it hollow and enterable — a raised floor about 0.4 high, four walls about 2.2 tall with a GAP at least 0.9 wide left in one wall for a door, a roof, and a step outside the gap. Make the walls thin (0.12-0.16) and WG.solid only the walls, floor and step, never the doorway.';
 async function askForgeAI(prompt){
-  let key=null;try{key=localStorage.getItem('hlidarendi.ai.key')}catch(e){}
-  if(!key)return null;
-  const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
-    headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-    body:JSON.stringify({model:'claude-opus-5',max_tokens:3000,system:FORGE_SYS,
-      messages:[{role:'user',content:'Design for: "'+String(prompt).slice(0,200)+'"'}]})});
-  if(!r.ok)throw new Error('AI '+r.status);
-  const j=await r.json();
-  const text=(j.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
+  if(!AI.on())return null;
+  const text=await AI.ask(FORGE_SYS,'Design for: "'+String(prompt).slice(0,200)+'"',3000);
   const m=text.match(/function\s+build\s*\([\s\S]*\}/);
   return m?m[0]:null;
+}
+// ── THE WORLD AGENT ───────────────────────────────────────────────────────
+// The forge only ever made statues. An agent that can see this world and act
+// in it does so through the SAME doors a person uses — the slash commands and
+// buttons that already exist — so it can do nothing you could not do yourself,
+// and every one of its acts is a line in the log you can read afterwards.
+const AGENT_ACTS={
+  say:{n:'say',d:'a line spoken into the world log'},
+  dog:{n:'dog',d:'words spoken TO ARGOS — he decides for himself whether to heed them'},
+  build:{n:'build',d:'forge a structure or a rig from words, on the land ahead'},
+  weather:{n:'weather',d:'dawn|day|dusk|night|fog|rain'},
+  place:{n:'place',d:'travel: a place name anywhere on earth'},
+  goto:{n:'goto',d:'travel: "lat lon"'},
+  game:{n:'game',d:'striker|golf|ctf'},
+  feed:{n:'feed',d:'fill the bowl, or hand-feed him if he is close'},
+  ball:{n:'ball',d:'take or throw the ball'},
+  stone:{n:'stone',d:'throw a stone'},
+  hitch:{n:'hitch',d:'couple the rig to the home'},
+  drop:{n:'drop',d:'set the home down here'},
+  live:{n:'live',d:'read the live conditions on this land'},
+  deed:{n:'deed',d:'keep a deed to this land under a name'}
+};
+function agentSystem(){
+  const acts=Object.values(AGENT_ACTS).map(a=>a.n+' — '+a.d).join('\n');
+  return 'You are the standing world of HLIÐARENDI, in Fljótshlíð, Iceland: a body (the walker), '+
+  'a dog (ARGOS, who has his own mind and is never commanded, only spoken to), a dwelling (the Ingold '+
+  'trailer, which can be hitched to a rig and hauled), and a place (real baked elevation, real imagery, '+
+  'real quakes and aircraft overhead).\n'+
+  'A human sentence reaches you as EVIDENCE about what they want, never as a command over the dog.\n'+
+  'Reply with ONLY a JSON object, no fences, no prose outside it:\n'+
+  '{"line":"one or two sentences in the world\'s voice — plain, concrete, never chirpy",'+
+  '"do":[{"a":"<action>","p":"<argument>"}]}\n'+
+  'Actions:\n'+acts+'\n'+
+  'Use at most three actions. Use none at all if the sentence only wants an answer — the line alone is '+
+  'a fine reply. Never invent an action name. Never claim to have done something you did not put in "do".';
+}
+function agentWorldState(){
+  const d=argos.world.dog,r=locomotion.root,iv=argos.mind.iv||{};
+  const geo=TERRAIN.geo?TERRAIN.geo.lat.toFixed(4)+', '+TERRAIN.geo.lon.toFixed(4):'Hlíðarendi (baked)';
+  return JSON.stringify({
+    land:geo, sky:WEATHER.current||'day',
+    walker:{at:[+r.x.toFixed(1),+r.z.toFixed(1)],driving:!!TRUCK.on},
+    rig:{at:[+TRUCK.x.toFixed(1),+TRUCK.z.toFixed(1)],hitched:!!TRUCK.hitched},
+    home:{at:[+TR.x.toFixed(1),+TR.z.toFixed(1)]},
+    argos:{at:[+d[0].toFixed(1),+d[2].toFixed(1)],doing:argos.state?.winner||'—',
+      away:+Math.hypot(d[0]-r.x,d[2]-r.z).toFixed(1),
+      hunger:+(iv.hunger||0).toFixed(2),thirst:+(iv.thirst||0).toFixed(2),
+      fatigue:+(iv.fatigue||0).toFixed(2),happiness:+(iv.happiness||0).toFixed(2),
+      carrying:!!argos.world.carrying},
+    ball:ball.state, bowl:bowl.food?'filled':'empty', bond:+BOND.v.toFixed(2),
+    built:FORGE.structures.length
+  });
+}
+function agentDo(a,p){
+  const t=String(p==null?'':p).trim();
+  switch(a){
+    case 'say':chat.line('world',t||'…');return 'said';
+    case 'dog':{let prog=null;try{prog=argos.say(t)}catch(e){}
+      chat.line('you','“'+t+'”');
+      if(prog)chat.line('dog',prog.reading+(prog.cue?' · cue "'+prog.cue+'"':''));
+      return 'spoke to argos';}
+    case 'build':buildFromWords(t||'a cairn');return 'forging "'+(t||'a cairn')+'"';
+    case 'weather':return WEATHER.set(t)?('the sky turns — '+t):'that sky is not one of this world\'s';
+    case 'place':chat.say('/place '+t);return 'calling on '+t;
+    case 'goto':chat.say('/goto '+t);return 'calling on '+t;
+    case 'game':{const g=t.toLowerCase();
+      if(g.startsWith('str')){STRIKER.toggle();return 'striker'}
+      chat.say('/'+(g==='ctf'?'ctf':'golf'));return g;}
+    case 'feed':return feedBowl()?'fed':'nothing to feed with from here';
+    case 'ball':return (takeBall()||throwBall())?'the ball moves':'the ball is out of reach';
+    case 'stone':return throwStone()?'a stone flies':'no stone thrown';
+    case 'hitch':return hitchTrailer()?'hitched':'the rig is not at the tongue';
+    case 'drop':unhitchTrailer();return 'the home stands here';
+    case 'live':LIVE.refresh?.();return 'reading the land';
+    case 'deed':chat.say('/deed '+(t||'this land'));return 'deed kept';
+  }
+  return null;
+}
+async function askAgent(text){
+  chat.line('you','🗲 '+text);
+  if(!AI.on()){
+    chat.line('world','no agent line — open AI in the menu and connect one. Meanwhile the forge still answers: try “a watchtower”.');
+    return false;
+  }
+  chat.line('world','…');
+  const wait=$('#chatLog')?.lastElementChild;
+  let out;
+  try{out=await AI.ask(agentSystem(),'WORLD: '+agentWorldState()+'\n\nTHEY SAY: '+String(text).slice(0,600),1200)}
+  catch(e){if(wait)wait.remove();chat.line('world','the agent line failed — '+String(e.message||e).slice(0,140));return false}
+  if(wait)wait.remove();
+  let j=null;
+  try{const m=out.match(/\{[\s\S]*\}/);j=JSON.parse(m?m[0]:out)}catch(e){}
+  if(!j){chat.line('world',out.slice(0,300));return true}
+  if(j.line)chat.line('world',String(j.line).slice(0,400));
+  const acts=Array.isArray(j.do)?j.do.slice(0,3):[];
+  for(const it of acts){
+    const a=String(it&&it.a||'').toLowerCase();
+    if(!AGENT_ACTS[a]){chat.line('world','(the agent asked for “'+a+'”, which this world has no door for)');continue}
+    let r=null;try{r=agentDo(a,it.p)}catch(e){r='that act failed — '+String(e.message||e).slice(0,60)}
+    if(r)chat.line('world','▸ '+r);
+  }
+  updateWorldUI();
+  return true;
 }
 async function buildFromWords(prompt){
   // a vehicle is not a statue: ask for one and a DRIVABLE rig rolls off the
@@ -1095,7 +1288,7 @@ function truckStep(dt){
     // straight and the more speed it eats. Towing should feel like towing.
     const bite=Math.abs(theta)/LIM;
     TRUCK.yaw+=normAngle(psi-TRUCK.yaw)*Math.min(.5,dt*(2.2*bite+9*folded));
-    TRUCK.vel.multiplyScalar(Math.exp(-dt*(.35+2.6*bite*bite)));
+    TRUCK.vel.multiplyScalar(Math.exp(-dt*(.12+3.0*bite*bite)));   // straight costs little, folded costs plenty
     TRUCK.speed=Math.hypot(TRUCK.vel.x,TRUCK.vel.z);
     if(folded>.05&&TRUCK.speed>4)buzz('fold',[9,16,8],420);
     // the home rides the ground it is on, over its whole six metres, and
@@ -1139,7 +1332,7 @@ async function gotoPlace(lat,lon){
   // in the yard, the ball at your feet — and a mind fresh for the new land
   if(TRUCK.hitched)TRUCK.hitched=false;
   applyTrailerOffset(0,0,0,0);
-  PAD.datum=rawTerrain(TR.x,TR.z);setPad(TR.x,TR.z);
+  PAD.datum=rawTerrain(TR.x,TR.z);setPad(TR.x,TR.z);   // new land: datum, pad, then the mesh
   buildTerrainMesh();
   dressWorld().then(t=>chat.line('world','dressed — '+t+' tiles · © Esri · © OpenStreetMap')).catch(()=>{});
   placeHero(0,0,locomotion.heading);
@@ -1341,9 +1534,39 @@ argos.world.dog=DOG_SPAWN.slice();
 // a different one and he is severed from his own body: the mind keeps deciding
 // while the legs answer to an array nobody reads. Move him in place, and seat
 // him on the ground, or he has no contact to earn traction from.
+// A BODY IS NOT A POINT AND A POSTURE IS NOT A CONSTANT. Standing, Argos
+// reaches 3 cm below his root; SITTING, his haunches and rear pads go nearly
+// 20 cm below it. Seat the root on the ground and the sit drives his back half
+// into the hill — which is exactly what "the dog falls through the ground"
+// looks like, and why it looked fine every time he was measured on his feet.
+// dogLift() asks his OWN posed skeleton how far it currently reaches below the
+// root, so the ground meets whatever part of him is lowest, always.
+const DOG_PADS=Object.keys(argos.rig.nodes).filter(k=>/Pad$/.test(k));
+const DOG_PAW=0.021;                               // the flesh under the pad node
+let dogLiftV=DOG_PAW;
+function dogLift(){
+  // ASK THE POSE, NOT THE GAIT. Standing, the pads hang from the root and the
+  // gap between them IS the posture — a sit puts the rear pads 0.19 below the
+  // root, and that is exactly how deep his hindquarters used to be buried. In
+  // a gait the foot solver pins the pads in the WORLD instead, so that gap
+  // stops being a property of the pose: read it then and lift by it and the
+  // measurement raises the root, which widens the gap, which raises the root.
+  // So the posture is measured only while he is still; under way the plain
+  // paw offset is what the foot solver already expects.
+  const L=argos.loco;let target=DOG_PAW;
+  if((L.speed||0)<0.08){
+    const R=argos.rig,r0=R.root.t[1]||0;let drop=0;
+    for(const k of DOG_PADS){const nd=R.nodes[k];if(nd){const v=r0-nd.world[13];if(v>drop)drop=v}}
+    target=Math.min(.45,Math.max(0,drop))+DOG_PAW;
+  }
+  // rise fast, settle slow: a body may float for a moment on the way up out of
+  // a sit, but it must never be let down into the hill ahead of its own legs
+  dogLiftV+=(target-dogLiftV)*(target>dogLiftV?.40:.07);
+  return dogLiftV;
+}
 function seatDog(x,z){
   const d=argos.world.dog;
-  d[0]=x;d[2]=z;d[1]=CONTACT.crest(CONTACT.dogHeight,x,z,(argos.loco&&argos.loco.heading)||0,.52,.26);
+  d[0]=x;d[2]=z;d[1]=CONTACT.crest(CONTACT.dogHeight,x,z,(argos.loco&&argos.loco.heading)||0,.52,.26)+dogLiftV;
   argos.loco.speed=0;argos.loco.desiredSpeed=0;
 }
 argos.world.human=[0,0,0];
@@ -1358,7 +1581,9 @@ argos.world.human=[0,0,0];
 // little light on the downhill side, which is what a real dog looks like.
 argos.setTerrain(()=>{
   const d=argos.world.dog,hd=(argos.loco&&argos.loco.heading)||0;
-  const hi=CONTACT.crest(CONTACT.dogHeight,d[0],d[2],hd,.52,.26);
+  const lift=dogLift();
+  argos.loco.groundDrop=lift;                      // the runtime plants pads against THIS
+  const hi=CONTACT.crest(CONTACT.dogHeight,d[0],d[2],hd,.52,.26)+lift;
   // The centre alone buries his uphill half. Standing on the crest of his own
   // footprint means NO part of him is ever inside the land — the cost is a
   // downhill paw riding light on steep ground, which is the honest geometry of
@@ -3043,11 +3268,13 @@ const chat={
             .catch(e=>chat.line('world','the atlas line is closed — '+String(e.message||e).slice(0,50)))}
         else r='say: /place <somewhere on earth>'}
       else if(cmd==='ai'){const k2=text.slice(4).trim();
-        if(k2==='off'||!k2){try{localStorage.removeItem('hlidarendi.ai.key')}catch(e){}r='AI OFF — the agent uses stand-ins'}
-        else{try{localStorage.setItem('hlidarendi.ai.key',k2)}catch(e){}r='agent line configured — /build speaks to Claude now'}window.__refreshAI?.()}
+        if(k2==='off'){AI.off();r='AI OFF — the agent uses stand-ins'}
+        else if(!k2){window.__openAI?.();r='the agent line — endpoint, model and key'}
+        else{AI.key=k2;AI.save();r='agent line configured — 🗲 AGENT mode and /build speak to it now'}
+        window.__refreshAI?.()}
       else if(WEATHER.presets[cmd])r=WEATHER.set(cmd)?('the sky turns — '+cmd):'…';
       else if(cmd==='forget'){try{localStorage.removeItem('hlidarendi.v1')}catch(e){}r='forgotten — next visit starts fresh'}
-      else if(cmd==='help')r='/what (what there is to do) · /build <words> (a tower, a trailer, a truck…) · games: /striker /golf /ctf · /live (quakes + aircraft on this land) · land: /place <name> /goto <lat> <lon> /deed <name> · /ai <key|off> /save /reset /feed /ball /forget · sky: /dawn /day /dusk /night /fog /rain · the RIG: DRIVE (or E), HITCH at the home’s tongue to haul, roll over the ball to stow it, FIRE launches';
+      else if(cmd==='help')r='/what (what there is to do) · /build <words> (a tower, a trailer, a truck…) · games: /striker /golf /ctf · /live (quakes + aircraft on this land) · land: /place <name> /goto <lat> <lon> /deed <name> · /ai (open the agent line — Anthropic, a proxy, or any OpenAI-compatible gateway; then 🗲 AGENT turns a sentence into weather, land and errands) · /save /reset /feed /ball /forget · sky: /dawn /day /dusk /night /fog /rain · the RIG: DRIVE (or E), HITCH at the home’s tongue to haul, roll over the ball to stow it, FIRE launches';
       chat.line('world',r);updateWorldUI();return null;
     }
     let prog=null;
@@ -3163,31 +3390,62 @@ const on=(sel,fn)=>{const el=$(sel);if(el)el.onclick=fn};
 // lightning — summon structures through the forge. The log folds beneath it.
 {
   const ag=$('#agentSay'),st2=$('#agentStatus');
-  const refreshAI=()=>{let k=null;try{k=localStorage.getItem('hlidarendi.ai.key')}catch(e){}
-    if(st2)st2.textContent=k?'● AI ON · claude-opus-5 · say /ai off to disconnect':'● AI OFF · stand-ins · tap to configure'};
+  const refreshAI=()=>{if(st2)st2.textContent=AI.on()
+    ?'● AI ON · '+AI.model+' · '+(AI.dialect==='openai'?'gateway':AI.dialect==='anthropic'?'anthropic':'proxy')+' · tap to change'
+    :'● AI OFF · stand-ins · tap to configure'};
   refreshAI();window.__refreshAI=refreshAI;
+  // THE PANEL. Everything the line needs, in one place, with a TEST that says
+  // what actually went wrong instead of failing quietly on the next sentence.
+  const aiOut=(msg,cls)=>{const o2=$('#aiOut');if(!o2)return;o2.textContent=msg||'';o2.className=cls||''};
+  const openAI=()=>{
+    $('#aiDialect').value=AI.dialect;$('#aiBase').value=AI.base;
+    $('#aiModel').value=AI.model;$('#aiKey').value=AI.key;
+    aiOut(AI.on()?'connected — '+AI.base:'not connected');
+    document.body.classList.add('ai-open');document.body.classList.remove('menu-open','land-open');
+    setTimeout(()=>$('#aiKey')?.focus(),60);
+  };
+  window.__openAI=openAI;
+  const readAI=()=>{AI.dialect=$('#aiDialect').value;AI.base=$('#aiBase').value.trim()||AI.base;
+    AI.model=$('#aiModel').value.trim()||AI.model;AI.key=$('#aiKey').value.trim()};
+  on('#aiDialect',null);
+  $('#aiDialect')?.addEventListener('change',()=>{
+    const d=$('#aiDialect').value,b=$('#aiBase');
+    if(d==='anthropic')b.value='https://api.anthropic.com/v1/messages';
+    else if(d==='openai'&&!/chat\/completions/.test(b.value))b.value='https://your-gateway.example/v1/chat/completions';
+    else if(d==='anthropic-proxy'&&/api\.anthropic\.com/.test(b.value))b.value='https://your-proxy.example/v1/messages';
+  });
+  on('#aiSave',()=>{readAI();AI.save();refreshAI();
+    chat.line('world',AI.on()?'the agent line is open — 🗲 AGENT mode speaks to it, /build forges through it':'the agent line is closed — stand-ins answer');
+    document.body.classList.remove('ai-open')});
+  on('#aiOff',()=>{AI.off();refreshAI();aiOut('disconnected — the stand-ins answer now');
+    $('#aiKey').value='';$('#aiBase').value=AI.base;$('#aiDialect').value=AI.dialect});
+  on('#aiTest',async()=>{readAI();aiOut('asking…');
+    try{const t=await AI.test();aiOut('the line answers: '+t,'ok')}
+    catch(e){aiOut(String(e.message||e),'bad')}
+    refreshAI()});
+  $('#aiPanel')?.addEventListener('pointerdown',e=>{if(e.target&&e.target.id==='aiPanel')document.body.classList.remove('ai-open')});
   let barMode='speak';
   const setBarMode=m=>{barMode=m;
     const tag=$('#agentTag');if(tag)tag.textContent=m==='agent'?'AGENT':'SPEAK';
     $('#modeBtn')?.classList.toggle('on',m==='agent');
-    if(ag)ag.placeholder=m==='agent'?'summon a structure — a dragon gate, a watchtower, a bridge…':'speak — words reach the dog and the terrarium · /help';
+    if(ag)ag.placeholder=m==='agent'?'ask the world — build a watchtower, turn the sky, take us to Þórsmörk…':'speak — words reach the dog and the terrarium · /help';
   };
   setBarMode('speak');
   on('#modeBtn',()=>setBarMode(barMode==='agent'?'speak':'agent'));
   on('#logBtn',()=>setLog(!document.body.classList.contains('log-open')));
   on('#sayBtn',()=>setLog(!document.body.classList.contains('log-open')));
-  if(st2)st2.onclick=()=>{setBarMode('speak');if(ag){ag.value='/ai ';ag.focus()}};
+  if(st2)st2.onclick=openAI;
   $('#agentForm')?.addEventListener('submit',e=>{
     e.preventDefault();const t=(ag?.value||'').trim();if(!t)return;ag.value='';
     openLog();
-    if(barMode==='agent'&&t[0]!=='/'){chat.line('you','⚒ '+t);buildFromWords(t)}
+    if(barMode==='agent'&&t[0]!=='/')askAgent(t);
     else chat.say(t);
     if(IS_TOUCH)ag?.blur();
   });
   const prefill=v=>{setBarMode('speak');openLog();if(ag){ag.value=v;if(!IS_TOUCH)ag.focus()}};
   on('#buildBtn',()=>{setBarMode('agent');ag?.focus()});
   on('#speakBtn',()=>{setBarMode('speak');openLog();ag?.focus()});
-  on('#aiBtn',()=>prefill('/ai '));
+  on('#aiBtn',()=>{window.__openAI?.()});
   on('#gotoBtn',()=>prefill('/goto 63.7422 -20.1080'));
   on('#placeBtn',()=>prefill('/place '));
   on('#dressBtn',()=>{openLog();chat.line('world','calling on the living ground…');

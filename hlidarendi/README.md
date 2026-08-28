@@ -176,6 +176,46 @@ places him via `{kind:'actor', species:'argos'}`. The architecture and the
 phased plan for the walking body (possession-based) are in
 [UPSTREAM.md](UPSTREAM.md).
 
+## The agent line
+
+`/ai`, the AI chip in the menu, or the status line under the top bar opens
+one panel: **endpoint, model, key** — and a **TEST** that tells you what
+actually went wrong instead of failing silently on your next sentence. Three
+endpoints are understood, because a raw Anthropic key in a browser is not
+something most people can or should do:
+
+| Endpoint | For |
+|---|---|
+| **Anthropic** — `api.anthropic.com/v1/messages` | your own key, sent with `anthropic-dangerous-direct-browser-access` |
+| **Anthropic-compatible proxy** | a `/v1/messages` endpoint you run; it may hold the key itself, so the key field can stay empty |
+| **OpenAI-compatible gateway** | any `/v1/chat/completions` endpoint — the reply is read from `choices[0].message.content` |
+
+Everything in the page that talks to a model goes through `AI.ask`, so there
+is one thing to configure and one thing to blame. The key lives in this
+browser's `localStorage` and is sent only to the endpoint you named.
+
+With a line open, the 🗲 chip switches the top bar from **SPEAK** to
+**AGENT**, and a sentence becomes acts:
+
+    it is getting close and grey — call the dog in and put a watchtower on the ridge
+
+    ▸ the sky turns — fog
+    ▸ spoke to argos      "come here, good boy"  → heard something he knows · cue "come"
+    ▸ forging "a watchtower"
+
+The agent is handed the world as it stands — where everyone is, what Argos is
+doing and how hungry, tired and happy he is, the ball, the bowl, the bond, the
+land's coordinates — and answers with a line and at most three acts. **It acts
+only through the doors a person already has**: `say`, `dog`, `build`,
+`weather`, `place`, `goto`, `game`, `feed`, `ball`, `stone`, `hitch`, `drop`,
+`live`, `deed`. Anything else is refused out loud and logged. And the dog is
+not on that list as a puppet: `dog` speaks *to* Argos, whose own mind decides
+whether to heed it — **a human sentence enters the dog's world as evidence,
+never as a command**, and that holds for a model's sentence too.
+
+Without a line the world still answers: the forge falls back to its stand-ins
+and every slash command works as before.
+
 ## One ground
 
 `NEVER SOLVE THE SAME PHYSICAL QUESTION TWICE` was written as a law and then
@@ -190,6 +230,24 @@ before and after:
 | The home's collision frame (`worldOf`) and its rendered frame (`rotation.y`) were **mirror images**; the yaw was stored mirrored so collisions stayed self-consistent — at the cost of the drawn home swinging the wrong way by *twice* the hitch angle | seen home and felt home **5.49 m apart** in a turn | **0.00 m** parked and straight, 0.05 m mid-turn |
 | No fold limit on the tongue and no reaction from the load: reverse swung the cab through 180° and the house came with it | hitch angle **178°** — the trailer on the roof of the cab | capped at **70°**, worst measured 66° |
 | Single-point ground under multi-metre bodies (one sample under a 6 m house), and a four-wheel **average** that sank the chassis into every crest | body corners buried | **0.000 m** penetration, dog · rig · home |
+| The drawn ground was a **150×150 approximation** of a 232×232 height field, so between the vertices the mesh and the collision surface were different surfaces | up to **0.24 m** apart *between* vertices | **0.000 m** — one array, one triangle |
+| **A sitting dog puts his haunches 0.19 m below his root**, and the root was seated flat on the ground. He was measured on his feet every time, where the drop is 3 cm, and passed | rear half **0.19 m inside the hill** whenever he sat | **0.03 m** worst, on his feet or off them |
+
+The mesh is no longer an approximation of the ground: `GROUND` is one array —
+the hillside with the farmyard's levelled pad baked in — the terrain mesh puts
+**one vertex on every node of it**, and `terrainH()` interpolates the *same
+triangle* three.js drew (the plane's quads split on the diagonal from
+`(i,j+1)` to `(i+1,j)`, so the query follows that split). Seen and felt are
+the same surface by construction, not by agreement.
+
+And the dog is lifted by however far his own posed skeleton currently reaches
+below his root — measured from the pads while he is standing still, where that
+gap really is the posture. Under way the foot solver pins his pads in the
+world instead, so the same measurement would raise the root, widen the gap and
+raise it again; under way he takes the plain paw offset the solver already
+expects. The lift rises fast and settles slowly: he may float for a moment
+coming up out of a sit, but he is never let down into the hill ahead of his
+own legs.
 
 The correction is one module, `CONTACT`, and every body asks it:
 

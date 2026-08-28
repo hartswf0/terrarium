@@ -231,6 +231,24 @@ body.land-open #landBtn{background:#2a2410!important}
 body.land-open #landMenu{display:flex}
 .land-item{font:700 10px/1.2 "IBM Plex Mono",monospace;letter-spacing:.08em;text-align:left;color:var(--amber);background:var(--panel);border:1px solid #5c4d1e;border-radius:8px!important;padding:10px 12px;cursor:pointer;backdrop-filter:blur(4px)}
 .land-item:active{background:var(--amber);color:#1a1503}
+/* THE AI PANEL — a key in a chat command is not a setting. Endpoint, dialect,
+   model and key, with a TEST that tells you what actually went wrong. */
+#aiPanel{position:fixed;inset:0;z-index:120;display:none;align-items:center;justify-content:center;background:rgba(5,7,10,.82);padding:14px}
+body.ai-open #aiPanel{display:flex}
+#aiCard{width:min(94vw,430px);max-height:88vh;overflow:auto;background:var(--panel);border:1px solid #5c4d1e;border-radius:12px;padding:16px 16px 14px;
+  font:600 11px/1.5 "IBM Plex Mono",monospace;color:var(--txt);box-shadow:0 18px 60px #000a}
+#aiCard h3{font:800 12px/1 "IBM Plex Mono",monospace;letter-spacing:.22em;color:var(--amber);margin:0 0 4px}
+#aiCard .note{color:var(--dim);font-weight:500;font-size:10px;line-height:1.55;margin:0 0 12px}
+#aiCard label{display:block;font:700 9px/1 "IBM Plex Mono",monospace;letter-spacing:.2em;color:var(--dim);text-transform:uppercase;margin:10px 0 4px}
+#aiCard input,#aiCard select{width:100%;box-sizing:border-box;background:#0c1015;border:1px solid #2a3340;border-radius:7px;
+  color:var(--txt);font:600 11px/1.3 "IBM Plex Mono",monospace;padding:8px 9px;outline:none}
+#aiCard input:focus,#aiCard select:focus{border-color:var(--amber)}
+#aiRow{display:flex;gap:8px;margin-top:14px}
+#aiRow button{flex:1;font:800 10px/1 "IBM Plex Mono",monospace;letter-spacing:.16em;border-radius:8px!important;padding:11px 8px;cursor:pointer;
+  background:#0c1015;border:1px solid #2a3340;color:var(--txt)}
+#aiSave{background:var(--amber)!important;color:#1a1503!important;border-color:var(--amber)!important}
+#aiOut{margin-top:11px;font-weight:500;font-size:10px;line-height:1.5;color:var(--dim);white-space:pre-wrap;word-break:break-word;min-height:1.5em}
+#aiOut.ok{color:var(--teal)}#aiOut.bad{color:var(--red)}
 #recBtn{color:var(--red)!important}
 #recBtn .dot{width:9px;height:9px;border-radius:999px!important;background:var(--red);display:inline-block}
 #recBtn.on{background:var(--red)!important;color:#fff!important}
@@ -347,6 +365,30 @@ body #headDock .joy{background:rgba(10,14,17,.6)!important}
   <button class="land-item" data-land="live">◉ LIVE CONDITIONS — quakes · aircraft</button>
   <button class="land-item" data-land="save">↓ SAVE LAND</button>
 </div>
+<div id="aiPanel"><div id="aiCard">
+  <h3>THE AGENT LINE</h3>
+  <p class="note">Words become weather, land, structures and errands. Point this at Anthropic
+  directly, or at any proxy or OpenAI-compatible gateway you run. Nothing is sent until you
+  speak in AGENT mode; the key stays in this browser.</p>
+  <label for="aiDialect">endpoint</label>
+  <select id="aiDialect">
+    <option value="anthropic">Anthropic — api.anthropic.com</option>
+    <option value="anthropic-proxy">Anthropic-compatible proxy</option>
+    <option value="openai">OpenAI-compatible gateway</option>
+  </select>
+  <label for="aiBase">url</label>
+  <input id="aiBase" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="https://api.anthropic.com/v1/messages">
+  <label for="aiModel">model</label>
+  <input id="aiModel" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="claude-opus-5">
+  <label for="aiKey">key</label>
+  <input id="aiKey" type="password" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="sk-… (leave empty if your proxy holds it)">
+  <div id="aiRow">
+    <button id="aiTest" type="button">TEST</button>
+    <button id="aiOff" type="button">DISCONNECT</button>
+    <button id="aiSave" type="button">CONNECT</button>
+  </div>
+  <div id="aiOut"></div>
+</div></div>
 <div id="agentBar">
   <div id="agentRow">
     <span id="agentTag">SPEAK</span>
