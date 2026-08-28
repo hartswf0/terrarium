@@ -4,6 +4,7 @@ import {IN as EL_IN, WT, EL, DOOR_PLAN} from './elements.js';
 import {TERRAIN} from './terrain-data.js';
 import {LIVING_GROUND} from './living-ground.js';
 import {MEMBERS} from './trailer-members.js';
+import {AI_PROVIDER_DEFAULTS,getAIConfig,saveAIConfig,aiWorkerUrl,aiLocalAvailable,apiKeyIssue,callConfiguredLLM,requestAIText,AILOG} from './ai-line.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
@@ -561,76 +562,23 @@ function standinFor(prompt){
   if(/light|lamp|fire|beacon|star/.test(p))return 'beacon';
   return 'cairn';
 }
-// ══ THE AGENT LINE — one place the world talks to a model ════════════════
-// A key typed into a chat command is not a setting, and a model that can only
-// forge a cairn is not an agent. AI is the single seam: where the line goes,
-// which dialect it speaks, which model answers — and every call in the page
-// goes through AI.ask, so there is exactly one thing to configure and one
-// thing to blame when it fails.
+// ══ THE AGENT LINE ═══════════════════════════════════════════════════════
+// The stack itself lives in src/ai-line.js — Terrarium's own, ported whole and
+// reading THE SAME config key III writes (`trig.ai.config.v2`). Configure a
+// model once in the standing world and this page already has one. AI is only
+// the thin handle this file holds it by.
 const AI={
-  key:'',model:'claude-opus-5',base:'https://api.anthropic.com/v1/messages',dialect:'anthropic',
-  load(){
-    try{
-      const raw=localStorage.getItem('hlidarendi.ai');
-      if(raw)Object.assign(this,JSON.parse(raw));
-      else{const k=localStorage.getItem('hlidarendi.ai.key');if(k)this.key=k}  // the old one-line key
-    }catch(e){}
-    if(!this.base)this.base='https://api.anthropic.com/v1/messages';
-    if(!this.model)this.model='claude-opus-5';
-    return this;
-  },
-  save(){try{localStorage.setItem('hlidarendi.ai',JSON.stringify(
-    {key:this.key,model:this.model,base:this.base,dialect:this.dialect}));
-    localStorage.removeItem('hlidarendi.ai.key')}catch(e){}return this},
-  // DISCONNECT means disconnected: a custom endpoint counts as a line whether
-  // or not a key was typed, so clearing the key alone would leave it open
-  off(){this.key='';this.base='https://api.anthropic.com/v1/messages';this.dialect='anthropic';
-    try{localStorage.removeItem('hlidarendi.ai');localStorage.removeItem('hlidarendi.ai.key')}catch(e){}},
-  // a proxy may hold the key itself, so a custom endpoint counts as connected
-  on(){return !!this.key||(this.dialect!=='anthropic'&&!!this.base)},
-  headers(){
-    const h={'content-type':'application/json'};
-    if(this.dialect==='openai'){if(this.key)h['authorization']='Bearer '+this.key}
-    else{if(this.key)h['x-api-key']=this.key;h['anthropic-version']='2023-06-01';
-      if(this.dialect==='anthropic')h['anthropic-dangerous-direct-browser-access']='true'}
-    return h;
-  },
-  body(system,user,maxTok){
-    if(this.dialect==='openai')return{model:this.model,max_tokens:maxTok,
-      messages:[{role:'system',content:system},{role:'user',content:user}]};
-    return{model:this.model,max_tokens:maxTok,system,messages:[{role:'user',content:user}]};
-  },
-  // both shapes come home as plain text: an Anthropic content array or an
-  // OpenAI choice. A gateway that answers either one works here unchanged.
-  text(j){
-    if(Array.isArray(j?.content))return j.content.filter(b=>b.type==='text').map(b=>b.text).join('\n');
-    const c=j?.choices?.[0]?.message?.content;
-    if(typeof c==='string')return c;
-    if(Array.isArray(c))return c.map(b=>b.text||'').join('\n');
-    return '';
-  },
-  async ask(system,user,maxTok){
-    if(!this.on())throw new Error('no agent line — open AI and connect one');
-    let r;
-    try{r=await fetch(this.base,{method:'POST',headers:this.headers(),body:JSON.stringify(this.body(system,user,maxTok||1500))})}
-    catch(e){throw new Error('the line did not open (network or CORS) — '+String(e.message||e).slice(0,80))}
-    if(!r.ok){
-      let d='';try{d=(await r.text()).slice(0,180)}catch(e){}
-      throw new Error('HTTP '+r.status+(d?' — '+d:''));
-    }
-    const t=this.text(await r.json());
-    if(!t)throw new Error('the model answered with nothing this page could read');
-    return t;
-  },
-  async test(){
-    const t=await this.ask('Reply with exactly: HLIDARENDI','say the word',32);
-    return t.trim().slice(0,60);
-  }
-}.load();
+  get cfg(){return getAIConfig()},
+  on(){return aiLocalAvailable()},
+  label(){const c=getAIConfig();
+    return c.provider==='thunder'?('thunderhead · '+(aiWorkerUrl(c)?'gateway':'no gateway url')):(c.provider+' · '+(c.model||'model'));},
+  ask(system,user,maxTok,task){return requestAIText(user,system,null,maxTok||1500,{task:task||'generic'})},
+  log:AILOG
+};
 const FORGE_SYS='You are a structure builder for HLIDARENDI, a small standing world. Reply with ONLY one JavaScript function, no fences, no prose:\nfunction build(w, WG, THREE){ ... return w; }\nOne focal structure at the origin. Vocabulary: WG.box(w,h,d,mat) WG.cyl(r,h,mat) WG.cone(r,h,mat) WG.sphere(r,mat) WG.torus(r,t,mat); materials WG.flat(hex,{rough,metal}) WG.matte(hex,rough) WG.lit(hex,intensity); WG.put(mesh,x,y,z,ry) places (y=0 is the ground); WG.solid(mesh,w,h,d) makes it collide; WG.rand(seed) for randomness. Under 60 meshes; every part within 12 units of the origin; scale in metres (a person is 1.7 tall).\nIf asked for a DWELLING (trailer, caravan, cabin, hut, shed): build it hollow and enterable — a raised floor about 0.4 high, four walls about 2.2 tall with a GAP at least 0.9 wide left in one wall for a door, a roof, and a step outside the gap. Make the walls thin (0.12-0.16) and WG.solid only the walls, floor and step, never the doorway.';
 async function askForgeAI(prompt){
   if(!AI.on())return null;
-  const text=await AI.ask(FORGE_SYS,'Design for: "'+String(prompt).slice(0,200)+'"',3000);
+  const text=await AI.ask(FORGE_SYS,'Design for: "'+String(prompt).slice(0,200)+'"',3000,'forge');
   const m=text.match(/function\s+build\s*\([\s\S]*\}/);
   return m?m[0]:null;
 }
@@ -720,7 +668,7 @@ async function askAgent(text){
   chat.line('world','…');
   const wait=$('#chatLog')?.lastElementChild;
   let out;
-  try{out=await AI.ask(agentSystem(),'WORLD: '+agentWorldState()+'\n\nTHEY SAY: '+String(text).slice(0,600),1200)}
+  try{out=await AI.ask(agentSystem(),'WORLD: '+agentWorldState()+'\n\nTHEY SAY: '+String(text).slice(0,600),1200,'agent')}
   catch(e){if(wait)wait.remove();chat.line('world','the agent line failed — '+String(e.message||e).slice(0,140));return false}
   if(wait)wait.remove();
   let j=null;
@@ -750,7 +698,7 @@ async function buildFromWords(prompt){
   const fwd=rotateLocalY(new THREE.Vector3(0,0,1),locomotion.heading);
   const at={x:locomotion.root.x+fwd.x*5,z:locomotion.root.z+fwd.z*5};
   let code=null,via='stand-in';
-  try{code=await askForgeAI(prompt);if(code)via='claude'}catch(e){chat.line('world','the agent line failed ('+String(e.message||e).slice(0,60)+') — using a stand-in')}
+  try{code=await askForgeAI(prompt);if(code)via=AI.label()}catch(e){chat.line('world','the agent line failed ('+String(e.message||e).slice(0,80)+') — using a stand-in')}
   if(!code)code=STANDINS[standinFor(prompt)];
   const r=FORGE.run(code,at,'build-'+(FORGE.structures.length+1));
   if(r.ok)chat.line('world','built via '+via+' — '+r.meshes+' meshes, '+r.solids+' solid, standing on the land ahead of you');
@@ -3268,13 +3216,16 @@ const chat={
             .catch(e=>chat.line('world','the atlas line is closed — '+String(e.message||e).slice(0,50)))}
         else r='say: /place <somewhere on earth>'}
       else if(cmd==='ai'){const k2=text.slice(4).trim();
-        if(k2==='off'){AI.off();r='AI OFF — the agent uses stand-ins'}
-        else if(!k2){window.__openAI?.();r='the agent line — endpoint, model and key'}
-        else{AI.key=k2;AI.save();r='agent line configured — 🗲 AGENT mode and /build speak to it now'}
+        if(k2==='off'){saveAIConfig({...AI.cfg,apiKey:'',shareRoom:false});r='AI OFF — the agent uses stand-ins'}
+        else if(!k2){window.__openAI?.();r='the agent line — provider, model, endpoint, key'}
+        else{const c=AI.cfg,pv=c.provider==='thunder'?(/^sk-/.test(k2)?'openai':'anthropic'):c.provider;
+          const d=AI_PROVIDER_DEFAULTS[pv]||{};
+          saveAIConfig({provider:pv,model:c.provider==='thunder'?d.model:c.model,endpoint:c.provider==='thunder'?d.endpoint:c.endpoint,apiKey:k2});
+          r='agent line configured — '+pv+' · '+AI.label()+' — 🗲 AGENT and /build speak to it now'}
         window.__refreshAI?.()}
       else if(WEATHER.presets[cmd])r=WEATHER.set(cmd)?('the sky turns — '+cmd):'…';
       else if(cmd==='forget'){try{localStorage.removeItem('hlidarendi.v1')}catch(e){}r='forgotten — next visit starts fresh'}
-      else if(cmd==='help')r='/what (what there is to do) · /build <words> (a tower, a trailer, a truck…) · games: /striker /golf /ctf · /live (quakes + aircraft on this land) · land: /place <name> /goto <lat> <lon> /deed <name> · /ai (open the agent line — Anthropic, a proxy, or any OpenAI-compatible gateway; then 🗲 AGENT turns a sentence into weather, land and errands) · /save /reset /feed /ball /forget · sky: /dawn /day /dusk /night /fog /rain · the RIG: DRIVE (or E), HITCH at the home’s tongue to haul, roll over the ball to stow it, FIRE launches';
+      else if(cmd==='help')r='/what (what there is to do) · /build <words> (a tower, a trailer, a truck…) · games: /striker /golf /ctf · /live (quakes + aircraft on this land) · land: /place <name> /goto <lat> <lon> /deed <name> · /ai (the agent line — THUNDERHEAD, OpenAI, Gemini, Anthropic or your own endpoint, sharing the standing world’s own settings; then 🗲 AGENT turns a sentence into weather, land and errands) · /save /reset /feed /ball /forget · sky: /dawn /day /dusk /night /fog /rain · the RIG: DRIVE (or E), HITCH at the home’s tongue to haul, roll over the ball to stow it, FIRE launches';
       chat.line('world',r);updateWorldUI();return null;
     }
     let prog=null;
@@ -3391,38 +3342,67 @@ const on=(sel,fn)=>{const el=$(sel);if(el)el.onclick=fn};
 {
   const ag=$('#agentSay'),st2=$('#agentStatus');
   const refreshAI=()=>{if(st2)st2.textContent=AI.on()
-    ?'● AI ON · '+AI.model+' · '+(AI.dialect==='openai'?'gateway':AI.dialect==='anthropic'?'anthropic':'proxy')+' · tap to change'
+    ?'● AI ON · '+AI.label()+' · tap to change'
     :'● AI OFF · stand-ins · tap to configure'};
   refreshAI();window.__refreshAI=refreshAI;
-  // THE PANEL. Everything the line needs, in one place, with a TEST that says
-  // what actually went wrong instead of failing quietly on the next sentence.
+  // THE PANEL — the standing world's own API manager, in this world's chrome.
   const aiOut=(msg,cls)=>{const o2=$('#aiOut');if(!o2)return;o2.textContent=msg||'';o2.className=cls||''};
+  const formCfg=()=>({provider:$('#aiProvider').value,model:$('#aiModel').value.trim(),
+    endpoint:$('#aiBase').value.trim(),apiKey:$('#aiKey').value.trim(),shareRoom:false});
+  const aiWarn=()=>{
+    const w=$('#aiWarn'),p2=$('#aiProvider').value,ep=($('#aiBase').value||'').trim();
+    let msg='';
+    if(p2==='thunder'){$('#aiModel').value='server-router';
+      msg='SECURE SERVER MODE: '+(aiWorkerUrl({provider:'thunder',endpoint:ep})||'gateway URL missing — put your worker URL in ENDPOINT')+'. Models route by task; no key is kept in this browser.';}
+    else if(p2==='openai'){
+      const route=/\/chat\/completions(?:[/?#]|$)/i.test(ep)?'CHAT COMPLETIONS PAYLOAD':(/\/responses(?:[/?#]|$)/i.test(ep)?'RESPONSES API PAYLOAD':'AUTO-DETECTED PAYLOAD');
+      msg='DIRECT OPENAI DEV MODE: '+route+'. A key stored in a browser can be read.';}
+    else if(p2==='custom'&&!ep)msg='A custom provider needs an OpenAI-compatible endpoint URL.';
+    else if(p2!=='thunder')msg='DIRECT DEV MODE: a key stored in a browser can be read.';
+    if(w){w.textContent=msg;w.classList.toggle('show',!!msg)}
+  };
+  const drawLog=()=>{const el=$('#aiLog');if(el)el.textContent=AILOG.lines.length?AILOG.text():'nothing has gone down the line yet'};
+  AILOG.onChange(drawLog);
   const openAI=()=>{
-    $('#aiDialect').value=AI.dialect;$('#aiBase').value=AI.base;
-    $('#aiModel').value=AI.model;$('#aiKey').value=AI.key;
-    aiOut(AI.on()?'connected — '+AI.base:'not connected');
+    const c=AI.cfg;
+    $('#aiProvider').value=c.provider;$('#aiModel').value=c.model;
+    $('#aiBase').value=c.endpoint;$('#aiKey').value=c.apiKey;
+    aiOut(AI.on()?'connected — '+AI.label()+(AILOG.route?'\nlast route: '+AILOG.route:''):'Not configured.');
+    aiWarn();drawLog();
     document.body.classList.add('ai-open');document.body.classList.remove('menu-open','land-open');
-    setTimeout(()=>$('#aiKey')?.focus(),60);
   };
   window.__openAI=openAI;
-  const readAI=()=>{AI.dialect=$('#aiDialect').value;AI.base=$('#aiBase').value.trim()||AI.base;
-    AI.model=$('#aiModel').value.trim()||AI.model;AI.key=$('#aiKey').value.trim()};
-  on('#aiDialect',null);
-  $('#aiDialect')?.addEventListener('change',()=>{
-    const d=$('#aiDialect').value,b=$('#aiBase');
-    if(d==='anthropic')b.value='https://api.anthropic.com/v1/messages';
-    else if(d==='openai'&&!/chat\/completions/.test(b.value))b.value='https://your-gateway.example/v1/chat/completions';
-    else if(d==='anthropic-proxy'&&/api\.anthropic\.com/.test(b.value))b.value='https://your-proxy.example/v1/messages';
+  // ONLY A PROVIDER CHANGE RE-DEFAULTS THE FIELDS. Doing it on an endpoint
+  // edit too silently wiped the URL you had just typed the moment you left
+  // the field — the setting looked saved and the call went somewhere else.
+  $('#aiProvider')?.addEventListener('change',()=>{
+    const d=AI_PROVIDER_DEFAULTS[$('#aiProvider').value]||{};
+    $('#aiModel').value=d.model||'';$('#aiBase').value=d.endpoint||'';
+    aiWarn();
   });
-  on('#aiSave',()=>{readAI();AI.save();refreshAI();
-    chat.line('world',AI.on()?'the agent line is open — 🗲 AGENT mode speaks to it, /build forges through it':'the agent line is closed — stand-ins answer');
-    document.body.classList.remove('ai-open')});
-  on('#aiOff',()=>{AI.off();refreshAI();aiOut('disconnected — the stand-ins answer now');
-    $('#aiKey').value='';$('#aiBase').value=AI.base;$('#aiDialect').value=AI.dialect});
-  on('#aiTest',async()=>{readAI();aiOut('asking…');
-    try{const t=await AI.test();aiOut('the line answers: '+t,'ok')}
-    catch(e){aiOut(String(e.message||e),'bad')}
-    refreshAI()});
+  $('#aiBase')?.addEventListener('input',aiWarn);
+  on('#aiClose',()=>document.body.classList.remove('ai-open'));
+  on('#aiLogBtn',()=>$('#aiCard')?.classList.toggle('log-open'));
+  on('#aiSave',()=>{
+    const c=formCfg(),issue=apiKeyIssue(c);
+    if(issue&&c.provider!=='thunder'&&c.apiKey)return aiOut('CHECK YOUR KEY\n'+issue,'bad');
+    saveAIConfig(c);refreshAI();aiOut(AI.on()?'saved — '+AI.label():'saved, but no key or gateway yet','ok');
+    chat.line('world',AI.on()?'the agent line is open — 🗲 AGENT turns a sentence into acts, /build forges through it':'the agent line is closed — stand-ins answer');
+    if(AI.on())document.body.classList.remove('ai-open');
+  });
+  on('#aiOff',()=>{const c=AI.cfg;saveAIConfig({...c,apiKey:'',shareRoom:false});
+    $('#aiKey').value='';refreshAI();aiOut('key cleared — the stand-ins answer now')});
+  on('#aiTest',async()=>{
+    const c=formCfg(),issue=apiKeyIssue(c);
+    if(issue)return aiOut('CHECK YOUR KEY\n'+issue,'bad');
+    if(!aiLocalAvailable(c))return aiOut('a gateway URL or an API key is required','bad');
+    const b=$('#aiTest');b.disabled=true;b.textContent='…';
+    try{const t=await callConfiguredLLM('Reply with exactly READY.','Return only the word READY.',c,null,64,{task:'test'});
+      aiOut('TEST OK\n'+c.provider+' / '+(c.model||'default')+(AILOG.route?'\nroute: '+AILOG.route:'')+'\n'+String(t).trim().slice(0,120),'ok');
+      AILOG.push('TEST OK · '+c.provider+' / '+(c.model||'default'),'ok');}
+    catch(e){aiOut('TEST FAILED\n'+String(e.message||e),'bad');AILOG.push('TEST FAILED · '+String(e.message||e).slice(0,160),'err')}
+    finally{b.disabled=false;b.textContent='TEST';refreshAI()}
+  });
   $('#aiPanel')?.addEventListener('pointerdown',e=>{if(e.target&&e.target.id==='aiPanel')document.body.classList.remove('ai-open')});
   let barMode='speak';
   const setBarMode=m=>{barMode=m;

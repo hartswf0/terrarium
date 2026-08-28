@@ -237,7 +237,10 @@ body.land-open #landMenu{display:flex}
 body.ai-open #aiPanel{display:flex}
 #aiCard{width:min(94vw,430px);max-height:88vh;overflow:auto;background:var(--panel);border:1px solid #5c4d1e;border-radius:12px;padding:16px 16px 14px;
   font:600 11px/1.5 "IBM Plex Mono",monospace;color:var(--txt);box-shadow:0 18px 60px #000a}
-#aiCard h3{font:800 12px/1 "IBM Plex Mono",monospace;letter-spacing:.22em;color:var(--amber);margin:0 0 4px}
+#aiHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 4px}
+#aiCard h3{font:800 12px/1 "IBM Plex Mono",monospace;letter-spacing:.22em;color:var(--amber);margin:0}
+#aiClose{background:transparent;border:1px solid #5c4d1e;border-radius:7px!important;color:var(--amber);
+  font:700 11px/1 "IBM Plex Mono",monospace;padding:6px 9px;cursor:pointer}
 #aiCard .note{color:var(--dim);font-weight:500;font-size:10px;line-height:1.55;margin:0 0 12px}
 #aiCard label{display:block;font:700 9px/1 "IBM Plex Mono",monospace;letter-spacing:.2em;color:var(--dim);text-transform:uppercase;margin:10px 0 4px}
 #aiCard input,#aiCard select{width:100%;box-sizing:border-box;background:#0c1015;border:1px solid #2a3340;border-radius:7px;
@@ -247,8 +250,19 @@ body.ai-open #aiPanel{display:flex}
 #aiRow button{flex:1;font:800 10px/1 "IBM Plex Mono",monospace;letter-spacing:.16em;border-radius:8px!important;padding:11px 8px;cursor:pointer;
   background:#0c1015;border:1px solid #2a3340;color:var(--txt)}
 #aiSave{background:var(--amber)!important;color:#1a1503!important;border-color:var(--amber)!important}
-#aiOut{margin-top:11px;font-weight:500;font-size:10px;line-height:1.5;color:var(--dim);white-space:pre-wrap;word-break:break-word;min-height:1.5em}
-#aiOut.ok{color:var(--teal)}#aiOut.bad{color:var(--red)}
+#aiOut{font-weight:500;font-size:10px;line-height:1.5;color:var(--dim);white-space:pre-wrap;word-break:break-word;min-height:1.5em;
+  background:#0c1015;border:1px solid #2a3340;border-radius:7px;padding:8px 9px}
+#aiOut.ok{color:var(--teal);border-color:#1a5c52}#aiOut.bad{color:var(--red);border-color:#6b2020}
+#aiWarn{display:none;margin:0 0 10px;font-weight:500;font-size:10px;line-height:1.5;color:var(--amber);
+  border:1px solid #5c4d1e;background:#5c4d1e22;border-radius:7px;padding:8px 9px}
+#aiWarn.show{display:block}
+/* AICON's job in this page's idiom: every request and reply on the record —
+   you cannot debug a line you cannot see, and the phone IS the devtools */
+#aiLogBtn{margin-top:10px;width:100%;font:700 9px/1 "IBM Plex Mono",monospace;letter-spacing:.2em;
+  background:transparent;border:1px solid #2a3340;border-radius:7px!important;color:var(--dim);padding:8px;cursor:pointer}
+#aiLog{display:none;margin:8px 0 0;max-height:180px;overflow:auto;background:#080b0f;border:1px solid #2a3340;
+  border-radius:7px;padding:8px 9px;font:500 9px/1.5 "IBM Plex Mono",monospace;color:var(--dim);white-space:pre-wrap;word-break:break-word}
+#aiCard.log-open #aiLog{display:block}
 #recBtn{color:var(--red)!important}
 #recBtn .dot{width:9px;height:9px;border-radius:999px!important;background:var(--red);display:inline-block}
 #recBtn.on{background:var(--red)!important;color:#fff!important}
@@ -366,28 +380,35 @@ body #headDock .joy{background:rgba(10,14,17,.6)!important}
   <button class="land-item" data-land="save">↓ SAVE LAND</button>
 </div>
 <div id="aiPanel"><div id="aiCard">
-  <h3>THE AGENT LINE</h3>
-  <p class="note">Words become weather, land, structures and errands. Point this at Anthropic
-  directly, or at any proxy or OpenAI-compatible gateway you run. Nothing is sent until you
-  speak in AGENT mode; the key stays in this browser.</p>
-  <label for="aiDialect">endpoint</label>
-  <select id="aiDialect">
-    <option value="anthropic">Anthropic — api.anthropic.com</option>
-    <option value="anthropic-proxy">Anthropic-compatible proxy</option>
-    <option value="openai">OpenAI-compatible gateway</option>
+  <div id="aiHead"><h3>THE AGENT LINE</h3><button id="aiClose" type="button" aria-label="close">✕</button></div>
+  <p class="note">The same settings the standing world uses — one model configured once serves both.
+  THUNDERHEAD keeps the key in a Cloudflare Worker and out of this browser; the direct modes are for
+  local work, where a key in a page can be read.</p>
+  <div id="aiWarn"></div>
+  <label for="aiProvider">provider</label>
+  <select id="aiProvider">
+    <option value="thunder">THUNDERHEAD secure server router</option>
+    <option value="openai">OpenAI Responses API (direct dev mode)</option>
+    <option value="gemini">Gemini direct dev mode</option>
+    <option value="anthropic">Anthropic direct dev mode</option>
+    <option value="custom">Custom OpenAI-compatible endpoint</option>
   </select>
-  <label for="aiBase">url</label>
-  <input id="aiBase" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="https://api.anthropic.com/v1/messages">
-  <label for="aiModel">model</label>
-  <input id="aiModel" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="claude-opus-5">
-  <label for="aiKey">key</label>
-  <input id="aiKey" type="password" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="sk-… (leave empty if your proxy holds it)">
+  <label for="aiModel">model / route</label>
+  <input id="aiModel" spellcheck="false" autocapitalize="off" autocomplete="off">
+  <label for="aiBase">endpoint override</label>
+  <input id="aiBase" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="optional endpoint override">
+  <label for="aiKey">api key</label>
+  <input id="aiKey" type="password" spellcheck="false" autocapitalize="off" autocomplete="off"
+    data-lpignore="true" data-1p-ignore="true" name="hlidarendi-key-nofill" placeholder="sk-… paste your KEY here (not a URL)">
   <div id="aiRow">
     <button id="aiTest" type="button">TEST</button>
-    <button id="aiOff" type="button">DISCONNECT</button>
-    <button id="aiSave" type="button">CONNECT</button>
+    <button id="aiOff" type="button">CLEAR KEY</button>
+    <button id="aiSave" type="button">SAVE</button>
   </div>
-  <div id="aiOut"></div>
+  <label for="aiOut">line status</label>
+  <div id="aiOut">Not configured.</div>
+  <button id="aiLogBtn" type="button">THE LINE ▾</button>
+  <pre id="aiLog"></pre>
 </div></div>
 <div id="agentBar">
   <div id="agentRow">

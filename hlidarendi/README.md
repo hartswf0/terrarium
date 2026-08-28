@@ -176,23 +176,37 @@ places him via `{kind:'actor', species:'argos'}`. The architecture and the
 phased plan for the walking body (possession-based) are in
 [UPSTREAM.md](UPSTREAM.md).
 
-## The agent line
+## The agent line — Terrarium's own, not a second one
 
-`/ai`, the AI chip in the menu, or the status line under the top bar opens
-one panel: **endpoint, model, key** — and a **TEST** that tells you what
-actually went wrong instead of failing silently on your next sentence. Three
-endpoints are understood, because a raw Anthropic key in a browser is not
-something most people can or should do:
+The first version of this was a key typed into a chat command and a hand-rolled
+fetch. That was a mistake: `unset-04-hartsoe-iii.html` already carries a real,
+used-in-anger AI stack, and writing a smaller one here meant two things to
+configure and two things to blame.
 
-| Endpoint | For |
+`src/ai-line.js` is that stack, ported — **and it reads the same config key,
+`trig.ai.config.v2`**. Configure a model once in the standing world and
+HLIÐARENDI already has one; configure it here and Terrarium does. When this
+page runs beside III, III's own `getAIConfig`/`saveAIConfig` win and this
+module simply uses them.
+
+What came across with it:
+
+| | |
 |---|---|
-| **Anthropic** — `api.anthropic.com/v1/messages` | your own key, sent with `anthropic-dangerous-direct-browser-access` |
-| **Anthropic-compatible proxy** | a `/v1/messages` endpoint you run; it may hold the key itself, so the key field can stay empty |
-| **OpenAI-compatible gateway** | any `/v1/chat/completions` endpoint — the reply is read from `choices[0].message.content` |
+| **THUNDERHEAD** (the default) | the key lives in a Cloudflare Worker and never enters the browser; models route by task. This is the answer to "a raw key in a page", and it already existed. |
+| **OpenAI** | Responses API, with the dual-schema auto-recovery — routes by URL, then retries once with the other payload when the server says `messages` or `input` is missing, so stale saved endpoints and proxies recover instead of failing at you |
+| **Gemini** | direct, with JSON mode on the tasks that want JSON |
+| **Anthropic** | direct, with the browser-access header |
+| **Custom** | any OpenAI-compatible endpoint |
+| **`apiKeyIssue`** | the #1 setup mistake caught before the provider is bothered: a URL pasted into the key field, a password manager's autofill, whitespace, an OpenAI key that isn't `sk-` |
+| **`extractLLMText`** | every reply shape read the same way |
 
-Everything in the page that talks to a model goes through `AI.ask`, so there
-is one thing to configure and one thing to blame. The key lives in this
-browser's `localStorage` and is sent only to the endpoint you named.
+Open it with `/ai`, the AI chip in the menu, or the status line under the top
+bar: **PROVIDER · MODEL · ENDPOINT · KEY**, with **TEST** (which reports the
+route it actually took), **SAVE**, and **CLEAR KEY** — the same panel the
+standing world has. And AICON's job in this page's idiom: **THE LINE** opens a
+record of every request and reply — task, route, prompt, what came back. You
+cannot debug a line you cannot see.
 
 With a line open, the 🗲 chip switches the top bar from **SPEAK** to
 **AGENT**, and a sentence becomes acts:

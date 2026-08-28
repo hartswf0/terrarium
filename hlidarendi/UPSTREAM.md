@@ -127,6 +127,22 @@ importer and this module converging on one shared place library — is the
 standing direction: the sidecar pattern is the vehicle, but the goal is
 shared organs, not a rider on a host.
 
+## The agent line — one stack, shared config (shipped)
+
+The standalone page no longer carries its own AI wiring. `src/ai-line.js` is
+III's stack ported whole — `AI_PROVIDER_DEFAULTS`, `getAIConfig`,
+`saveAIConfig`, `aiWorkerUrl`, `aiLocalAvailable`, `apiKeyIssue`,
+`extractLLMText`, `callConfiguredLLM`, `requestAIText` — reading **the same
+`trig.ai.config.v2`**, so a model configured in either world serves both, and
+deferring to III's own `window.getAIConfig`/`saveAIConfig` when it runs beside
+them. It publishes the same window surface III does, so a sidecar or cartridge
+finds one agent line however it arrived.
+
+The standing direction is the same one the living ground has: this module is
+the *shared organ*, and III should eventually consume it instead of keeping
+its own copy inline. Until it does, the config key is the seam that keeps them
+honest — two implementations of one contract, never two contracts.
+
 ## Division of labour from here
 
 - **`unset-04-hartsoe-iii.html`** — the game: shell, chrome, AI, games,
