@@ -1,0 +1,44 @@
+name: Geonosis foundation
+
+on:
+  push:
+    branches: [geonosis-foundation]
+  pull_request:
+    paths:
+      - 'engine.html'
+      - 'src/observe/**'
+      - 'tests/geonosis.mjs'
+      - 'tests/usgs-water.mjs'
+      - 'tests/live-water.mjs'
+      - 'tests/interpretants.mjs'
+      - 'tests/water-relations.mjs'
+      - 'tests/nldi-water.mjs'
+      - 'tests/live-water-network.mjs'
+      - '.github/workflows/geonosis.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  geonosis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Foundation semantics
+        run: node tests/geonosis.mjs
+      - name: USGS Water adapter
+        run: node tests/usgs-water.mjs
+      - name: Terrarium live water bridge
+        run: node tests/live-water.mjs
+      - name: Actor interpretants
+        run: node tests/interpretants.mjs
+      - name: Gauge to watercourse candidate relations
+        run: node tests/water-relations.mjs
+      - name: NLDI network linkage and measures gate
+        run: node tests/nldi-water.mjs
+      - name: Live water network integration
+        run: node tests/live-water-network.mjs
