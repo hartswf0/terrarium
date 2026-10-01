@@ -18179,7 +18179,7 @@ ${GATES.map((g2, i) => `<div class="ac-th"><span class="ac-dot" id="ad-th-${i}" 
         return 'the given arrangement returns — remembered, not inevitable';
     }
     // ── TESTIMONY — description as an operational method ────────────────────
-    function testify(text) {
+    function testify(text, at) {
         text = String(text || '').trim().slice(0, 120);
         if (!text) return 'say: note: <your sentence> — what does the official map leave out?';
         if (S.signs >= SIGN_MAX) return 'the testimony wall is full (' + SIGN_MAX + ')';
@@ -18196,7 +18196,10 @@ ${GATES.map((g2, i) => `<div class="ac-th"><span class="ac-dot" id="ad-th-${i}" 
         const board = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 1.12), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, side: THREE.DoubleSide }));
         board.position.y = 2.15; g3.add(board);
         const fwd = new THREE.Vector3(Math.sin(P.yaw), 0, Math.cos(P.yaw));
-        g3.position.copy(P.pos).addScaledVector(fwd, 6).setY(0);
+        if (at && isFinite(at.x) && isFinite(at.z)) {   // a placed stop (e.g. a worldtext link) stands where it was scouted
+            let gy = 0; try { gy = (window.__groundY && window.__groundY(at.x, at.z)) || 0; } catch (_) {}
+            g3.position.set(at.x, gy, at.z);
+        } else g3.position.copy(P.pos).addScaledVector(fwd, 6).setY(0);
         g3.rotation.y = P.yaw + Math.PI;
         g3.userData = { id: (crypto.randomUUID ? crypto.randomUUID() : 'ts' + Date.now()), _atlas: true, _ritualWorld: true,
                         isAssembly: true,   // groups take the guarded child-disposal path in triggerDestruction
@@ -22030,11 +22033,43 @@ resetDrive(); requestAnimationFrame(frame);
     if (e.key === 'p' || e.key === 'P') exportLandPack();
     if (e.key === 'r' || e.key === 'R') { if (window.CINE) window.CINE.recording ? window.CINE.stopRec() : window.CINE.startRec(); }
   });
+  // ?land=<place | lat,lon[@m]>[&wt=<stops.json>] — A LINK THAT OPENS A REAL PLACE.
+  // The full standard at the named spot (ground + photo + GEO's facades and
+  // street names); an optional worldtext doc plants its stops as testimony on
+  // that tile. Stops doc: { stops: [ { lat, lon, text } ] }.
+  setTimeout(() => {
+    let q; try { q = new URLSearchParams(location.search); } catch (_) { return; }
+    const land = q.get('land'); if (!land) return;
+    try { if (typeof autoEnterPlay === 'function') autoEnterPlay(); } catch (_) {}
+    Promise.resolve(terraGo(land)).catch(() => {});
+    const wt = q.get('wt');
+    if (!wt) return;
+    // plant as soon as the GROUND is down — buildings (GEO/Overpass) may take minutes
+    let tries = 0;
+    const waitGround = setInterval(async () => {
+      if (++tries > 240) { clearInterval(waitGround); return; }
+      if (!(window.HARTSOE_GROUND && window.HARTSOE_GROUND.on && curLand && isFinite(+curLand.lat) && window.ATLAS)) return;
+      clearInterval(waitGround);
+      try {
+        const doc = await (await fetch(wt)).json();
+        const mLat = 111320, mLon = 111320 * Math.cos(curLand.lat * Math.PI / 180), S = +curLand.scale || 1.84;
+        let n = 0;
+        for (const st of (doc.stops || [])) {
+          const x = (st.lon - curLand.lon) * mLon / S, z = -(st.lat - curLand.lat) * mLat / S;
+          if (Math.abs(x) > 78 || Math.abs(z) > 78) continue;   // only what stands on this tile
+          window.ATLAS.testify(st.text, { x, z }); n++;
+        }
+        try { notify('WORLDTEXT — ' + n + ' STOPS STAND ON THE REAL GROUND'); } catch (_) {}
+        console.info('[worldtext] planted', n, 'stops from', wt);
+      } catch (e) { console.warn('[worldtext]', e); }
+    }, 500);
+  }, 1200);
   // THE FULL IMAGE IS THE DEFAULT: boot lands on the real photographed site
   // (cached after the first visit — instant, offline). The green deed cartridge
   // stays one tap away in the ⛰ menu; it is the fallback if the sky is closed.
   setTimeout(() => {
     if (currentRoom && currentRole !== 'host') return;   // the host will replay its authoritative tile
+    if (/[?&](cart|twin|land)=/.test(location.search)) return;   // a link that names its own place keeps it
     Promise.resolve(terraGo(HENRY.view.lat + ', ' + HENRY.view.lon + ' @' + HENRY.view.halfM))
       .then((r) => { if (!/loaded/.test(String(r))) loadHartsoe(); })
       .catch(() => { try { loadHartsoe(); } catch (_) {} });
